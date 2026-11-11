@@ -833,3 +833,39 @@ build runs the Next.js default bundler and repeats the smoke test.
   from the UI (the API has no re-enable); class sessions and Zoom review screens
   remain (UI-3b, UI-3c).
 - **Next planned feature:** UI-3b.
+
+## Checkpoint UI-3b — 2026-11-11 — Staff screens: class sessions
+
+- **UI-3a evidence:** merged as PR #24, merge commit `02386c9`; frontend CI green.
+- **Feature ID / name:** UI-3b.
+- **Branch:** `feature/staff-ui-sessions`. **PR / merge SHA:** see the merged pull
+  request titled "feat(web): class session screens".
+- **Implemented behavior:** nav item "Classes". `/staff/sessions` lists classes
+  in a fortnight (`?from=YYYY-MM-DD`, default today in Asia/Colombo; previous,
+  next and "from today" links) with a batch filter, and for owners and
+  administrators a schedule form (title, date, start and end time, one or more
+  active batches, optional Zoom webinar ID). `/staff/sessions/{id}` shows the
+  time in the class's zone, expected students (each once, with their batches),
+  batches with roster links and the webinar ID; managers edit every field and
+  cancel or restore. Assigned instructors and attendance officers read the
+  classes of their batches; the batch page links to its classes.
+- **Time handling:** people type a date and clock times in the class's zone
+  (Asia/Colombo for new classes); the screen converts with `Intl` to UTC
+  instants for the API and back for display, so daylight-saving zones also
+  work (unit-tested with Europe/London). Classes must end on the day they
+  start, a deliberate screen-only limit; the API allows up to 12 hours across
+  midnight.
+- **API changes:** none. **Database changes:** none.
+- **Tests executed (macOS):** frontend lint, type-check, 33 unit tests (3 new),
+  production build; Playwright 44 tests (6 new: 3 scenarios × desktop and
+  mobile, including a stale edit refused with the typed values kept), run twice.
+  Real stack: the owner schedules and edits a class, the assigned instructor
+  sees it and its expected student, and gets 404 after unassignment; the
+  database holds 12:30–15:00 UTC for 18:00–20:30 Colombo. Passed twice; no
+  secrets in logs.
+- **Defect caught before commit:** the "new class" panel heading and the title
+  field shared an element id; the heading id was renamed.
+- **Known issues / not done:** no recurring classes; no class time zone choice
+  in the form (new classes use Asia/Colombo); editing a class's time or webinar
+  ID does not revisit existing Zoom links (API behaviour, see 003D-1).
+- **Next planned feature:** UI-3c Zoom review screens.

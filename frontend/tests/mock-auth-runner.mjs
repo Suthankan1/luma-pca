@@ -17,7 +17,7 @@ const backend = createServer(async (req, res) => {
     res.end(value ? JSON.stringify(value) : "");
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|enrollments|accounts|staff-accounts|assignments)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|enrollments|accounts|staff-accounts|assignments|class-sessions)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -142,6 +142,29 @@ const publicStudent = student => {
   delete copy.invitationToken;
   return copy;
 };
+const classSessions = [];
+// The class's date where it is taught, as the API computes it.
+const localDate = (iso, zone) => new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+const sessionView = s => ({ ...s, localDate: localDate(s.startsAt, s.timeZone), batches: s.batchIds.map(id => batches.find(b => b.id === id))
+  .map(b => ({ batchId: b.id, courseId: b.courseId, code: b.code, name: b.name })).sort((a, b) => a.code.localeCompare(b.code)) });
+/** Returns an error response for an invalid class body, as the API's service would, or null. */
+function classSessionProblem(body, existing, send) {
+  const refuse = (status, value) => { send(status, value); return true; };
+  const ids = body.batchIds ?? [];
+  if (ids.length < 1 || ids.length > 20) return refuse(400, { detail: "batchIds must list between 1 and 20 batches" });
+  if (new Set(ids).size !== ids.length) return refuse(400, { detail: "batchIds must not repeat a batch" });
+  for (const id of ids) {
+    const batch = batches.find(b => b.id === id);
+    if (!batch) return refuse(404, { detail: "Batch not found" });
+    if (!batch.active && !existing.includes(id)) return refuse(409, { detail: "An inactive batch cannot be added to a class" });
+  }
+  const length = Date.parse(body.endsAt) - Date.parse(body.startsAt);
+  if (!(length > 0) || length > 12 * 3600_000) return refuse(400, { detail: "endsAt must be after startsAt and at most 12 hours later" });
+  if (body.zoomWebinarId && !/^\d{9,20}$/.test(body.zoomWebinarId.replace(/[\s-]/g, ""))) {
+    return refuse(400, { detail: "zoomWebinarId must be a Zoom webinar ID such as 812 3456 7890" });
+  }
+  return false;
+}
 const enrollmentView = e => {
   const batch = batches.find(b => b.id === e.batchId);
   const student = students.find(s => s.id === e.studentId);
@@ -155,7 +178,8 @@ function academicApi(req, body, send) {
   const [, , , collection, id, sub] = path.split("/");
   const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
   // Assigned staff may list batches; the mock has no assignments, so they see none.
-  if (!manager && collection === "batches" && !id && req.method === "GET" && roles.some(r => staffRoles.includes(r))) return send(200, []);
+  if (!manager && (collection === "batches" || collection === "class-sessions") && !id && req.method === "GET"
+      && roles.some(r => staffRoles.includes(r))) return send(200, []);
   if (!manager) return send(403, { detail: "Forbidden" });
   const stale = () => send(409, { detail: "The record was changed by someone else; reload and retry" });
   const notFound = () => send(404, { detail: "Not found" });
@@ -280,6 +304,50 @@ function academicApi(req, body, send) {
     const created = { id: uuid(), batchId: id, studentId: student.id, enrolledOn: body.enrolledOn, withdrawnOn: null, version: 0 };
     enrollments.push(created);
     return send(201, enrollmentView(created));
+  }
+
+  if (collection === "class-sessions") {
+    if (req.method === "GET" && !id) {
+      const params = new URLSearchParams(query);
+      const from = Date.parse(params.get("from")), to = Date.parse(params.get("to"));
+      if (!(to > from) || to - from > 92 * 86400_000) return send(400, { detail: "to must be after from and at most 92 days later" });
+      const batchId = params.get("batchId");
+      if (batchId && !batches.some(b => b.id === batchId)) return notFound();
+      return send(200, classSessions.filter(s => Date.parse(s.startsAt) >= from && Date.parse(s.startsAt) < to && (!batchId || s.batchIds.includes(batchId)))
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map(sessionView));
+    }
+    if (req.method === "POST" && !id) {
+      if (classSessionProblem(body, [], send)) return;
+      const created = { id: uuid(), title: String(body.title).trim(), startsAt: body.startsAt, endsAt: body.endsAt,
+        timeZone: body.timeZone ?? "Asia/Colombo", status: "SCHEDULED", zoomWebinarId: body.zoomWebinarId?.replace(/[\s-]/g, "") || null,
+        batchIds: [...body.batchIds], version: 0 };
+      classSessions.push(created);
+      return send(201, sessionView(created));
+    }
+    const session = classSessions.find(s => s.id === id);
+    if (!session) return notFound();
+    if (req.method === "GET" && sub === "students") {
+      const day = localDate(session.startsAt, session.timeZone);
+      const expected = new Map();
+      for (const e of enrollments) {
+        if (!session.batchIds.includes(e.batchId) || e.enrolledOn > day || (e.withdrawnOn && e.withdrawnOn <= day)) continue;
+        const student = students.find(s => s.id === e.studentId);
+        const entry = expected.get(student.id) ?? { studentId: student.id, studentNumber: student.studentNumber, fullName: student.fullName, batchIds: [] };
+        entry.batchIds.push(e.batchId);
+        expected.set(student.id, entry);
+      }
+      return send(200, [...expected.values()].sort((a, b) => a.studentNumber.localeCompare(b.studentNumber)));
+    }
+    if (req.method === "GET") return send(200, sessionView(session));
+    if (req.method === "PUT") {
+      if (body.status !== "SCHEDULED" && body.status !== "CANCELLED") return send(400, { detail: "status must be SCHEDULED or CANCELLED" });
+      if (session.version !== body.version) return stale();
+      if (classSessionProblem(body, session.batchIds, send)) return;
+      Object.assign(session, { title: String(body.title).trim(), startsAt: body.startsAt, endsAt: body.endsAt, timeZone: body.timeZone,
+        status: body.status, zoomWebinarId: body.zoomWebinarId?.replace(/[\s-]/g, "") || null, batchIds: [...body.batchIds], version: session.version + 1 });
+      return send(200, sessionView(session));
+    }
+    return send(405);
   }
 
   const list = collection === "courses" ? courses : batches;

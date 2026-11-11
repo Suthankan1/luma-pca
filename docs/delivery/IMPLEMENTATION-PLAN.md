@@ -22,7 +22,7 @@
 | UI-1 Staff screens: shell, courses and batches | Figma-based staff layout, server-side API client, Server Actions with inline errors, Playwright desktop and mobile | DONE; also verified on the real stack by `scripts/staff-ui-real-stack.sh` (UI-2) |
 | UI-2 Staff screens: students and enrollments | Student list with paging, create with invitation link, batch roster | DONE: list, detail, invitation link, enrol/withdraw/re-enrol, rosters for managers and assigned staff; real-stack browser run |
 | UI-3a Staff screens: staff accounts and batch assignments | Team list and record (roles, invitation, disable) within the role rules; assign and remove staff on the batch page | DONE; instructor flow verified on the real stack |
-| UI-3b Staff screens: class sessions | Schedule, edit and cancel sessions shared by batches | TODO |
+| UI-3b Staff screens: class sessions | Schedule, edit and cancel sessions shared by batches | DONE: fortnight list with batch filter, schedule/edit/cancel/restore, expected students; real-stack run checks stored UTC times |
 | UI-3c Staff screens: Zoom review | Dead-lettered receipts with replay; occurrence review (link, not a class, auto-link) | TODO |
 | 003A Zoom account authorization & secrets | Real sandbox account, scopes and safe token management | BLOCKED pending academy |
 | 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | DONE against fixtures: signature and timestamp checks, URL validation, idempotent durable receipt, off by default. Real Zoom delivery unproven until 003A |
@@ -38,4 +38,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `UI-3b` class session screens, then `UI-3c` Zoom review screens. Attendance (`004A`) still waits for participant identity, which needs a real Zoom test webinar (`003A`).
+**Suggested next small slice:** `UI-3c` Zoom review screens. Attendance (`004A`) still waits for participant identity, which needs a real Zoom test webinar (`003A`).

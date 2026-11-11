@@ -4,7 +4,8 @@ import { test, expect } from "@playwright/test";
 /**
  * Real stack, real browser: an administrator activates their invitation, enrols an
  * authenticator, sets up a course, batch and student, invites and enrols the student,
- * and the student activates and signs in. Started by scripts/staff-ui-real-stack.sh.
+ * the student activates and signs in, and an instructor is invited, assigned, sees the
+ * roster and the batch's class, and loses both when unassigned. Started by scripts/staff-ui-real-stack.sh.
  */
 const adminEmail = "smoke.admin@example.invalid";
 const adminInvite = process.env.LUMA_REAL_ADMIN_INVITE!;
@@ -130,6 +131,26 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.getByRole("button", { name: "Assign" }).click();
   await expect(page.locator("#assign-feedback")).toHaveText("Assigned. They can open this roster from their next request.");
 
+  // 7b. A class for the batch, entered in Sri Lanka time; the API stores UTC.
+  await page.goto("/staff/sessions");
+  await page.locator("#schedule-title").fill("Real stack class");
+  await page.locator("#schedule-date").fill("2027-01-13");
+  await page.locator("#schedule-start").fill("18:00");
+  await page.locator("#schedule-end").fill("20:00");
+  await page.getByLabel("REAL-PHY · MON · Monday evening", { exact: true }).check();
+  await page.locator("#schedule-webinar").fill("812 3456 7890");
+  await page.getByRole("button", { name: "Schedule class" }).click();
+  await expect(page.locator("#schedule-feedback")).toHaveText("Real stack class scheduled.");
+  await page.getByRole("link", { name: "Open the class →" }).click();
+  await expect(page).toHaveURL(/\/staff\/sessions\/[0-9a-f-]{36}$/);
+  const classUrl = page.url();
+  await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:00 (Asia/Colombo)");
+  await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
+  await page.locator("#edit-end").fill("20:30");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students follow the new date and batches.");
+  await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
+
   // 8. The instructor activates, signs in without MFA (not an elevated role) and sees only their batch.
   const instructorContext = await browser.newContext();
   const instructor = await instructorContext.newPage();
@@ -147,6 +168,12 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(mine).toContainText("MON Monday evening");
   await mine.getByRole("link", { name: "Roster →" }).click();
   await expect(instructor.getByRole("region", { name: "ROSTER" }).locator(".dir-list")).toContainText("PCA-REAL-001 Real Stack Student");
+  await instructor.goto("/staff/sessions?from=2027-01-10");
+  await expect(instructor.getByRole("region", { name: "CLASSES" })).toContainText("Real stack class");
+  await expect(instructor.getByRole("button", { name: "Schedule class" })).toHaveCount(0);
+  await instructor.goto(classUrl);
+  await expect(instructor.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
+  await expect(instructor.getByRole("button", { name: "Save changes" })).toHaveCount(0);
   await instructor.goto("/staff/students");
   await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators manage student records.");
   await instructor.goto("/staff/team");
@@ -159,5 +186,6 @@ test("an administrator onboards a student end to end on the real stack", async (
   expect((await instructor.goto(rosterUrl))?.status()).toBe(404);
   await instructor.goto("/staff/courses");
   await expect(instructor.getByText("You are not assigned to any batch yet.")).toBeVisible();
+  expect((await instructor.goto(classUrl))?.status()).toBe(404);
   await instructorContext.close();
 });
