@@ -23,7 +23,12 @@ export function isSameOrigin(origin: string | null, configuredOrigin: string, fe
 
 export function cookieNames(secure: boolean) {
   const prefix = secure ? "__Host-" : "";
-  return { access: `${prefix}luma-access`, refresh: `${prefix}luma-refresh` };
+  return {
+    access: `${prefix}luma-access`,
+    refresh: `${prefix}luma-refresh`,
+    mfa: `${prefix}luma-mfa`,
+    recovery: `${prefix}luma-recovery`,
+  };
 }
 
 export function sessionCookie(secure: boolean, maxAge: number) {
@@ -37,25 +42,115 @@ export function sessionKey(value: string | undefined) {
   return key;
 }
 
-const purpose = Buffer.from("luma/bff/access/v1");
+export type MfaChallengeState = {
+  mfaToken: string;
+  enrolled: boolean;
+  portal?: Portal | null;
+  secret?: string;
+  otpauthUri?: string;
+  expiresAt: number;
+};
 
-export function sealAccess(accessToken: string, key: Buffer) {
+export type RecoveryCodesState = {
+  codes: string[];
+  portal?: Portal | null;
+  expiresAt: number;
+};
+
+const purpose = Buffer.from("luma/bff/access/v1");
+const mfaPurpose = Buffer.from("luma/bff/mfa/v1");
+const recoveryPurpose = Buffer.from("luma/bff/recovery/v1");
+
+function sealWithPurpose(data: string, key: Buffer, aad: Buffer) {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
-  cipher.setAAD(purpose);
-  const encrypted = Buffer.concat([cipher.update(accessToken, "utf8"), cipher.final()]);
+  cipher.setAAD(aad);
+  const encrypted = Buffer.concat([cipher.update(data, "utf8"), cipher.final()]);
   return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64url");
 }
 
-export function openAccess(cookie: string, key: Buffer) {
+function openWithPurpose(cookie: string, key: Buffer, aad: Buffer) {
   if (!/^[A-Za-z0-9_-]{39,3800}$/.test(cookie)) return null;
   try {
     const decoded = Buffer.from(cookie, "base64url");
     if (decoded.length < 29 || decoded.toString("base64url") !== cookie) return null;
     const decipher = createDecipheriv("aes-256-gcm", key, decoded.subarray(0, 12));
-    decipher.setAAD(purpose);
+    decipher.setAAD(aad);
     decipher.setAuthTag(decoded.subarray(12, 28));
     return Buffer.concat([decipher.update(decoded.subarray(28)), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+export function sealAccess(accessToken: string, key: Buffer) {
+  return sealWithPurpose(accessToken, key, purpose);
+}
+
+export function openAccess(cookie: string, key: Buffer) {
+  return openWithPurpose(cookie, key, purpose);
+}
+
+export function sealMfa(state: MfaChallengeState, key: Buffer) {
+  return sealWithPurpose(JSON.stringify(state), key, mfaPurpose);
+}
+
+export function openMfa(cookie: string, key: Buffer): MfaChallengeState | null {
+  const plain = openWithPurpose(cookie, key, mfaPurpose);
+  if (!plain) return null;
+  try {
+    const parsed = JSON.parse(plain);
+    if (typeof parsed?.mfaToken !== "string" || !parsed.mfaToken || parsed.mfaToken.length > 128
+        || typeof parsed?.enrolled !== "boolean"
+        || !Number.isSafeInteger(parsed?.expiresAt) || parsed.expiresAt <= 0) {
+      return null;
+    }
+    if (Date.now() > parsed.expiresAt) return null;
+    if (parsed.portal !== undefined && parsed.portal !== null && parsed.portal !== "staff" && parsed.portal !== "student") {
+      return null;
+    }
+    if (parsed.secret !== undefined && (typeof parsed.secret !== "string" || parsed.secret.length > 128)) {
+      return null;
+    }
+    if (parsed.otpauthUri !== undefined && (typeof parsed.otpauthUri !== "string" || parsed.otpauthUri.length > 512)) {
+      return null;
+    }
+    return {
+      mfaToken: parsed.mfaToken,
+      enrolled: parsed.enrolled,
+      portal: parsed.portal ?? null,
+      secret: parsed.secret,
+      otpauthUri: parsed.otpauthUri,
+      expiresAt: parsed.expiresAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function sealRecovery(state: RecoveryCodesState, key: Buffer) {
+  return sealWithPurpose(JSON.stringify(state), key, recoveryPurpose);
+}
+
+export function openRecovery(cookie: string, key: Buffer): RecoveryCodesState | null {
+  const plain = openWithPurpose(cookie, key, recoveryPurpose);
+  if (!plain) return null;
+  try {
+    const parsed = JSON.parse(plain);
+    if (!Array.isArray(parsed?.codes) || parsed.codes.length === 0 || parsed.codes.length > 20
+        || !parsed.codes.every((c: unknown) => typeof c === "string" && c.length > 0 && c.length <= 32)
+        || !Number.isSafeInteger(parsed?.expiresAt) || parsed.expiresAt <= 0) {
+      return null;
+    }
+    if (Date.now() > parsed.expiresAt) return null;
+    if (parsed.portal !== undefined && parsed.portal !== null && parsed.portal !== "staff" && parsed.portal !== "student") {
+      return null;
+    }
+    return {
+      codes: parsed.codes,
+      portal: parsed.portal ?? null,
+      expiresAt: parsed.expiresAt,
+    };
   } catch {
     return null;
   }

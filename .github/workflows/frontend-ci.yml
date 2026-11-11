@@ -24,3 +24,7 @@ jobs:
         run: npm --prefix frontend run build
       - name: Session HTTP smoke test
         run: npm --prefix frontend run test:smoke
+      - name: Install Playwright browsers
+        run: npx --prefix frontend playwright install --with-deps chromium
+      - name: End-to-end browser tests
+        run: npm --prefix frontend run test:e2e

@@ -13,21 +13,28 @@ sequenceDiagram
     User->>BFF: Protected request with session cookie
     Note over User,BFF: BFF checks Origin on mutations
     BFF->>API: Bearer JWT on server-side request
-  else Owner or administrator sign-in through the API
-    User->>Client: Login credentials
-    Client->>API: POST /auth/login
+  else Owner or administrator sign-in through the browser (001G)
+    User->>BFF: Login credentials over HTTPS
+    BFF->>API: POST /auth/login
     API->>DB: Check password and store challenge digest
-    API-->>Client: MFA challenge with enrolment status
+    API-->>BFF: MFA challenge with enrolment status
+    BFF-->>User: Sealed HttpOnly MFA challenge cookie, redirect to /sign-in/mfa
     opt First sign-in or authenticator reset
-      Client->>API: POST /auth/mfa/enroll with challenge
+      BFF->>API: POST /auth/mfa/enroll with challenge
       API->>DB: Store encrypted authenticator secret
-      API-->>Client: Setup secret and authenticator URI
+      API-->>BFF: Setup secret and authenticator URI
+      BFF-->>User: QR code and manual setup secret
     end
-    User->>Client: Authenticator or recovery code
-    Client->>API: POST /auth/mfa/verify with challenge and code
+    User->>BFF: Verification or recovery code (POST /api/session/mfa-verify)
+    BFF->>API: POST /auth/mfa/verify with challenge and code
     API->>DB: Verify factor, consume challenge and start MFA session
-    API-->>Client: Access JWT, refresh token and recovery codes on enrolment
-    Client->>API: Protected request with bearer JWT
+    API-->>BFF: Access JWT, refresh token and recovery codes on enrolment
+    opt First sign-in: recovery codes presentation
+      BFF-->>User: Sealed recovery cookie, redirect to /sign-in/mfa/recovery-codes
+      User->>BFF: Acknowledge recovery codes (POST /api/session/mfa-recovery)
+      BFF-->>User: Clear recovery cookie, redirect to /staff
+    end
+    BFF-->>User: HttpOnly SameSite session cookies, redirect to /staff
   end
   API->>API: Check token, session, privileged MFA, roles and resource scope
   Note over BFF,API: Refresh rotates the opaque token and reuse revokes the session
