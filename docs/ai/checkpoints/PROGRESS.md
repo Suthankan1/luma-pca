@@ -769,3 +769,35 @@ build runs the Next.js default bundler and repeats the smoke test.
   drifts from the image tag. Lint, type-check, unit, build and smoke run in a
   parallel job with an npm cache. Both jobs have a 15-minute limit.
 - **Next planned feature:** UI-2 students and enrollments screens.
+
+## Checkpoint UI-2 — 2026-11-11 — Staff screens: students, enrolments, invitations, rosters
+
+- **UI-1 evidence:** merged as PR #22, merge commit `1ffe567`; frontend CI green (checks and e2e jobs).
+- **Feature ID / name:** UI-2.
+- **Branch:** `feature/staff-ui-students`. **PR / merge SHA:** see the merged pull
+  request titled "feat(web): student, enrolment and roster screens".
+- **Implemented behavior:** `/staff/students` (Active/Inactive/All filter, 50 per
+  page with Next and First links, add form); `/staff/students/{id}` (rename,
+  deactivate/reactivate, create an invitation link shown once with copy button
+  and Colombo-time expiry, enrol in active batches, withdraw on a date, re-enrol);
+  `/staff/batches/{id}` roster, readable by owners and administrators and by
+  instructors and attendance officers assigned to the batch (the API answers 404
+  otherwise, shown as not found). Non-managers see explanations, and on Courses
+  & batches a list of their assigned batches. Malformed or unknown ids are 404.
+- **Invitation links:** built from `LUMA_WEB_ORIGIN` plus the API's
+  `activationPath`; returned only in the Server Action's response to the
+  administrator, never stored or put in a URL; the path shape is checked first.
+- **API changes:** none. **Database changes:** none.
+- **Tests executed (macOS):** frontend lint, type-check, 26 unit tests (4 new),
+  production build; Playwright 30 tests (8 new: 4 scenarios × desktop and
+  mobile), run twice. **Real stack, new:** `scripts/staff-ui-real-stack.sh`
+  (PostgreSQL 17, backend jar, `next start`) drives the whole onboarding in a real
+  browser, including MFA enrolment with computed codes and the student signing
+  in; passed twice; database counts and the audit row checked; no secrets in logs.
+  This also verifies the UI-1 screens against the real backend.
+- **Test-only fix before commit:** the students spec first reused the courses
+  spec's course code in the shared mock backend; codes are now distinct.
+- **Known issues / not done:** no email delivery (the administrator copies the
+  link); no name search; the real-stack script is not in CI; staff accounts,
+  class sessions and Zoom review screens remain (UI-3).
+- **Next planned feature:** UI-3.

@@ -19,8 +19,8 @@
 | 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | DONE: student records with linked accounts, batch enrollments, student own-record routes (part 1); staff assignments with batch-scoped read access for instructors and attendance officers (part 2). Bulk import and staff account administration TODO |
 | 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | DONE: class sessions shared by up to 20 batches, expected students listed once per session, batch-scoped staff reads. Attendance uniqueness itself arrives with 004A |
-| UI-1 Staff screens: shell, courses and batches | Figma-based staff layout, server-side API client, Server Actions with inline errors, Playwright desktop and mobile | DONE (mock backend in browser tests) |
-| UI-2 Staff screens: students and enrollments | Student list with paging, create with invitation link, batch roster | TODO |
+| UI-1 Staff screens: shell, courses and batches | Figma-based staff layout, server-side API client, Server Actions with inline errors, Playwright desktop and mobile | DONE; also verified on the real stack by `scripts/staff-ui-real-stack.sh` (UI-2) |
+| UI-2 Staff screens: students and enrollments | Student list with paging, create with invitation link, batch roster | DONE: list, detail, invitation link, enrol/withdraw/re-enrol, rosters for managers and assigned staff; real-stack browser run |
 | UI-3 Staff screens: staff, invitations, class sessions, Zoom review | Remaining API-only areas | TODO |
 | 003A Zoom account authorization & secrets | Real sandbox account, scopes and safe token management | BLOCKED pending academy |
 | 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | DONE against fixtures: signature and timestamp checks, URL validation, idempotent durable receipt, off by default. Real Zoom delivery unproven until 003A |
@@ -36,4 +36,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `UI-2` students and enrollments screens, then `UI-3`. Attendance (`004A`) still waits for participant identity, which needs a real Zoom test webinar (`003A`).
+**Suggested next small slice:** `UI-3` staff accounts and invitations, class sessions, and the Zoom review queue screens. Attendance (`004A`) still waits for participant identity, which needs a real Zoom test webinar (`003A`).

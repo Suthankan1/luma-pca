@@ -87,3 +87,49 @@ export function formatDate(isoDate: string | null) {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${day} ${months[month - 1]} ${year}`;
 }
+
+const emailShape = /^[^\s@]{1,64}@[^\s@.]+(\.[^\s@.]+)+$/;
+
+export type StudentInput = { studentNumber: string; fullName: string; email: string };
+
+export function parseStudentForm(form: FormData): StudentInput | { error: string } {
+  const studentNumber = text(form, "studentNumber");
+  const fullName = text(form, "fullName");
+  const email = text(form, "email");
+  if (!codeShape.test(studentNumber)) return { error: "Use 1 to 60 letters, digits, dots, hyphens or underscores for the student number." };
+  if (!fullName || fullName.length > 200) return { error: "Enter the student’s full name, up to 200 characters." };
+  if (email.length > 254 || !emailShape.test(email)) return { error: "Enter a valid email address." };
+  return { studentNumber, fullName, email };
+}
+
+export function parseEnrollForm(form: FormData): { batchId: string; enrolledOn: string } | { error: string } {
+  const batchId = uuidOrNull(form.get("batchId"));
+  const enrolledOn = text(form, "enrolledOn");
+  if (!batchId) return { error: "Choose a batch." };
+  if (!dateShape.test(enrolledOn)) return { error: "Enter the enrolment date." };
+  return { batchId, enrolledOn };
+}
+
+export function isIsoDate(value: unknown): value is string {
+  return typeof value === "string" && dateShape.test(value);
+}
+
+export const accountStatusLabels: Record<string, string> = {
+  PENDING_ACTIVATION: "Invitation pending",
+  ACTIVE: "Account active",
+  DISABLED: "Account disabled",
+};
+
+/** Today's date at the academy (Asia/Colombo), for date inputs' defaults. */
+export function academyToday(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+/** Links between student list pages; `after` is the API's keyset cursor. */
+export function studentListHref(options: { after?: string | null; status?: string }) {
+  const params = new URLSearchParams();
+  if (options.status && options.status !== "active") params.set("status", options.status);
+  if (options.after) params.set("after", options.after);
+  const query = params.toString();
+  return `/staff/students${query ? `?${query}` : ""}`;
+}

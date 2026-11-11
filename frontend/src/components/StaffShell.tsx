@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 export const staffNav = [
   { key: "overview", label: "Overview", href: "/staff" },
   { key: "courses", label: "Courses & batches", href: "/staff/courses" },
+  { key: "students", label: "Students", href: "/staff/students" },
 ] as const;
 
 export type StaffSection = (typeof staffNav)[number]["key"];

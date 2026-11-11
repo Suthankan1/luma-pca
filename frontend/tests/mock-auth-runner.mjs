@@ -17,7 +17,7 @@ const backend = createServer(async (req, res) => {
     res.end(value ? JSON.stringify(value) : "");
   };
 
-  if (req.url.startsWith("/api/v1/courses") || req.url.startsWith("/api/v1/batches")) {
+  if (/^\/api\/v1\/(courses|batches|students|enrollments|accounts)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -91,6 +91,8 @@ const backend = createServer(async (req, res) => {
       if (/^([A-TV-Z])\1{42}$/.test(String(body.token)) && !activatedTokens.has(body.token)) {
         if (typeof body.password !== "string" || body.password.includes("weak")) return send(422, { detail: "Password rejected" });
         activatedTokens.add(body.token);
+        const invited = students.find(student => student.invitationToken === body.token);
+        if (invited) invited.accountStatus = "ACTIVE";
         return send(204);
       }
       return send(400, { detail: "Invitation is invalid or has expired" });
@@ -121,15 +123,105 @@ const courses = [];
 const batches = [];
 let nextId = 1;
 const uuid = () => `00000000-0000-4000-8000-${String(nextId++).padStart(12, "0")}`;
+const students = [];
+const enrollments = [];
+const invitationLetters = "PQRSTVWXYZ";
+let invitations = 0;
+const staffRoles = ["INSTRUCTOR", "ATTENDANCE_OFFICER"];
+const publicStudent = student => {
+  const copy = { ...student };
+  delete copy.invitationToken;
+  return copy;
+};
+const enrollmentView = e => {
+  const batch = batches.find(b => b.id === e.batchId);
+  const student = students.find(s => s.id === e.studentId);
+  return { ...e, courseId: batch.courseId, batchCode: batch.code, batchName: batch.name, studentNumber: student.studentNumber,
+    studentName: student.fullName, status: e.withdrawnOn ? "WITHDRAWN" : "ENROLLED" };
+};
+
 function academicApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
-  if (!roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN")) return send(403, { detail: "Forbidden" });
-  const [, , , collection, id] = req.url.split("?")[0].split("/");
-  const list = collection === "courses" ? courses : batches;
+  const [path, query = ""] = req.url.split("?");
+  const [, , , collection, id, sub] = path.split("/");
+  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  // Assigned staff may list batches; the mock has no assignments, so they see none.
+  if (!manager && collection === "batches" && !id && req.method === "GET" && roles.some(r => staffRoles.includes(r))) return send(200, []);
+  if (!manager) return send(403, { detail: "Forbidden" });
   const stale = () => send(409, { detail: "The record was changed by someone else; reload and retry" });
+  const notFound = () => send(404, { detail: "Not found" });
+
+  if (collection === "students") {
+    if (req.method === "GET" && !id) {
+      const params = new URLSearchParams(query);
+      const limit = Number(params.get("limit") ?? 50);
+      const after = (params.get("after") ?? "").toUpperCase();
+      const active = params.get("active");
+      const matching = students.filter(s => (active === null || String(s.active) === active) && s.studentNumber > after)
+        .sort((a, b) => a.studentNumber.localeCompare(b.studentNumber));
+      const items = matching.slice(0, limit).map(publicStudent);
+      return send(200, { items, nextAfter: matching.length > limit ? items[items.length - 1].studentNumber : null });
+    }
+    const student = id && students.find(s => s.id === id);
+    if (req.method === "POST" && !id) {
+      const studentNumber = String(body.studentNumber).trim().toUpperCase();
+      const email = String(body.email).trim().toLowerCase();
+      if (students.some(s => s.studentNumber === studentNumber)) return send(409, { detail: "A student with this student number already exists" });
+      if (students.some(s => s.email === email)) return send(409, { detail: "An account with this email already exists" });
+      const created = { id: uuid(), studentNumber, fullName: String(body.fullName).trim(), email, accountId: uuid(),
+        accountStatus: "PENDING_ACTIVATION", active: true, version: 0 };
+      students.push(created);
+      return send(201, publicStudent(created));
+    }
+    if (!student) return notFound();
+    if (req.method === "GET" && sub === "enrollments") return send(200, enrollments.filter(e => e.studentId === id).map(enrollmentView));
+    if (req.method === "GET") return send(200, publicStudent(student));
+    if (req.method === "PUT") {
+      if (student.version !== body.version) return stale();
+      Object.assign(student, { fullName: body.fullName, active: body.active, version: student.version + 1 });
+      return send(200, publicStudent(student));
+    }
+    return send(405);
+  }
+
+  if (collection === "accounts" && sub === "invitations" && req.method === "POST") {
+    const student = students.find(s => s.accountId === id);
+    if (!student) return notFound();
+    if (student.accountStatus !== "PENDING_ACTIVATION") return send(409, { detail: "Only an account pending activation can be invited" });
+    const token = invitationLetters[invitations++ % invitationLetters.length].repeat(43);
+    student.invitationToken = token;
+    return send(201, { accountId: id, activationToken: token, activationPath: `/activate#token=${token}`,
+      expiresAt: new Date(Date.now() + 72 * 3600 * 1000).toISOString() });
+  }
+
+  if (collection === "enrollments" && req.method === "PUT") {
+    const enrollment = enrollments.find(e => e.id === id);
+    if (!enrollment) return notFound();
+    if (enrollment.version !== body.version) return stale();
+    Object.assign(enrollment, { enrolledOn: body.enrolledOn, withdrawnOn: body.withdrawnOn ?? null, version: enrollment.version + 1 });
+    return send(200, enrollmentView(enrollment));
+  }
+
+  if (collection === "batches" && sub === "enrollments") {
+    const batch = batches.find(b => b.id === id);
+    if (!batch) return notFound();
+    if (req.method === "GET") return send(200, enrollments.filter(e => e.batchId === id).map(enrollmentView));
+    const student = students.find(s => s.id === body.studentId);
+    if (!student) return notFound();
+    if (!batch.active) return send(409, { detail: "Students cannot be enrolled in an inactive batch" });
+    if (!student.active) return send(409, { detail: "An inactive student cannot be enrolled" });
+    if (enrollments.some(e => e.batchId === id && e.studentId === student.id)) {
+      return send(409, { detail: "The student is already enrolled in this batch" });
+    }
+    const created = { id: uuid(), batchId: id, studentId: student.id, enrolledOn: body.enrolledOn, withdrawnOn: null, version: 0 };
+    enrollments.push(created);
+    return send(201, enrollmentView(created));
+  }
+
+  const list = collection === "courses" ? courses : batches;
   if (req.method === "GET" && !id) return send(200, list);
   const found = id && list.find(item => item.id === id);
-  if (req.method === "GET") return found ? send(200, found) : send(404, { detail: "Not found" });
+  if (req.method === "GET") return found ? send(200, found) : notFound();
   if (req.method === "POST") {
     const code = String(body.code ?? "").trim().toUpperCase();
     if (collection === "courses") {
@@ -149,7 +241,7 @@ function academicApi(req, body, send) {
     return send(201, batch);
   }
   if (req.method === "PUT") {
-    if (!found) return send(404, { detail: "Not found" });
+    if (!found) return notFound();
     if (found.version !== body.version) return stale();
     Object.assign(found, body, { code: String(body.code).toUpperCase(), version: found.version + 1 });
     return send(200, found);

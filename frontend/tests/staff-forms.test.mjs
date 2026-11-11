@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatDate, isAcademyManager, parseBatchForm, parseCourseForm, problemMessage, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
+import { academyToday, formatDate, isAcademyManager, parseBatchForm, parseCourseForm, parseEnrollForm, parseStudentForm, problemMessage, studentListHref, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
 
 const form = fields => {
   const data = new FormData();
@@ -63,4 +63,32 @@ test("a refused submission hands back what was typed, capped, so the form keeps 
   const data = form({ code: "mon", name: "N".repeat(400) });
   assert.deepEqual(submittedValues(data, ["code", "missing"]), { code: "mon", missing: "" });
   assert.equal(submittedValues(data, ["name"]).name.length, 300);
+});
+
+test("student forms apply the API's rules first", () => {
+  assert.deepEqual(parseStudentForm(form({ studentNumber: " pca-001 ", fullName: " Kavindi Perera ", email: " k@example.invalid " })),
+    { studentNumber: "pca-001", fullName: "Kavindi Perera", email: "k@example.invalid" });
+  assert.ok("error" in parseStudentForm(form({ studentNumber: "PCA 001", fullName: "N", email: "k@example.invalid" })));
+  assert.ok("error" in parseStudentForm(form({ studentNumber: "PCA-1", fullName: " ", email: "k@example.invalid" })));
+  for (const email of ["", "no-at", "a@b", "two@@example.invalid", `${"x".repeat(250)}@example.invalid`]) {
+    assert.ok("error" in parseStudentForm(form({ studentNumber: "PCA-1", fullName: "N", email })), email);
+  }
+});
+
+test("enrolments need a batch id and a date", () => {
+  assert.deepEqual(parseEnrollForm(form({ batchId: id, enrolledOn: "2027-01-10" })), { batchId: id, enrolledOn: "2027-01-10" });
+  assert.ok("error" in parseEnrollForm(form({ batchId: "x", enrolledOn: "2027-01-10" })));
+  assert.ok("error" in parseEnrollForm(form({ batchId: id, enrolledOn: "" })));
+});
+
+test("the academy's today is the Colombo calendar date", () => {
+  assert.equal(academyToday(new Date("2027-03-01T20:00:00Z")), "2027-03-02");
+  assert.equal(academyToday(new Date("2027-03-01T08:00:00Z")), "2027-03-01");
+});
+
+test("student list links keep the filter and the paging cursor", () => {
+  assert.equal(studentListHref({}), "/staff/students");
+  assert.equal(studentListHref({ status: "active" }), "/staff/students");
+  assert.equal(studentListHref({ status: "all", after: "PCA-050" }), "/staff/students?status=all&after=PCA-050");
+  assert.equal(studentListHref({ status: "inactive" }), "/staff/students?status=inactive");
 });
