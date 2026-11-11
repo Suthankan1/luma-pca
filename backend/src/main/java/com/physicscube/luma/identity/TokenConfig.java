@@ -28,6 +28,20 @@ class TokenConfig {
     }
 
     @Bean
+    SecretCipher mfaSecretCipher(AuthProperties properties) {
+        if (properties.mfaEncryptionKey() != null && !properties.mfaEncryptionKey().isBlank()) {
+            return SecretCipher.fromBase64(properties.mfaEncryptionKey());
+        }
+        if (!properties.ephemeralSigningKey()) {
+            throw new IllegalStateException("No MFA encryption key: set LUMA_AUTH_MFA_ENCRYPTION_KEY, "
+                    + "or LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true for local development only");
+        }
+        log.warn("Using an EPHEMERAL MFA encryption key. Not for production: "
+                + "authenticators enrolled now stop working after a restart.");
+        return SecretCipher.ephemeral();
+    }
+
+    @Bean
     JwtEncoder jwtEncoder(SigningKeys keys) {
         return keys.encoder();
     }

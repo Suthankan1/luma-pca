@@ -39,14 +39,16 @@ interface AccountRepository extends JpaRepository<Account, UUID> {
     int reserveLoginAttempt(@Param("id") UUID id, @Param("maxFailures") int maxFailures,
                             @Param("now") Instant now, @Param("lockUntil") Instant lockUntil);
 
-    /** Clears the counter and any lock, unless the account changed since the password was read. */
+    /** Clears the password counter and a lock set by this attempt, if the account is still current. */
     @Transactional
     @Modifying(clearAutomatically = true)
     @Query(nativeQuery = true, value = """
             UPDATE accounts SET failed_login_count = 0, locked_until = NULL
             WHERE id = :id AND status = 'ACTIVE' AND auth_version = :authVersion
+              AND (locked_until IS NULL OR locked_until <= :now OR locked_until = :attemptLockUntil)
             """)
-    int recordLoginSuccess(@Param("id") UUID id, @Param("authVersion") int authVersion);
+    int recordLoginSuccess(@Param("id") UUID id, @Param("authVersion") int authVersion,
+                           @Param("now") Instant now, @Param("attemptLockUntil") Instant attemptLockUntil);
 
     @Query("select count(a) > 0 from Account a where a.id = :id and a.lockedUntil > :now")
     boolean isLocked(@Param("id") UUID id, @Param("now") Instant now);

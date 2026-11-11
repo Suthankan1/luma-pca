@@ -37,12 +37,13 @@ class RefreshSessions {
     }
 
     @Transactional
-    Issued start(UUID accountId, int authVersion) {
+    Issued start(UUID accountId, int authVersion, boolean mfaVerified) {
         Instant now = Instant.now();
         UUID sessionId = UUID.randomUUID();
         Instant sessionExpiry = now.plus(properties.sessionMaxLifetime());
-        jdbc.update("INSERT INTO refresh_sessions (id, account_id, auth_version, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-                sessionId, accountId, authVersion, Timestamp.from(now), Timestamp.from(sessionExpiry));
+        jdbc.update("INSERT INTO refresh_sessions (id, account_id, auth_version, created_at, expires_at, mfa_verified) "
+                        + "VALUES (?, ?, ?, ?, ?, ?)",
+                sessionId, accountId, authVersion, Timestamp.from(now), Timestamp.from(sessionExpiry), mfaVerified);
         return issue(sessionId, accountId, now, sessionExpiry);
     }
 
@@ -54,7 +55,7 @@ class RefreshSessions {
         }
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT t.id AS token_id, t.expires_at AS token_expires_at, s.id AS session_id, s.account_id,
-                       s.auth_version, s.expires_at AS session_expires_at, s.revoked_at
+                       s.auth_version, s.expires_at AS session_expires_at, s.revoked_at, s.mfa_verified
                 FROM refresh_tokens t JOIN refresh_sessions s ON s.id = t.session_id
                 WHERE t.token_hash = ? FOR UPDATE OF s
                 """, OpaqueToken.digest(presentedToken));
@@ -77,8 +78,15 @@ class RefreshSessions {
             log.warn("Refresh token reuse detected; session {} of account {} revoked", sessionId, accountId);
             return null;
         }
-        Integer currentVersion = jdbc.query("SELECT auth_version FROM accounts WHERE id = ? AND status = 'ACTIVE'",
-                results -> results.next() ? results.getInt(1) : null, accountId);
+        // Like bearer authentication, refreshing cannot continue a password-only
+        // session once its account has been promoted to an elevated role.
+        Integer currentVersion = jdbc.query("""
+                SELECT auth_version FROM accounts
+                WHERE id = ? AND status = 'ACTIVE' AND (? OR NOT EXISTS (
+                    SELECT 1 FROM account_roles WHERE account_id = accounts.id
+                      AND role IN ('ACADEMY_OWNER', 'ACADEMY_ADMIN')
+                ))
+                """, results -> results.next() ? results.getInt(1) : null, accountId, row.get("mfa_verified"));
         if (currentVersion == null || currentVersion != ((Number) row.get("auth_version")).intValue()) {
             revoke(sessionId, "ACCOUNT_CHANGED", now);
             return null;
@@ -103,11 +111,13 @@ class RefreshSessions {
                 + "WHERE account_id = ? AND revoked_at IS NULL", Timestamp.from(Instant.now()), accountId);
     }
 
+    /** @return whether the current account's live session passed MFA, or {@code null} when the session is invalid */
     @Transactional(readOnly = true)
-    boolean isActive(UUID sessionId, UUID accountId) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM refresh_sessions "
-                + "WHERE id = ? AND account_id = ? AND revoked_at IS NULL AND expires_at > ?)",
-                Boolean.class, sessionId, accountId, Timestamp.from(Instant.now())));
+    Boolean mfaStateIfActive(UUID sessionId, UUID accountId, int authVersion) {
+        return jdbc.query("SELECT mfa_verified FROM refresh_sessions "
+                        + "WHERE id = ? AND account_id = ? AND auth_version = ? AND revoked_at IS NULL AND expires_at > ?",
+                results -> results.next() ? results.getBoolean(1) : null,
+                sessionId, accountId, authVersion, Timestamp.from(Instant.now()));
     }
 
     private void revoke(UUID sessionId, String reason, Instant now) {

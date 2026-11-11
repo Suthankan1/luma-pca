@@ -360,17 +360,21 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void elevatedAccountsCannotSignInUntilMfaExists() {
+    void elevatedAccountsNeverReceiveTokensFromThePasswordStepAlone() {
         for (Role role : List.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN)) {
             String email = role.name().toLowerCase().replace('_', '.') + "@example.invalid";
             accounts.setPassword(accounts.register(academyId, email, Set.of(role, Role.INSTRUCTOR)).id(), PASSPHRASE);
 
             HttpResponse<String> response = login(email, PASSPHRASE);
 
-            assertEquals(403, response.statusCode(), role.name());
-            assertFalse(response.body().contains("accessToken"));
+            assertEquals(200, response.statusCode(), role.name());
+            Map<String, Object> body = HttpApi.parse(response);
+            assertEquals(Set.of("mfaRequired", "mfaToken", "mfaExpiresIn", "mfaEnrolled"), body.keySet());
+            assertEquals(true, body.get("mfaRequired"));
+            assertEquals(401, me((String) body.get("mfaToken")), "a challenge is not an access token");
             assertEquals(401, login(email, WRONG).statusCode(), "a wrong password must not reveal the MFA requirement");
         }
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM refresh_sessions", Integer.class));
     }
 
     @Test
