@@ -23,6 +23,8 @@ class ZoomWebhookDisabledIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void ingressIsOffByDefault() throws Exception {
+        // Other test classes share the database; start from a known state.
+        resetDatabase();
         byte[] body = ZoomWebhookHttpIntegrationTest.joined(1, "X").getBytes(StandardCharsets.UTF_8);
         long now = Instant.now().getEpochSecond();
         HttpResponse<String> response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(

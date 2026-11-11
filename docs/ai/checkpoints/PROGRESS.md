@@ -632,3 +632,54 @@ build runs the Next.js default bundler and repeats the smoke test.
   payload retention policy undecided; the `x-zm-request-id` header is not used
   because Zoom does not document it.
 - **Next planned feature:** 003C receipt processing worker; 003A needs the academy's Zoom credentials.
+
+## Checkpoint 003C — 2026-11-11 — Zoom receipt processing worker
+
+- **003B evidence:** merged as PR #19, merge commit `eea9743`; backend CI and GitGuardian green.
+  The closed branches of PRs #3, #17 and #18 were deleted on GitHub at the owner's request.
+- **Feature ID / name:** 003C — outbox/worker (in-database queue).
+- **Branch:** `feature/003c-receipt-worker`. **PR / merge SHA:** see the merged pull
+  request titled "feat(zoom): process webhook receipts with retries and dead letters".
+- **Implemented behavior:** a poller in the API process claims due receipts with
+  `FOR UPDATE SKIP LOCKED` (safe on several instances), runs the handler for the
+  event type and marks the receipt in the same transaction. A failed attempt is
+  undone with a JDBC savepoint while the claim is kept, then retried after 30 s
+  doubling to 1 h, ten attempts over about 3 hours, or dead-lettered at once for
+  malformed payloads and unknown types. Owners and administrators list receipts
+  by status without payloads and requeue dead letters with an audited reason.
+  The first handler records each webinar event per occurrence
+  (`zoom_occurrence_events`), one row per receipt, ordered by Zoom's event time.
+- **Source checked:** Zoom's event reference (developers.zoom.us Meetings
+  webhooks page, read 2026-11-11) lists `payload.object.id` and
+  `payload.object.uuid` as required strings on `webinar.participant_joined`. Only
+  those are read; participant fields wait for a real test webinar.
+- **Database changes:** Flyway `V12__zoom_receipt_processing.sql`.
+- **API changes:** `GET /api/v1/zoom/receipts`, `POST /api/v1/zoom/receipts/{id}/replay`; OpenAPI updated.
+- **Configuration:** `LUMA_ZOOM_PROCESSING_ENABLED` (default true),
+  `LUMA_ZOOM_PROCESSING_POLL_INTERVAL` (default PT5S). Integration tests turn
+  polling off and drive the processor directly.
+- **Corrections made during the slice:** (1) Spring's JPA transaction manager
+  refuses savepoints by default; instead of enabling nested transactions for the
+  whole application, the processor sets a JDBC savepoint on the transaction's own
+  connection, so handlers must write through `JdbcTemplate`. (2) My first retry
+  schedule claimed "about 4 hours" but added up to about 1 hour; the default is
+  now ten attempts (about 3 hours) and a test pins the arithmetic.
+  (3) The first CI run failed on Linux only: the 003B "ingress is off" test
+  counted receipts without clearing the shared test database, and on Linux it ran
+  after the new worker tests. It now resets first; the full suite was then run
+  locally in reverse and random class order (241 passing each time).
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker — 241 tests, 0 failures, 0 errors, 0 skipped on macOS. 12 new: 3
+  backoff unit tests and 9 PostgreSQL 17 tests (out-of-order events, idempotent
+  reprocessing, malformed payloads dead-lettered without quoting them, partial
+  writes rolled back on failure, ten-attempt dead-lettering with doubling waits,
+  4 workers over 200 receipts with every receipt attempted exactly once, a receipt
+  locked by another worker skipped until released, listing and audited replay,
+  access limited to owners and administrators). Worker tests run three times;
+  no payload text in logs. Linux CI result is on the pull request.
+- **Known issues / not done:** polling runs inside the API process (a separate
+  worker and SQS are the production plan); no alerting on dead letters; the
+  occurrence log is not yet linked to class sessions or students (003D); events
+  are still unproven against a real Zoom account (003A).
+- **Next planned feature:** 003D occurrence and identity mapping (participant
+  parts need 003A); staff screens are the other large open area.

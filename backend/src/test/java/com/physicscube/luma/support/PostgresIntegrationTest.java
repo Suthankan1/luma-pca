@@ -12,7 +12,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * entity mappings against the result. One container is shared by all subclasses.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "luma.auth.ephemeral-signing-key=true")
+        properties = {"luma.auth.ephemeral-signing-key=true",
+        // Tests drive the receipt processor directly; no background polling.
+        "luma.zoom.processing.enabled=false"})
 public abstract class PostgresIntegrationTest {
     @ServiceConnection
     protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
