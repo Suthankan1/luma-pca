@@ -32,8 +32,11 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all", "/api/v1/auth/mfa/reset").authenticated()
                     // First gate only. Services repeat the role check and bind every query to
                     // the caller's academy; later slices add course and batch scope there.
-                    .requestMatchers("/api/v1/courses", "/api/v1/courses/**", "/api/v1/batches", "/api/v1/batches/**")
+                    .requestMatchers("/api/v1/courses", "/api/v1/courses/**", "/api/v1/batches", "/api/v1/batches/**",
+                            "/api/v1/students", "/api/v1/students/**", "/api/v1/enrollments/**")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
+                    // A student's own data; services resolve "own" from the token, never from input.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments").hasRole("STUDENT")
                     .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

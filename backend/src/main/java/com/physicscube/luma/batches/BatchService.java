@@ -6,7 +6,11 @@ import com.physicscube.luma.shared.api.ConflictException;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -79,6 +83,22 @@ public class BatchService {
         } catch (DataIntegrityViolationException e) {
             throw translate(e);
         }
+    }
+
+    /**
+     * For other modules: the batch if it belongs to the academy, else not found. The
+     * caller remains responsible for its own role checks.
+     */
+    @Transactional(readOnly = true)
+    public BatchView requireInAcademy(UUID academyId, UUID batchId) {
+        return BatchView.of(load(academyId, batchId));
+    }
+
+    /** For other modules: views of those batches that belong to the academy. No role check. */
+    @Transactional(readOnly = true)
+    public Map<UUID, BatchView> viewsInAcademy(UUID academyId, Collection<UUID> batchIds) {
+        return batches.findByAcademyIdAndIdIn(academyId, batchIds).stream().map(BatchView::of)
+                .collect(Collectors.toMap(BatchView::id, Function.identity()));
     }
 
     private Batch load(UUID academyId, UUID batchId) {

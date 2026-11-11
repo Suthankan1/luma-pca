@@ -371,3 +371,47 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Known issues / not done:**
   No self-service MFA reset for locked-out administrators without recovery codes (requires owner assistance or database intervention); recovery codes cannot be regenerated without resetting MFA; no client IP rate limiting yet.
 - **Next planned feature:** 002B — Students, enrollments and staff assignments.
+
+## Checkpoint 002B-1 — 2026-11-11 — Students and batch enrollments
+
+- **001G evidence:** merged as PR #11, merge commit `4ecbcb9`; CI green on `main`.
+- **Feature ID / name:** 002B part 1 — student records, enrollments, student
+  own-record access. Part 2 (staff assignments) follows separately.
+- **Branch:** `feature/002b-students-enrollments`. **PR / merge SHA:** see the
+  merged pull request titled "feat(students): add student records and batch enrollments".
+- **Implemented behavior:** owners and administrators create students; each
+  creation also creates a STUDENT sign-in account pending activation, in one
+  transaction. Student numbers are upper-cased, unique per academy and
+  immutable. Students list with keyset pagination (`after`, `limit` ≤ 200).
+  Enrollments link a student to a batch (unique per batch and student; one
+  student may be in several batches, including two of one course). Withdrawal
+  sets a date and keeps the row; clearing it re-enrols. Inactive batches and
+  students cannot take new enrollments. A student reads only
+  `/api/v1/me/student` and `/api/v1/me/enrollments`.
+- **Authorization:** route rules plus service checks; "own" is resolved from
+  the token's account and academy together, never from input. Students get 403
+  on all staff routes, including for their own record, and never see rosters or
+  classmates. Instructor, Attendance Officer and Analyst still get 403 everywhere
+  here; scoped access comes with part 2. Another academy's records return 404.
+- **Database changes:** Flyway `V7__students_enrollments.sql`: `students`,
+  `enrollments`, and `uq_accounts_id_academy` so composite foreign keys keep a
+  student's account, and an enrollment's batch and student, in one academy.
+- **API changes:** ten operations; OpenAPI updated with `Student` and `Enrollment` schemas.
+- **Frontend changes:** none.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker — 174 tests, 0 failures, 0 errors, 0 skipped on macOS. New: 10
+  student and 9 enrollment tests over real HTTP on PostgreSQL 17 (no partial
+  rows on duplicates, 8-way create and enrol races, pagination, immutability,
+  cross-academy 404s, role 403s, student self-only access, constraints) and 1
+  service-level test of role, academy and ownership checks. Linux CI result is
+  on the pull request.
+- **Decisions:** (1) creating a student always creates their account; an email
+  already used by any account is refused. (2) Withdrawal is a date, not a
+  delete. (3) Deactivating a student does not disable their sign-in, so they keep
+  access to their own history. (4) No rule yet against two simultaneous batches
+  of one course; that is academy open question P1 and is deliberately allowed.
+- **Known issues / not done:** no way to send the invitation to a new student
+  (invitation issuance has no route yet); no bulk import; no name search; no
+  audit trail; the student record shows email from the account and cannot
+  change it; no staff UI.
+- **Next planned feature:** 002B part 2 — staff assignments with batch scope.
