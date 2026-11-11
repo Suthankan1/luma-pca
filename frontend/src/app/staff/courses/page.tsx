@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
 import { ActiveToggle, BatchForm, CourseForm } from "@/components/staff/ActionForms";
 import { requirePortal } from "@/lib/auth-server";
@@ -17,8 +18,18 @@ export default async function CoursesPage() {
     hasStudentPortal: hasPortal(identity, "student") };
 
   if (!isAcademyManager(identity.roles)) {
+    // Instructors and attendance officers: the API returns only the batches they are assigned to.
+    const mine = await staffApi<Batch[]>("/api/v1/batches");
     return <StaffShell {...shell}>
       <p className="banner">Only academy owners and administrators manage courses and batches. Ask an administrator if something here needs to change.</p>
+      {mine.ok && <section className="panel" aria-labelledby="mine-title">
+        <h2 id="mine-title" className="panel-title">YOUR BATCHES</h2>
+        <p className="panel-sub">{mine.data.length === 0 ? "You are not assigned to any batch yet." : "Batches you are assigned to."}</p>
+        <ul className="dir-list">{mine.data.map(batch => <li key={batch.id} className="dir-row dir-course">
+          <div><strong>{batch.code}</strong> <span>{batch.name}</span></div>
+          <Link className="text-link" href={`/staff/batches/${batch.id}`}>Roster →</Link>
+        </li>)}</ul>
+      </section>}
     </StaffShell>;
   }
 
@@ -49,7 +60,7 @@ export default async function CoursesPage() {
             </div>
             <ul className="dir-batches" aria-label={`Batches of ${course.code}`}>
               {(byCourse.get(course.id) ?? []).map(batch => <li key={batch.id} className="dir-row dir-batch">
-                <div><strong>{batch.code}</strong> <span>{batch.name}</span>
+                <div><Link className="text-link" href={`/staff/batches/${batch.id}`}><strong>{batch.code}</strong> <span>{batch.name}</span></Link>
                   <span className="muted dir-dates"> · {formatDate(batch.startsOn)}{batch.endsOn ? ` – ${formatDate(batch.endsOn)}` : " onwards"}</span></div>
                 <div className="dir-meta">
                   <span className={`status ${batch.active ? "on" : "off"}`}>{batch.active ? "Active" : "Inactive"}</span>

@@ -96,3 +96,14 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 :focus-visible { outline: 3px solid var(--pca-cyan); outline-offset: 2px; }
 @media (max-width: 960px) { .staff-grid { grid-template-columns: 1fr; } .staff-nav { flex-direction: row; flex-wrap: wrap; } .staff-railfoot { margin-top: 0; } }
 @media (max-width: 580px) { .dir-row { flex-direction: column; align-items: flex-start; gap: 6px; } .form-pair { grid-template-columns: 1fr; } }
+.text-link { color: var(--pca-blue); text-decoration: underline; text-underline-offset: 3px; }
+.text-link strong { color: inherit; }
+.filter-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.filter-row .chip { min-height: 32px; display: inline-flex; align-items: center; }
+.check-row { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.check-row input { width: auto; min-height: auto; }
+.invite-box { display: grid; gap: 10px; background: #e8f6fd; border: 1px solid #9acee5; border-radius: 12px; padding: 14px; }
+.invite-box input { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.inline-date { min-height: 32px; padding: 4px 8px; border: 1px solid #587695; border-radius: 6px; font-size: 12px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 580px) { .dir-meta { flex-wrap: wrap; white-space: normal; } }
