@@ -181,3 +181,133 @@ export function parseAssignForm(form: FormData): { email: string; role: string }
   if (role !== "INSTRUCTOR" && role !== "ATTENDANCE_OFFICER") return { error: "Choose instructor or attendance officer." };
   return { email, role };
 }
+
+// ---- Class sessions -------------------------------------------------------------
+// The API stores instants (UTC) plus the IANA zone the class is taught in. People type
+// a date and clock times in that zone; these helpers convert both ways with Intl only.
+
+export const ACADEMY_TIME_ZONE = "Asia/Colombo";
+const timeShape = /^([01]\d|2[0-3]):[0-5]\d$/;
+const MAX_CLASS_MINUTES = 12 * 60;
+const MAX_CLASS_BATCHES = 20;
+
+export function isTimeZone(zone: string) {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: zone });
+    return /^[A-Za-z]+\/[A-Za-z0-9_+\-/]+$/.test(zone);
+  } catch {
+    return false;
+  }
+}
+
+/** Wall-clock parts of an instant in a zone. */
+function wallClock(epochMs: number, zone: string) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(new Date(epochMs)).map(p => [p.type, p.value]));
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}`,
+    asUtc: Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second)) };
+}
+
+/** "2027-01-11" + "18:00" in Asia/Colombo → "2027-01-11T12:30:00.000Z". Times skipped by a DST change resolve forward. */
+export function zonedToInstant(date: string, time: string, zone: string) {
+  const [y, m, d] = date.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  const wanted = Date.UTC(y, m - 1, d, h, mi);
+  let guess = wanted - (wallClock(wanted, zone).asUtc - wanted);
+  guess += wanted - wallClock(guess, zone).asUtc;
+  return new Date(guess).toISOString();
+}
+
+/** An instant's date and clock time in a zone, for form defaults. */
+export function instantParts(iso: string, zone: string) {
+  const { date, time } = wallClock(Date.parse(iso), zone);
+  return { date, time };
+}
+
+/** "Mon 11 Jan 2027 · 18:00–20:00" in the class's own zone (24-hour clock). */
+export function formatClassTime(startsAt: string, endsAt: string, zone: string) {
+  const start = instantParts(startsAt, zone);
+  const end = instantParts(endsAt, zone);
+  const weekday = new Intl.DateTimeFormat("en-GB", { timeZone: zone, weekday: "short" }).format(new Date(startsAt));
+  const endText = end.date === start.date ? end.time : `${formatDate(end.date)} ${end.time}`;
+  return `${weekday} ${formatDate(start.date)} · ${start.time}–${endText}`;
+}
+
+/** Calendar arithmetic on "YYYY-MM-DD" strings. */
+export function addDays(isoDate: string, days: number) {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/** A "YYYY-MM-DD" string naming a day that exists (not 30 February). */
+export function isRealDate(value: unknown): value is string {
+  return isIsoDate(value) && addDays(value, 0) === value;
+}
+
+export const SESSION_WINDOW_DAYS = 14;
+
+/** The fortnight of classes shown: from the given academy date (default today) for 14 days. */
+export function sessionWindow(fromParam: unknown, today = academyToday()) {
+  const from = isRealDate(fromParam) ? fromParam : today;
+  const to = addDays(from, SESSION_WINDOW_DAYS);
+  return { from, to, lastDay: addDays(to, -1), previous: addDays(from, -SESSION_WINDOW_DAYS), next: to,
+    fromInstant: zonedToInstant(from, "00:00", ACADEMY_TIME_ZONE), toInstant: zonedToInstant(to, "00:00", ACADEMY_TIME_ZONE) };
+}
+
+export function sessionListHref(options: { from?: string | null; batch?: string | null }) {
+  const params = new URLSearchParams();
+  if (options.from) params.set("from", options.from);
+  if (options.batch) params.set("batch", options.batch);
+  const query = params.toString();
+  return `/staff/sessions${query ? `?${query}` : ""}`;
+}
+
+export type SessionInput = { title: string; startsAt: string; endsAt: string; timeZone: string; batchIds: string[]; zoomWebinarId: string | null };
+
+/** Same rules as the API (1–20 batches, at most 12 hours, webinar ID digits), checked first. Classes end on the day they start. */
+export function parseSessionForm(form: FormData): SessionInput | { error: string } {
+  const title = text(form, "title");
+  const date = text(form, "date");
+  const startTime = text(form, "startTime");
+  const endTime = text(form, "endTime");
+  const timeZone = text(form, "timeZone") || ACADEMY_TIME_ZONE;
+  const rawBatches = form.getAll("batchIds");
+  const batchIds = rawBatches.map(uuidOrNull);
+  const webinar = text(form, "zoomWebinarId").replace(/[\s-]/g, "");
+  if (!title || title.length > 200) return { error: "Enter a class title of up to 200 characters." };
+  if (!isRealDate(date)) return { error: "Enter the date of the class." };
+  if (!timeShape.test(startTime) || !timeShape.test(endTime)) return { error: "Enter start and end times such as 18:00." };
+  if (endTime <= startTime) return { error: "The class must end after it starts, on the same day." };
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  if ((eh * 60 + em) - (sh * 60 + sm) > MAX_CLASS_MINUTES) return { error: "A class can last at most 12 hours." };
+  if (!isTimeZone(timeZone)) return { error: "That request was not valid. Reload the page." };
+  if (batchIds.length === 0) return { error: "Choose at least one batch." };
+  if (batchIds.length > MAX_CLASS_BATCHES) return { error: `Choose at most ${MAX_CLASS_BATCHES} batches.` };
+  if (batchIds.some(id => !id) || new Set(batchIds).size !== batchIds.length) return { error: "Choose batches from the list." };
+  if (webinar && !/^\d{9,20}$/.test(webinar)) return { error: "Enter the Zoom webinar ID as digits, such as 812 3456 7890, or leave it empty." };
+  return { title, startsAt: zonedToInstant(date, startTime, timeZone), endsAt: zonedToInstant(date, endTime, timeZone), timeZone,
+    batchIds: batchIds as string[], zoomWebinarId: webinar || null };
+}
+
+/** "81234567890" → "812 3456 7890", the way Zoom shows 11-digit IDs; other lengths in groups of four. */
+export function formatWebinarId(id: string | null) {
+  if (!id) return "";
+  if (id.length === 11) return `${id.slice(0, 3)} ${id.slice(3, 7)} ${id.slice(7)}`;
+  return id.replace(/(\d{4})(?=\d)/g, "$1 ");
+}
+
+export type ClassSession = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
+  zoomWebinarId: string | null; batches: { batchId: string; courseId: string; code: string; name: string }[]; version: number };
+export type CourseRef = { id: string; code: string };
+type BatchRef = { id: string; courseId: string; code: string; name: string; active: boolean };
+
+/** Batch choices labelled like the enrolment form, "COURSE · BATCH · name"; without course data, "BATCH · name". */
+export function batchOptions(courses: CourseRef[], batches: BatchRef[], include: (batch: BatchRef) => boolean) {
+  const courseCode = new Map(courses.map(course => [course.id, course.code]));
+  return batches.filter(include).map(batch => {
+    const course = courseCode.get(batch.courseId);
+    return { id: batch.id, label: `${course ? `${course} · ` : ""}${batch.code} · ${batch.name}` };
+  }).sort((a, b) => a.label.localeCompare(b.label));
+}

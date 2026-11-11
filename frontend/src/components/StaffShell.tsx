@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 export const staffNav = [
   { key: "overview", label: "Overview", href: "/staff" },
   { key: "courses", label: "Courses & batches", href: "/staff/courses" },
+  { key: "sessions", label: "Classes", href: "/staff/sessions" },
   { key: "students", label: "Students", href: "/staff/students" },
   { key: "team", label: "Staff", href: "/staff/team" },
 ] as const;

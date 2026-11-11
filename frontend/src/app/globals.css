@@ -112,3 +112,7 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .danger-zone { border-top-color: #f2c7c7; }
 .action.danger { background: #a4161a; }
 .panel-gap { margin-top: 20px; }
+.pager, .link-row { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 14px; }
+.filter-form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+.filter-form label { font-weight: 700; }
+.filter-form select { min-height: 44px; padding: 9px 12px; border: 1px solid #587695; border-radius: 8px; background: #fff; max-width: 100%; }

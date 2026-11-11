@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { canManageStaff, grantableRoles, parseAssignForm, parseRoles, parseStaffForm, academyToday, formatDate, isAcademyManager, parseBatchForm, parseCourseForm, parseEnrollForm, parseStudentForm, problemMessage, studentListHref, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
+import * as forms from "../src/lib/staff-forms.ts";
 
 const form = fields => {
   const data = new FormData();
@@ -133,4 +134,47 @@ test("roles are listed senior first whatever order the API returns", async () =>
   const { roleList } = await import("../src/lib/staff-forms.ts");
   assert.equal(roleList(["ATTENDANCE_OFFICER", "INSTRUCTOR"]), "Instructor, Attendance officer");
   assert.equal(roleList(["ANALYST", "ACADEMY_OWNER"]), "Owner, Analyst");
+});
+
+test("class times convert between the academy zone and UTC", () => {
+  assert.equal(forms.zonedToInstant("2027-01-11", "18:00", "Asia/Colombo"), "2027-01-11T12:30:00.000Z");
+  assert.equal(forms.zonedToInstant("2027-01-11", "02:00", "Asia/Colombo"), "2027-01-10T20:30:00.000Z");
+  // Zones with daylight saving use the offset in force on that date.
+  assert.equal(forms.zonedToInstant("2027-07-01", "09:00", "Europe/London"), "2027-07-01T08:00:00.000Z");
+  assert.equal(forms.zonedToInstant("2027-01-01", "09:00", "Europe/London"), "2027-01-01T09:00:00.000Z");
+  assert.deepEqual(forms.instantParts("2027-01-10T20:30:00Z", "Asia/Colombo"), { date: "2027-01-11", time: "02:00" });
+  assert.equal(forms.formatClassTime("2027-01-11T12:30:00Z", "2027-01-11T14:30:00Z", "Asia/Colombo"), "Mon 11 Jan 2027 · 18:00–20:00");
+});
+
+test("the class list shows a fortnight from a valid date, else from today", () => {
+  const w = forms.sessionWindow("2027-01-10", "2026-11-11");
+  assert.deepEqual([w.from, w.lastDay, w.previous, w.next], ["2027-01-10", "2027-01-23", "2026-12-27", "2027-01-24"]);
+  assert.equal(w.fromInstant, "2027-01-09T18:30:00.000Z");
+  assert.equal(forms.sessionWindow("not-a-date", "2026-11-11").from, "2026-11-11");
+  assert.equal(forms.sessionWindow("2027-02-30", "2026-11-11").from, "2026-11-11");
+  assert.equal(forms.addDays("2026-12-31", 1), "2027-01-01");
+  assert.equal(forms.sessionListHref({ from: "2027-01-10", batch: null }), "/staff/sessions?from=2027-01-10");
+});
+
+test("the class form applies the API's rules first", () => {
+  const batch = "00000000-0000-4000-8000-000000000001";
+  const form = (fields, batches = [batch]) => {
+    const data = new FormData();
+    for (const [k, v] of Object.entries({ title: "Waves", date: "2027-01-11", startTime: "18:00", endTime: "20:00", ...fields })) data.set(k, v);
+    for (const b of batches) data.append("batchIds", b);
+    return data;
+  };
+  assert.deepEqual(forms.parseSessionForm(form({ zoomWebinarId: "812 3456-7890" })), {
+    title: "Waves", startsAt: "2027-01-11T12:30:00.000Z", endsAt: "2027-01-11T14:30:00.000Z", timeZone: "Asia/Colombo",
+    batchIds: [batch], zoomWebinarId: "81234567890" });
+  assert.equal(forms.parseSessionForm(form({})).zoomWebinarId, null);
+  assert.match(forms.parseSessionForm(form({ endTime: "18:00" })).error, /end after it starts/);
+  assert.match(forms.parseSessionForm(form({ startTime: "06:00", endTime: "18:30" })).error, /12 hours/);
+  assert.match(forms.parseSessionForm(form({}, [])).error, /at least one batch/);
+  assert.match(forms.parseSessionForm(form({}, [batch, batch])).error, /from the list/);
+  assert.match(forms.parseSessionForm(form({}, ["../x"])).error, /from the list/);
+  assert.match(forms.parseSessionForm(form({ zoomWebinarId: "12345" })).error, /webinar ID/);
+  assert.match(forms.parseSessionForm(form({ timeZone: "+05:30" })).error, /not valid/);
+  assert.match(forms.parseSessionForm(form({ startTime: "6pm" })).error, /such as 18:00/);
+  assert.equal(forms.formatWebinarId("81234567890"), "812 3456 7890");
 });

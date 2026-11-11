@@ -50,6 +50,7 @@ docker exec $PG psql -At -U luma -d luma -c "SELECT 'courses=' || count(*) FROM 
   -c "SELECT 'students=' || count(*) FROM students" -c "SELECT 'enrollments=' || count(*) || ' withdrawn=' || count(withdrawn_on) FROM enrollments" \
   -c "SELECT 'active accounts=' || count(*) FROM accounts WHERE status = 'ACTIVE'" \
   -c "SELECT 'staff assignments=' || count(*) FROM staff_assignments" \
+  -c "SELECT 'class sessions=' || string_agg(starts_at::text || ' to ' || ends_at::text || ' webinar ' || zoom_webinar_id, ';') FROM class_sessions" \
   -c "SELECT 'audit: ' || string_agg(action, ',' ORDER BY occurred_at) FROM audit_events"
 leaks=$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE" "$S/backend.log" "$S/frontend.log" | awk -F: '{s+=$2} END {print s}')
 echo "secrets in logs: $leaks"
