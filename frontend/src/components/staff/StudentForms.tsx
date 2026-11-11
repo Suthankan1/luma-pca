@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
-import { createStudent, enroll, inviteStudent, updateEnrollment, updateStudent } from "@/app/staff/students/actions";
+import { useActionState } from "react";
+import { createStudent, enroll, updateEnrollment, updateStudent } from "@/app/staff/students/actions";
 import type { FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, id }: { state: FormState; id: string }) {
@@ -40,28 +40,6 @@ export function StudentDetailsForm({ id, version, fullName, active }: { id: stri
     <p className="panel-sub">An inactive student cannot be enrolled in new batches but can still sign in and see their own history.</p>
     <button className="action" type="submit" disabled={pending}>{pending ? "Saving…" : "Save details"}</button>
     <Feedback state={state} id="details-feedback" />
-  </form>;
-}
-
-export function InviteForm({ studentId, accountId }: { studentId: string; accountId: string }) {
-  const [state, action, pending] = useActionState(inviteStudent, null);
-  const [copied, setCopied] = useState(false);
-  const link = state?.ok ? state.values?.link : undefined;
-  return <form action={action} className="session-form staff-form" aria-describedby="invite-feedback">
-    <h3 className="form-title">Invitation</h3>
-    <input type="hidden" name="studentId" value={studentId} />
-    <input type="hidden" name="accountId" value={accountId} />
-    <p className="panel-sub">The student opens the link and chooses a password. Creating a new link cancels the previous one.</p>
-    {link ? <div className="invite-box">
-      <p className="form-ok" role="status">Invitation created. This link is shown only now; send it to the student privately.</p>
-      <label htmlFor="invite-link">Invitation link</label>
-      <input id="invite-link" readOnly value={link} onFocus={event => event.currentTarget.select()} />
-      <p className="panel-sub">Expires {new Date(state!.values!.expiresAt).toLocaleString("en-GB", { timeZone: "Asia/Colombo", dateStyle: "medium", timeStyle: "short" })} (Colombo time).</p>
-      <button type="button" className="action secondary" onClick={async () => {
-        try { await navigator.clipboard.writeText(link); setCopied(true); } catch { setCopied(false); }
-      }}>{copied ? "Copied" : "Copy link"}</button>
-    </div> : <button className="action" type="submit" disabled={pending}>{pending ? "Creating…" : "Create invitation link"}</button>}
-    {state && !state.ok && <Feedback state={state} id="invite-feedback" />}
   </form>;
 }
 

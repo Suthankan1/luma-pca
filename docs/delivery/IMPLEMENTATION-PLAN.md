@@ -14,14 +14,16 @@
 | 001F Admin MFA | TOTP enrolment and verification for owner/admin; removes the sign-in block | DONE in the backend (TOTP, recovery codes, reset, lockout); the development override was removed. Browser MFA step is new slice 001G |
 | 001G Browser MFA step | Next.js code entry, enrolment QR and recovery-code display; Playwright coverage | DONE: Next.js MFA challenge handling, enrollment QR code, manual secret display, TOTP and recovery-code verification, one-time recovery codes presentation and acknowledgment, unit tests, HTTP smoke tests, and Playwright e2e browser tests |
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | DONE for the routes that exist: cross-academy, batch-scope, student-ownership and role tests (002A, 002B). Extend with every new resource |
-| 001H Staff account administration | Create staff, change roles, disable, issue invitations; escalation and last-owner rules; audit trail | DONE (backend API; no staff screen yet) |
+| 001H Staff account administration | Create staff, change roles, disable, issue invitations; escalation and last-owner rules; audit trail | DONE (API; staff screens in UI-3a) |
 | 001I Browser account activation | Next.js page that redeems an invitation and sets a password | DONE: `/activate`, code read from the link fragment, Playwright and real-stack tests |
 | 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | DONE: student records with linked accounts, batch enrollments, student own-record routes (part 1); staff assignments with batch-scoped read access for instructors and attendance officers (part 2). Bulk import and staff account administration TODO |
 | 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | DONE: class sessions shared by up to 20 batches, expected students listed once per session, batch-scoped staff reads. Attendance uniqueness itself arrives with 004A |
 | UI-1 Staff screens: shell, courses and batches | Figma-based staff layout, server-side API client, Server Actions with inline errors, Playwright desktop and mobile | DONE; also verified on the real stack by `scripts/staff-ui-real-stack.sh` (UI-2) |
 | UI-2 Staff screens: students and enrollments | Student list with paging, create with invitation link, batch roster | DONE: list, detail, invitation link, enrol/withdraw/re-enrol, rosters for managers and assigned staff; real-stack browser run |
-| UI-3 Staff screens: staff, invitations, class sessions, Zoom review | Remaining API-only areas | TODO |
+| UI-3a Staff screens: staff accounts and batch assignments | Team list and record (roles, invitation, disable) within the role rules; assign and remove staff on the batch page | DONE; instructor flow verified on the real stack |
+| UI-3b Staff screens: class sessions | Schedule, edit and cancel sessions shared by batches | TODO |
+| UI-3c Staff screens: Zoom review | Dead-lettered receipts with replay; occurrence review (link, not a class, auto-link) | TODO |
 | 003A Zoom account authorization & secrets | Real sandbox account, scopes and safe token management | BLOCKED pending academy |
 | 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | DONE against fixtures: signature and timestamp checks, URL validation, idempotent durable receipt, off by default. Real Zoom delivery unproven until 003A |
 | 003C Outbox/worker | Retry, DLQ, dedup, out-of-order receipts | DONE with an in-database queue: multi-worker claiming, backoff, dead letter, audited replay, per-occurrence event log. SQS transport and separate worker deployment remain the production plan |
@@ -36,4 +38,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `UI-3` staff accounts and invitations, class sessions, and the Zoom review queue screens. Attendance (`004A`) still waits for participant identity, which needs a real Zoom test webinar (`003A`).
+**Suggested next small slice:** `UI-3b` class session screens, then `UI-3c` Zoom review screens. Attendance (`004A`) still waits for participant identity, which needs a real Zoom test webinar (`003A`).

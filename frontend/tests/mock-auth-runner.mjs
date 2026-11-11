@@ -17,7 +17,7 @@ const backend = createServer(async (req, res) => {
     res.end(value ? JSON.stringify(value) : "");
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|enrollments|accounts)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|enrollments|accounts|staff-accounts|assignments)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -103,7 +103,7 @@ const backend = createServer(async (req, res) => {
 
     case "/api/v1/auth/me":
       if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
-      return send(200, { accountId: "test-admin", academyId: "test-academy", roles });
+      return send(200, { accountId: SELF_ID, academyId: "test-academy", roles });
 
     case "/api/v1/auth/logout":
       if (body.refreshToken === latestRefresh) latestRefresh = "";
@@ -123,6 +123,15 @@ const courses = [];
 const batches = [];
 let nextId = 1;
 const uuid = () => `00000000-0000-4000-8000-${String(nextId++).padStart(12, "0")}`;
+const SELF_ID = "00000000-0000-4000-8000-0000000000aa";
+// The signed-in administrator, an owner, an analyst, and staff added by tests.
+const staff = [
+  { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["ACADEMY_ADMIN"], status: "ACTIVE", mfaEnrolled: true, version: 0 },
+  { id: "00000000-0000-4000-8000-0000000000bb", email: "owner@example.invalid", roles: ["ACADEMY_OWNER"], status: "ACTIVE", mfaEnrolled: true, version: 0 },
+  { id: "00000000-0000-4000-8000-0000000000cc", email: "analyst@example.invalid", roles: ["ANALYST"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
+];
+const assignments = [];
+const ELEVATED = ["ACADEMY_OWNER", "ACADEMY_ADMIN"];
 const students = [];
 const enrollments = [];
 const invitationLetters = "PQRSTVWXYZ";
@@ -184,10 +193,65 @@ function academicApi(req, body, send) {
     return send(405);
   }
 
+  if (collection === "staff-accounts") {
+    const owner = roles.includes("ACADEMY_OWNER");
+    const forbidden = detail => send(403, { detail });
+    if (req.method === "GET" && !id) return send(200, staff);
+    if (req.method === "POST" && !id) {
+      const email = String(body.email).trim().toLowerCase();
+      if (body.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may grant the owner or administrator role");
+      if (staff.some(s => s.email === email) || students.some(s => s.email === email)) return send(409, { detail: "An account with this email already exists" });
+      const created = { id: uuid(), email, roles: [...body.roles].sort(), status: "PENDING_ACTIVATION", mfaEnrolled: false, version: 0 };
+      staff.push(created);
+      return send(201, created);
+    }
+    const person = staff.find(s => s.id === id);
+    if (!person) return notFound();
+    if (req.method === "GET") return send(200, person);
+    if (person.id === SELF_ID) return forbidden(sub === "roles" ? "You cannot change your own roles" : "You cannot disable your own account");
+    if (person.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may manage an owner or administrator account");
+    if (req.method === "PUT" && sub === "roles") {
+      if (body.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may grant the owner or administrator role");
+      if (person.version !== body.version) return stale();
+      Object.assign(person, { roles: [...body.roles].sort(), version: person.version + 1 });
+      return send(200, person);
+    }
+    if (req.method === "POST" && sub === "disable") {
+      Object.assign(person, { status: "DISABLED" });
+      return send(200, person);
+    }
+    return send(405);
+  }
+
+  if (collection === "assignments" && req.method === "DELETE") {
+    const index = assignments.findIndex(a => a.id === id);
+    if (index < 0) return notFound();
+    assignments.splice(index, 1);
+    return send(204);
+  }
+
+  if (collection === "batches" && sub === "assignments") {
+    const batch = batches.find(b => b.id === id);
+    if (!batch) return notFound();
+    if (req.method === "GET") return send(200, assignments.filter(a => a.batchId === id));
+    const person = staff.find(s => s.email === String(body.email).trim().toLowerCase());
+    if (!person) return send(404, { detail: "Staff account not found" });
+    if (person.status === "DISABLED") return send(409, { detail: "A disabled account cannot be assigned" });
+    if (!person.roles.includes(body.role)) return send(409, { detail: `The account does not hold the ${body.role} role` });
+    if (assignments.some(a => a.batchId === id && a.accountId === person.id && a.role === body.role)) {
+      return send(409, { detail: "The account is already assigned to this batch in this role" });
+    }
+    const created = { id: uuid(), batchId: id, courseId: batch.courseId, batchCode: batch.code, batchName: batch.name,
+      accountId: person.id, email: person.email, role: body.role, createdAt: new Date().toISOString() };
+    assignments.push(created);
+    return send(201, created);
+  }
+
   if (collection === "accounts" && sub === "invitations" && req.method === "POST") {
-    const student = students.find(s => s.accountId === id);
+    const student = students.find(s => s.accountId === id) ?? staff.find(s => s.id === id);
     if (!student) return notFound();
-    if (student.accountStatus !== "PENDING_ACTIVATION") return send(409, { detail: "Only an account pending activation can be invited" });
+    if (student.status && student.status !== "PENDING_ACTIVATION") return send(409, { detail: "Only an account pending activation can be invited" });
+    if (student.accountStatus && student.accountStatus !== "PENDING_ACTIVATION") return send(409, { detail: "Only an account pending activation can be invited" });
     const token = invitationLetters[invitations++ % invitationLetters.length].repeat(43);
     student.invitationToken = token;
     return send(201, { accountId: id, activationToken: token, activationPath: `/activate#token=${token}`,

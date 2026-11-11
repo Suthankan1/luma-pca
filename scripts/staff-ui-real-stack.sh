@@ -2,7 +2,8 @@
 # Real-stack browser test for the staff screens: throwaway PostgreSQL 17 + the built
 # Spring backend jar + a production build of Next.js, driven by Playwright
 # (frontend/tests/real-stack). Only an academy and a pending administrator with a
-# known invitation are seeded; everything else happens through the browser.
+# known invitation are seeded; everything else (including an instructor and their
+# batch assignment) happens through the browser.
 #
 # Needs: Docker running, JDK 21 as `java` (or JAVA_HOME), Node 22+, a built backend
 # (`mvn -f backend/pom.xml package`), `npm --prefix frontend ci` and
@@ -48,6 +49,7 @@ echo "--- database after the run"
 docker exec $PG psql -At -U luma -d luma -c "SELECT 'courses=' || count(*) FROM courses" -c "SELECT 'batches=' || count(*) FROM batches" \
   -c "SELECT 'students=' || count(*) FROM students" -c "SELECT 'enrollments=' || count(*) || ' withdrawn=' || count(withdrawn_on) FROM enrollments" \
   -c "SELECT 'active accounts=' || count(*) FROM accounts WHERE status = 'ACTIVE'" \
+  -c "SELECT 'staff assignments=' || count(*) FROM staff_assignments" \
   -c "SELECT 'audit: ' || string_agg(action, ',' ORDER BY occurred_at) FROM audit_events"
 leaks=$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE" "$S/backend.log" "$S/frontend.log" | awk -F: '{s+=$2} END {print s}')
 echo "secrets in logs: $leaks"

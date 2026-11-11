@@ -90,7 +90,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(row).not.toContainText("withdrawn");
 
   await page.getByRole("link", { name: /MON/ }).first().click();
-  await expect(page.locator(".dir-list")).toContainText("PCA-REAL-001 Real Stack Student");
+  await expect(page.getByRole("region", { name: "ROSTER" }).locator(".dir-list")).toContainText("PCA-REAL-001 Real Stack Student");
 
   // 5. The student redeems the link in a separate browser session and signs in.
   const studentContext = await browser.newContext();
@@ -110,4 +110,54 @@ test("an administrator onboards a student end to end on the real stack", async (
   // 6. The administrator sees the account as active.
   await page.goto("/staff/students");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-001" })).toContainText("Account active");
+
+  // 7. The owner adds an instructor, invites them and assigns them to the batch.
+  await page.goto("/staff/team");
+  await page.locator("#staff-email").fill("real.instructor@example.invalid");
+  await page.locator(".role-choices").getByLabel("Instructor", { exact: true }).check();
+  await page.getByRole("button", { name: "Add staff member" }).click();
+  await expect(page.locator("#staff-feedback")).toHaveText("real.instructor@example.invalid added. Open their record to send an invitation.");
+  await page.getByRole("link", { name: "Open their record →" }).click();
+  await page.getByRole("button", { name: "Create invitation link" }).click();
+  const instructorInvite = await page.getByLabel("Invitation link").inputValue();
+  expect(instructorInvite).toMatch(/\/activate#token=[A-Za-z0-9_-]{43}$/);
+
+  await page.goto("/staff/courses");
+  await page.getByRole("link", { name: /MON/ }).first().click();
+  await expect(page).toHaveURL(/\/staff\/batches\/[0-9a-f-]{36}$/);
+  const rosterUrl = page.url();
+  await page.locator("#assign-email").fill("real.instructor@example.invalid");
+  await page.getByRole("button", { name: "Assign" }).click();
+  await expect(page.locator("#assign-feedback")).toHaveText("Assigned. They can open this roster from their next request.");
+
+  // 8. The instructor activates, signs in without MFA (not an elevated role) and sees only their batch.
+  const instructorContext = await browser.newContext();
+  const instructor = await instructorContext.newPage();
+  await instructor.goto(instructorInvite);
+  await instructor.fill("#password", passphrase);
+  await instructor.fill("#confirm", passphrase);
+  await instructor.getByRole("button", { name: "Activate account" }).click();
+  await expect(instructor).toHaveURL(/\/sign-in\?activated=1$/);
+  await instructor.fill("#email", "real.instructor@example.invalid");
+  await instructor.fill("#password", passphrase);
+  await instructor.getByRole("button", { name: "Sign in" }).click();
+  await expect(instructor).toHaveURL(/\/staff$/);
+  await instructor.goto("/staff/courses");
+  const mine = instructor.getByRole("region", { name: "YOUR BATCHES" });
+  await expect(mine).toContainText("MON Monday evening");
+  await mine.getByRole("link", { name: "Roster →" }).click();
+  await expect(instructor.getByRole("region", { name: "ROSTER" }).locator(".dir-list")).toContainText("PCA-REAL-001 Real Stack Student");
+  await instructor.goto("/staff/students");
+  await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators manage student records.");
+  await instructor.goto("/staff/team");
+  await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators manage staff accounts.");
+
+  // 9. The owner removes the assignment; the instructor loses the roster on their next request.
+  await page.goto(rosterUrl);
+  await page.getByRole("button", { name: "Remove real.instructor@example.invalid as Instructor" }).click();
+  await expect(page.getByText("No one is assigned yet.")).toBeVisible();
+  expect((await instructor.goto(rosterUrl))?.status()).toBe(404);
+  await instructor.goto("/staff/courses");
+  await expect(instructor.getByText("You are not assigned to any batch yet.")).toBeVisible();
+  await instructorContext.close();
 });
