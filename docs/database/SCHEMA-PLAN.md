@@ -1,6 +1,6 @@
 # Database model and migration sequencing
 
-**Present:** V1 `academies` and `courses`; V2 `accounts` and `account_roles` (academy-level role grants only). All other tables are **planned**: design is in the full blueprint. Do not infer migrations are already applied.
+**Present:** V1 `academies` and `courses`; V2 `accounts` and `account_roles` (academy-level role grants only); V3 `account_invitations`. All other tables are **planned**: design is in the full blueprint. Do not infer migrations are already applied.
 
 | Group | Planned tables | Main constraints |
 | --- | --- | --- |

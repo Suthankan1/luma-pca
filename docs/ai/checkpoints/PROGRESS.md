@@ -83,3 +83,40 @@ build runs the Next.js default bundler and repeats the smoke test.
   JDK 21 explicitly.
 - **Next planned feature:** 001B — invitation tokens (hashed, expiring,
   single-use) and activation that calls `setPassword`.
+
+## Checkpoint 001B — 2026-11-11 — Invitations and activation (service layer)
+
+- **001A evidence:** merged as PR #4, merge commit `de55f02`.
+- **Feature ID / name:** 001B — secure invitation and account activation.
+- **Branch:** `feature/001b-invitations`. **PR / merge SHA:** see the merged pull
+  request titled "feat(auth): add single-use account invitations" and `git log main`.
+- **Implemented behavior:** `InvitationService.issue` creates a 256-bit random
+  base64url token for an account pending activation, valid 72 hours by default
+  (maximum 14 days), and revokes any earlier unused invitation. `accept` claims
+  the token atomically and activates the account with the chosen password.
+  Unknown, expired, used and revoked tokens and non-pending accounts all fail
+  with one identical error. A rejected password rolls the claim back so the
+  invitation can be retried. `revoke` cancels an unused invitation.
+- **Database changes:** Flyway `V3__identity_invitations.sql` adds
+  `account_invitations` (SHA-256 token digest only, unique digest, expiry after
+  creation, consumed and revoked mutually exclusive, partial unique index
+  allowing one open invitation per account).
+- **Decision:** the digest is plain SHA-256, not HMAC with a server secret. The
+  token carries 256 bits of entropy, so a stolen digest cannot be brute-forced;
+  this avoids introducing secret management before the key-handling slice.
+- **API changes:** none; still no HTTP route. **Frontend changes:** none.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker running. **Result:** 56 tests, 0 failures, 0 errors, 0 skipped.
+  The 14 new PostgreSQL 17 integration tests cover single use, expiry,
+  revocation, re-issue, disabled accounts, retry after a weak password, 8-thread
+  concurrent accept (exactly one activation) and concurrent issue (exactly one
+  usable token), and direct constraint violations.
+- **Security considerations:** the raw token exists only in the returned
+  `IssuedInvitation`, whose `toString` redacts it. Nothing logs it.
+- **Known issues / not done:** nothing delivers the token (no email or
+  notification module); no HTTP activation route and therefore no rate limiting
+  on activation attempts; no audit trail; no way yet to create the first
+  academy owner; staff cannot issue invitations until login and authorization
+  exist.
+- **Next planned feature:** 001C — RS256 login, lockout using the existing
+  counters, and the public activation route.

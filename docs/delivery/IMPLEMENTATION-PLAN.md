@@ -8,7 +8,7 @@
 | 000B Backend/DB bootstrap | Boot start, Flyway V1, health+status, unit tests | DONE (PR #1) |
 | 000C Frontend bootstrap | Next install/lint/build and 3 preview pages | DONE (PR #1) |
 | 001A Auth schema + hashed-password domain | PostgreSQL migration + TCs; no public endpoint | DONE (V2 accounts/roles, Argon2id, Testcontainers) |
-| 001B Secure invitation + activation | Student/staff role creation, expiry and validation tests | TODO |
+| 001B Secure invitation + activation | Student/staff role creation, expiry and validation tests | DONE at service layer (V3 invitations, single-use hashed tokens); HTTP activation route and token delivery TODO with 001C |
 | 001C JWT login | RS256 signatures, issuer/audience, lockout, MFA admin path | TODO |
 | 001D Refresh and BFF | Atomic refresh rotation, reuse revocation, HttpOnly cookie, CSRF and e2e | PARTIAL: Next.js BFF cookies/origin checks merged (PR #2, mock API only); backend refresh rotation TODO |
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | TODO |
@@ -29,4 +29,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `001B` secure invitation and activation on top of the `001A` account model. Implement each as one small test-backed commit and update `docs/ai/checkpoints/PROGRESS.md`.
+**Suggested next small slice:** `001C` RS256 login with lockout, plus the public activation route for `001B` invitations. Implement each as one small test-backed commit and update `docs/ai/checkpoints/PROGRESS.md`.
