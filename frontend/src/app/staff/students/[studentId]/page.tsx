@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
-import { EnrollForm, EnrollmentAction, InviteForm, StudentDetailsForm } from "@/components/staff/StudentForms";
+import { InviteForm } from "@/components/staff/InviteForm";
+import { EnrollForm, EnrollmentAction, StudentDetailsForm } from "@/components/staff/StudentForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
@@ -69,7 +70,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
       <section className="panel" aria-labelledby="manage-title">
         <h2 id="manage-title" className="panel-title">MANAGE</h2>
         {s.accountStatus === "PENDING_ACTIVATION"
-          ? <InviteForm studentId={s.id} accountId={s.accountId} />
+          ? <InviteForm accountId={s.accountId} who="student" />
           : <p className="panel-sub">{s.accountStatus === "ACTIVE" ? "The student has activated their sign-in." : "The student’s sign-in is disabled."}</p>}
         <StudentDetailsForm id={s.id} version={s.version} fullName={s.fullName} active={s.active} />
       </section>

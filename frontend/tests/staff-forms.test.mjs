@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { academyToday, formatDate, isAcademyManager, parseBatchForm, parseCourseForm, parseEnrollForm, parseStudentForm, problemMessage, studentListHref, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
+import { canManageStaff, grantableRoles, parseAssignForm, parseRoles, parseStaffForm, academyToday, formatDate, isAcademyManager, parseBatchForm, parseCourseForm, parseEnrollForm, parseStudentForm, problemMessage, studentListHref, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
 
 const form = fields => {
   const data = new FormData();
@@ -91,4 +91,46 @@ test("student list links keep the filter and the paging cursor", () => {
   assert.equal(studentListHref({ status: "active" }), "/staff/students");
   assert.equal(studentListHref({ status: "all", after: "PCA-050" }), "/staff/students?status=all&after=PCA-050");
   assert.equal(studentListHref({ status: "inactive" }), "/staff/students?status=inactive");
+});
+
+test("only owners may grant owner or administrator", () => {
+  assert.deepEqual(grantableRoles(["ACADEMY_ADMIN"]), ["INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST"]);
+  assert.deepEqual(grantableRoles(["ACADEMY_OWNER"]), ["ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST"]);
+});
+
+test("nobody manages themselves, and administrators never manage owners or administrators", () => {
+  const admin = { accountId: "me", roles: ["ACADEMY_ADMIN"] };
+  const owner = { accountId: "boss", roles: ["ACADEMY_OWNER"] };
+  assert.equal(canManageStaff(admin, { id: "me", roles: ["ACADEMY_ADMIN"] }), false);
+  assert.equal(canManageStaff(admin, { id: "t", roles: ["INSTRUCTOR"] }), true);
+  assert.equal(canManageStaff(admin, { id: "o", roles: ["ACADEMY_OWNER"] }), false);
+  assert.equal(canManageStaff(admin, { id: "a", roles: ["INSTRUCTOR", "ACADEMY_ADMIN"] }), false);
+  assert.equal(canManageStaff(owner, { id: "a", roles: ["ACADEMY_ADMIN"] }), true);
+  assert.equal(canManageStaff({ accountId: "i", roles: ["INSTRUCTOR"] }, { id: "t", roles: ["INSTRUCTOR"] }), false);
+});
+
+test("staff and assignment forms check roles and emails", () => {
+  const data = new FormData();
+  data.set("email", " teacher@example.invalid ");
+  data.append("roles", "INSTRUCTOR");
+  data.append("roles", "ANALYST");
+  assert.deepEqual(parseStaffForm(data), { email: "teacher@example.invalid", roles: ["INSTRUCTOR", "ANALYST"] });
+  const none = new FormData();
+  assert.ok("error" in parseRoles(none));
+  const bad = new FormData();
+  bad.append("roles", "STUDENT");
+  assert.ok("error" in parseRoles(bad), "students are not staff");
+  const twice = new FormData();
+  twice.append("roles", "ANALYST");
+  twice.append("roles", "ANALYST");
+  assert.ok("error" in parseRoles(twice));
+  assert.deepEqual(parseAssignForm(form({ email: "t@example.invalid", role: "ATTENDANCE_OFFICER" })), { email: "t@example.invalid", role: "ATTENDANCE_OFFICER" });
+  assert.ok("error" in parseAssignForm(form({ email: "t@example.invalid", role: "ANALYST" })));
+  assert.ok("error" in parseAssignForm(form({ email: "nope", role: "INSTRUCTOR" })));
+});
+
+test("roles are listed senior first whatever order the API returns", async () => {
+  const { roleList } = await import("../src/lib/staff-forms.ts");
+  assert.equal(roleList(["ATTENDANCE_OFFICER", "INSTRUCTOR"]), "Instructor, Attendance officer");
+  assert.equal(roleList(["ANALYST", "ACADEMY_OWNER"]), "Owner, Analyst");
 });

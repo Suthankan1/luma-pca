@@ -20,7 +20,9 @@ async function accessToken() {
   return access;
 }
 
-export async function staffApi<T>(path: `/api/v1/${string}`, init?: { method: "POST" | "PUT"; body: unknown }): Promise<ApiResult<T>> {
+export async function staffApi<T>(path: `/api/v1/${string}`,
+                                  init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }): Promise<ApiResult<T>> {
+  const requestBody = init && "body" in init ? JSON.stringify(init.body) : undefined;
   const access = await accessToken();
   let response: Response;
   try {
@@ -29,8 +31,8 @@ export async function staffApi<T>(path: `/api/v1/${string}`, init?: { method: "P
       cache: "no-store",
       redirect: "error",
       signal: AbortSignal.timeout(5000),
-      headers: { Authorization: `Bearer ${access}`, ...(init ? { "Content-Type": "application/json" } : {}) },
-      body: init ? JSON.stringify(init.body) : undefined,
+      headers: { Authorization: `Bearer ${access}`, ...(requestBody ? { "Content-Type": "application/json" } : {}) },
+      body: requestBody,
     });
   } catch {
     return { ok: false, status: 503 };

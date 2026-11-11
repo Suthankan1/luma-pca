@@ -801,3 +801,35 @@ build runs the Next.js default bundler and repeats the smoke test.
   link); no name search; the real-stack script is not in CI; staff accounts,
   class sessions and Zoom review screens remain (UI-3).
 - **Next planned feature:** UI-3.
+
+## Checkpoint UI-3a — 2026-11-11 — Staff screens: staff accounts and batch assignments
+
+- **UI-2 evidence:** merged as PR #23, merge commit `4f876d9`; frontend CI green.
+- **Feature ID / name:** UI-3a.
+- **Branch:** `feature/staff-ui-team`. **PR / merge SHA:** see the merged pull
+  request titled "feat(web): staff accounts and batch assignment screens".
+- **Implemented behavior:** `/staff/team` lists staff accounts (you marked,
+  roles senior-first, account and two-step status) with an add form;
+  `/staff/team/{id}` changes roles (optimistic version), issues an invitation
+  link while pending, and disables with an explicit confirmation. The screens
+  mirror the API's rules: nobody changes or disables themselves; only owners
+  grant Owner/Administrator or touch an owner's or administrator's account; the
+  API re-checks every rule. Batch pages show an "Assigned staff" panel for
+  managers to assign by email and remove assignments. The invitation form is now
+  shared between students and staff. Nav gains "Staff".
+- **API changes:** none. **Database changes:** none.
+- **Tests executed (macOS):** frontend lint, type-check, 30 unit tests (4 new),
+  production build; Playwright 38 tests (8 new: 4 scenarios × desktop and
+  mobile), run twice. Real stack (`scripts/staff-ui-real-stack.sh`), extended:
+  the owner adds an instructor, invites and assigns them; the instructor
+  activates, signs in without MFA, sees only their batch and its roster, gets the
+  manager-only banners; after removal the roster is 404 and the batch list is
+  empty. Passed twice; staff assignments 0 at the end; no secrets in logs.
+- **Test-only fixes before commit:** roster assertions scoped to the ROSTER
+  region (the batch page now has two lists); the disable test checks the
+  resulting page state because the form unmounts once the account is disabled;
+  the real-stack spec waits for the batch URL before recording it.
+- **Known issues / not done:** no email delivery; disabling is not reversible
+  from the UI (the API has no re-enable); class sessions and Zoom review screens
+  remain (UI-3b, UI-3c).
+- **Next planned feature:** UI-3b.

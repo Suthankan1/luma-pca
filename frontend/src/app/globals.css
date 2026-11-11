@@ -107,3 +107,8 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .inline-date { min-height: 32px; padding: 4px 8px; border: 1px solid #587695; border-radius: 6px; font-size: 12px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 580px) { .dir-meta { flex-wrap: wrap; white-space: normal; } }
+.role-choices { border: 0; padding: 0; margin: 4px 0 0; display: grid; gap: 8px; }
+.role-choices legend { font-weight: 700; margin-bottom: 8px; }
+.danger-zone { border-top-color: #f2c7c7; }
+.action.danger { background: #a4161a; }
+.panel-gap { margin-top: 20px; }

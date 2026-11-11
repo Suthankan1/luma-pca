@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { config } from "@/lib/auth-server";
 import { requireSameOriginAction, staffApi } from "@/lib/staff-api";
 import {
   isIsoDate, parseEnrollForm, parseStudentForm, problemMessage, submittedValues, uuidOrNull, type FormState,
@@ -38,25 +37,6 @@ export async function updateStudent(_previous: FormState, form: FormData): Promi
   revalidatePath(`/staff/students/${id}`);
   revalidatePath("/staff/students");
   return { ok: true, message: "Saved." };
-}
-
-/**
- * Issues an activation invitation and returns its link once, to the administrator
- * only. The web app does not store it; issuing again cancels the previous link.
- */
-export async function inviteStudent(_previous: FormState, form: FormData): Promise<FormState> {
-  await requireSameOriginAction();
-  const accountId = uuidOrNull(form.get("accountId"));
-  const studentId = uuidOrNull(form.get("studentId"));
-  if (!accountId || !studentId) return { ok: false, message: "That request was not valid. Reload the page." };
-  const result = await staffApi<{ activationPath: string; expiresAt: string }>(`/api/v1/accounts/${accountId}/invitations`,
-    { method: "POST", body: {} });
-  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
-  if (!/^\/activate#token=[A-Za-z0-9_-]{20,128}$/.test(result.data.activationPath)) {
-    return { ok: false, message: problemMessage(502, undefined) };
-  }
-  return { ok: true, message: "Invitation created.",
-    values: { link: `${config().origin}${result.data.activationPath}`, expiresAt: result.data.expiresAt } };
 }
 
 export async function enroll(_previous: FormState, form: FormData): Promise<FormState> {

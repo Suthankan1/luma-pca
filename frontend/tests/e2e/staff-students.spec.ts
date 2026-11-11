@@ -85,7 +85,7 @@ test.describe("Staff students and enrolments", () => {
 
     await page.getByRole("link", { name: new RegExp(`MON-${p.toUpperCase()}`) }).click();
     await expect(page).toHaveURL(/\/staff\/batches\//);
-    await expect(page.locator(".dir-list")).toContainText(`PCA-${p.toUpperCase()}-001 Kavindi Perera`);
+    await expect(page.getByRole("region", { name: "ROSTER" }).locator(".dir-list")).toContainText(`PCA-${p.toUpperCase()}-001 Kavindi Perera`);
     await expect(page.locator(".panel-sub").first()).toHaveText("1 enrolled");
 
     // The student follows the invitation link in a fresh browser session.
