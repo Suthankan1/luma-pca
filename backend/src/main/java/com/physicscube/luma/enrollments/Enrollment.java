@@ -74,6 +74,10 @@ class Enrollment {
         return id;
     }
 
+    UUID getAcademyId() {
+        return academyId;
+    }
+
     UUID getBatchId() {
         return batchId;
     }

@@ -83,6 +83,17 @@ public class BatchService {
         return BatchView.of(batch);
     }
 
+    /**
+     * For other modules: the batches the caller may read.
+     *
+     * @throws AccessDeniedException if the caller has no role that can ever read a batch
+     */
+    @Transactional(readOnly = true)
+    public BatchScope scope(CurrentAccount caller) {
+        return caller.isAcademyManager() ? new BatchScope(true, Set.of())
+                : new BatchScope(false, Set.copyOf(assignedBatchIds(caller)));
+    }
+
     private List<UUID> assignedBatchIds(CurrentAccount caller) {
         Set<String> scoped = caller.batchScopedRoles();
         if (scoped.isEmpty()) {
