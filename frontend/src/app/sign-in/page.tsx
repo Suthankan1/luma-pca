@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Shell } from "@/components/Shell";
-import { currentSession } from "@/lib/auth-server";
+import { currentMfaChallenge, currentSession } from "@/lib/auth-server";
 import { portalPath } from "@/lib/session-policy";
 
 const messages = {
@@ -21,6 +22,7 @@ export default async function SignIn({ searchParams }: {
   if (destination && error !== "sign-out" && (destination === "/staff" || destination === "/student")) {
     redirect(destination);
   }
+  const mfa = !identity && !canRefresh ? await currentMfaChallenge() : null;
   const message = error && Object.hasOwn(messages, error)
     ? messages[error as keyof typeof messages]
     : unavailable ? messages.unavailable : undefined;
@@ -39,6 +41,14 @@ export default async function SignIn({ searchParams }: {
         <form method="post" action="/api/session/logout" className="session-form">
           <button className="action secondary" type="submit">Sign out</button>
         </form>
+      </> : mfa ? <>
+        <p className="sub">Two-factor authentication is required to complete sign-in.</p>
+        <div className="nav-links">
+          <Link href="/sign-in/mfa" className="action">Continue verification</Link>
+          <form method="post" action="/api/session/mfa-cancel">
+            <button className="action secondary" type="submit">Cancel and restart</button>
+          </form>
+        </div>
       </> : <form method="post" action="/api/session/login" className="session-form">
         {(portal === "staff" || portal === "student") && <input type="hidden" name="portal" value={portal} />}
         <label htmlFor="email">Email</label>
