@@ -1,12 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authRequest, config, readIdentity, readTokens } from "@/lib/auth-server";
-import { isSameOrigin, portalPath, sealAccess, sessionCookie } from "@/lib/session-policy";
+import {
+  authRequest,
+  config,
+  readIdentity,
+  readMfaChallenge,
+  readMfaEnrollment,
+  readMfaVerification,
+  readTokens,
+} from "@/lib/auth-server";
+import {
+  isSameOrigin,
+  openMfa,
+  portalPath,
+  sealAccess,
+  sealMfa,
+  sealRecovery,
+  sessionCookie,
+  type MfaChallengeState,
+  type RecoveryCodesState,
+} from "@/lib/session-policy";
 
 const noStore = { "Cache-Control": "no-store" };
 
 export async function POST(request: NextRequest, context: { params: Promise<{ action: string }> }) {
   const { action } = await context.params;
-  if (action !== "login" && action !== "refresh" && action !== "logout") {
+  const allowedActions = ["login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery"];
+  if (!allowedActions.includes(action)) {
     return new NextResponse(null, { status: 404, headers: noStore });
   }
 
@@ -17,11 +36,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       return new NextResponse(null, { status: 403, headers: noStore });
     }
 
-    const clear = (path: string) => {
+    const clearAll = (path: string) => {
       const response = go(path);
       for (const name of Object.values(names)) response.cookies.set(name, "", sessionCookie(secure, 0));
       return response;
     };
+
+    const clearMfaOnly = (path: string) => {
+      const response = go(path);
+      response.cookies.set(names.mfa, "", sessionCookie(secure, 0));
+      response.cookies.set(names.recovery, "", sessionCookie(secure, 0));
+      return response;
+    };
+
     const refreshToken = request.cookies.get(names.refresh)?.value;
 
     if (action === "logout") {
@@ -29,14 +56,26 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
         const result = await authRequest("logout", { body: { refreshToken } });
         if (result.status !== 204) return go("/sign-in?error=sign-out");
       }
-      return clear("/sign-in?signedOut=1");
+      return clearAll("/sign-in?signedOut=1");
+    }
+
+    if (action === "mfa-cancel") {
+      return clearMfaOnly("/sign-in");
+    }
+
+    if (action === "mfa-recovery") {
+      const response = go("/staff");
+      response.cookies.set(names.recovery, "", sessionCookie(secure, 0));
+      return response;
     }
 
     if (action === "login" && refreshToken) return go("/sign-in");
-    if (action === "refresh" && !refreshToken) return clear("/sign-in?error=expired");
+    if (action === "refresh" && !refreshToken) return clearAll("/sign-in?error=expired");
+
     if (request.headers.get("content-type")?.split(";")[0] !== "application/x-www-form-urlencoded") {
       return new NextResponse(null, { status: 415, headers: noStore });
     }
+
     const reader = request.body?.pipeThrough(new TextDecoderStream()).getReader();
     let encoded = "";
     if (reader) {
@@ -52,33 +91,129 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     }
     const form = new URLSearchParams(encoded);
     const preferred = form.get("portal");
-    const errorPath = (error: string) => `/sign-in?error=${error}${preferred === "staff" || preferred === "student" ? `&portal=${preferred}` : ""}`;
+    const safePreferred = preferred === "staff" || preferred === "student" ? preferred : undefined;
+    const errorPath = (error: string) =>
+      `/sign-in?error=${error}${safePreferred ? `&portal=${safePreferred}` : ""}`;
+
+    if (action === "mfa-verify") {
+      const code = form.get("code")?.trim();
+      if (!code || code.length > 32) {
+        return go("/sign-in/mfa?error=code");
+      }
+
+      const sealedMfa = request.cookies.get(names.mfa)?.value;
+      const mfaState = sealedMfa ? openMfa(sealedMfa, key) : null;
+      if (!mfaState || Date.now() > mfaState.expiresAt) {
+        return clearMfaOnly("/sign-in?error=expired");
+      }
+
+      const verifyResult = await authRequest("mfa/verify", {
+        body: { mfaToken: mfaState.mfaToken, code },
+      });
+
+      if (verifyResult.status === 401 || verifyResult.status === 400) {
+        return go("/sign-in/mfa?error=code");
+      }
+      if (verifyResult.status === 429) return go("/sign-in/mfa?error=limited");
+      if (!verifyResult.ok) return go("/sign-in/mfa?error=unavailable");
+
+      const verified = await readMfaVerification(verifyResult);
+      let destination: string;
+      try {
+        const identity = await readIdentity(verified.accessToken);
+        destination = identity ? portalPath(identity, mfaState.portal) : errorPath("expired");
+      } catch {
+        destination = errorPath("unavailable");
+      }
+
+      const hasRecoveryCodes = Array.isArray(verified.recoveryCodes) && verified.recoveryCodes.length > 0;
+      const response = go(hasRecoveryCodes ? "/sign-in/mfa/recovery-codes" : destination);
+      response.cookies.set(names.access, sealAccess(verified.accessToken, key), sessionCookie(secure, verified.expiresIn));
+      response.cookies.set(names.refresh, verified.refreshToken, sessionCookie(secure, verified.refreshExpiresIn));
+      response.cookies.set(names.mfa, "", sessionCookie(secure, 0));
+
+      if (hasRecoveryCodes) {
+        const recoveryState: RecoveryCodesState = {
+          codes: verified.recoveryCodes!,
+          portal: mfaState.portal,
+          expiresAt: Date.now() + 300_000,
+        };
+        response.cookies.set(names.recovery, sealRecovery(recoveryState, key), sessionCookie(secure, 300));
+      } else {
+        response.cookies.set(names.recovery, "", sessionCookie(secure, 0));
+      }
+      return response;
+    }
+
     const email = form.get("email")?.trim();
     const password = form.get("password");
     if (action === "login" && (!email || email.length > 254 || !password || password.length > 256)) {
       return go(errorPath("invalid"));
     }
 
-    const result = await authRequest(action, { body: action === "login" ? { email, password } : { refreshToken } });
+    const result = await authRequest(
+      action as "login" | "refresh",
+      { body: action === "login" ? { email: email!, password: password! } : { refreshToken: refreshToken! } }
+    );
+
     if (result.status === 401 || result.status === 400) {
-      return action === "login" ? go(errorPath("invalid")) : clear(errorPath("expired"));
+      return action === "login" ? go(errorPath("invalid")) : clearAll(errorPath("expired"));
     }
     if (result.status === 429) return go(errorPath("limited"));
     if (!result.ok) return go(errorPath("unavailable"));
 
-    const tokens = await readTokens(result);
+    const data = await result.json();
+
+    if (action === "login" && data?.mfaRequired === true) {
+      const challenge = readMfaChallenge(data);
+      let secret: string | undefined;
+      let otpauthUri: string | undefined;
+
+      if (!challenge.mfaEnrolled) {
+        const enrollResult = await authRequest("mfa/enroll", {
+          body: { mfaToken: challenge.mfaToken },
+        });
+        if (!enrollResult.ok) {
+          return go(errorPath("unavailable"));
+        }
+        const enrollment = await readMfaEnrollment(enrollResult);
+        secret = enrollment.secret;
+        otpauthUri = enrollment.otpauthUri;
+      }
+
+      const mfaState: MfaChallengeState = {
+        mfaToken: challenge.mfaToken,
+        enrolled: challenge.mfaEnrolled,
+        portal: safePreferred ?? null,
+        secret,
+        otpauthUri,
+        expiresAt: Date.now() + challenge.mfaExpiresIn * 1000,
+      };
+
+      const response = go("/sign-in/mfa");
+      response.cookies.set(names.mfa, sealMfa(mfaState, key), sessionCookie(secure, challenge.mfaExpiresIn));
+      if (request.cookies.has(names.access)) response.cookies.set(names.access, "", sessionCookie(secure, 0));
+      if (request.cookies.has(names.refresh)) response.cookies.set(names.refresh, "", sessionCookie(secure, 0));
+      if (request.cookies.has(names.recovery)) response.cookies.set(names.recovery, "", sessionCookie(secure, 0));
+      return response;
+    }
+
+    const tokens = typeof data?.accessToken === "string" ? await readTokens(new Response(JSON.stringify(data))) : null;
+    if (!tokens) throw new Error("Invalid session response");
+
     let destination: string;
     try {
       const identity = await readIdentity(tokens.accessToken);
-      destination = identity ? portalPath(identity, preferred) : errorPath("expired");
+      destination = identity ? portalPath(identity, safePreferred) : errorPath("expired");
     } catch {
       destination = errorPath("unavailable");
     }
 
-    // Preserve a successful rotation even if the separate identity lookup fails.
     const response = go(destination);
     response.cookies.set(names.access, sealAccess(tokens.accessToken, key), sessionCookie(secure, tokens.expiresIn));
     response.cookies.set(names.refresh, tokens.refreshToken, sessionCookie(secure, tokens.refreshExpiresIn));
+    if (request.cookies.has(names.mfa)) response.cookies.set(names.mfa, "", sessionCookie(secure, 0));
+    if (request.cookies.has(names.recovery)) response.cookies.set(names.recovery, "", sessionCookie(secure, 0));
     return response;
   } catch {
     return go(action === "logout" ? "/sign-in?error=sign-out" : "/sign-in?error=unavailable");
