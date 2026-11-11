@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: '22'
       - name: Install dependencies
-        run: npm --prefix frontend install --no-audit --no-fund
+        run: npm --prefix frontend ci --no-audit --no-fund
       - name: ESLint
         run: npm --prefix frontend run lint
       - name: Type check

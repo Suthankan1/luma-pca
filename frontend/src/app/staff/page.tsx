@@ -12,7 +12,7 @@ export default function StaffPreview() {
       <div className="panel"><span className="chip cyan">SAMPLE</span><div className="value">12</div><p className="muted">Records requiring review</p></div>
     </div>
     <div className="two">
-      <div className="panel"><h2 className="font-bold text-xl mb-3">Today's sample schedule</h2>
+      <div className="panel"><h2 className="font-bold text-xl mb-3">Today&apos;s sample schedule</h2>
         <div className="listrow"><span>09:00 · Physics</span><span className="muted">Completed</span></div>
         <div className="listrow"><span>14:00 · Advanced Mathematics</span><span className="muted">Live (fictional)</span></div>
         <div className="listrow"><span>18:00 · Chemistry</span><span className="muted">Upcoming</span></div>

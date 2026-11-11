@@ -17,3 +17,17 @@
 **Next tiny steps:** (1) verify `mvn test` and Next `npm install && npm run lint && npm run build`, Docker PostgreSQL migration and API status; (2) commit/bootstrap; (3) start `001A` persistence-backed account model, password-hash tests and migration without issuing JWT yet.
 
 **Agent update rule:** After each completed small feature, append its feature ID, commit SHA if known, actual test commands/results, decisions, scope changes, next intended slice and unresolved blockers. Never overwrite verified history or claim a commit/push without evidence.
+
+## Checkpoint 000B/000C — 2026-11-11
+
+Imported the original 141-file starter to the private GitHub repository as
+`9fde58f`. Added Spring Boot 4's Flyway starter so the existing V1 migration
+runs at startup, locked npm dependencies and switched CI and Docker to
+`npm ci`. Corrected the staff preview's JSX lint error.
+
+Java 21 `mvn verify` passed all 4 starter tests and packaged the API. A
+disposable PostgreSQL 18 instance applied Flyway V1 and returned HTTP 200 from
+the readiness and system status endpoints. Frontend lint, TypeScript and
+production build passed with Next.js 16.4.6. PostgreSQL 17 in Docker and the
+production deployment remain separate verification targets. Next: account
+authentication, scoped academy catalog and disabled-by-default Zoom ingress.
