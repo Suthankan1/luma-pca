@@ -869,3 +869,46 @@ build runs the Next.js default bundler and repeats the smoke test.
   in the form (new classes use Asia/Colombo); editing a class's time or webinar
   ID does not revisit existing Zoom links (API behaviour, see 003D-1).
 - **Next planned feature:** UI-3c Zoom review screens.
+
+## Checkpoint UI-3c — 2026-11-11 — Staff screens: Zoom review
+
+- **UI-3b evidence:** merged as PR #25, merge commit `5785fe6`; frontend CI green.
+- **Feature ID / name:** UI-3c. With it, every staff API area has a screen.
+- **Branch:** `feature/staff-ui-zoom`. **PR / merge SHA:** see the merged pull
+  request titled "feat(web): Zoom review screen".
+- **Implemented behavior:** nav item "Zoom review" (owners and administrators;
+  others see an explanation). `/staff/zoom` lists webinar occurrences (All /
+  Needs review / Decided; 50 most recent) with webinar ID, first and last event
+  time in Colombo time, event count, state and the linked class. Undecided
+  occurrences get a decision form: a class chosen from scheduled classes
+  starting within a day (same webinar first, then nearest), or "Not a class",
+  each with a required reason; decided ones can be changed. "Run automatic
+  linking" reports how many were linked. Failed (dead-lettered) events show
+  type, time, attempts and error, with a replay form and reason, plus a count of
+  events waiting to be processed. Payloads are never shown (the API does not
+  return them). The overview page's "Coming next" now names attendance only.
+- **Design notes:** Zoom occurrence UUIDs may contain "/", so decisions are made
+  in forms on the list page rather than on per-occurrence URLs; the occurrence
+  id is checked for size and printable characters only. Class choices come from
+  one class-list request spanning the shown occurrences (at most 92 days, the
+  API's limit; older occurrences beyond that get no choices, only "Not a class").
+- **API changes:** none. **Database changes:** none.
+- **Tests executed (macOS):** frontend lint, type-check, 34 unit tests (1 new),
+  production build; Playwright 50 tests (6 new: 3 scenarios × desktop and
+  mobile), run three times after the fix below. Real stack: Zoom receipts and
+  occurrences are seeded (no personal data; ingress and processing off);
+  automatic linking links the occurrence on the class's webinar ("Linked 1
+  occurrence; 1 still needs review."), the other is linked by hand then marked
+  not a class, and the failed event is replayed into the queue. Database
+  check: one AUTOMATIC link, one MANUAL "not a class", receipt back to RECEIVED
+  with 0 attempts; audit has ZOOM_OCCURRENCE_LINKED,
+  ZOOM_OCCURRENCE_MARKED_NOT_CLASS and ZOOM_RECEIPT_REPLAYED. Passed twice; no
+  secrets in logs.
+- **Test-only fix before commit:** the UI-3b stale-edit test opened the second
+  tab before the first had navigated to the class (one timeout in a full run);
+  it now waits for the class URL.
+- **Known issues / not done:** no paging beyond the 50 most recent occurrences
+  and failed events; no search by webinar ID; still unproven against a real
+  Zoom account (003A).
+- **Next planned feature:** 003A when the academy's Zoom test webinar is
+  available; otherwise real-stack browser test in CI, or password recovery.

@@ -311,3 +311,67 @@ export function batchOptions(courses: CourseRef[], batches: BatchRef[], include:
     return { id: batch.id, label: `${course ? `${course} · ` : ""}${batch.code} · ${batch.name}` };
   }).sort((a, b) => a.label.localeCompare(b.label));
 }
+
+// ---- Zoom review ------------------------------------------------------------------
+
+export type Occurrence = { occurrenceUuid: string; webinarId: string; firstEventAt: string; lastEventAt: string; eventCount: number;
+  classSessionId: string | null; linkSource: "AUTOMATIC" | "MANUAL" | null; linkedAt: string | null };
+export type ZoomReceipt = { id: string; eventType: string; eventTs: number; status: string; attempts: number; lastError: string | null;
+  receivedAt: string; nextAttemptAt: string | null; processedAt: string | null };
+
+export const zoomEventLabels: Record<string, string> = {
+  "webinar.started": "Webinar started",
+  "webinar.ended": "Webinar ended",
+  "webinar.participant_joined": "Participant joined",
+  "webinar.participant_left": "Participant left",
+};
+
+/** "13 Jan 2027 18:02" at the academy (or another zone). */
+export function formatInstant(iso: string, zone = ACADEMY_TIME_ZONE) {
+  const { date, time } = instantParts(iso, zone);
+  return `${formatDate(date)} ${time}`;
+}
+
+/** Zoom occurrence UUIDs are opaque strings (they may contain "/", "+" or "="); only their size and characters are checked. */
+export function occurrenceIdOrNull(value: FormDataEntryValue | null) {
+  return typeof value === "string" && /^[\x21-\x7e]{1,100}$/.test(value) ? value : null;
+}
+
+/** Decisions and replays are audited with their reason, so it is required; it must not identify people. */
+export function parseReason(form: FormData): string | { error: string } {
+  const reason = text(form, "reason");
+  if (reason.length < 3 || reason.length > 300) return { error: "Give a reason of 3 to 300 characters. Don’t include names or emails." };
+  return reason;
+}
+
+export function occurrenceState(occurrence: Occurrence) {
+  if (!occurrence.linkSource) return "Needs review";
+  if (!occurrence.classSessionId) return "Marked not a class";
+  return occurrence.linkSource === "AUTOMATIC" ? "Linked automatically" : "Linked by an administrator";
+}
+
+const DAY_MS = 86_400_000;
+const MAX_LIST_DAYS = 92;
+
+/**
+ * One class-list request covering a day either side of the shown occurrences. The API
+ * lists at most 92 days, so a wider spread keeps the most recent end.
+ */
+export function candidateWindow(occurrences: readonly Occurrence[]) {
+  if (occurrences.length === 0) return null;
+  const times = occurrences.map(o => Date.parse(o.firstEventAt));
+  const to = Math.max(...times) + DAY_MS;
+  const from = Math.max(Math.min(...times) - DAY_MS, to - MAX_LIST_DAYS * DAY_MS);
+  return { from: new Date(from).toISOString(), to: new Date(to).toISOString() };
+}
+
+/** Scheduled classes starting within a day of the occurrence, same webinar first, then nearest in time. */
+export function candidateClasses(occurrence: Occurrence, sessions: readonly ClassSession[]) {
+  const at = Date.parse(occurrence.firstEventAt);
+  return sessions
+    .filter(s => s.status === "SCHEDULED" && Math.abs(Date.parse(s.startsAt) - at) <= DAY_MS)
+    .map(s => ({ session: s, sameWebinar: s.zoomWebinarId === occurrence.webinarId, distance: Math.abs(Date.parse(s.startsAt) - at) }))
+    .sort((a, b) => Number(b.sameWebinar) - Number(a.sameWebinar) || a.distance - b.distance)
+    .map(({ session, sameWebinar }) => ({ id: session.id,
+      label: `${formatClassTime(session.startsAt, session.endsAt, session.timeZone)} · ${session.title}${sameWebinar ? " · same webinar" : ""}` }));
+}

@@ -120,6 +120,7 @@ test.describe("Classes", () => {
     await fillClass(page, { title: "Optics", date: "2027-02-01", start: "09:00", end: "10:30", batches: [`${code.toUpperCase()} · A · Batch A`] });
     await page.getByRole("button", { name: "Schedule class" }).click();
     await page.getByRole("link", { name: "Open the class →" }).click();
+    await expect(page).toHaveURL(/\/staff\/sessions\/[0-9a-f-]{36}$/);
     const other = await context.newPage();
     await other.goto(page.url());
     await other.locator("#edit-title").fill("Optics (first)");

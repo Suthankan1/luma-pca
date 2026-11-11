@@ -12,12 +12,17 @@ export default async function StaffPage() {
     <div className="staff-grid">
       <section className="panel" aria-labelledby="setup-title">
         <h2 id="setup-title" className="panel-title">ACADEMIC SETUP</h2>
-        <p className="panel-sub">{manager ? "Courses and the batches that take them." : "Owners and administrators set up courses and batches."}</p>
-        <div className="nav-links"><Link className="action" href="/staff/courses">Courses &amp; batches →</Link></div>
+        <p className="panel-sub">{manager ? "Courses, batches, the classes they take, students and staff."
+          : "Your batches’ rosters and classes. Owners and administrators manage everything else."}</p>
+        <div className="nav-links">
+          <Link className="action" href="/staff/courses">Courses &amp; batches →</Link>
+          <Link className="action secondary" href="/staff/sessions">Classes →</Link>
+          {manager && <Link className="action secondary" href="/staff/zoom">Zoom review →</Link>}
+        </div>
       </section>
       <section className="panel" aria-labelledby="soon-title">
         <h2 id="soon-title" className="panel-title">COMING NEXT</h2>
-        <p className="panel-sub">Students and enrollments, staff and invitations, class sessions and the Zoom review queue are available through the API and will get screens next. Attendance appears once Zoom participant data is verified.</p>
+        <p className="panel-sub">Attendance. Zoom webinar events are already received and linked to classes; turning them into attendance waits until participant data is checked against a real test webinar.</p>
       </section>
     </div>
   </StaffShell>;

@@ -1,0 +1,120 @@
+import Link from "next/link";
+import { StaffShell } from "@/components/StaffShell";
+import { AutoLinkForm, DecisionForm, ReplayForm } from "@/components/staff/ZoomForms";
+import { requirePortal } from "@/lib/auth-server";
+import { hasPortal } from "@/lib/session-policy";
+import { staffApi } from "@/lib/staff-api";
+import {
+  candidateClasses, candidateWindow, formatClassTime, formatInstant, formatWebinarId, isAcademyManager, occurrenceState, zoomEventLabels,
+  type ClassSession, type Occurrence, type ZoomReceipt,
+} from "@/lib/staff-forms";
+
+export const metadata = { title: "Zoom review · LUMA" };
+
+const views = [
+  { key: "all", label: "All", query: "" },
+  { key: "review", label: "Needs review", query: "&decided=false" },
+  { key: "decided", label: "Decided", query: "&decided=true" },
+] as const;
+
+const LIMIT = 50;
+
+/**
+ * Owners and administrators review what the webhook worker could not settle on its own:
+ * webinar occurrences not linked to a class, and receipts that failed processing.
+ * Receipt payloads (names, emails) are never shown; the API does not return them.
+ */
+export default async function ZoomReviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const identity = await requirePortal("staff");
+  const requested = (await searchParams).view;
+  const view = views.find(v => v.key === requested) ?? views[0];
+  const shell = { active: "zoom" as const, crumb: "Zoom", title: "Zoom review",
+    subtitle: "Webinar occurrences become attendance only once they are linked to a class. Nothing here is shown to students.",
+    hasStudentPortal: hasPortal(identity, "student") };
+  if (!isAcademyManager(identity.roles)) {
+    return <StaffShell {...shell}>
+      <p className="banner">Only academy owners and administrators review Zoom events.</p>
+    </StaffShell>;
+  }
+
+  const [occurrences, dead, waiting] = await Promise.all([
+    staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?limit=${LIMIT}${view.query}`),
+    staffApi<ZoomReceipt[]>(`/api/v1/zoom/receipts?status=DEAD&limit=${LIMIT}`),
+    staffApi<ZoomReceipt[]>("/api/v1/zoom/receipts?status=RECEIVED&limit=200"),
+  ]);
+  if (!occurrences.ok || !dead.ok || !waiting.ok) {
+    return <StaffShell {...shell}>
+      <p className="session-error" role="alert">We couldn’t load Zoom events right now. Please reload the page shortly.</p>
+    </StaffShell>;
+  }
+  // Class choices: scheduled classes within a day of each occurrence, from one list request.
+  const window = candidateWindow(occurrences.data);
+  const sessions = window
+    ? await staffApi<ClassSession[]>(`/api/v1/class-sessions?${new URLSearchParams({ from: window.from, to: window.to })}`)
+    : null;
+  const nearby = sessions?.ok ? sessions.data : [];
+  // Linked classes may lie outside that window; fetch the few that do for their titles.
+  const known = new Map(nearby.map(s => [s.id, s]));
+  const missing = [...new Set(occurrences.data.map(o => o.classSessionId).filter((id): id is string => !!id && !known.has(id)))];
+  for (const result of await Promise.all(missing.map(id => staffApi<ClassSession>(`/api/v1/class-sessions/${id}`)))) {
+    if (result.ok) known.set(result.data.id, result.data);
+  }
+  const reviewCount = occurrences.data.filter(o => !o.linkSource).length;
+
+  return <StaffShell {...shell}>
+    <section className="panel" aria-labelledby="occurrences-title">
+      <h2 id="occurrences-title" className="panel-title">WEBINAR OCCURRENCES</h2>
+      <p className="panel-sub">Each time a webinar runs, Zoom reports a new occurrence. It is linked automatically when exactly one scheduled class
+        on that webinar ID covers its start (±60 minutes); otherwise decide here. Your decisions are never overridden automatically.</p>
+      <nav className="filter-row" aria-label="Filter occurrences">
+        {views.map(v => <Link key={v.key} href={v.key === "all" ? "/staff/zoom" : `/staff/zoom?view=${v.key}`}
+          className={`chip ${v.key === view.key ? "cyan" : ""}`} aria-current={v.key === view.key ? "true" : undefined}>{v.label}</Link>)}
+      </nav>
+      <div className="link-row"><AutoLinkForm /></div>
+      {sessions && !sessions.ok && <p className="session-error" role="alert">Class choices couldn’t be loaded; reload to decide.</p>}
+      <ul className="dir-list">
+        {occurrences.data.map((o, index) => {
+          const linked = o.classSessionId ? known.get(o.classSessionId) : undefined;
+          const state = occurrenceState(o);
+          return <li key={o.occurrenceUuid} className="dir-course occurrence" aria-label={`Webinar ${formatWebinarId(o.webinarId)} at ${formatInstant(o.firstEventAt)}`}>
+            <div className="dir-row">
+              <div>
+                <strong>Webinar {formatWebinarId(o.webinarId)}</strong>
+                <span className="dir-dates muted"> {formatInstant(o.firstEventAt)} – {formatInstant(o.lastEventAt)} · {o.eventCount} event{o.eventCount === 1 ? "" : "s"}</span>
+                {o.classSessionId && <div className="dir-dates">
+                  {linked ? <Link className="text-link" href={`/staff/sessions/${linked.id}`}>{linked.title}, {formatClassTime(linked.startsAt, linked.endsAt, linked.timeZone)}</Link>
+                    : <Link className="text-link" href={`/staff/sessions/${o.classSessionId}`}>Linked class</Link>}
+                </div>}
+              </div>
+              <span className={`status ${state === "Needs review" ? "off" : "on"}`}>{state}</span>
+            </div>
+            {o.linkSource ? <details className="decision">
+              <summary>Change decision</summary>
+              <DecisionForm prefix={`occ-${index}`} occurrenceUuid={o.occurrenceUuid} candidates={candidateClasses(o, nearby)} current={o.classSessionId} />
+            </details> : <DecisionForm prefix={`occ-${index}`} occurrenceUuid={o.occurrenceUuid} candidates={candidateClasses(o, nearby)} current={null} />}
+          </li>;
+        })}
+        {occurrences.data.length === 0 && <li className="dir-empty muted">{view.key === "review" ? "Nothing needs review." : "No webinar occurrences yet."}</li>}
+      </ul>
+      {occurrences.data.length === LIMIT && <p className="panel-sub">Showing the {LIMIT} most recent{view.key === "review" ? "" : `; ${reviewCount} of them need review`}.</p>}
+    </section>
+
+    <section className="panel panel-gap" aria-labelledby="receipts-title">
+      <h2 id="receipts-title" className="panel-title">FAILED EVENTS</h2>
+      <p className="panel-sub">Events the worker gave up on after retrying, or could not read. Replay one once its cause is fixed.
+        {" "}{waiting.data.length >= 200 ? "200 or more" : waiting.data.length} event{waiting.data.length === 1 ? " is" : "s are"} waiting to be processed.</p>
+      <ul className="dir-list">
+        {dead.data.map((r, index) => <li key={r.id} className="dir-course receipt" aria-label={`${zoomEventLabels[r.eventType] ?? r.eventType} received ${formatInstant(r.receivedAt)}`}>
+          <div className="dir-row">
+            <div><strong>{zoomEventLabels[r.eventType] ?? r.eventType}</strong>
+              <span className="dir-dates muted"> received {formatInstant(r.receivedAt)} · {r.attempts} attempt{r.attempts === 1 ? "" : "s"}</span>
+              {r.lastError && <div className="dir-dates"><code>{r.lastError}</code></div>}</div>
+            <span className="status off">Failed</span>
+          </div>
+          <ReplayForm prefix={`receipt-${index}`} id={r.id} />
+        </li>)}
+        {dead.data.length === 0 && <li className="dir-empty muted">No failed events.</li>}
+      </ul>
+    </section>
+  </StaffShell>;
+}
