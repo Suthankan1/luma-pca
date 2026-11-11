@@ -44,3 +44,9 @@ luma:
     # Base64 of 32 random bytes from a secrets manager; encrypts authenticator secrets at rest.
     # Losing or changing it makes every enrolled authenticator unusable.
     mfa-encryption-key: ${LUMA_AUTH_MFA_ENCRYPTION_KEY:}
+  zoom:
+    webhook:
+      # Webhook ingress stays off (404) until a secret token is set. Never commit one.
+      secret-token: ${LUMA_ZOOM_WEBHOOK_SECRET_TOKEN:}
+      academy-id: ${LUMA_ZOOM_WEBHOOK_ACADEMY_ID:}
+      max-clock-skew: ${LUMA_ZOOM_WEBHOOK_MAX_CLOCK_SKEW:PT5M}

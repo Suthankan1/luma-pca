@@ -584,3 +584,51 @@ build runs the Next.js default bundler and repeats the smoke test.
   activation does not sign the person in; no rate limit on activation attempts
   beyond the 256-bit code space.
 - **Next planned feature:** 003B Zoom webhook receipt against fixtures.
+
+## Checkpoint 003B — 2026-11-11 — Signed Zoom webhook receipt (fixtures only)
+
+- **001I evidence:** merged as PR #16, merge commit `bc2665b`; backend and frontend CI green on `main`.
+- **Feature ID / name:** 003B — webhook verification and durable receipt.
+- **Branch:** `feature/003b-zoom-webhook-ingress`. **PR / merge SHA:** see the
+  merged pull request titled "feat(zoom): verify and durably record Zoom
+  webhooks". Two attempts (PR #17 and PR #18) were closed unmerged because
+  GitGuardian flagged a random-looking sample `plainToken` used in two test files
+  as a generic high-entropy secret (incident 39943027, which may remain open for
+  the owner to resolve as test data). The first fix wrongly targeted a
+  hard-coded HMAC (now computed in the test, which is still better); the fixture
+  is now the low-entropy `zoomUrlValidationFixture`. Lesson for agents: read the
+  flagged string itself, and keep random-looking literals out of tests.
+- **Source checked:** Zoom's webhook documentation was read on 2026-11-11
+  (https://developers.zoom.us/docs/api/webhooks/). It documents the signature
+  scheme, URL validation (3-second limit), and retries of 5xx only (5, 20 and 60
+  minutes later). It documents **no** replay window and **no** event identifier.
+- **Implemented behavior:** `POST /api/v1/zoom/webhooks`, off (404) unless
+  `LUMA_ZOOM_WEBHOOK_SECRET_TOKEN` and `LUMA_ZOOM_WEBHOOK_ACADEMY_ID` are set.
+  Verifies `x-zm-signature` over the raw body and the request timestamp (within 5
+  minutes, our choice), answers `endpoint.url_validation`, stores the four
+  webinar start/end/join/leave event types and drops other verified types. The
+  receipt is committed before the 2xx; an identical redelivery is acknowledged
+  without a second row; a storage failure answers 503 so Zoom retries.
+- **Security decision beyond Zoom's sample code:** validation requests must be
+  signed, and a `plainToken` containing `:` is refused, so the validation answer
+  can never serve as a signature for a forged event.
+- **Database changes:** Flyway `V11__zoom_webhook_receipts.sql`.
+- **API changes:** the planned webhook entry is replaced by the implemented one in OpenAPI.
+- **Frontend changes:** none.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker — 229 tests, 0 failures, 0 errors, 0 skipped on macOS. 17 new: 6
+  unit tests against reference values computed independently with Python's
+  `hmac` module (tampering, freshness both ways, malformed headers,
+  configuration), 10 real-HTTP tests on PostgreSQL 17 (storage, URL validation,
+  forgery attempt, ten rejection cases with empty bodies, redelivery, 12
+  concurrent duplicates producing one receipt, malformed and unused events, size
+  and content-type limits, 503 then successful retry, log capture proving no
+  names, emails, secret or signatures are logged), 1 disabled-by-default test.
+  The Zoom tests were run three times. Linux CI result is on the pull request.
+- **Known issues / not done:** **no real Zoom delivery has been received**; the
+  5-minute window may reject retries if Zoom keeps the original timestamp (to
+  verify in 003A); dedup on the exact body will not merge a retry whose body
+  differs; nothing processes receipts yet (003C); one academy per deployment;
+  payload retention policy undecided; the `x-zm-request-id` header is not used
+  because Zoom does not document it.
+- **Next planned feature:** 003C receipt processing worker; 003A needs the academy's Zoom credentials.
