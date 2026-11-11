@@ -4,6 +4,7 @@
  * {@link com.physicscube.luma.identity.AccountService} and
  * {@link com.physicscube.luma.identity.InvitationService}, never the repositories
  * or entities directly. Password sign-in issues RS256 access tokens bound to a
- * rotating refresh session; MFA and recovery are not implemented yet.
+ * rotating refresh session. Owner and administrator accounts need an authenticator
+ * code (TOTP) as a second factor. Password recovery is not implemented yet.
  */
 package com.physicscube.luma.identity;

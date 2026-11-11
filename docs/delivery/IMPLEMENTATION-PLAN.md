@@ -9,9 +9,10 @@
 | 000C Frontend bootstrap | Next install/lint/build and 3 preview pages | DONE (PR #1) |
 | 001A Auth schema + hashed-password domain | PostgreSQL migration + TCs; no public endpoint | DONE (V2 accounts/roles, Argon2id, Testcontainers) |
 | 001B Secure invitation + activation | Student/staff role creation, expiry and validation tests | DONE at service layer (V3 invitations, single-use hashed tokens); HTTP activation route and token delivery TODO with 001C |
-| 001C JWT login | RS256 signatures, issuer/audience, lockout, MFA admin path | DONE except MFA: login, token validation, key rotation, lockout, activation route. Owner/admin sign-in is blocked until MFA (new slice 001F) |
+| 001C JWT login | RS256 signatures, issuer/audience, lockout | DONE. Password sign-in, token validation, key rotation, lockout and invitation activation. See 001F for admin MFA. |
 | 001D Refresh and BFF | Atomic refresh rotation, reuse revocation, HttpOnly cookie, CSRF and e2e | DONE: Next.js BFF cookies/origin checks (PR #2) plus backend refresh rotation, reuse revocation, logout and logout-all; verified together by `scripts/auth-stack-smoke.sh`. Browser-driven (Playwright) e2e still TODO |
-| 001F Admin MFA | TOTP enrolment and verification for owner/admin; removes the sign-in block | TODO |
+| 001F Admin MFA | TOTP enrolment and verification for owner/admin; removes the sign-in block | DONE in the backend (TOTP, recovery codes, reset, lockout); the development override was removed. Browser MFA step is new slice 001G |
+| 001G Browser MFA step | Next.js code entry, enrolment QR and recovery-code display; Playwright coverage | TODO |
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | PARTIAL: cross-academy isolation and role denial enforced and tested for courses/batches (002A); course/batch/student scope needs 002B assignments and enrollments |
 | 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | TODO |
@@ -30,4 +31,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `001F` admin MFA, because every staff route built so far is only reachable by owner/admin accounts, which cannot sign in without the development override. Then `002B` students, enrollments and staff assignments, which unlock batch-scoped access for instructors. Implement each as one small test-backed commit and update `docs/ai/checkpoints/PROGRESS.md`.
+**Suggested next small slice:** `001G` browser MFA step, so administrators can sign in through the Next.js app; then `002B` students, enrollments and staff assignments.

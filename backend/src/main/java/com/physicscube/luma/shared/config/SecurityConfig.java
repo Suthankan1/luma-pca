@@ -25,9 +25,11 @@ public class SecurityConfig {
                             "/api/v1/system/status", "/.well-known/jwks.json").permitAll()
                     // The refresh token in the body is the credential for refresh and logout.
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/activate",
-                            "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
+                            "/api/v1/auth/refresh", "/api/v1/auth/logout",
+                            // The challenge token from the password step is the credential here.
+                            "/api/v1/auth/mfa/enroll", "/api/v1/auth/mfa/verify").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all", "/api/v1/auth/mfa/reset").authenticated()
                     // First gate only. Services repeat the role check and bind every query to
                     // the caller's academy; later slices add course and batch scope there.
                     .requestMatchers("/api/v1/courses", "/api/v1/courses/**", "/api/v1/batches", "/api/v1/batches/**")

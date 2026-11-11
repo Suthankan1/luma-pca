@@ -3,8 +3,11 @@ package com.physicscube.luma.support;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.physicscube.luma.identity.AccountService;
+import com.physicscube.luma.identity.Base32;
+import com.physicscube.luma.identity.Totp;
 import com.physicscube.luma.identity.domain.Role;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -14,14 +17,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
 
-/**
- * Base for tests that call staff routes over real HTTP. Owner and administrator
- * sign-in is blocked until MFA exists, so these tests enable the development-only
- * override; the block itself is covered by AuthHttpIntegrationTest.
- */
-@TestPropertySource(properties = "luma.auth.allow-elevated-login-without-mfa=true")
+/** Base for tests that call staff routes over real HTTP, signing in the way real staff do, MFA included. */
 public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
     private static final String PASSPHRASE = "quiet river under bridge";
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
@@ -60,12 +57,30 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
         return id;
     }
 
+    /**
+     * Signs in and returns an access token. For accounts that need MFA this enrols an
+     * authenticator on first use, so call it once per such account: a second sign-in
+     * inside the same 30 seconds would be refused as a replayed code.
+     */
     protected String login(String email) {
         Map<String, String> body = new LinkedHashMap<>();
         body.put("email", email);
         body.put("password", PASSPHRASE);
         HttpResponse<String> response = api.post("/api/v1/auth/login", HttpApi.json(body));
         assertEquals(200, response.statusCode(), response.body());
-        return (String) HttpApi.parse(response).get("accessToken");
+        Map<String, Object> result = HttpApi.parse(response);
+        if (Boolean.TRUE.equals(result.get("mfaRequired"))) {
+            String challenge = (String) result.get("mfaToken");
+            HttpResponse<String> enrolment = api.post("/api/v1/auth/mfa/enroll", HttpApi.json(Map.of("mfaToken", challenge)));
+            assertEquals(200, enrolment.statusCode(), enrolment.body());
+            byte[] secret = Base32.decode((String) HttpApi.parse(enrolment).get("secret"));
+            Map<String, String> verification = new LinkedHashMap<>();
+            verification.put("mfaToken", challenge);
+            verification.put("code", Totp.code(secret, Totp.step(Instant.now())));
+            response = api.post("/api/v1/auth/mfa/verify", HttpApi.json(verification));
+            assertEquals(200, response.statusCode(), response.body());
+            result = HttpApi.parse(response);
+        }
+        return (String) result.get("accessToken");
     }
 }

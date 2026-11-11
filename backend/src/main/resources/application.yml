@@ -41,5 +41,6 @@ luma:
     ephemeral-signing-key: ${LUMA_AUTH_EPHEMERAL_SIGNING_KEY:false}
     refresh-token-ttl: ${LUMA_AUTH_REFRESH_TOKEN_TTL:P7D}
     session-max-lifetime: ${LUMA_AUTH_SESSION_MAX_LIFETIME:P30D}
-    # MFA is not implemented yet, so owner/admin sign-in stays blocked unless this is set.
-    allow-elevated-login-without-mfa: ${LUMA_AUTH_ALLOW_ELEVATED_LOGIN_WITHOUT_MFA:false}
+    # Base64 of 32 random bytes from a secrets manager; encrypts authenticator secrets at rest.
+    # Losing or changing it makes every enrolled authenticator unusable.
+    mfa-encryption-key: ${LUMA_AUTH_MFA_ENCRYPTION_KEY:}

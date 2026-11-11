@@ -39,6 +39,25 @@ class AuthController {
         }
     }
 
+    record MfaRequiredResponse(boolean mfaRequired, String mfaToken, long mfaExpiresIn, boolean mfaEnrolled) {
+    }
+
+    record MfaTokenRequest(@NotBlank @Size(max = 128) String mfaToken) {
+    }
+
+    record MfaVerifyRequest(@NotBlank @Size(max = 128) String mfaToken, @NotBlank @Size(max = 32) String code) {
+    }
+
+    record MfaEnrollmentResponse(String secret, String otpauthUri) {
+    }
+
+    record MfaVerifiedResponse(String accessToken, String tokenType, long expiresIn, String refreshToken,
+                               long refreshExpiresIn, List<String> recoveryCodes) {
+    }
+
+    record MfaResetRequest(@NotBlank @Size(max = 256) String password) {
+    }
+
     record RefreshTokenRequest(@NotBlank @Size(max = 128) String refreshToken) {
     }
 
@@ -48,9 +67,37 @@ class AuthController {
     record IdentityResponse(String accountId, String academyId, List<String> roles) {
     }
 
+    /** Returns tokens, or {@code mfaRequired} with a challenge when a second factor is needed. */
     @PostMapping("/login")
-    TokenResponse login(@Valid @RequestBody LoginRequest request) {
-        return TokenResponse.of(auth.login(request.email(), request.password()));
+    Object login(@Valid @RequestBody LoginRequest request) {
+        AuthService.LoginOutcome outcome = auth.login(request.email(), request.password());
+        if (outcome.challenge() != null) {
+            return new MfaRequiredResponse(true, outcome.challenge().mfaToken(), outcome.challenge().expiresInSeconds(),
+                    outcome.challenge().enrolled());
+        }
+        return TokenResponse.of(outcome.tokens());
+    }
+
+    @PostMapping("/mfa/enroll")
+    MfaEnrollmentResponse enrollMfa(@Valid @RequestBody MfaTokenRequest request) {
+        AuthService.MfaEnrollment enrollment = auth.beginMfaEnrollment(request.mfaToken());
+        return new MfaEnrollmentResponse(enrollment.secret(), enrollment.otpauthUri());
+    }
+
+    @PostMapping("/mfa/verify")
+    MfaVerifiedResponse verifyMfa(@Valid @RequestBody MfaVerifyRequest request) {
+        AuthService.MfaOutcome outcome = auth.completeMfa(request.mfaToken(), request.code());
+        SessionTokens tokens = outcome.tokens();
+        return new MfaVerifiedResponse(tokens.accessToken(), "Bearer", tokens.expiresInSeconds(), tokens.refreshToken(),
+                tokens.refreshExpiresInSeconds(), outcome.recoveryCodes());
+    }
+
+    /** Removes the caller's authenticator; requires their password again and signs them out everywhere. */
+    @PostMapping("/mfa/reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void resetMfa(JwtAuthenticationToken authentication, @Valid @RequestBody MfaResetRequest request) {
+        auth.resetMfa(UUID.fromString(authentication.getName()),
+                UUID.fromString(authentication.getToken().getClaimAsString("sid")), request.password());
     }
 
     @PostMapping("/refresh")

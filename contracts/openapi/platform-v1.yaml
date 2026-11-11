@@ -4,7 +4,7 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/refresh/logout/logout-all/activate/me, JWKS, courses and batches. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me and MFA enroll/verify/reset, JWKS, courses and batches. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
 servers:
   - url: http://localhost:8080
@@ -23,7 +23,7 @@ paths:
                 $ref: '#/components/schemas/SystemStatus'
   /api/v1/auth/login:
     post:
-      summary: Password sign-in, starts a refresh session (implemented)
+      summary: Password sign-in for a session or MFA challenge (implemented)
       operationId: login
       tags: [Identity]
       requestBody:
@@ -38,14 +38,15 @@ paths:
                 password: {type: string, maxLength: 256, writeOnly: true}
       responses:
         '200':
-          description: RS256 access token and opaque refresh token
+          description: Tokens, or an MFA challenge for accounts that need a second factor
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccessTokenResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/AccessTokenResponse'
+                  - $ref: '#/components/schemas/MfaRequiredResponse'
         '400': {description: Malformed request}
         '401': {description: Invalid credentials. Identical for unknown email, wrong password, inactive and locked accounts}
-        '403': {description: Password was correct but the account needs MFA, which is not available yet}
   /api/v1/auth/activate:
     post:
       summary: Redeem an invitation and set the first password (implemented)
@@ -67,7 +68,7 @@ paths:
         '422': {description: Password rejected by policy; the invitation stays usable}
   /api/v1/auth/me:
     get:
-      summary: Current account, academy and stored roles (implemented)
+      summary: Current account, academy and current roles (implemented)
       operationId: getIdentity
       tags: [Identity]
       security: [{bearerAuth: []}]
@@ -86,10 +87,88 @@ paths:
       tags: [Identity]
       responses:
         '200': {description: JWK Set containing public RSA keys only}
+  /api/v1/auth/mfa/enroll:
+    post:
+      summary: Start authenticator enrolment for an account that needs MFA (implemented)
+      operationId: enrollMfa
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mfaToken]
+              properties:
+                mfaToken: {type: string, maxLength: 128, writeOnly: true}
+      responses:
+        '200':
+          description: Secret to load into an authenticator app; replaces any unconfirmed secret
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [secret, otpauthUri]
+                properties:
+                  secret: {type: string, description: Base32}
+                  otpauthUri: {type: string}
+        '400': {description: Malformed request}
+        '401': {description: 'Challenge unusable, or the account already has a confirmed authenticator'}
+  /api/v1/auth/mfa/verify:
+    post:
+      summary: Complete sign-in with an authenticator or recovery code (implemented)
+      operationId: verifyMfa
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mfaToken, code]
+              properties:
+                mfaToken: {type: string, maxLength: 128, writeOnly: true}
+                code: {type: string, maxLength: 32, description: 6-digit code or a recovery code}
+      responses:
+        '200':
+          description: Tokens; recoveryCodes is set only when this call completed enrolment
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AccessTokenResponse'
+                  - type: object
+                    properties:
+                      recoveryCodes: {type: [array, 'null'], items: {type: string}}
+        '400': {description: Malformed request}
+        '401': {description: Unusable challenge or rejected code (indistinguishable)}
+  /api/v1/auth/mfa/reset:
+    post:
+      summary: Remove the caller's authenticator and end all their sessions (implemented)
+      description: An enrolled account must use a live MFA-verified session.
+      operationId: resetMfa
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: {type: string, maxLength: 256, writeOnly: true}
+      responses:
+        '204': {description: Authenticator removed; next sign-in enrols again}
+        '400': {description: Malformed request}
+        '401': {description: Invalid session or failed password recheck}
   /api/v1/auth/refresh:
     post:
       summary: Exchange a refresh token for a new token pair (implemented)
-      description: The presented token can never be used again. Presenting an already exchanged token revokes the whole session.
+      description: >-
+        Refresh tokens are single-use. Presenting an exchanged token revokes
+        the session. An account promoted to owner or administrator must
+        complete MFA before it can refresh a session.
       operationId: refreshSession
       tags: [Identity]
       requestBody:
@@ -338,6 +417,14 @@ components:
         refreshToken: {type: string, description: Opaque single-use token}
         refreshExpiresIn: {type: integer, description: Seconds, example: 604800}
       required: [accessToken, tokenType, expiresIn, refreshToken, refreshExpiresIn]
+    MfaRequiredResponse:
+      type: object
+      required: [mfaRequired, mfaToken, mfaExpiresIn, mfaEnrolled]
+      properties:
+        mfaRequired: {type: boolean, const: true}
+        mfaToken: {type: string, description: Short-lived challenge consumed on successful verification}
+        mfaExpiresIn: {type: integer, description: Seconds, example: 300}
+        mfaEnrolled: {type: boolean, description: False means the client must call mfa/enroll first}
     RefreshTokenRequest:
       type: object
       required: [refreshToken]
