@@ -153,6 +153,7 @@ class StaffAccountHttpIntegrationTest extends StaffApiIntegrationTest {
         assertTrue(issued.headers().firstValue("Cache-Control").orElse("").contains("no-store"));
         String token = (String) HttpApi.parse(issued).get("activationToken");
         assertTrue(token.matches("[A-Za-z0-9_-]{43}"));
+        assertEquals("/activate#token=" + token, HttpApi.parse(issued).get("activationPath"));
         assertEquals(204, activateWithInvitation(token));
         assertEquals(200, passwordLogin(address).statusCode());
         assertEquals("ACTIVE", HttpApi.parse(api.get("/api/v1/staff-accounts/" + id, admin)).get("status"));

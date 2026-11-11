@@ -543,3 +543,44 @@ build runs the Next.js default bundler and repeats the smoke test.
   database; removing a staff role leaves its batch assignments in place (they
   grant nothing without the role).
 - **Next planned feature:** 001I browser activation page, then 003B Zoom webhook receipt.
+
+## Checkpoint 001I — 2026-11-11 — Browser account activation
+
+- **001H evidence:** merged as PR #15, merge commit `cbbae6e`; backend CI green on `main`.
+- **Feature ID / name:** 001I — browser account activation.
+- **Branch:** `feature/001i-activation-page`. **PR / merge SHA:** see the merged
+  pull request titled "feat(web): activate invited accounts in the browser".
+- **Implemented behavior:** new Next.js page `/activate`. An administrator sends
+  `https://<web origin>/activate#token=<code>`; the page copies the code from the
+  fragment into the form and removes it from the address bar. The person may
+  also paste the code or the whole link. The form posts to the BFF action
+  `/api/session/activate` (same origin check as sign-in), which rejects a missing
+  code or mismatched passwords locally, calls `POST /api/v1/auth/activate`, and
+  redirects to `/sign-in?activated=1` on success. On a weak password, the
+  person returns to the form with the code kept in the fragment; an invalid,
+  used or expired code returns to an empty form. The sign-in page shows
+  "Your account is active". Activation never signs anyone in.
+- **Backend change:** the invitation response gains `activationPath`
+  (`/activate#token=...`); OpenAPI updated.
+- **Defect found by the browser tests and fixed before commit:** the first
+  version set the page's referrer policy to `no-referrer`. That makes browsers
+  send `Origin: null` on form posts, so the BFF's cross-site check refused every
+  activation with 403. Curl-based checks could not have caught it. The policy
+  was unnecessary (fragments are never sent in a Referer) and was removed.
+- **Tests executed (macOS):** frontend lint, type-check, 15 unit tests (4 new:
+  code extraction from codes and links, local form checks, fragment-only
+  redirects), production build, HTTP smoke test; Playwright 16 tests, 6 new
+  (3 scenarios × desktop and mobile: invalid, pasted-link, mismatch, weak and
+  successful activation, reuse refused, malformed code caught locally,
+  cross-site post refused, labels), run twice. Backend: 212 tests. Real stack
+  (`scripts/auth-stack-smoke.sh`, PostgreSQL 17 + backend jar + Next.js): 55
+  checks, now activating the student through the page, including a password the
+  backend refuses and a reused code, and confirming the activation code never
+  appears in the frontend log. Test-only fixes: label lookups made exact, the
+  Next.js route announcer excluded from alert lookups, and one mock activation
+  code per browser project.
+- **Known issues / not done:** no email delivery (the administrator sends the
+  link); no staff screen to create staff or issue invitations (API only);
+  activation does not sign the person in; no rate limit on activation attempts
+  beyond the 256-bit code space.
+- **Next planned feature:** 003B Zoom webhook receipt against fixtures.

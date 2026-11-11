@@ -155,3 +155,34 @@ export function openRecovery(cookie: string, key: Buffer): RecoveryCodesState | 
     return null;
   }
 }
+
+const activationTokenShape = /^[A-Za-z0-9_-]{20,128}$/;
+
+/**
+ * The activation code from what the person entered: the bare code, or a whole
+ * invitation link ending in `#token=<code>`. Anything else is rejected.
+ */
+export function extractActivationToken(input: string | null | undefined): string | null {
+  if (!input) return null;
+  let value = input.trim();
+  const marker = value.lastIndexOf("token=");
+  if (marker >= 0) value = value.slice(marker + "token=".length);
+  value = value.split(/[&#\s]/)[0];
+  return activationTokenShape.test(value) ? value : null;
+}
+
+export type ActivationProblem = "token" | "mismatch" | "weak";
+
+/** Checks that need no server; the backend still applies the full password policy. */
+export function activationProblem(token: string | null, password: string, confirm: string): ActivationProblem | null {
+  if (!token) return "token";
+  if (password !== confirm) return "mismatch";
+  const length = [...password].length;
+  if (length < 12 || length > 128) return "weak";
+  return null;
+}
+
+/** The activation page, keeping the code in the fragment so it never reaches a server or log. */
+export function activationPath(error?: string, token?: string | null) {
+  return `/activate${error ? `?error=${encodeURIComponent(error)}` : ""}${token ? `#token=${token}` : ""}`;
+}

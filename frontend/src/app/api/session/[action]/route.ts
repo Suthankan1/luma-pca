@@ -9,6 +9,9 @@ import {
   readTokens,
 } from "@/lib/auth-server";
 import {
+  activationPath,
+  activationProblem,
+  extractActivationToken,
   isSameOrigin,
   openMfa,
   portalPath,
@@ -24,7 +27,7 @@ const noStore = { "Cache-Control": "no-store" };
 
 export async function POST(request: NextRequest, context: { params: Promise<{ action: string }> }) {
   const { action } = await context.params;
-  const allowedActions = ["login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery"];
+  const allowedActions = ["login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery", "activate"];
   if (!allowedActions.includes(action)) {
     return new NextResponse(null, { status: 404, headers: noStore });
   }
@@ -145,6 +148,20 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       return response;
     }
 
+    if (action === "activate") {
+      // Independent of any session in this browser: it only sets the invited account's password.
+      const token = extractActivationToken(form.get("token"));
+      const password = form.get("password") ?? "";
+      const problem = activationProblem(token, password, form.get("confirm") ?? "");
+      if (problem) return go(activationPath(problem, problem === "token" ? null : token));
+      const activated = await authRequest("activate", { body: { token, password } });
+      if (activated.status === 204) return go("/sign-in?activated=1");
+      if (activated.status === 400) return go(activationPath("invalid"));
+      if (activated.status === 422) return go(activationPath("weak", token));
+      if (activated.status === 429) return go(activationPath("limited", token));
+      return go(activationPath("unavailable", token));
+    }
+
     const email = form.get("email")?.trim();
     const password = form.get("password");
     if (action === "login" && (!email || email.length > 254 || !password || password.length > 256)) {
@@ -216,6 +233,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     if (request.cookies.has(names.recovery)) response.cookies.set(names.recovery, "", sessionCookie(secure, 0));
     return response;
   } catch {
+    if (action === "activate") return go(activationPath("unavailable"));
     return go(action === "logout" ? "/sign-in?error=sign-out" : "/sign-in?error=unavailable");
   }
 }

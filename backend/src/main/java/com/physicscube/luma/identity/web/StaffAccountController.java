@@ -38,8 +38,12 @@ class StaffAccountController {
     record ReplaceRolesRequest(@NotNull @Size(max = 5) List<String> roles, @NotNull @PositiveOrZero Long version) {
     }
 
-    /** The activation token is shown once; deliver it to the person and do not store it. */
-    record InvitationResponse(UUID accountId, String activationToken, Instant expiresAt) {
+    /**
+     * The activation token is shown once; deliver it to the person and do not store it.
+     * {@code activationPath} is appended to the web app's origin to form the link; the
+     * token sits in the fragment, which browsers never send to a server.
+     */
+    record InvitationResponse(UUID accountId, String activationToken, String activationPath, Instant expiresAt) {
     }
 
     @GetMapping("/api/v1/staff-accounts")
@@ -74,6 +78,7 @@ class StaffAccountController {
     ResponseEntity<InvitationResponse> invite(JwtAuthenticationToken authentication, @PathVariable UUID accountId) {
         IssuedInvitation issued = staff.invite(CurrentAccount.from(authentication), accountId);
         return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
-                .body(new InvitationResponse(issued.accountId(), issued.token(), issued.expiresAt()));
+                .body(new InvitationResponse(issued.accountId(), issued.token(), "/activate#token=" + issued.token(),
+                        issued.expiresAt()));
     }
 }

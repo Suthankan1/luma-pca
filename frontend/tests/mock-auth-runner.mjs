@@ -6,6 +6,7 @@ let rotation = 0;
 let latestRefresh = "";
 const jwt = "fake-access-token.for-bff.e2e-test";
 let roles = [];
+const activatedTokens = new Set();
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -79,6 +80,16 @@ const backend = createServer(async (req, res) => {
         });
       }
       return send(401);
+
+    // Activation codes: one letter repeated 43 times activates once ("U" is always used up),
+    // so each browser project can use its own code. Anything else is unknown.
+    case "/api/v1/auth/activate":
+      if (/^([A-TV-Z])\1{42}$/.test(String(body.token)) && !activatedTokens.has(body.token)) {
+        if (typeof body.password !== "string" || body.password.includes("weak")) return send(422, { detail: "Password rejected" });
+        activatedTokens.add(body.token);
+        return send(204);
+      }
+      return send(400, { detail: "Invitation is invalid or has expired" });
 
     case "/api/v1/auth/refresh":
       if (body.refreshToken !== latestRefresh) return send(401);

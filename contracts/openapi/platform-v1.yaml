@@ -713,10 +713,11 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [accountId, activationToken, expiresAt]
+                required: [accountId, activationToken, activationPath, expiresAt]
                 properties:
                   accountId: {type: string, format: uuid}
                   activationToken: {type: string}
+                  activationPath: {type: string, description: 'Append to the web app origin to form the invitation link, e.g. /activate#token=...'}
                   expiresAt: {type: string, format: date-time}
         '403': {description: An administrator inviting an owner or administrator}
         '404': {description: Account not in this academy}
