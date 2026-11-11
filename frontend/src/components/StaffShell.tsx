@@ -7,6 +7,7 @@ export const staffNav = [
   { key: "sessions", label: "Classes", href: "/staff/sessions" },
   { key: "students", label: "Students", href: "/staff/students" },
   { key: "team", label: "Staff", href: "/staff/team" },
+  { key: "zoom", label: "Zoom review", href: "/staff/zoom" },
 ] as const;
 
 export type StaffSection = (typeof staffNav)[number]["key"];

@@ -151,6 +151,33 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students follow the new date and batches.");
   await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
 
+  // 7c. Zoom review against the seeded occurrences: automatic linking finds the class by
+  // webinar ID and time; the other occurrence is decided by hand, then the decision changed.
+  await page.goto("/staff/zoom");
+  const auto = page.getByRole("listitem", { name: "Webinar 812 3456 7890 at 13 Jan 2027 18:20" });
+  const manual = page.getByRole("listitem", { name: "Webinar 555 0001 1101 at 13 Jan 2027 09:30" });
+  await expect(auto.locator(".status")).toHaveText("Needs review");
+  await page.getByRole("button", { name: "Run automatic linking" }).click();
+  await expect(page.locator(".autolink-feedback")).toHaveText("Linked 1 occurrence; 1 still needs review.");
+  await expect(auto.locator(".status")).toHaveText("Linked automatically");
+  await expect(auto.getByRole("link", { name: /^Real stack class, Wed 13 Jan 2027/ })).toBeVisible();
+  await manual.getByLabel("Class").selectOption({ label: "Wed 13 Jan 2027 · 18:00–20:30 · Real stack class" });
+  await manual.getByLabel(/^Reason/).fill("Checked against the timetable");
+  await manual.getByRole("button", { name: "Link to class" }).click();
+  await expect(manual.locator(".status")).toHaveText("Linked by an administrator");
+  await manual.getByText("Change decision").click();
+  await manual.getByLabel(/^Reason/).fill("Staff rehearsal, not a class");
+  await manual.getByRole("button", { name: "Not a class" }).click();
+  await expect(manual.locator(".status")).toHaveText("Marked not a class");
+  const failed = page.getByRole("region", { name: "FAILED EVENTS" });
+  const receipt = failed.getByRole("listitem").filter({ hasText: "Seeded failure for the real-stack test" });
+  await expect(receipt).toContainText("Participant left");
+  await receipt.getByLabel(/^Reason/).fill("Parser fixed");
+  await receipt.getByRole("button", { name: "Replay" }).click();
+  await expect(failed).toContainText("No failed events.");
+  // Processing is off for this run, so the replayed event waits in the queue.
+  await expect(failed).toContainText("1 event is waiting to be processed.");
+
   // 8. The instructor activates, signs in without MFA (not an elevated role) and sees only their batch.
   const instructorContext = await browser.newContext();
   const instructor = await instructorContext.newPage();
@@ -176,6 +203,8 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(instructor.getByRole("button", { name: "Save changes" })).toHaveCount(0);
   await instructor.goto("/staff/students");
   await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators manage student records.");
+  await instructor.goto("/staff/zoom");
+  await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators review Zoom events.");
   await instructor.goto("/staff/team");
   await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators manage staff accounts.");
 

@@ -178,3 +178,38 @@ test("the class form applies the API's rules first", () => {
   assert.match(forms.parseSessionForm(form({ startTime: "6pm" })).error, /such as 18:00/);
   assert.equal(forms.formatWebinarId("81234567890"), "812 3456 7890");
 });
+
+test("Zoom review: reasons, occurrence ids, states and class candidates", () => {
+  const reasonForm = value => { const f = new FormData(); f.set("reason", value); return f; };
+  assert.equal(forms.parseReason(reasonForm("  Test webinar  ")), "Test webinar");
+  assert.match(forms.parseReason(reasonForm("no")).error, /3 to 300/);
+  assert.match(forms.parseReason(reasonForm("x".repeat(301))).error, /3 to 300/);
+  assert.equal(forms.occurrenceIdOrNull("4444AAAiAAAAAiAiAiiAii=="), "4444AAAiAAAAAiAiAiiAii==");
+  assert.equal(forms.occurrenceIdOrNull("ab/cd+ef"), "ab/cd+ef");
+  assert.equal(forms.occurrenceIdOrNull("has space"), null);
+  assert.equal(forms.occurrenceIdOrNull("x".repeat(101)), null);
+  assert.equal(forms.formatInstant("2027-01-13T12:32:00Z"), "13 Jan 2027 18:02");
+
+  const occurrence = { occurrenceUuid: "o1", webinarId: "81234567890", firstEventAt: "2027-01-13T12:40:00Z", lastEventAt: "2027-01-13T14:50:00Z",
+    eventCount: 4, classSessionId: null, linkSource: null, linkedAt: null };
+  assert.equal(forms.occurrenceState(occurrence), "Needs review");
+  assert.equal(forms.occurrenceState({ ...occurrence, linkSource: "MANUAL" }), "Marked not a class");
+  assert.equal(forms.occurrenceState({ ...occurrence, linkSource: "AUTOMATIC", classSessionId: "s" }), "Linked automatically");
+  assert.equal(forms.occurrenceState({ ...occurrence, linkSource: "MANUAL", classSessionId: "s" }), "Linked by an administrator");
+
+  const session = (id, startsAt, extra = {}) => ({ id, title: id, startsAt, endsAt: new Date(Date.parse(startsAt) + 3600_000).toISOString(),
+    timeZone: "Asia/Colombo", status: "SCHEDULED", zoomWebinarId: null, ...extra });
+  const candidates = forms.candidateClasses(occurrence, [
+    session("near", "2027-01-13T12:30:00Z"),
+    session("webinar", "2027-01-13T20:00:00Z", { zoomWebinarId: "81234567890" }),
+    session("cancelled", "2027-01-13T12:30:00Z", { status: "CANCELLED" }),
+    session("far", "2027-01-15T12:30:00Z"),
+  ]);
+  assert.deepEqual(candidates.map(c => c.id), ["webinar", "near"]);
+  assert.match(candidates[0].label, /· webinar · same webinar$/);
+
+  assert.equal(forms.candidateWindow([]), null);
+  assert.deepEqual(forms.candidateWindow([occurrence]), { from: "2027-01-12T12:40:00.000Z", to: "2027-01-14T12:40:00.000Z" });
+  const wide = forms.candidateWindow([occurrence, { ...occurrence, firstEventAt: "2026-01-01T00:00:00Z" }]);
+  assert.equal(Date.parse(wide.to) - Date.parse(wide.from), 92 * 86_400_000);
+});

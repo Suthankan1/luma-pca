@@ -17,7 +17,7 @@ const backend = createServer(async (req, res) => {
     res.end(value ? JSON.stringify(value) : "");
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|enrollments|accounts|staff-accounts|assignments|class-sessions)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -165,6 +165,69 @@ function classSessionProblem(body, existing, send) {
   }
   return false;
 }
+// Zoom review data per browser project ("1" desktop, "2" mobile): an occurrence that
+// automatic linking can settle once the test schedules its class, one that needs a
+// manual decision (its id contains "/", as real Zoom UUIDs can), and a failed receipt.
+const occurrences = [];
+const occurrenceLinks = new Map();
+const receipts = [];
+for (const n of ["1", "2"]) {
+  const day = `2027-03-0${n}`;
+  occurrences.push({ occurrenceUuid: `auto${n}AAAAAAAAAAAAAAAA==`, webinarId: `9876543210${n}`, firstEventAt: `${day}T12:35:00Z`, lastEventAt: `${day}T14:40:00Z`, eventCount: 6 });
+  occurrences.push({ occurrenceUuid: `man/${n}AAAAAAAAAAAAAAA==`, webinarId: `5550001110${n}`, firstEventAt: `${day}T04:00:00Z`, lastEventAt: `${day}T05:00:00Z`, eventCount: 2 });
+  receipts.push({ id: `00000000-0000-4000-8000-00000000d00${n}`, eventType: "webinar.participant_joined", eventTs: Date.parse(`${day}T12:36:00Z`),
+    status: "DEAD", attempts: 1, lastError: `Payload has no occurrence UUID (case ${n})`, receivedAt: `${day}T12:36:01Z`, nextAttemptAt: null, processedAt: null });
+}
+const occurrenceView = o => {
+  const link = occurrenceLinks.get(o.occurrenceUuid);
+  return { ...o, classSessionId: link?.classSessionId ?? null, linkSource: link?.linkSource ?? null, linkedAt: link?.linkedAt ?? null };
+};
+
+function zoomApi(req, body, send, parts, query) {
+  const [, , , , resource, id, action] = parts;
+  if (req.method === "GET" && resource === "occurrences") {
+    const decided = new URLSearchParams(query).get("decided");
+    return send(200, occurrences.map(occurrenceView).filter(o => decided === null || String(o.linkSource !== null) === decided)
+      .sort((a, b) => b.firstEventAt.localeCompare(a.firstEventAt)));
+  }
+  if (req.method === "POST" && resource === "occurrences" && id === "auto-link") {
+    let linked = 0, undecided = 0;
+    for (const o of occurrences.filter(o => !occurrenceLinks.has(o.occurrenceUuid))) {
+      const at = Date.parse(o.firstEventAt);
+      const matches = classSessions.filter(s => s.status === "SCHEDULED" && s.zoomWebinarId === o.webinarId
+        && Date.parse(s.startsAt) - 3600_000 <= at && at <= Date.parse(s.endsAt) + 3600_000);
+      if (matches.length === 1) {
+        occurrenceLinks.set(o.occurrenceUuid, { classSessionId: matches[0].id, linkSource: "AUTOMATIC", linkedAt: new Date().toISOString() });
+        linked++;
+      } else undecided++;
+    }
+    return send(200, { linked, stillUndecided: undecided });
+  }
+  const reason = String(body?.reason ?? "").trim();
+  if (req.method === "POST" && resource === "occurrence-links") {
+    if (reason.length < 3 || reason.length > 300) return send(400, { detail: "A reason of 3 to 300 characters is required" });
+    if (!occurrences.some(o => o.occurrenceUuid === body.occurrenceUuid)) return send(404, { detail: "Occurrence not found" });
+    const session = body.sessionId && classSessions.find(s => s.id === body.sessionId);
+    if (body.sessionId && !session) return send(404, { detail: "Class session not found" });
+    if (session && session.status === "CANCELLED") return send(409, { detail: "An occurrence cannot be linked to a cancelled class" });
+    occurrenceLinks.set(body.occurrenceUuid, { classSessionId: body.sessionId ?? null, linkSource: "MANUAL", linkedAt: new Date().toISOString() });
+    return send(200, occurrenceView(occurrences.find(o => o.occurrenceUuid === body.occurrenceUuid)));
+  }
+  if (req.method === "GET" && resource === "receipts") {
+    const status = new URLSearchParams(query).get("status") ?? "DEAD";
+    return send(200, receipts.filter(r => r.status === status));
+  }
+  if (req.method === "POST" && resource === "receipts" && action === "replay") {
+    if (reason.length < 3 || reason.length > 300) return send(400, { detail: "A reason of 3 to 300 characters is required" });
+    const receipt = receipts.find(r => r.id === id);
+    if (!receipt) return send(404, { detail: "Receipt not found" });
+    if (receipt.status !== "DEAD") return send(409, { detail: "Only a dead-lettered receipt can be replayed" });
+    Object.assign(receipt, { status: "RECEIVED", attempts: 0, lastError: null, nextAttemptAt: new Date().toISOString() });
+    return send(204);
+  }
+  return send(405);
+}
+
 const enrollmentView = e => {
   const batch = batches.find(b => b.id === e.batchId);
   const student = students.find(s => s.id === e.studentId);
@@ -305,6 +368,8 @@ function academicApi(req, body, send) {
     enrollments.push(created);
     return send(201, enrollmentView(created));
   }
+
+  if (collection === "zoom") return zoomApi(req, body, send, path.split("/"), query);
 
   if (collection === "class-sessions") {
     if (req.method === "GET" && !id) {
