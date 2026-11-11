@@ -220,3 +220,45 @@ build runs the Next.js default bundler and repeats the smoke test.
   client address, audit, first-account bootstrap, invitation delivery).
 - **Next planned feature:** 002A course/batch domain with the 001E scoped
   authorization foundation; 001F admin MFA before any staff admin route.
+
+## Checkpoint 002A — 2026-11-11 — Courses and batches (API)
+
+- **001D evidence:** merged as PR #7, merge commit `90ed6f9`.
+- **Feature ID / name:** 002A — course/batch domain, with the cross-academy and
+  role-denial part of 001E.
+- **Branch:** `feature/002a-courses-batches`. **PR / merge SHA:** see the merged
+  pull request titled "feat(courses): add academy-scoped course and batch management".
+- **Implemented behavior:** owners and administrators can list, read, create and
+  update courses (`/api/v1/courses`) and batches (`/api/v1/batches`) of their
+  own academy. Codes are trimmed and upper-cased; a course code is unique per
+  academy and a batch code per course. Nothing is deleted: records are
+  deactivated. A batch cannot move to another course or be added to an inactive
+  one. Updates carry the version last read and get 409 when stale.
+- **Authorization:** two layers. The route rule admits only owner/admin; the
+  services repeat that check through `CurrentAccount` and bind every query to
+  the caller's academy, taken from the verified token and never from the
+  request. A record of another academy returns the same 404 as a missing one.
+  Instructor, Attendance Officer, Analyst and Student get 403 on all of these
+  routes; scoped access for them needs 002B.
+- **Database changes:** Flyway `V5__courses_batches.sql` adds `batches` and, on
+  `courses`, `updated_at`, `version` and code/title checks. A composite foreign
+  key keeps a batch in its course's academy.
+- **API changes:** eight operations; OpenAPI updated with schemas.
+- **Frontend changes:** none. There is no staff screen for courses or batches.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker — 123 tests, 0 failures, 0 errors, 0 skipped. 27 new: 14 course
+  and 11 batch tests over real HTTP on PostgreSQL 17 (validation, uniqueness,
+  8-way create and update races, cross-academy 404s, role 403s, role removal
+  mid-session, no delete, constraints) and 2 tests calling the services
+  directly to prove role and academy checks without the route rules.
+  `scripts/auth-stack-smoke.sh` re-run: 26 checks passed.
+- **Test support:** `StaffApiIntegrationTest` (enables the development-only
+  elevated-login override so admin tokens can be obtained) and
+  `resetDatabase()` (`TRUNCATE academies CASCADE`).
+- **Known issues / not done:** owner/admin still cannot sign in without the
+  development override, so these routes are unusable in a real deployment until
+  001F (MFA). No audit record of who changed what. Lists are unpaginated
+  (bounded by academy size). No staff UI. No timetable, enrollments, staff
+  assignments or class sessions. Academy policy on whether a student may be in
+  several batches of one course is still an open question for 002B.
+- **Next planned feature:** 001F admin MFA, then 002B.

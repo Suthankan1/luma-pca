@@ -32,8 +32,7 @@ class ElevatedLoginOverrideIntegrationTest extends PostgresIntegrationTest {
     @Test
     void adminCanSignInOnlyWhenTheOverrideIsEnabled() {
         HttpApi api = new HttpApi(port);
-        jdbc.update("DELETE FROM accounts");
-        jdbc.update("DELETE FROM academies");
+        resetDatabase();
         UUID academyId = UUID.randomUUID();
         jdbc.update("INSERT INTO academies (id, name) VALUES (?, 'Test Academy')", academyId);
         accounts.setPassword(accounts.register(academyId, "admin@example.invalid", Set.of(Role.ACADEMY_ADMIN)).id(), PASSPHRASE);

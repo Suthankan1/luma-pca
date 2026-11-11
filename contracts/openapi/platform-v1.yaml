@@ -4,7 +4,7 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/refresh/logout/logout-all/activate/me and JWKS. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me, JWKS, courses and batches. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
 servers:
   - url: http://localhost:8080
@@ -129,20 +129,169 @@ paths:
         '401': {description: Missing or invalid access token}
   /api/v1/courses:
     get:
-      summary: Proposed academy-scoped courses — NOT IMPLEMENTED
-      x-implementation-status: planned
-      security: [{bearerAuth: []}]
+      summary: Courses of the caller's academy, sorted by code (implemented; owner/admin only)
+      operationId: listCourses
       tags: [Courses]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: active, required: false, schema: {type: boolean}}
       responses:
-        '200': {description: Authorized course page}
+        '200':
+          description: All matching courses
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Course'}}
+        '401': {description: Not signed in}
+        '403': {description: Not an academy owner or administrator}
+    post:
+      summary: Create a course (implemented; owner/admin only)
+      operationId: createCourse
+      tags: [Courses]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, title]
+              properties:
+                code: {type: string, maxLength: 60, description: 'Letters, digits, dot, underscore, hyphen; stored upper-case'}
+                title: {type: string, maxLength: 200}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Course'}
+        '400': {description: Invalid data}
+        '409': {description: Code already used in this academy}
+  /api/v1/courses/{courseId}:
+    parameters:
+      - {in: path, name: courseId, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Read a course (implemented; owner/admin only)
+      operationId: getCourse
+      tags: [Courses]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Course
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Course'}
+        '404': {description: Not found, or belongs to another academy}
+    put:
+      summary: Replace a course's code, title and active flag (implemented; owner/admin only)
+      description: Courses are deactivated, not deleted.
+      operationId: updateCourse
+      tags: [Courses]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, title, active, version]
+              properties:
+                code: {type: string, maxLength: 60}
+                title: {type: string, maxLength: 200}
+                active: {type: boolean}
+                version: {type: integer, description: Version last read}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Course'}
+        '404': {description: Not found, or belongs to another academy}
+        '409': {description: Stale version, or code already used}
   /api/v1/batches:
     get:
-      summary: Proposed course/batch-scoped batches — NOT IMPLEMENTED
-      x-implementation-status: planned
-      security: [{bearerAuth: []}]
+      summary: Batches of the caller's academy, newest start first (implemented; owner/admin only)
+      operationId: listBatches
       tags: [Batches]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: courseId, required: false, schema: {type: string, format: uuid}}
       responses:
-        '200': {description: Authorized batch page}
+        '200':
+          description: All matching batches
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Batch'}}
+        '404': {description: courseId not found in this academy}
+    post:
+      summary: Create a batch in a course (implemented; owner/admin only)
+      operationId: createBatch
+      tags: [Batches]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [courseId, code, name, startsOn]
+              properties:
+                courseId: {type: string, format: uuid}
+                code: {type: string, maxLength: 60}
+                name: {type: string, maxLength: 200}
+                startsOn: {type: string, format: date}
+                endsOn: {type: [string, 'null'], format: date}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+        '400': {description: Invalid data, including endsOn before startsOn}
+        '404': {description: Course not found in this academy}
+        '409': {description: Code already used in this course, or the course is inactive}
+  /api/v1/batches/{batchId}:
+    parameters:
+      - {in: path, name: batchId, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Read a batch (implemented; owner/admin only)
+      operationId: getBatch
+      tags: [Batches]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Batch
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+        '404': {description: Not found, or belongs to another academy}
+    put:
+      summary: Replace a batch's details (implemented; owner/admin only)
+      description: A batch cannot be moved to another course and is deactivated, not deleted.
+      operationId: updateBatch
+      tags: [Batches]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name, startsOn, active, version]
+              properties:
+                code: {type: string, maxLength: 60}
+                name: {type: string, maxLength: 200}
+                startsOn: {type: string, format: date}
+                endsOn: {type: [string, 'null'], format: date}
+                active: {type: boolean}
+                version: {type: integer}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Batch'}
+        '404': {description: Not found, or belongs to another academy}
+        '409': {description: Stale version, or code already used}
   /api/v1/class-sessions:
     get:
       summary: Proposed assigned sessions — NOT IMPLEMENTED
@@ -203,6 +352,31 @@ components:
           type: array
           items: {type: string, enum: [ACADEMY_OWNER, ACADEMY_ADMIN, INSTRUCTOR, ATTENDANCE_OFFICER, ANALYST, STUDENT]}
       required: [accountId, academyId, roles]
+    Course:
+      type: object
+      required: [id, code, title, active, version, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        title: {type: string}
+        active: {type: boolean}
+        version: {type: integer}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    Batch:
+      type: object
+      required: [id, courseId, code, name, startsOn, endsOn, active, version, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        courseId: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        startsOn: {type: string, format: date}
+        endsOn: {type: [string, 'null'], format: date}
+        active: {type: boolean}
+        version: {type: integer}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
   securitySchemes:
     bearerAuth:
       type: http

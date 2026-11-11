@@ -70,8 +70,7 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
     @BeforeEach
     void seed() {
         api = new HttpApi(port);
-        jdbc.update("DELETE FROM accounts");
-        jdbc.update("DELETE FROM academies");
+        resetDatabase();
         academyId = UUID.randomUUID();
         jdbc.update("INSERT INTO academies (id, name) VALUES (?, 'Test Academy')", academyId);
         studentId = accounts.register(academyId, EMAIL, Set.of(Role.STUDENT)).id();
