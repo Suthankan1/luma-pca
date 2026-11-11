@@ -21,6 +21,8 @@
 
 **As built (002B part 2):** Owner and Admin assign Instructors and Attendance Officers to batches by email; the account must be in the academy, not disabled and already hold the role. Assigned staff may read only their batches (`GET /api/v1/batches`, `/batches/{id}`, `/batches/{id}/enrollments`) and their own assignments (`GET /api/v1/me/assignments`); they cannot change batches, enrol students, see assignments or reach courses or students. An unassigned batch returns the same 404 as a missing one. Access requires both the assignment and the role held now, so removing either takes effect on the next request. Analysts still have no batch access.
 
+**As built (002C):** Owner and Admin create and edit class sessions. Instructors and Attendance Officers read sessions that include a batch they are assigned to; they see only their own batches in the session and only those batches' students in the expected list, so a shared class never reveals another batch. A session with none of their batches returns 404. Students and Analysts have no session access yet.
+
 **Negative acceptance examples:** student A cannot request student B's record by guessing ID; teacher for Batch A cannot export Batch B; staff cannot access another academy's integration; guest/unregistered users are not blindly counted; a student in two batches sees only classes associated with enrollments.
 
 See `docs/architecture/adr/ADR-0004-multi-course-batch.md`.

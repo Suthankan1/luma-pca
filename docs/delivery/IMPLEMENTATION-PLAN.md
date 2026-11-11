@@ -16,7 +16,7 @@
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | DONE for the routes that exist: cross-academy, batch-scope, student-ownership and role tests (002A, 002B). Extend with every new resource |
 | 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | DONE: student records with linked accounts, batch enrollments, student own-record routes (part 1); staff assignments with batch-scoped read access for instructors and attendance officers (part 2). Bulk import and staff account administration TODO |
-| 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | TODO |
+| 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | DONE: class sessions shared by up to 20 batches, expected students listed once per session, batch-scoped staff reads. Attendance uniqueness itself arrives with 004A |
 | 003A Zoom account authorization & secrets | Real sandbox account, scopes and safe token management | BLOCKED pending academy |
 | 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | TODO |
 | 003C Outbox/worker | Retry, DLQ, dedup, out-of-order receipts | TODO |
@@ -31,4 +31,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `002C` class sessions shared between batches (one session, many batches, no duplicate attendance records). A small staff-account administration slice (invite instructors and attendance officers, send student invitations) is also needed before real use.
+**Suggested next small slice:** staff account administration (invite instructors, attendance officers and administrators; send activation invitations to students), which real onboarding needs. Zoom work (`003B` webhook receipt) can then start against fixtures while `003A` waits for academy credentials.

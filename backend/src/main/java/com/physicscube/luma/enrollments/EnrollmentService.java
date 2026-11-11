@@ -10,7 +10,10 @@ import com.physicscube.luma.shared.security.CurrentAccount;
 import com.physicscube.luma.students.StudentService;
 import com.physicscube.luma.students.StudentView;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.TreeMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -97,6 +100,29 @@ public class EnrollmentService {
         Enrollment saved = enrollments.saveAndFlush(enrollment);
         return view(saved, batches.requireInAcademy(caller.academyId(), saved.getBatchId()),
                 students.requireInAcademy(caller.academyId(), saved.getStudentId()));
+    }
+
+    /**
+     * For other modules: each student enrolled on {@code day} in any of the batches,
+     * listed once with every one of those batches they belong to. A withdrawal date
+     * is the first day the student is no longer enrolled. No role check; the caller
+     * decides which batches the requester may see.
+     */
+    @Transactional(readOnly = true)
+    public List<ExpectedStudent> expectedOn(UUID academyId, Collection<UUID> batchIds, LocalDate day) {
+        if (batchIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, List<UUID>> batchesByStudent = new TreeMap<>();
+        for (Enrollment e : enrollments.inForceOn(academyId, batchIds, day)) {
+            batchesByStudent.computeIfAbsent(e.getStudentId(), id -> new ArrayList<>()).add(e.getBatchId());
+        }
+        Map<UUID, StudentView> people = students.viewsInAcademy(academyId, batchesByStudent.keySet());
+        return batchesByStudent.entrySet().stream()
+                .map(entry -> new ExpectedStudent(entry.getKey(), people.get(entry.getKey()).studentNumber(),
+                        people.get(entry.getKey()).fullName(), entry.getValue().stream().sorted().toList()))
+                .sorted(Comparator.comparing(ExpectedStudent::studentNumber))
+                .toList();
     }
 
     private List<EnrollmentView> views(UUID academyId, List<Enrollment> found) {

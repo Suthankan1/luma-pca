@@ -457,3 +457,49 @@ build runs the Next.js default bundler and repeats the smoke test.
   (accounts must still be seeded); no route to send invitations; no audit trail;
   no staff UI. Analyst aggregate access is not designed yet.
 - **Next planned feature:** 002C class sessions shared between batches.
+
+## Checkpoint 002C — 2026-11-11 — Class sessions shared between batches
+
+- **002B part 2 evidence:** merged as PR #13, merge commit `43c51ec`; backend CI green on `main`.
+- **Feature ID / name:** 002C — sessions and shared-batch schedule.
+- **Branch:** `feature/002c-class-sessions`. **PR / merge SHA:** see the merged pull
+  request titled "feat(sessions): schedule classes shared between batches".
+- **Implemented behavior:** owners and administrators schedule a class for 1–20
+  batches (`POST /api/v1/class-sessions`) with UTC times, an IANA time zone
+  (default Asia/Colombo) and at most 12 hours' length, and replace any field,
+  including the batch set and SCHEDULED/CANCELLED status (`PUT`). A class shared
+  by several batches is one session record. `GET /api/v1/class-sessions` lists by
+  start time in a window of at most 92 days, optionally for one batch.
+  `GET /{id}/students` lists the students expected at the class, each once with
+  all of the session's batches they belong to.
+- **Eligibility rule (decision to review):** a student is expected if enrolled in
+  one of the batches on the class's local calendar date in its time zone. A
+  withdrawal date is the first day the student is no longer enrolled.
+- **Authorization:** assigned instructors and attendance officers read sessions
+  that include one of their batches, see only those batches in the session and
+  only those batches' students, so a shared class never reveals the other batch.
+  Sessions without their batches return 404. Students and analysts have no
+  session access yet.
+- **Database changes:** Flyway `V9__class_sessions.sql`: `class_sessions` and
+  `session_batches` (composite same-academy keys; primary key on session and
+  batch; batches used by sessions cannot be deleted). The batch set is part of
+  the session entity, so a batch-only edit advances the version.
+- **API changes:** five operations replacing the planned `/api/v1/class-sessions`
+  entry; OpenAPI updated. Attendance remains planned.
+- **Docs fix:** README status text now lists students, enrollments, staff
+  assignments and sessions; two earlier README edits (002B parts 1 and 2) had
+  silently not applied after the 001G README rewrite.
+- **Frontend changes:** none.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker — 198 tests, 0 failures, 0 errors, 0 skipped on macOS. 12 new
+  real-HTTP tests on PostgreSQL 17: one record per shared class, a student in
+  two batches expected once, local-date eligibility (Colombo versus UTC),
+  validation, foreign and inactive batches, window listing, batch-only edits
+  advancing the version, an 8-way edit race leaving exactly one batch set,
+  instructor and officer views of a shared class, cross-academy, students and
+  analysts refused, constraints. Linux CI result is on the pull request.
+- **Known issues / not done:** no attendance records yet (004A will key them on
+  session and student); no Zoom webinar mapping (003D); no student timetable
+  route; no recurring schedules (each class is created individually); classes
+  may be shared across courses, pending academy question P1; no staff UI.
+- **Next planned feature:** staff account administration, then Zoom ingress (003B).
