@@ -43,3 +43,40 @@ fictional attendance as dashboard content.
 Four frontend unit tests, lint, type checking, a production webpack build and
 an HTTP smoke test against a mock API passed. The production GitHub Actions
 build runs the Next.js default bundler and repeats the smoke test.
+
+## Checkpoint 001A — 2026-11-11 — Account persistence and password hashing
+
+- **Feature ID / name:** 001A — auth schema and hashed-password domain.
+- **Branch:** `feature/001a-account-persistence`. **PR / merge SHA:** see the
+  pull request titled "feat(auth): persist academy accounts" and `git log main`.
+- **Implemented behavior:** `AccountService` registers a pending account
+  (normalized email, at least one role), sets a password (activates the account,
+  bumps `auth_version`, clears lockout counters), disables an account and looks
+  one up by email without exposing the hash. Passwords are hashed with Argon2id
+  (16-byte salt, 19 MiB, 2 iterations, parallelism 1). Password policy: 12–128
+  characters, not one repeated character, must not contain the email name.
+- **Database changes:** Flyway `V2__identity_accounts.sql` adds `accounts` and
+  `account_roles` with checks for normalized email, allowed status and role
+  values, and "ACTIVE requires a password hash".
+- **Decision:** email is unique across all academies, not per academy, because
+  the sign-in form sends only email and password. Revisit only if a second
+  academy must share addresses.
+- **API changes:** none. No HTTP route was added; the default-deny filter chain
+  is unchanged and a test asserts account/auth paths return 401/403.
+- **Frontend changes:** none.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker running. **Result:** 42 tests, 0 failures, 0 errors, 0 skipped
+  (4 attendance, 13 email, 7 password policy, 5 hasher, 13 PostgreSQL 17
+  Testcontainers integration tests including an 8-thread duplicate-email race
+  and direct constraint violations). Frontend unchanged; its lint, typecheck
+  and 4 unit tests passed on this machine before the change.
+- **Security considerations:** hashes never leave the identity module; exception
+  messages contain no password or email; role grants are academy-level only and
+  do not yet express course/batch scope.
+- **Known issues / not done:** no login, JWT, refresh sessions, invitations,
+  recovery, lockout enforcement, MFA or audit trail yet. `failed_login_count`
+  and `locked_until` exist but nothing increments them. No breached-password
+  check. Local default JDK on the development Mac is 25; builds must select
+  JDK 21 explicitly.
+- **Next planned feature:** 001B — invitation tokens (hashed, expiring,
+  single-use) and activation that calls `setPassword`.
