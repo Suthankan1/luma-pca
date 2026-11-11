@@ -262,3 +262,21 @@ build runs the Next.js default bundler and repeats the smoke test.
   assignments or class sessions. Academy policy on whether a student may be in
   several batches of one course is still an open question for 002B.
 - **Next planned feature:** 001F admin MFA, then 002B.
+
+## Checkpoint 002A-fix — 2026-11-11 — Timestamp precision, and a broken `main`
+
+- **What happened:** PR #8 (002A) was merged as `dc808cc` at 07:52:27 UTC by the
+  repository owner's account while its backend CI job was still running. That
+  job then failed (3 of 123 tests), so `main` was red until this fix.
+- **Defect:** on Linux the JVM clock has nanosecond precision, while PostgreSQL
+  stores microseconds. A course or batch returned by create/update therefore
+  carried timestamps that differed in the last three digits from the same
+  record read back. macOS clocks report microseconds, so every local run passed.
+- **Fix:** `shared.time.DbTime` truncates to microseconds; used for entity
+  timestamps (`Course`, `Batch`, `Account`) and invitation expiry.
+- **Tests:** new `DbTimeTest` and a service test asserting that what a write
+  returns equals what a read returns. The authoritative check is the Linux CI
+  job, because the defect cannot occur on the development Mac.
+- **Process change for agents:** PRs have been merged within about a minute of
+  opening, before checks finish. Open PRs as **drafts**, wait for all checks,
+  then mark ready and merge. Local green on macOS is not sufficient evidence.

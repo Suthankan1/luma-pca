@@ -80,4 +80,23 @@ class ServiceLayerAuthorizationIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM courses WHERE academy_id = ?", Integer.class, theirs));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM batches WHERE academy_id = ?", Integer.class, theirs));
     }
+
+    /** Guards against platform clocks finer than the database: a write must return exactly what a read returns. */
+    @Test
+    void valuesReturnedByWritesEqualWhatIsReadBack() {
+        CurrentAccount admin = caller(academy("Physics Cube Test"), "ACADEMY_ADMIN");
+
+        CourseView created = courses.create(admin, "PHY", "Physics");
+        assertEquals(created, courses.get(admin, created.id()));
+        assertEquals(0, created.createdAt().getNano() % 1_000);
+        CourseView updated = courses.update(admin, created.id(), "PHY", "Physics 2", true, 0);
+        assertEquals(updated, courses.get(admin, created.id()));
+        assertEquals(0, updated.updatedAt().getNano() % 1_000);
+
+        BatchView batch = batches.create(admin, created.id(), "MON", "Monday", START, null);
+        assertEquals(batch, batches.get(admin, batch.id()));
+        BatchView changed = batches.update(admin, batch.id(), "MON", "Monday 2", START, null, true, 0);
+        assertEquals(changed, batches.get(admin, batch.id()));
+        assertEquals(0, changed.updatedAt().getNano() % 1_000);
+    }
 }
