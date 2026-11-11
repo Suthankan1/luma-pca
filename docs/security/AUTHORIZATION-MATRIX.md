@@ -23,6 +23,8 @@
 
 **As built (002C):** Owner and Admin create and edit class sessions. Instructors and Attendance Officers read sessions that include a batch they are assigned to; they see only their own batches in the session and only those batches' students in the expected list, so a shared class never reveals another batch. A session with none of their batches returns 404. Students and Analysts have no session access yet.
 
+**As built (staff administration):** Owner and Admin list staff, create staff accounts, change roles, disable accounts and issue activation invitations for pending staff and student accounts. Only an Owner may grant, change or remove the Owner or Admin role, or disable or invite such an account. Nobody changes their own roles or disables themselves. The academy always keeps one active Owner; every change locks the academy row and re-reads the caller's roles under that lock, so two owners removing each other at once leave one. Students are never managed through staff routes. Each action writes an append-only audit event (actor, action, target id; no email or token).
+
 **Negative acceptance examples:** student A cannot request student B's record by guessing ID; teacher for Batch A cannot export Batch B; staff cannot access another academy's integration; guest/unregistered users are not blindly counted; a student in two batches sees only classes associated with enrollments.
 
 See `docs/architecture/adr/ADR-0004-multi-course-batch.md`.

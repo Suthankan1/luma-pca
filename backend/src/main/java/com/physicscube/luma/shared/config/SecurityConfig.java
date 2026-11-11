@@ -41,7 +41,8 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/assignments").hasAnyRole("INSTRUCTOR", "ATTENDANCE_OFFICER")
                     .requestMatchers("/api/v1/courses", "/api/v1/courses/**", "/api/v1/batches", "/api/v1/batches/**",
                             "/api/v1/students", "/api/v1/students/**", "/api/v1/enrollments/**", "/api/v1/assignments/**",
-                            "/api/v1/class-sessions", "/api/v1/class-sessions/**")
+                            "/api/v1/class-sessions", "/api/v1/class-sessions/**",
+                            "/api/v1/staff-accounts", "/api/v1/staff-accounts/**", "/api/v1/accounts/*/invitations")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
                     // A student's own data; services resolve "own" from the token, never from input.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments").hasRole("STUDENT")

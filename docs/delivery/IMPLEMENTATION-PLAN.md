@@ -14,6 +14,8 @@
 | 001F Admin MFA | TOTP enrolment and verification for owner/admin; removes the sign-in block | DONE in the backend (TOTP, recovery codes, reset, lockout); the development override was removed. Browser MFA step is new slice 001G |
 | 001G Browser MFA step | Next.js code entry, enrolment QR and recovery-code display; Playwright coverage | DONE: Next.js MFA challenge handling, enrollment QR code, manual secret display, TOTP and recovery-code verification, one-time recovery codes presentation and acknowledgment, unit tests, HTTP smoke tests, and Playwright e2e browser tests |
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | DONE for the routes that exist: cross-academy, batch-scope, student-ownership and role tests (002A, 002B). Extend with every new resource |
+| 001H Staff account administration | Create staff, change roles, disable, issue invitations; escalation and last-owner rules; audit trail | DONE in the backend; browser activation page TODO (001I) |
+| 001I Browser account activation | Next.js page that redeems an invitation and sets a password | TODO |
 | 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | DONE: student records with linked accounts, batch enrollments, student own-record routes (part 1); staff assignments with batch-scoped read access for instructors and attendance officers (part 2). Bulk import and staff account administration TODO |
 | 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | DONE: class sessions shared by up to 20 batches, expected students listed once per session, batch-scoped staff reads. Attendance uniqueness itself arrives with 004A |
@@ -31,4 +33,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** staff account administration (invite instructors, attendance officers and administrators; send activation invitations to students), which real onboarding needs. Zoom work (`003B` webhook receipt) can then start against fixtures while `003A` waits for academy credentials.
+**Suggested next small slice:** `001I` browser activation page, so invited staff and students can activate without API tools. Then `003B` Zoom webhook receipt against fixtures.

@@ -101,6 +101,15 @@ public class Account {
         authVersion++;
     }
 
+    /** Replaces every role grant. Callers enforce who may grant which role. */
+    public void replaceRoles(Set<Role> newRoles) {
+        if (newRoles == null || newRoles.isEmpty()) {
+            throw new IllegalArgumentException("At least one role is required");
+        }
+        roles.clear();
+        roles.addAll(newRoles);
+    }
+
     public void disable() {
         if (status != AccountStatus.DISABLED) {
             status = AccountStatus.DISABLED;
@@ -141,6 +150,14 @@ public class Account {
 
     public int getAuthVersion() {
         return authVersion;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public java.time.Instant getCreatedAt() {
+        return createdAt;
     }
 
     public Set<Role> getRoles() {

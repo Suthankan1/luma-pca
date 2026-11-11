@@ -18,6 +18,19 @@ interface AccountRepository extends JpaRepository<Account, UUID> {
 
     boolean existsByEmail(String email);
 
+    Optional<Account> findByIdAndAcademyId(UUID id, UUID academyId);
+
+    @Query("select distinct a from Account a join a.roles r where a.academyId = :academyId and r in :roles order by a.email")
+    java.util.List<Account> withAnyRole(@Param("academyId") UUID academyId,
+                                        @Param("roles") java.util.Collection<com.physicscube.luma.identity.domain.Role> roles);
+
+    @Query("""
+            select count(distinct a) from Account a join a.roles r
+            where a.academyId = :academyId and r = com.physicscube.luma.identity.domain.Role.ACADEMY_OWNER
+              and a.status = com.physicscube.luma.identity.domain.AccountStatus.ACTIVE and a.id <> :excluded
+            """)
+    long activeOwnersOtherThan(@Param("academyId") UUID academyId, @Param("excluded") UUID excluded);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Account> findWithLockById(UUID id);
 
