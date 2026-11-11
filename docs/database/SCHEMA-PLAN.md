@@ -1,6 +1,6 @@
 # Database model and migration sequencing
 
-**Present:** V1 `academies` and `courses`; V2 `accounts` and `account_roles` (academy-level role grants only); V3 `account_invitations`; V4 `refresh_sessions` and `refresh_tokens`; V5 `batches` plus `updated_at`/`version`/code checks on `courses`; V7 `students` (linked one-to-one to an account in the same academy) and `enrollments` (unique per batch and student, withdrawn not deleted); V6 `account_totp`, `account_recovery_codes`, `mfa_challenges` and `refresh_sessions.mfa_verified`. All other tables are **planned**: design is in the full blueprint. Do not infer migrations are already applied.
+**Present:** V1 `academies` and `courses`; V2 `accounts` and `account_roles` (academy-level role grants only); V3 `account_invitations`; V4 `refresh_sessions` and `refresh_tokens`; V5 `batches` plus `updated_at`/`version`/code checks on `courses`; V8 `staff_assignments` (account, batch and role in one academy; unique per batch, account and role); V7 `students` (linked one-to-one to an account in the same academy) and `enrollments` (unique per batch and student, withdrawn not deleted); V6 `account_totp`, `account_recovery_codes`, `mfa_challenges` and `refresh_sessions.mfa_verified`. All other tables are **planned**: design is in the full blueprint. Do not infer migrations are already applied.
 
 | Group | Planned tables | Main constraints |
 | --- | --- | --- |

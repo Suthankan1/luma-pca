@@ -415,3 +415,45 @@ build runs the Next.js default bundler and repeats the smoke test.
   audit trail; the student record shows email from the account and cannot
   change it; no staff UI.
 - **Next planned feature:** 002B part 2 — staff assignments with batch scope.
+
+## Checkpoint 002B-2 — 2026-11-11 — Staff assignments and batch-scoped access
+
+- **002B part 1 evidence:** merged as PR #12, merge commit `818c6f4`; backend CI green on `main`.
+- **Feature ID / name:** 002B part 2 — staff assignments; completes 002B and the
+  batch-scope part of 001E for the routes that exist.
+- **Branch:** `feature/002b-staff-assignments`. **PR / merge SHA:** see the merged
+  pull request titled "feat(batches): scope instructors and attendance officers to assigned batches".
+- **Implemented behavior:** owners and administrators assign instructors and
+  attendance officers to batches by email (`POST /api/v1/batches/{id}/assignments`),
+  list them, and remove them (`DELETE /api/v1/assignments/{id}`). The account must
+  be in the academy, not disabled, and already hold the role. Assigned staff read
+  only their batches, those batches' rosters, and `GET /api/v1/me/assignments`.
+- **Authorization:** access needs the assignment and the role held now; removing
+  either takes effect on the next request without signing in again. An
+  unassigned batch returns the same 404 as a missing one (a role with no batch
+  access at all, such as Analyst or Student, gets 403). Assigned staff cannot
+  change batches, enrol students, see assignments, or reach courses or students.
+  An email from another academy is reported like an unknown one.
+- **Behavior change:** instructors and attendance officers previously got 403 on
+  `GET /api/v1/batches`; without assignments they now get an empty list, and 404
+  for individual batches and rosters. Four existing tests were updated for this.
+- **Database changes:** Flyway `V8__staff_assignments.sql` (composite academy
+  foreign keys; unique per batch, account and role; role limited to INSTRUCTOR
+  and ATTENDANCE_OFFICER; deleted with the account).
+- **API changes:** four operations; OpenAPI updated with an `Assignment` schema
+  and the widened read access on batches and rosters.
+- **Frontend changes:** none.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker — 186 tests, 0 failures, 0 errors, 0 skipped on macOS. New: 11
+  real-HTTP tests on PostgreSQL 17 (Batch A versus Batch B for instructors and
+  officers, read-only, role removal mid-session, unassignment, suitable accounts,
+  8-way duplicate race, cross-academy, students and analysts refused,
+  constraints) and 1 service-level scope test. Linux CI result is on the pull request.
+- **Decisions:** (1) 404, not 403, for an unassigned batch. (2) Assign by email
+  so administrators need no account ids. (3) Assignments are deleted, not
+  soft-deleted: they are access grants, not evidence; an audit trail is still
+  missing. (4) Assigned staff see student names and numbers on rosters, not emails.
+- **Known issues / not done:** no API to create staff accounts or change roles
+  (accounts must still be seeded); no route to send invitations; no audit trail;
+  no staff UI. Analyst aggregate access is not designed yet.
+- **Next planned feature:** 002C class sessions shared between batches.

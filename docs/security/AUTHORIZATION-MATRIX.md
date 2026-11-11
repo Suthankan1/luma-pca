@@ -19,6 +19,8 @@
 
 **As built (002B part 1):** Owner and Admin manage students and enrollments of their own academy. A Student reads only `GET /api/v1/me/student` and `GET /api/v1/me/enrollments`, which resolve "own" from the token; students get 403 on every staff route, including for their own record, and never see rosters or classmates. Other staff roles still get 403 until staff assignments exist.
 
+**As built (002B part 2):** Owner and Admin assign Instructors and Attendance Officers to batches by email; the account must be in the academy, not disabled and already hold the role. Assigned staff may read only their batches (`GET /api/v1/batches`, `/batches/{id}`, `/batches/{id}/enrollments`) and their own assignments (`GET /api/v1/me/assignments`); they cannot change batches, enrol students, see assignments or reach courses or students. An unassigned batch returns the same 404 as a missing one. Access requires both the assignment and the role held now, so removing either takes effect on the next request. Analysts still have no batch access.
+
 **Negative acceptance examples:** student A cannot request student B's record by guessing ID; teacher for Batch A cannot export Batch B; staff cannot access another academy's integration; guest/unregistered users are not blindly counted; a student in two batches sees only classes associated with enrollments.
 
 See `docs/architecture/adr/ADR-0004-multi-course-batch.md`.

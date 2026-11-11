@@ -47,8 +47,13 @@ class ServiceLayerAuthorizationIntegrationTest extends StaffApiIntegrationTest {
             assertThrows(AccessDeniedException.class, () -> courses.get(denied, course.id()));
             assertThrows(AccessDeniedException.class, () -> courses.create(denied, "NEW", "New"));
             assertThrows(AccessDeniedException.class, () -> courses.update(denied, course.id(), "PHY", "Changed", false, 0));
-            assertThrows(AccessDeniedException.class, () -> batches.list(denied, null));
-            assertThrows(AccessDeniedException.class, () -> batches.get(denied, batch.id()));
+            if (denied.batchScopedRoles().isEmpty()) {
+                assertThrows(AccessDeniedException.class, () -> batches.list(denied, null));
+                assertThrows(AccessDeniedException.class, () -> batches.get(denied, batch.id()));
+            } else {
+                assertEquals(List.of(), batches.list(denied, null), "a staff role alone grants no batch");
+                assertThrows(ResourceNotFoundException.class, () -> batches.get(denied, batch.id()));
+            }
             assertThrows(AccessDeniedException.class, () -> batches.create(denied, course.id(), "NEW", "New", START, null));
             assertThrows(AccessDeniedException.class,
                     () -> batches.update(denied, batch.id(), "MON", "Changed", START, null, false, 0));
