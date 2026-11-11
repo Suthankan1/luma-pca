@@ -19,8 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Batch enrollments. Managing and reading rosters is limited to academy owners and
- * administrators until scoped staff assignments exist. A student reads only their
+ * Batch enrollments. Owners and administrators manage them; staff assigned to a
+ * batch may read its roster. A student reads only their
  * own enrollments, never a roster. Records of another academy are reported as not found.
  */
 @Service
@@ -38,8 +38,7 @@ public class EnrollmentService {
     /** Everyone ever enrolled in the batch, withdrawn included, by student number. */
     @Transactional(readOnly = true)
     public List<EnrollmentView> roster(CurrentAccount caller, UUID batchId) {
-        caller.requireAcademyManager();
-        batches.requireInAcademy(caller.academyId(), batchId);
+        batches.requireReadable(caller, batchId);
         return views(caller.academyId(), enrollments.findByAcademyIdAndBatchId(caller.academyId(), batchId));
     }
 

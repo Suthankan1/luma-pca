@@ -7,48 +7,88 @@ import com.physicscube.luma.shared.api.ResourceNotFoundException;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Batches of the caller's academy. Only academy owners and administrators may use
- * it until scoped staff assignments exist: an instructor's role alone grants no
- * batch. A batch or course in another academy is reported as not found.
+ * Batches of the caller's academy. Owners and administrators see and manage every
+ * batch. Instructors and attendance officers may read only the batches they are
+ * assigned to in a role they still hold; their role alone grants nothing. A batch
+ * outside the caller's academy or scope is reported as not found.
  */
 @Service
 public class BatchService {
     private final BatchRepository batches;
+    private final StaffAssignmentRepository assignments;
     private final CourseService courses;
 
-    BatchService(BatchRepository batches, CourseService courses) {
+    BatchService(BatchRepository batches, StaffAssignmentRepository assignments, CourseService courses) {
         this.batches = batches;
+        this.assignments = assignments;
         this.courses = courses;
     }
 
-    /** @param courseId {@code null} for every batch of the academy */
+    /** @param courseId {@code null} for every batch the caller may see */
     @Transactional(readOnly = true)
     public List<BatchView> list(CurrentAccount caller, UUID courseId) {
-        caller.requireAcademyManager();
-        List<Batch> found;
-        if (courseId == null) {
-            found = batches.findByAcademyIdOrderByStartsOnDescCodeAsc(caller.academyId());
-        } else {
+        if (courseId != null) {
             courses.requireInAcademy(caller.academyId(), courseId);
-            found = batches.findByAcademyIdAndCourseIdOrderByStartsOnDescCodeAsc(caller.academyId(), courseId);
+        }
+        List<Batch> found;
+        if (caller.isAcademyManager()) {
+            found = courseId == null ? batches.findByAcademyIdOrderByStartsOnDescCodeAsc(caller.academyId())
+                    : batches.findByAcademyIdAndCourseIdOrderByStartsOnDescCodeAsc(caller.academyId(), courseId);
+        } else {
+            found = batches.findByAcademyIdAndIdIn(caller.academyId(), assignedBatchIds(caller)).stream()
+                    .filter(batch -> courseId == null || courseId.equals(batch.getCourseId()))
+                    .sorted(Comparator.comparing(Batch::getStartsOn).reversed().thenComparing(Batch::getCode))
+                    .toList();
         }
         return found.stream().map(BatchView::of).toList();
     }
 
     @Transactional(readOnly = true)
     public BatchView get(CurrentAccount caller, UUID batchId) {
-        caller.requireAcademyManager();
-        return BatchView.of(load(caller.academyId(), batchId));
+        return requireReadable(caller, batchId);
+    }
+
+    /**
+     * For other modules: the batch if the caller may read it (manager of its academy,
+     * or assigned to it in a role they hold), else not found.
+     *
+     * @throws AccessDeniedException if the caller has no role that can ever read a batch
+     */
+    @Transactional(readOnly = true)
+    public BatchView requireReadable(CurrentAccount caller, UUID batchId) {
+        if (caller.isAcademyManager()) {
+            return BatchView.of(load(caller.academyId(), batchId));
+        }
+        Set<String> scoped = caller.batchScopedRoles();
+        if (scoped.isEmpty()) {
+            throw new AccessDeniedException("No role that grants batch access");
+        }
+        Batch batch = load(caller.academyId(), batchId);
+        if (!assignments.existsByBatchIdAndAccountIdAndRoleIn(batchId, caller.accountId(), scoped)) {
+            throw new ResourceNotFoundException("Batch");
+        }
+        return BatchView.of(batch);
+    }
+
+    private List<UUID> assignedBatchIds(CurrentAccount caller) {
+        Set<String> scoped = caller.batchScopedRoles();
+        if (scoped.isEmpty()) {
+            throw new AccessDeniedException("No role that grants batch access");
+        }
+        return assignments.batchIds(caller.academyId(), caller.accountId(), scoped);
     }
 
     @Transactional

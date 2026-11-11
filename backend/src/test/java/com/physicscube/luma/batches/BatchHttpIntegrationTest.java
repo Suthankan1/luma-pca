@@ -222,14 +222,20 @@ class BatchHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void instructorsAndOtherRolesGetNoBatchAccessFromTheirRoleAlone() {
+    void aStaffRoleAloneGrantsNoBatch() {
         Map<String, Object> batch = create(courseId, "MON");
         String path = "/api/v1/batches/" + batch.get("id");
 
         for (Role role : List.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST, Role.STUDENT)) {
             String token = tokenFor(academyId, role);
-            assertEquals(403, api.get("/api/v1/batches", token).statusCode(), role.name());
-            assertEquals(403, api.get(path, token).statusCode(), role.name());
+            boolean batchScoped = role == Role.INSTRUCTOR || role == Role.ATTENDANCE_OFFICER;
+            if (batchScoped) {
+                assertEquals(List.of(), codes(api.get("/api/v1/batches", token)), role + " without an assignment sees no batch");
+                assertEquals(404, api.get(path, token).statusCode(), role.name());
+            } else {
+                assertEquals(403, api.get("/api/v1/batches", token).statusCode(), role.name());
+                assertEquals(403, api.get(path, token).statusCode(), role.name());
+            }
             assertEquals(403, post(token, courseId, "NEW", "2027-01-10", null).statusCode(), role.name());
             assertEquals(403, api.put(path, updateBody("MON", "Changed", "2027-01-10", null, false, 0), token).statusCode(), role.name());
         }

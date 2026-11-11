@@ -51,7 +51,12 @@ class EnrollmentServiceAuthorizationIntegrationTest extends StaffApiIntegrationT
             assertThrows(AccessDeniedException.class, () -> students.get(denied, me.id()));
             assertThrows(AccessDeniedException.class, () -> students.create(denied, "X", "X", "x@example.invalid"));
             assertThrows(AccessDeniedException.class, () -> students.update(denied, me.id(), "X", true, 0));
-            assertThrows(AccessDeniedException.class, () -> enrollments.roster(denied, batch));
+            if (denied.batchScopedRoles().isEmpty()) {
+                assertThrows(AccessDeniedException.class, () -> enrollments.roster(denied, batch));
+            } else {
+                assertThrows(ResourceNotFoundException.class, () -> enrollments.roster(denied, batch),
+                        "an unassigned instructor gets not found");
+            }
             assertThrows(AccessDeniedException.class, () -> enrollments.forStudent(denied, me.id()));
             assertThrows(AccessDeniedException.class, () -> enrollments.enroll(denied, batch, me.id(), DAY));
             assertThrows(AccessDeniedException.class, () -> enrollments.update(denied, enrollment, DAY, null, 0));

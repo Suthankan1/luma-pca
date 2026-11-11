@@ -32,8 +32,12 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all", "/api/v1/auth/mfa/reset").authenticated()
                     // First gate only. Services repeat the role check and bind every query to
                     // the caller's academy; later slices add course and batch scope there.
+                    // Assigned staff may read batches and rosters; services limit them to their assignments.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/batches", "/api/v1/batches/*", "/api/v1/batches/*/enrollments")
+                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/me/assignments").hasAnyRole("INSTRUCTOR", "ATTENDANCE_OFFICER")
                     .requestMatchers("/api/v1/courses", "/api/v1/courses/**", "/api/v1/batches", "/api/v1/batches/**",
-                            "/api/v1/students", "/api/v1/students/**", "/api/v1/enrollments/**")
+                            "/api/v1/students", "/api/v1/students/**", "/api/v1/enrollments/**", "/api/v1/assignments/**")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
                     // A student's own data; services resolve "own" from the token, never from input.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments").hasRole("STUDENT")

@@ -218,7 +218,8 @@ class EnrollmentHttpIntegrationTest extends StaffApiIntegrationTest {
 
         for (Role role : List.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST)) {
             String token = tokenFor(academyId, role);
-            assertEquals(403, api.get("/api/v1/batches/" + batchA + "/enrollments", token).statusCode(), role.name());
+            int unassignedRoster = role == Role.ANALYST ? 403 : 404;
+            assertEquals(unassignedRoster, api.get("/api/v1/batches/" + batchA + "/enrollments", token).statusCode(), role.name());
             assertEquals(403, fixturesFor(token).enroll(batchB, student, "2027-01-10").statusCode(), role.name());
             assertEquals(403, api.put("/api/v1/enrollments/" + id, updateBody("2027-01-10", "2027-02-01", 0), token).statusCode());
             assertEquals(403, api.get("/api/v1/students/" + student + "/enrollments", token).statusCode(), role.name());
