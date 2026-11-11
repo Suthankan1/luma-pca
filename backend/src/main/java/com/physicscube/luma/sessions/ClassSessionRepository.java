@@ -20,6 +20,15 @@ interface ClassSessionRepository extends JpaRepository<ClassSession, UUID> {
             """)
     List<ClassSession> inWindow(@Param("academyId") UUID academyId, @Param("from") Instant from, @Param("to") Instant to);
 
+    /** Scheduled sessions on the webinar whose time, widened by the slack, contains the instant. */
+    @Query("""
+            select s.id from ClassSession s
+            where s.academyId = :academyId and s.zoomWebinarId = :webinarId and s.status = 'SCHEDULED'
+              and s.startsAt <= :latestStart and s.endsAt >= :earliestEnd
+            """)
+    List<UUID> scheduledOnWebinarAround(@Param("academyId") UUID academyId, @Param("webinarId") String webinarId,
+                                        @Param("latestStart") Instant latestStart, @Param("earliestEnd") Instant earliestEnd);
+
     @Query("""
             select distinct s from ClassSession s join s.batches b
             where s.academyId = :academyId and s.startsAt >= :from and s.startsAt < :to and b.batchId in :batchIds

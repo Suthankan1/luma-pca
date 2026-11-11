@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /** @param batches only the batches the caller may see; staff never learn about other batches' participation */
 public record SessionView(UUID id, String title, Instant startsAt, Instant endsAt, String timeZone, LocalDate localDate,
-                          String status, List<Batch> batches, long version, Instant createdAt, Instant updatedAt) {
+                          String status, String zoomWebinarId, List<Batch> batches, long version, Instant createdAt, Instant updatedAt) {
     public record Batch(UUID batchId, UUID courseId, String code, String name) {
     }
 }

@@ -36,13 +36,13 @@ class ClassSessionController {
 
     record CreateSessionRequest(@NotBlank @Size(max = 200) String title, @NotNull Instant startsAt,
                                 @NotNull Instant endsAt, @Size(max = 64) String timeZone,
-                                @NotNull List<UUID> batchIds) {
+                                @NotNull List<UUID> batchIds, @Size(max = 40) String zoomWebinarId) {
     }
 
     record UpdateSessionRequest(@NotBlank @Size(max = 200) String title, @NotNull Instant startsAt,
                                 @NotNull Instant endsAt, @Size(max = 64) String timeZone,
                                 @NotNull List<UUID> batchIds, @NotBlank String status,
-                                @NotNull @PositiveOrZero Long version) {
+                                @Size(max = 40) String zoomWebinarId, @NotNull @PositiveOrZero Long version) {
     }
 
     @GetMapping
@@ -64,7 +64,7 @@ class ClassSessionController {
     @PostMapping
     ResponseEntity<SessionView> create(JwtAuthenticationToken authentication, @Valid @RequestBody CreateSessionRequest request) {
         SessionView created = sessions.create(CurrentAccount.from(authentication), request.title(), request.startsAt(),
-                request.endsAt(), request.timeZone(), request.batchIds());
+                request.endsAt(), request.timeZone(), request.batchIds(), request.zoomWebinarId());
         return ResponseEntity.created(URI.create("/api/v1/class-sessions/" + created.id())).body(created);
     }
 
@@ -72,6 +72,7 @@ class ClassSessionController {
     SessionView update(JwtAuthenticationToken authentication, @PathVariable UUID sessionId,
                        @Valid @RequestBody UpdateSessionRequest request) {
         return sessions.update(CurrentAccount.from(authentication), sessionId, request.title(), request.startsAt(),
-                request.endsAt(), request.timeZone(), request.batchIds(), request.status(), request.version());
+                request.endsAt(), request.timeZone(), request.batchIds(), request.status(), request.zoomWebinarId(),
+                request.version());
     }
 }
