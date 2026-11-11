@@ -17,6 +17,10 @@ const backend = createServer(async (req, res) => {
     res.end(value ? JSON.stringify(value) : "");
   };
 
+  if (req.url.startsWith("/api/v1/courses") || req.url.startsWith("/api/v1/batches")) {
+    return academicApi(req, body, send);
+  }
+
   switch (req.url) {
     case "/api/v1/auth/login":
       if (body.password !== "correct-password") return send(401);
@@ -110,6 +114,48 @@ const backend = createServer(async (req, res) => {
   latestRefresh = `fake-opaque-refresh-${++rotation}`;
   return send(200, { accessToken: jwt, refreshToken: latestRefresh, expiresIn: 300, refreshExpiresIn: 600 });
 });
+
+// A small in-memory stand-in for the academic API, with the same status codes and
+// problem details as the real backend for the cases the staff screens handle.
+const courses = [];
+const batches = [];
+let nextId = 1;
+const uuid = () => `00000000-0000-4000-8000-${String(nextId++).padStart(12, "0")}`;
+function academicApi(req, body, send) {
+  if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+  if (!roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN")) return send(403, { detail: "Forbidden" });
+  const [, , , collection, id] = req.url.split("?")[0].split("/");
+  const list = collection === "courses" ? courses : batches;
+  const stale = () => send(409, { detail: "The record was changed by someone else; reload and retry" });
+  if (req.method === "GET" && !id) return send(200, list);
+  const found = id && list.find(item => item.id === id);
+  if (req.method === "GET") return found ? send(200, found) : send(404, { detail: "Not found" });
+  if (req.method === "POST") {
+    const code = String(body.code ?? "").trim().toUpperCase();
+    if (collection === "courses") {
+      if (courses.some(course => course.code === code)) return send(409, { detail: "A course with this code already exists" });
+      const course = { id: uuid(), code, title: body.title, active: true, version: 0 };
+      courses.push(course);
+      return send(201, course);
+    }
+    const course = courses.find(item => item.id === body.courseId);
+    if (!course) return send(404, { detail: "Course not found" });
+    if (!course.active) return send(409, { detail: "Batches cannot be added to an inactive course" });
+    if (batches.some(batch => batch.courseId === course.id && batch.code === code)) {
+      return send(409, { detail: "This course already has a batch with this code" });
+    }
+    const batch = { id: uuid(), courseId: course.id, code, name: body.name, startsOn: body.startsOn, endsOn: body.endsOn ?? null, active: true, version: 0 };
+    batches.push(batch);
+    return send(201, batch);
+  }
+  if (req.method === "PUT") {
+    if (!found) return send(404, { detail: "Not found" });
+    if (found.version !== body.version) return stale();
+    Object.assign(found, body, { code: String(body.code).toUpperCase(), version: found.version + 1 });
+    return send(200, found);
+  }
+  return send(405);
+}
 
 await new Promise((resolve, reject) => backend.listen(0, "127.0.0.1", resolve).once("error", reject));
 const backendPort = backend.address().port;
