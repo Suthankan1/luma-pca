@@ -17,9 +17,10 @@ public final class HttpApi {
         this.base = "http://localhost:" + port;
     }
 
-    /** Values must not need JSON escaping. */
-    public static String json(Map<String, String> fields) {
-        return fields.entrySet().stream().map(e -> '"' + e.getKey() + "\":\"" + e.getValue() + '"')
+    /** Strings are quoted and must not need escaping; numbers and booleans are written as is; null is allowed. */
+    public static String json(Map<String, ?> fields) {
+        return fields.entrySet().stream().map(e -> '"' + e.getKey() + "\":"
+                        + (e.getValue() instanceof String text ? '"' + text + '"' : String.valueOf(e.getValue())))
                 .collect(Collectors.joining(",", "{", "}"));
     }
 
@@ -38,6 +39,23 @@ public final class HttpApi {
             request.header("Authorization", "Bearer " + bearerToken);
         }
         return send(request);
+    }
+
+    public HttpResponse<String> put(String path, String body, String bearerToken) {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
+                .header("Content-Type", "application/json").PUT(HttpRequest.BodyPublishers.ofString(body));
+        if (bearerToken != null) {
+            request.header("Authorization", "Bearer " + bearerToken);
+        }
+        return send(request);
+    }
+
+    public HttpResponse<String> delete(String path, String bearerToken) {
+        return send(HttpRequest.newBuilder(URI.create(base + path)).header("Authorization", "Bearer " + bearerToken).DELETE());
+    }
+
+    public static java.util.List<Object> parseList(HttpResponse<String> response) {
+        return JsonParserFactory.getJsonParser().parseList(response.body());
     }
 
     public HttpResponse<String> get(String path, String bearerToken) {

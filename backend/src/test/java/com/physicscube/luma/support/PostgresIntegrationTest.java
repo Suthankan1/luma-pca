@@ -1,7 +1,9 @@
 package com.physicscube.luma.support;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
@@ -17,5 +19,13 @@ public abstract class PostgresIntegrationTest {
 
     static {
         POSTGRES.start();
+    }
+
+    @Autowired
+    private JdbcTemplate resetJdbc;
+
+    /** Empties every table that hangs off an academy, whatever later migrations add. */
+    protected void resetDatabase() {
+        resetJdbc.execute("TRUNCATE academies CASCADE");
     }
 }

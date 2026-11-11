@@ -12,8 +12,8 @@
 | 001C JWT login | RS256 signatures, issuer/audience, lockout, MFA admin path | DONE except MFA: login, token validation, key rotation, lockout, activation route. Owner/admin sign-in is blocked until MFA (new slice 001F) |
 | 001D Refresh and BFF | Atomic refresh rotation, reuse revocation, HttpOnly cookie, CSRF and e2e | DONE: Next.js BFF cookies/origin checks (PR #2) plus backend refresh rotation, reuse revocation, logout and logout-all; verified together by `scripts/auth-stack-smoke.sh`. Browser-driven (Playwright) e2e still TODO |
 | 001F Admin MFA | TOTP enrolment and verification for owner/admin; removes the sign-in block | TODO |
-| 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | TODO |
-| 002A Course/batch domain | CRUD + uniqueness + academy authorization | TODO |
+| 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | PARTIAL: cross-academy isolation and role denial enforced and tested for courses/batches (002A); course/batch/student scope needs 002B assignments and enrollments |
+| 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | TODO |
 | 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | TODO |
 | 003A Zoom account authorization & secrets | Real sandbox account, scopes and safe token management | BLOCKED pending academy |
@@ -30,4 +30,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `001E` scoped authorization foundation together with `002A` course/batch domain, since scope checks need courses and batches to exist. `001F` admin MFA must land before any staff administration route is usable. Implement each as one small test-backed commit and update `docs/ai/checkpoints/PROGRESS.md`.
+**Suggested next small slice:** `001F` admin MFA, because every staff route built so far is only reachable by owner/admin accounts, which cannot sign in without the development override. Then `002B` students, enrollments and staff assignments, which unlock batch-scoped access for instructors. Implement each as one small test-backed commit and update `docs/ai/checkpoints/PROGRESS.md`.

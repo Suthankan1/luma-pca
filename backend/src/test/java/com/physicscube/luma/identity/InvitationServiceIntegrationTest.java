@@ -50,8 +50,7 @@ class InvitationServiceIntegrationTest extends PostgresIntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
-        jdbc.update("DELETE FROM accounts");
-        jdbc.update("DELETE FROM academies");
+        resetDatabase();
         academyId = UUID.randomUUID();
         jdbc.update("INSERT INTO academies (id, name) VALUES (?, 'Test Academy')", academyId);
         studentId = accounts.register(academyId, "student@example.invalid", Set.of(Role.STUDENT)).id();
