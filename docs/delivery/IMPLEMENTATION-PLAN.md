@@ -15,7 +15,7 @@
 | 001G Browser MFA step | Next.js code entry, enrolment QR and recovery-code display; Playwright coverage | DONE: Next.js MFA challenge handling, enrollment QR code, manual secret display, TOTP and recovery-code verification, one-time recovery codes presentation and acknowledgment, unit tests, HTTP smoke tests, and Playwright e2e browser tests |
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | PARTIAL: cross-academy isolation and role denial enforced and tested for courses/batches (002A); course/batch/student scope needs 002B assignments and enrollments |
 | 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
-| 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | TODO |
+| 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | PART 1 DONE: student records with linked accounts, batch enrollments, student own-record routes. Part 2 TODO: staff assignments with batch-scoped access. Bulk import TODO |
 | 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | TODO |
 | 003A Zoom account authorization & secrets | Real sandbox account, scopes and safe token management | BLOCKED pending academy |
 | 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | TODO |
@@ -31,4 +31,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `002B` students, enrollments and staff assignments.
+**Suggested next small slice:** `002B` part 2, staff assignments: instructors and attendance officers get read access to the batches they are assigned to, with cross-batch negative tests. Then `002C` class sessions shared between batches.

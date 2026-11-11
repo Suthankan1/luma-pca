@@ -27,6 +27,16 @@ public record CurrentAccount(UUID accountId, UUID academyId, Set<String> roles) 
         return roles.stream().anyMatch(ACADEMY_MANAGERS::contains);
     }
 
+    public boolean hasRole(String role) {
+        return roles.contains(role);
+    }
+
+    public void requireRole(String role) {
+        if (!hasRole(role)) {
+            throw new AccessDeniedException(role + " role required");
+        }
+    }
+
     /** Owner or administrator of the caller's own academy. */
     public void requireAcademyManager() {
         if (!isAcademyManager()) {

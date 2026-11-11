@@ -14,4 +14,6 @@ interface BatchRepository extends JpaRepository<Batch, UUID> {
     List<Batch> findByAcademyIdAndCourseIdOrderByStartsOnDescCodeAsc(UUID academyId, UUID courseId);
 
     boolean existsByCourseIdAndCode(UUID courseId, String code);
+
+    List<Batch> findByAcademyIdAndIdIn(UUID academyId, java.util.Collection<UUID> ids);
 }

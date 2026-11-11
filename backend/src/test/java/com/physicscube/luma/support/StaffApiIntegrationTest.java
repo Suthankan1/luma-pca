@@ -57,6 +57,11 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
         return id;
     }
 
+    /** Activates a pending account (for example one created with a student record) with the test passphrase. */
+    protected void activate(UUID accountId) {
+        accounts.setPassword(accountId, PASSPHRASE);
+    }
+
     /**
      * Signs in and returns an access token. For accounts that need MFA this enrols an
      * authenticator on first use, so call it once per such account: a second sign-in

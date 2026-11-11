@@ -5,7 +5,11 @@ import com.physicscube.luma.identity.domain.EmailAddress;
 import com.physicscube.luma.identity.domain.PasswordPolicy;
 import com.physicscube.luma.identity.domain.Role;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -59,6 +63,13 @@ public class AccountService {
     @Transactional(readOnly = true)
     public Optional<AccountSummary> findById(UUID accountId) {
         return accounts.findById(accountId).map(AccountSummary::of);
+    }
+
+    /** Accounts that exist among the ids; missing ids are simply absent from the map. */
+    @Transactional(readOnly = true)
+    public Map<UUID, AccountSummary> findByIds(Collection<UUID> accountIds) {
+        return accounts.findAllById(accountIds).stream().map(AccountSummary::of)
+                .collect(Collectors.toMap(AccountSummary::id, Function.identity()));
     }
 
     @Transactional(readOnly = true)

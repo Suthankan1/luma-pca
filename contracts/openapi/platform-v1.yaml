@@ -4,7 +4,7 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/refresh/logout/logout-all/activate/me and MFA enroll/verify/reset, JWKS, courses and batches. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me and MFA enroll/verify/reset, JWKS, courses, batches, students, enrollments and own-record routes. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
 servers:
   - url: http://localhost:8080
@@ -371,6 +371,201 @@ paths:
               schema: {$ref: '#/components/schemas/Batch'}
         '404': {description: Not found, or belongs to another academy}
         '409': {description: Stale version, or code already used}
+  /api/v1/students:
+    get:
+      summary: Students of the caller's academy, by student number (implemented; owner/admin only)
+      operationId: listStudents
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: active, required: false, schema: {type: boolean}}
+        - {in: query, name: after, required: false, schema: {type: string}, description: nextAfter from the previous page}
+        - {in: query, name: limit, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextAfter]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Student'}}
+                  nextAfter: {type: [string, 'null']}
+        '400': {description: Invalid limit or filter}
+        '403': {description: Not an academy owner or administrator}
+    post:
+      summary: Create a student and their pending STUDENT sign-in account (implemented; owner/admin only)
+      operationId: createStudent
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentNumber, fullName, email]
+              properties:
+                studentNumber: {type: string, maxLength: 60, description: Academy student ID; stored upper-case; cannot change later}
+                fullName: {type: string, maxLength: 200}
+                email: {type: string, maxLength: 254}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Student'}
+        '400': {description: Invalid data}
+        '409': {description: Student number or email already used}
+  /api/v1/students/{studentId}:
+    parameters:
+      - {in: path, name: studentId, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Read a student (implemented; owner/admin only)
+      operationId: getStudent
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Student
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Student'}
+        '404': {description: Not found, or belongs to another academy}
+    put:
+      summary: Change a student's name or active flag (implemented; owner/admin only)
+      operationId: updateStudent
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, active, version]
+              properties:
+                fullName: {type: string, maxLength: 200}
+                active: {type: boolean}
+                version: {type: integer}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Student'}
+        '404': {description: Not found, or belongs to another academy}
+        '409': {description: Stale version}
+  /api/v1/students/{studentId}/enrollments:
+    get:
+      summary: A student's enrollments (implemented; owner/admin only)
+      operationId: listStudentEnrollments
+      tags: [Enrollments]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: studentId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Enrollments, withdrawn included
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Enrollment'}}
+        '404': {description: Student not found in this academy}
+  /api/v1/batches/{batchId}/enrollments:
+    parameters:
+      - {in: path, name: batchId, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Batch roster, withdrawn included, by student number (implemented; owner/admin only)
+      operationId: listBatchEnrollments
+      tags: [Enrollments]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Roster
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Enrollment'}}
+        '404': {description: Batch not found in this academy}
+    post:
+      summary: Enrol a student in the batch (implemented; owner/admin only)
+      operationId: enrollStudent
+      tags: [Enrollments]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, enrolledOn]
+              properties:
+                studentId: {type: string, format: uuid}
+                enrolledOn: {type: string, format: date}
+      responses:
+        '201':
+          description: Enrolled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Enrollment'}
+        '404': {description: Batch or student not found in this academy}
+        '409': {description: Already enrolled, or batch or student inactive}
+  /api/v1/enrollments/{enrollmentId}:
+    put:
+      summary: Change enrolment dates; a withdrawal date withdraws, clearing it re-enrols (implemented; owner/admin only)
+      operationId: updateEnrollment
+      tags: [Enrollments]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: enrollmentId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enrolledOn, version]
+              properties:
+                enrolledOn: {type: string, format: date}
+                withdrawnOn: {type: [string, 'null'], format: date}
+                version: {type: integer}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Enrollment'}
+        '400': {description: withdrawnOn before enrolledOn}
+        '404': {description: Not found, or belongs to another academy}
+        '409': {description: Stale version}
+  /api/v1/me/student:
+    get:
+      summary: The signed-in student's own record (implemented; STUDENT role)
+      operationId: getMyStudent
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Own record
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Student'}
+        '403': {description: Caller is not a student}
+        '404': {description: The account has no student record}
+  /api/v1/me/enrollments:
+    get:
+      summary: The signed-in student's own enrollments (implemented; STUDENT role)
+      operationId: listMyEnrollments
+      tags: [Enrollments]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Own enrollments only
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Enrollment'}}
+        '403': {description: Caller is not a student}
+        '404': {description: The account has no student record}
   /api/v1/class-sessions:
     get:
       summary: Proposed assigned sessions — NOT IMPLEMENTED
@@ -464,6 +659,36 @@ components:
         version: {type: integer}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
+    Student:
+      type: object
+      required: [id, studentNumber, fullName, accountId, active, version, createdAt, updatedAt]
+      properties:
+        id: {type: string, format: uuid}
+        studentNumber: {type: string}
+        fullName: {type: string}
+        email: {type: [string, 'null']}
+        accountId: {type: string, format: uuid}
+        accountStatus: {type: [string, 'null'], enum: [PENDING_ACTIVATION, ACTIVE, DISABLED, null]}
+        active: {type: boolean}
+        version: {type: integer}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+    Enrollment:
+      type: object
+      required: [id, batchId, courseId, batchCode, batchName, studentId, studentNumber, studentName, enrolledOn, status, version]
+      properties:
+        id: {type: string, format: uuid}
+        batchId: {type: string, format: uuid}
+        courseId: {type: string, format: uuid}
+        batchCode: {type: string}
+        batchName: {type: string}
+        studentId: {type: string, format: uuid}
+        studentNumber: {type: string}
+        studentName: {type: string}
+        enrolledOn: {type: string, format: date}
+        withdrawnOn: {type: [string, 'null'], format: date}
+        status: {type: string, enum: [ENROLLED, WITHDRAWN]}
+        version: {type: integer}
   securitySchemes:
     bearerAuth:
       type: http
