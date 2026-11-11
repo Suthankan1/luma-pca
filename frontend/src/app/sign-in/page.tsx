@@ -14,9 +14,9 @@ const messages = {
 };
 
 export default async function SignIn({ searchParams }: {
-  searchParams: Promise<{ error?: string; portal?: string; signedOut?: string }>;
+  searchParams: Promise<{ error?: string; portal?: string; signedOut?: string; activated?: string }>;
 }) {
-  const { error, portal, signedOut } = await searchParams;
+  const { error, portal, signedOut, activated } = await searchParams;
   const { identity, canRefresh, unavailable } = await currentSession();
   const destination = identity ? portalPath(identity, portal) : null;
   if (destination && error !== "sign-out" && (destination === "/staff" || destination === "/student")) {
@@ -32,6 +32,7 @@ export default async function SignIn({ searchParams }: {
       <h1 className="heading">Sign in to LUMA</h1>
       {message && <p className="session-error" role="alert">{message}</p>}
       {signedOut === "1" && <p className="sub" role="status">You’re signed out.</p>}
+      {activated === "1" && <p className="sub" role="status">Your account is active. Sign in with your new password.</p>}
       {error === "sign-out" || identity || canRefresh ? <>
         {canRefresh && !identity && error !== "sign-out" && <form method="post" action="/api/session/refresh" className="session-form">
           {(portal === "staff" || portal === "student") && <input type="hidden" name="portal" value={portal} />}

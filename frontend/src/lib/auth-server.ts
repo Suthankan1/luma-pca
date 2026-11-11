@@ -43,7 +43,7 @@ export function config() {
 }
 
 export async function authRequest(
-  path: "login" | "refresh" | "logout" | "me" | "mfa/enroll" | "mfa/verify",
+  path: "login" | "refresh" | "logout" | "me" | "mfa/enroll" | "mfa/verify" | "activate",
   options?: { body: object } | { access: string }
 ) {
   const url = new URL(`/api/v1/auth/${path}`, process.env.API_INTERNAL_URL ?? "http://localhost:8080");

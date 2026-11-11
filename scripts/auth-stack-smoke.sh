@@ -1,6 +1,7 @@
 #!/bin/bash
 # Real-stack auth smoke test: throwaway PostgreSQL 17 + the built Spring backend +
-# the Next.js dev server, driven with curl. Covers invitation activation, browser
+# the Next.js dev server, driven with curl. Covers invitation activation through the
+# browser page (student) and the API (admin), browser
 # sign-in, MFA enrollment, recovery codes, TOTP verification, recovery code sign-in,
 # protected portals, refresh rotation, replay revocation and sign-out.
 #
@@ -39,9 +40,6 @@ INSERT INTO account_roles (account_id, role) VALUES ('44444444-4444-4444-4444-44
 INSERT INTO account_invitations (id, account_id, token_hash, created_at, expires_at) VALUES ('55555555-5555-5555-5555-555555555555', '44444444-4444-4444-4444-444444444444', '$ADMIN_DIGEST', NOW(), NOW() + INTERVAL '1 hour');
 SQL
 
-BODY_STUDENT=$(printf '{"token":"%s","password":"%s"}' "$INVITE_STUDENT" "$PHRASE")
-check "activate student invitation" "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$BODY_STUDENT" localhost:$API/api/v1/auth/activate)" 204
-
 BODY_ADMIN=$(printf '{"token":"%s","password":"%s"}' "$INVITE_ADMIN" "$PHRASE")
 check "activate admin invitation" "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$BODY_ADMIN" localhost:$API/api/v1/auth/activate)" 204
 
@@ -52,6 +50,19 @@ for i in $(seq 1 90); do curl -sf -o /dev/null $ORIGIN/sign-in && break; sleep 1
 JAR="$S/cookies.txt"; rm -f "$JAR"
 web() { curl -s -o "$S/body.html" -D "$S/headers.txt" -b "$JAR" -c "$JAR" -w '%{http_code}' "$@"; }
 loc() { grep -i '^location:' "$S/headers.txt" | tr -d '\r' | sed -E 's/^[Ll]ocation: *//; s#^https?://[^/]+##'; }
+
+# --- Student activation through the browser page ---
+check "activation page loads" "$(web $ORIGIN/activate)" 200
+check "cross-origin activation refused" "$(web -X POST -H 'Origin: http://evil.example' --data-urlencode "token=$INVITE_STUDENT" --data-urlencode "password=$PHRASE" --data-urlencode "confirm=$PHRASE" $ORIGIN/api/session/activate)" 403
+web -X POST -H "Origin: $ORIGIN" --data-urlencode "token=$ORIGIN/activate#token=$INVITE_STUDENT" --data-urlencode "password=$PHRASE" --data-urlencode "confirm=different $PHRASE" $ORIGIN/api/session/activate >/dev/null
+check "mismatched passwords keep the code in the fragment" "$(loc)" "/activate?error=mismatch#token=$INVITE_STUDENT"
+web -X POST -H "Origin: $ORIGIN" --data-urlencode "token=$INVITE_STUDENT" --data-urlencode "password=smoke.student-is-me" --data-urlencode "confirm=smoke.student-is-me" $ORIGIN/api/session/activate >/dev/null
+check "password containing the email name refused by the backend" "$(loc)" "/activate?error=weak#token=$INVITE_STUDENT"
+check "still pending after refusals" "$(docker exec $PG psql -At -U luma -d luma -c "SELECT status FROM accounts WHERE email = 'smoke.student@example.invalid'")" PENDING_ACTIVATION
+check "activate through the page" "$(web -X POST -H "Origin: $ORIGIN" --data-urlencode "token=$ORIGIN/activate#token=$INVITE_STUDENT" --data-urlencode "password=$PHRASE" --data-urlencode "confirm=$PHRASE" $ORIGIN/api/session/activate; echo; loc)" "$(printf '303\n/sign-in?activated=1')"
+check "student account active" "$(docker exec $PG psql -At -U luma -d luma -c "SELECT status FROM accounts WHERE email = 'smoke.student@example.invalid'")" ACTIVE
+web -X POST -H "Origin: $ORIGIN" --data-urlencode "token=$INVITE_STUDENT" --data-urlencode "password=$PHRASE" --data-urlencode "confirm=$PHRASE" $ORIGIN/api/session/activate >/dev/null
+check "a used code is refused" "$(loc)" "/activate?error=invalid"
 
 # --- Student Flow ---
 check "student page redirects when signed out" "$(web $ORIGIN/student)" 307
@@ -162,7 +173,7 @@ check "staff portal loads after recovery login" "$(web $ORIGIN/staff)" 200
 web -X POST -H "Origin: $ORIGIN" $ORIGIN/api/session/logout >/dev/null
 
 check "no token or passphrase in backend log" "$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE_STUDENT|$INVITE_ADMIN" "$S/backend.log")" 0
-check "no token or passphrase in frontend log" "$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE" "$S/frontend.log")" 0
+check "no token, passphrase or activation code in frontend log" "$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE_STUDENT" "$S/frontend.log")" 0
 
 rm -f "$JAR" "$S/body.html" "$S/headers.txt"
 if [ $fail = 0 ]; then echo "STACK SMOKE PASSED"; else echo "STACK SMOKE FAILED"; tail -10 "$S/frontend.log"; exit 1; fi
