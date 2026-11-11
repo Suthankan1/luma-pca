@@ -664,6 +664,10 @@ build runs the Next.js default bundler and repeats the smoke test.
   connection, so handlers must write through `JdbcTemplate`. (2) My first retry
   schedule claimed "about 4 hours" but added up to about 1 hour; the default is
   now ten attempts (about 3 hours) and a test pins the arithmetic.
+  (3) The first CI run failed on Linux only: the 003B "ingress is off" test
+  counted receipts without clearing the shared test database, and on Linux it ran
+  after the new worker tests. It now resets first; the full suite was then run
+  locally in reverse and random class order (241 passing each time).
 - **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
   with Docker — 241 tests, 0 failures, 0 errors, 0 skipped on macOS. 12 new: 3
   backoff unit tests and 9 PostgreSQL 17 tests (out-of-order events, idempotent
