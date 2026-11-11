@@ -1,12 +1,13 @@
 package com.physicscube.luma.identity.web;
 
-import com.physicscube.luma.identity.AccessToken;
+import com.physicscube.luma.identity.SessionTokens;
 import com.physicscube.luma.identity.AuthService;
 import com.physicscube.luma.identity.InvitationService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -31,7 +32,14 @@ class AuthController {
     record LoginRequest(@NotBlank @Size(max = 254) String email, @NotBlank @Size(max = 256) String password) {
     }
 
-    record TokenResponse(String accessToken, String tokenType, long expiresIn) {
+    record TokenResponse(String accessToken, String tokenType, long expiresIn, String refreshToken, long refreshExpiresIn) {
+        static TokenResponse of(SessionTokens tokens) {
+            return new TokenResponse(tokens.accessToken(), "Bearer", tokens.expiresInSeconds(),
+                    tokens.refreshToken(), tokens.refreshExpiresInSeconds());
+        }
+    }
+
+    record RefreshTokenRequest(@NotBlank @Size(max = 128) String refreshToken) {
     }
 
     record ActivateRequest(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 256) String password) {
@@ -42,8 +50,26 @@ class AuthController {
 
     @PostMapping("/login")
     TokenResponse login(@Valid @RequestBody LoginRequest request) {
-        AccessToken token = auth.login(request.email(), request.password());
-        return new TokenResponse(token.value(), "Bearer", token.expiresInSeconds());
+        return TokenResponse.of(auth.login(request.email(), request.password()));
+    }
+
+    @PostMapping("/refresh")
+    TokenResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return TokenResponse.of(auth.refresh(request.refreshToken()));
+    }
+
+    /** Ends the session of the presented refresh token. Always 204, so it reveals nothing about the token. */
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void logout(@Valid @RequestBody RefreshTokenRequest request) {
+        auth.logout(request.refreshToken());
+    }
+
+    /** Ends every session of the signed-in account, on all devices. */
+    @PostMapping("/logout-all")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void logoutAll(JwtAuthenticationToken authentication) {
+        auth.logoutAll(UUID.fromString(authentication.getName()));
     }
 
     @PostMapping("/activate")

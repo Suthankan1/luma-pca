@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * Password sign-in. Each attempt is counted against the account before the password
+ * Password sign-in, token refresh and logout. Each sign-in attempt is counted against the account before the password
  * is checked, so parallel guesses cannot exceed the lockout limit. Password hashing
  * runs outside any database transaction.
  */
@@ -24,11 +24,14 @@ public class AuthService {
     private final AccountRepository accounts;
     private final PasswordHasher hasher;
     private final AccessTokenIssuer issuer;
+    private final RefreshSessions sessions;
     private final AuthProperties properties;
     /** Verified when there is nothing real to verify, so response time does not reveal whether an account exists. */
     private final String decoyHash;
 
-    AuthService(AccountRepository accounts, PasswordHasher hasher, AccessTokenIssuer issuer, AuthProperties properties) {
+    AuthService(AccountRepository accounts, PasswordHasher hasher, AccessTokenIssuer issuer,
+                RefreshSessions sessions, AuthProperties properties) {
+        this.sessions = sessions;
         this.accounts = accounts;
         this.hasher = hasher;
         this.issuer = issuer;
@@ -36,7 +39,7 @@ public class AuthService {
         this.decoyHash = hasher.hash(UUID.randomUUID().toString());
     }
 
-    public AccessToken login(String email, String password) {
+    public SessionTokens login(String email, String password) {
         if (password == null || password.length() > PasswordPolicy.MAX_LENGTH * 2) {
             throw new InvalidCredentialsException();
         }
@@ -64,7 +67,33 @@ public class AuthService {
         if (accounts.recordLoginSuccess(account.getId(), account.getAuthVersion()) != 1) {
             throw new InvalidCredentialsException();
         }
-        return issuer.issue(AccountSummary.of(account));
+        AccountSummary summary = AccountSummary.of(account);
+        return tokens(summary, sessions.start(summary.id(), summary.authVersion()));
+    }
+
+    /** Exchanges a refresh token for a new pair. The presented token can never be used again. */
+    public SessionTokens refresh(String refreshToken) {
+        RefreshSessions.Issued issued = sessions.rotate(refreshToken);
+        if (issued == null) {
+            throw new InvalidSessionException();
+        }
+        AccountSummary account = accounts.findById(issued.accountId()).map(AccountSummary::of)
+                .orElseThrow(InvalidSessionException::new);
+        return tokens(account, issued);
+    }
+
+    /** Idempotent: unknown or already ended sessions are ignored. */
+    public void logout(String refreshToken) {
+        sessions.revokeByToken(refreshToken);
+    }
+
+    public void logoutAll(UUID accountId) {
+        sessions.revokeAll(accountId);
+    }
+
+    private SessionTokens tokens(AccountSummary account, RefreshSessions.Issued issued) {
+        AccessToken access = issuer.issue(account, issued.sessionId());
+        return new SessionTokens(access.value(), access.expiresInSeconds(), issued.refreshToken(), issued.refreshExpiresInSeconds());
     }
 
     private Optional<Account> lookup(String email) {
