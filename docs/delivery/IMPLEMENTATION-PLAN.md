@@ -20,7 +20,7 @@
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | DONE: student records with linked accounts, batch enrollments, student own-record routes (part 1); staff assignments with batch-scoped read access for instructors and attendance officers (part 2). Bulk import and staff account administration TODO |
 | 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | DONE: class sessions shared by up to 20 batches, expected students listed once per session, batch-scoped staff reads. Attendance uniqueness itself arrives with 004A |
 | 003A Zoom account authorization & secrets | Real sandbox account, scopes and safe token management | BLOCKED pending academy |
-| 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | TODO |
+| 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | DONE against fixtures: signature and timestamp checks, URL validation, idempotent durable receipt, off by default. Real Zoom delivery unproven until 003A |
 | 003C Outbox/worker | Retry, DLQ, dedup, out-of-order receipts | TODO |
 | 003D Webinar occurrence identity and registration mapping | Real Zoom tests, stable student IDs, review unknown users | TODO |
 | 004A Provisional attendance timeline | Union/clip durations, SSE, late/missing and stale event handling | TODO |
@@ -33,4 +33,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `003B` Zoom webhook receipt (URL validation, signature and timestamp checks, idempotent durable receipt) against fixtures, while `003A` waits for academy Zoom credentials. Staff screens for the academic API are the other large open area.
+**Suggested next small slice:** `003C` processing worker for stored receipts (claim, retry with backoff, dead-letter, out-of-order handling), starting with an in-database queue and keeping SQS as the production transport per ADR-0006. `003A` (real Zoom account proof) is blocked on academy credentials.

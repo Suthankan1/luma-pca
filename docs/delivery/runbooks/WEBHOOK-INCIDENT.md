@@ -8,4 +8,4 @@
 6. Reconcile webinar participant reports for every affected occurrence; mark ambiguous attendance as REVIEW, not ABSENT.
 7. Notify academy operations and record incident timeline/corrective action.
 
-The endpoints/queues are **not implemented** in starter; this is a runbook template.
+**As built (003B):** the ingress endpoint and receipt table exist; queues, workers and replay tooling do not. Useful signals today: application logs `Rejected Zoom webhook: signature <MISSING|MALFORMED|STALE|MISMATCH>` (check clock sync and the configured secret token) and `Could not store Zoom webhook` (database trouble; Zoom will retry 5xx). Receipts awaiting processing: `SELECT event_type, count(*) FROM zoom_webhook_receipts WHERE processing_status = 'RECEIVED' GROUP BY 1`. Never copy `payload` contents into tickets or chat: they contain participant names and emails.

@@ -27,7 +27,9 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/activate",
                             "/api/v1/auth/refresh", "/api/v1/auth/logout",
                             // The challenge token from the password step is the credential here.
-                            "/api/v1/auth/mfa/enroll", "/api/v1/auth/mfa/verify").permitAll()
+                            "/api/v1/auth/mfa/enroll", "/api/v1/auth/mfa/verify",
+                            // Zoom signs each request; the signature over the raw body is the credential.
+                            "/api/v1/zoom/webhooks").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all", "/api/v1/auth/mfa/reset").authenticated()
                     // First gate only. Services repeat the role check and bind every query to
