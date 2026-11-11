@@ -760,4 +760,12 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Known issues / not done:** no editing of codes, titles or dates yet (only
   activation); no pagination needed yet (lists are academy-sized); other areas
   still API-only (UI-2, UI-3); the Figma typeface is not adopted.
+- **CI change in the same PR:** the first two CI attempts failed before any test
+  ran: `playwright install --with-deps` runs apt-get on every build, and the runner
+  could not resolve Ubuntu's package servers (GitHub reported no incident; same
+  runner image as an earlier passing run). The browser tests now run in their own
+  job inside `mcr.microsoft.com/playwright:v1.65.0-noble`, which has Chromium and its
+  libraries preinstalled; a step fails clearly if `@playwright/test` in the lockfile
+  drifts from the image tag. Lint, type-check, unit, build and smoke run in a
+  parallel job with an npm cache. Both jobs have a 15-minute limit.
 - **Next planned feature:** UI-2 students and enrollments screens.
