@@ -61,8 +61,11 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
     @Test
     void flywayAppliesAccountMigrationOnPostgres17() {
         assertTrue(jdbc.queryForObject("SELECT version()", String.class).startsWith("PostgreSQL 17"));
-        assertEquals(List.of("1", "2"), jdbc.queryForList(
-                "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class));
+        assertTrue(jdbc.queryForList(
+                "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class)
+                .containsAll(List.of("1", "2")));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM flyway_schema_history WHERE NOT success", Integer.class));
     }
 
     @Test

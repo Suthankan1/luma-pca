@@ -2,7 +2,7 @@
 
 **Status: architecture-approved project bootstrap, NOT a production-ready attendance system.**
 
-A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. Accounts and Argon2id password hashing are persisted behind an internal service, but backend JWT issuance/login, Zoom webhook ingestion, production attendance persistence, engagement and real deployment are **not implemented yet**. Do not onboard real students until the security and release gates pass.
+A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. Accounts, Argon2id password hashing and activation invitations are persisted behind internal services, but backend JWT issuance/login, Zoom webhook ingestion, production attendance persistence, engagement and real deployment are **not implemented yet**. Do not onboard real students until the security and release gates pass.
 
 - GitHub: https://github.com/Suthankan1/luma-pca
 - Figma: https://www.figma.com/design/QVzsewJyikM94Xp07hDwwi
