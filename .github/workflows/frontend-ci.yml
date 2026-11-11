@@ -18,5 +18,9 @@ jobs:
         run: npm --prefix frontend run lint
       - name: Type check
         run: npm --prefix frontend run typecheck
+      - name: Session policy tests
+        run: npm --prefix frontend test
       - name: Production build
         run: npm --prefix frontend run build
+      - name: Session HTTP smoke test
+        run: npm --prefix frontend run test:smoke

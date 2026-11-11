@@ -1,21 +1,28 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
+import type { Portal } from "@/lib/session-policy";
 
-export function Shell({ children, active = "home" }: { children: ReactNode; active?: "home" | "staff" | "student" }) {
+export function Shell({ children, active, otherPortal }: {
+  children: ReactNode;
+  active?: "home" | Portal;
+  otherPortal?: Portal;
+}) {
   return <div className="shell">
-    <aside className="aside" aria-label="Preview navigation">
-      <Link href="/" className="brand"><span className="brandmark">◈</span> luma.</Link>
+    <aside className="aside" aria-label="Academy navigation">
+      <Link href="/" className="brand"><span className="brandmark" aria-hidden>◈</span> luma.</Link>
       <p className="text-xs tracking-widest text-cyan-200 w-full mt-3 mb-2">PHYSICS CUBE ACADEMY</p>
-      <Link className={`navitem ${active === "home" ? "active" : ""}`} href="/">Platform home</Link>
-      <Link className={`navitem ${active === "staff" ? "active" : ""}`} href="/staff">Staff preview</Link>
-      <Link className={`navitem ${active === "student" ? "active" : ""}`} href="/student">Student preview</Link>
-      <Image className="brandtile" src="/physics-cube-academy-logo.jpg" alt="Physics Cube Academy supplied logo" width={560} height={300} />
+      {active === "staff" || active === "student" ? <>
+        <Link className="navitem active" aria-current="page" href={`/${active}`} prefetch={false}>
+          {active === "staff" ? "Staff portal" : "Student portal"}
+        </Link>
+        {otherPortal && <Link className="navitem" href={`/${otherPortal}`} prefetch={false}>
+          {otherPortal === "staff" ? "Staff portal" : "Student portal"}
+        </Link>}
+      </> : <Link className={`navitem ${active === "home" ? "active" : ""}`} href="/"
+        aria-current={active === "home" ? "page" : undefined}>Platform home</Link>}
+      <Image className="brandtile" src="/physics-cube-academy-logo.jpg" alt="Physics Cube Academy" width={560} height={300} />
     </aside>
-    <main className="content">
-      <div className="statusbar"><span>ACADEMY / PRESENCE INTELLIGENCE</span><span>BOOTSTRAP BUILD · NO LIVE DATA</span></div>
-      {children}
-      <footer>Prototype UI only · JWT authentication and Zoom synchronization are not implemented yet.</footer>
-    </main>
+    <main className="content">{children}</main>
   </div>;
 }

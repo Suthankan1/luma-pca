@@ -31,3 +31,15 @@ the readiness and system status endpoints. Frontend lint, TypeScript and
 production build passed with Next.js 16.4.6. PostgreSQL 17 in Docker and the
 production deployment remain separate verification targets. Next: account
 authentication, scoped academy catalog and disabled-by-default Zoom ingress.
+
+## Checkpoint 001D — Browser session and portal access
+
+Added Next.js sign-in, sign-out and session continuation for staff and students.
+The server verifies current roles with the API. Access tokens are sealed in
+authenticated encrypted HttpOnly cookies, and login, logout and refresh check
+the request origin before changing the session. The portal no longer displays
+fictional attendance as dashboard content.
+
+Four frontend unit tests, lint, type checking, a production webpack build and
+an HTTP smoke test against a mock API passed. The production GitHub Actions
+build runs the Next.js default bundler and repeats the smoke test.
