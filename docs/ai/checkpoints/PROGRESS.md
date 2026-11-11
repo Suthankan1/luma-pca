@@ -335,3 +335,39 @@ build runs the Next.js default bundler and repeats the smoke test.
   sign-in of the same account. All earlier open items still apply (recovery,
   rate limiting by client address, first-account bootstrap, invitation delivery).
 - **Next planned feature:** 001G browser MFA step, then 002B.
+
+## Checkpoint 001G — 2026-11-11 — Browser MFA integration (Next.js BFF)
+
+- **001F evidence:** merged as PR #10, merge commit `8ee04c1`.
+- **Feature ID / name:** 001G — Next.js browser MFA integration for academy owners and administrators.
+- **Branch:** `feature/001g-browser-mfa`.
+- **Implemented behavior:**
+  - Password sign-in detects `mfaRequired: true` from the backend and seals the short-lived challenge in an encrypted, HttpOnly, SameSite=Strict cookie (`__Host-luma-mfa` or `luma-mfa`) without creating an authenticated session.
+  - Initial enrollment screen (`/sign-in/mfa`): requests the setup secret once from `POST /api/v1/auth/mfa/enroll` and retains it in the sealed challenge cookie so page refreshes do not invalidate an unconfirmed secret. Renders a locally generated vector QR code (no external network requests or tracking) and accessible manual secret entry.
+  - Existing MFA verification: directly prompts for the 6-digit TOTP code or a single-use recovery code. Submissions go to `/api/session/mfa-verify`.
+  - One-time recovery codes presentation (`/sign-in/mfa/recovery-codes`): issued upon initial enrollment, sealed in a short-lived `__Host-luma-recovery` cookie with `Cache-Control: no-store`. Includes clipboard copy action with accessible feedback and requires explicit user acknowledgment. Once acknowledged, the recovery cookie is cleared and the user enters the staff portal (`/staff`). Codes cannot be re-viewed on refresh or back-navigation.
+  - Cancellation (`/api/session/mfa-cancel`) clears all MFA cookies and returns to sign-in. Expired challenges cleanly redirect to sign-in with an expiration message.
+  - Protected portals (`/staff`, `/student`) reject requests with pending MFA challenges, preventing privilege escalation.
+  - Origin and Sec-Fetch-Site checks enforced on all state-changing session routes.
+- **Dependencies added:**
+  - `qrcode` and `@types/qrcode`: for local vector QR code generation.
+  - `@playwright/test`: for automated end-to-end browser verification.
+- **CI updates:**
+  - `.github/workflows/frontend-ci.yml`: added `npx --prefix frontend playwright install --with-deps chromium` and `npm --prefix frontend run test:e2e` to verify full browser authentication flows in CI.
+- **Tests executed on macOS:**
+  1. `npm --prefix frontend test`: 11 unit tests passing (token parsing, MFA challenge detection, malformed challenge rejection, enrollment/verify outcome validation, sealed cookie encryption, tampering resistance, cross-purpose rejection, recovery code isolation).
+  2. `npm --prefix frontend run lint`: ESLint passed with 0 errors and 0 warnings.
+  3. `npm --prefix frontend run typecheck`: TypeScript compiler checks passed without errors.
+  4. `npm --prefix frontend run build`: Next.js production build succeeded with Turbopack (all static and dynamic routes compiled).
+  5. `npm --prefix frontend run test:smoke`: 43 HTTP integration assertions passed against mock backend and Next.js production server.
+  6. `npm --prefix frontend run test:e2e`: 10 Playwright browser tests passed (5 test scenarios across Desktop Chromium and Mobile Pixel 7 viewports: enrollment flow, existing TOTP login, recovery code verification, error handling, cancellation, and student/instructor regression).
+  7. `mvn -B -ntp -f backend/pom.xml verify`: 154 backend tests passed with Java 21 on PostgreSQL 17 Testcontainers.
+  8. `scripts/auth-stack-smoke.sh`: all 43 real-stack checks passed with PostgreSQL 17 in Docker, Spring Boot backend jar, and Next.js dev server.
+  9. `python3 scripts/verify_structure.py`: 25 required repository structure files present.
+- **Decisions:**
+  (1) The unconfirmed enrollment secret is stored in the AES-256-GCM encrypted challenge cookie so users can refresh or take time scanning without generating a new unconfirmed secret and invalidating the QR code.
+  (2) One-time recovery codes are delivered via a short-lived sealed cookie rather than URL parameters or localStorage, and wiped immediately upon acknowledgment.
+  (3) In `auth-server.ts`, loopback origins (`localhost`, `127.0.0.1`, `[::1]`) are permitted over HTTP even when running `next start` for local development and test runners, while production domains strictly require HTTPS.
+- **Known issues / not done:**
+  No self-service MFA reset for locked-out administrators without recovery codes (requires owner assistance or database intervention); recovery codes cannot be regenerated without resetting MFA; no client IP rate limiting yet.
+- **Next planned feature:** 002B — Students, enrollments and staff assignments.

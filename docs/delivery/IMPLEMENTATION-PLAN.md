@@ -12,7 +12,7 @@
 | 001C JWT login | RS256 signatures, issuer/audience, lockout | DONE. Password sign-in, token validation, key rotation, lockout and invitation activation. See 001F for admin MFA. |
 | 001D Refresh and BFF | Atomic refresh rotation, reuse revocation, HttpOnly cookie, CSRF and e2e | DONE: Next.js BFF cookies/origin checks (PR #2) plus backend refresh rotation, reuse revocation, logout and logout-all; verified together by `scripts/auth-stack-smoke.sh`. Browser-driven (Playwright) e2e still TODO |
 | 001F Admin MFA | TOTP enrolment and verification for owner/admin; removes the sign-in block | DONE in the backend (TOTP, recovery codes, reset, lockout); the development override was removed. Browser MFA step is new slice 001G |
-| 001G Browser MFA step | Next.js code entry, enrolment QR and recovery-code display; Playwright coverage | TODO |
+| 001G Browser MFA step | Next.js code entry, enrolment QR and recovery-code display; Playwright coverage | DONE: Next.js MFA challenge handling, enrollment QR code, manual secret display, TOTP and recovery-code verification, one-time recovery codes presentation and acknowledgment, unit tests, HTTP smoke tests, and Playwright e2e browser tests |
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | PARTIAL: cross-academy isolation and role denial enforced and tested for courses/batches (002A); course/batch/student scope needs 002B assignments and enrollments |
 | 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | TODO |
@@ -31,4 +31,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `001G` browser MFA step, so administrators can sign in through the Next.js app; then `002B` students, enrollments and staff assignments.
+**Suggested next small slice:** `002B` students, enrollments and staff assignments.
