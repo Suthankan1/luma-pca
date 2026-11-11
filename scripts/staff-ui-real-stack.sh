@@ -8,6 +8,7 @@
 # Needs: Docker running, JDK 21 as `java` (or JAVA_HOME), Node 22+, a built backend
 # (`mvn -f backend/pom.xml package`), `npm --prefix frontend ci` and
 # `npm --prefix frontend run build`. Uses ports 18081, 3200 and 55433.
+# Runs in CI as the "Real-stack browser test" workflow (.github/workflows/real-stack.yml).
 # All credentials are generated per run.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -68,4 +69,11 @@ docker exec $PG psql -At -U luma -d luma -c "SELECT 'courses=' || count(*) FROM 
 leaks=$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE" "$S/backend.log" "$S/frontend.log" | awk -F: '{s+=$2} END {print s}')
 echo "secrets in logs: $leaks"
 [ "$leaks" = 0 ] || status=1
+if [ "$status" != 0 ]; then
+  # Enough context to diagnose a CI failure; this run's generated credentials are masked.
+  for log in backend frontend; do
+    echo "--- last lines of the $log log"
+    tail -40 "$S/$log.log" | sed -e "s/$PHRASE/<passphrase>/g" -e "s/$INVITE/<invitation>/g" -E -e 's/eyJ[A-Za-z0-9_-]{20,}[A-Za-z0-9._-]*/<jwt>/g'
+  done
+fi
 exit $status

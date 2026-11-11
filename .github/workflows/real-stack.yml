@@ -1,0 +1,46 @@
+name: Real-stack browser test
+# The staff screens driven in a real browser against the real backend jar, PostgreSQL 17
+# and a production Next.js build (scripts/staff-ui-real-stack.sh). Unlike the frontend
+# e2e job, nothing is mocked: this catches contract drift between the two halves.
+on:
+  push:
+    paths: ['backend/**', 'frontend/**', 'scripts/staff-ui-real-stack.sh', '.github/workflows/real-stack.yml']
+  pull_request:
+    paths: ['backend/**', 'frontend/**', 'scripts/staff-ui-real-stack.sh', '.github/workflows/real-stack.yml']
+jobs:
+  real-stack:
+    # On the runner itself, not in a container: the script starts PostgreSQL with Docker,
+    # and the test uses the Google Chrome that GitHub preinstalls (no apt-get, no download).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Google Chrome is available
+        run: google-chrome --version
+      - name: Package the backend (its tests run in the backend workflow)
+        run: mvn -B -ntp -f backend/pom.xml -DskipTests package
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci --no-audit --no-fund
+      - name: Production build of the frontend
+        run: npm --prefix frontend run build
+      - name: Real-stack browser test
+        run: bash scripts/staff-ui-real-stack.sh
+      - name: Keep the Playwright trace of a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          # Holds only this run's throwaway accounts and generated passwords.
+          name: real-stack-trace
+          path: frontend/test-results/
+          retention-days: 3
