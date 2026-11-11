@@ -2,7 +2,7 @@
 
 **Status: architecture-approved project bootstrap, NOT a production-ready attendance system.**
 
-A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. JWT issuance/login, Zoom webhook ingestion, production attendance persistence, engagement and real deployment are **not implemented yet**. Do not onboard real students until the security and release gates pass.
+A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. Accounts and Argon2id password hashing are persisted behind an internal service, but backend JWT issuance/login, Zoom webhook ingestion, production attendance persistence, engagement and real deployment are **not implemented yet**. Do not onboard real students until the security and release gates pass.
 
 - GitHub: https://github.com/Suthankan1/luma-pca
 - Figma: https://www.figma.com/design/QVzsewJyikM94Xp07hDwwi
@@ -26,7 +26,7 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
 
 ## Prerequisites
 
-- JDK **21**, Maven **3.9+** (`mvn`, or install wrapper before using `./mvnw`), Node.js **22** (minimum supported by Next.js is 20.9), npm, Docker Engine with Docker Compose v2.
+- JDK **21** (set `JAVA_HOME` to it if another JDK is the default), a running Docker daemon for the PostgreSQL Testcontainers tests, Maven **3.9+** (`mvn`, or install wrapper before using `./mvnw`), Node.js **22** (minimum supported by Next.js is 20.9), npm, Docker Engine with Docker Compose v2.
 - No cloud credentials or real student data are needed for the bootstrap.
 - Local PostgreSQL credentials are sample-only and **must never be used in production**.
 
@@ -50,7 +50,7 @@ npm ci
 npm run dev                            # http://localhost:3000
 ```
 
-There is **no JWT login yet**, and staff/student Next.js pages display explicitly labeled *preview-only*, fictional UI. The Spring security filter denies other API routes by default until authorized feature slices are built.
+There is **no backend login endpoint yet**: the Next.js sign-in flow is only tested against a mock API, so nobody can sign in against the real backend. The Spring security filter denies other API routes by default until authorized feature slices are built.
 
 ## Commands
 

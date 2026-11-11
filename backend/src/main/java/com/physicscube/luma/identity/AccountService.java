@@ -1,0 +1,63 @@
+package com.physicscube.luma.identity;
+
+import com.physicscube.luma.identity.domain.Account;
+import com.physicscube.luma.identity.domain.EmailAddress;
+import com.physicscube.luma.identity.domain.PasswordPolicy;
+import com.physicscube.luma.identity.domain.Role;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Account persistence and password storage. Not reachable over HTTP in this slice:
+ * invitation, login and token issuance build on it in later slices.
+ */
+@Service
+public class AccountService {
+    private final AccountRepository accounts;
+    private final PasswordHasher passwordHasher;
+
+    AccountService(AccountRepository accounts, PasswordHasher passwordHasher) {
+        this.accounts = accounts;
+        this.passwordHasher = passwordHasher;
+    }
+
+    /** Creates an account that cannot sign in until a password is set. */
+    @Transactional
+    public AccountSummary register(UUID academyId, String email, Set<Role> roles) {
+        String normalized = EmailAddress.normalize(email);
+        if (accounts.existsByEmail(normalized)) {
+            throw new DuplicateEmailException();
+        }
+        try {
+            return AccountSummary.of(accounts.saveAndFlush(Account.pending(academyId, normalized, roles)));
+        } catch (DataIntegrityViolationException e) {
+            // A concurrent registration won the race; the unique constraint is the authority.
+            if (String.valueOf(e.getMessage()).contains("uq_accounts_email")) {
+                throw new DuplicateEmailException();
+            }
+            throw e;
+        }
+    }
+
+    @Transactional
+    public void setPassword(UUID accountId, String rawPassword) {
+        Account account = accounts.findById(accountId).orElseThrow(() -> new AccountNotFoundException(accountId));
+        PasswordPolicy.validate(rawPassword, account.getEmail());
+        account.applyPasswordHash(passwordHasher.hash(rawPassword), Instant.now());
+    }
+
+    @Transactional
+    public void disable(UUID accountId) {
+        accounts.findById(accountId).orElseThrow(() -> new AccountNotFoundException(accountId)).disable();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<AccountSummary> findByEmail(String email) {
+        return accounts.findByEmail(EmailAddress.normalize(email)).map(AccountSummary::of);
+    }
+}
