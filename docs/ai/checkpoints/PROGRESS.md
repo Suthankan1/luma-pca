@@ -503,3 +503,43 @@ build runs the Next.js default bundler and repeats the smoke test.
   route; no recurring schedules (each class is created individually); classes
   may be shared across courses, pending academy question P1; no staff UI.
 - **Next planned feature:** staff account administration, then Zoom ingress (003B).
+
+## Checkpoint 001H — 2026-11-11 — Staff account administration, invitations and audit trail
+
+- **002C evidence:** merged as PR #14, merge commit `8c8988d`; backend CI green on `main`.
+- **Feature ID / name:** 001H — staff account administration (new roadmap row).
+- **Branch:** `feature/staff-account-admin`. **PR / merge SHA:** see the merged pull
+  request titled "feat(identity): administer staff accounts and issue invitations".
+- **Implemented behavior:** owners and administrators list staff accounts
+  (students never appear), create staff accounts pending activation, replace
+  roles (with version), disable accounts (ends every session; tokens rejected),
+  and issue activation invitations for pending staff and student accounts. The
+  invitation token is returned once with `Cache-Control: no-store`, never stored
+  or logged; re-issuing revokes the previous one.
+- **Escalation and lock-out rules:** only an owner grants, changes or removes
+  OWNER/ADMIN, or disables or invites such an account; nobody changes their own
+  roles or disables themselves; an academy always keeps an active owner. Each
+  change locks the academy row and re-reads the caller's roles under the lock, so
+  two owners removing or disabling each other at once leave exactly one (tested).
+- **Audit trail:** new `audit` module; Flyway `V10__audit_events.sql` with an
+  append-only trigger. Staff creation, role changes, disablement and invitations
+  record actor, action and target id in the same transaction; details hold role
+  names and expiry only, never email or tokens. Refused actions record nothing.
+  There is no API to read the audit trail yet.
+- **API changes:** six operations; OpenAPI updated with `StaffAccount` and `StaffRole`.
+- **Frontend changes:** none. **No browser page redeems an invitation yet**;
+  `POST /api/v1/auth/activate` must be called directly. Slice 001I adds the page.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker — 212 tests, 0 failures, 0 errors, 0 skipped on macOS. 14 new
+  real-HTTP tests on PostgreSQL 17 (who may grant what, self-change refused,
+  invitation end to end for staff and students, re-issue, versions, immediate
+  role and disable effects, two concurrent owner-versus-owner races run three
+  times, cross-academy, non-managers, audit contents and append-only enforcement).
+  Two test mistakes were fixed before committing (a stale version in a race test,
+  a convoluted assertion); no product defect. Linux CI result is on the pull request.
+- **Known issues / not done:** no email delivery; no browser activation page; no
+  re-enable for disabled accounts; no owner-driven MFA reset for another person;
+  no audit read API; first-account (academy owner) provisioning still needs the
+  database; removing a staff role leaves its batch assignments in place (they
+  grant nothing without the role).
+- **Next planned feature:** 001I browser activation page, then 003B Zoom webhook receipt.

@@ -4,7 +4,7 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/refresh/logout/logout-all/activate/me and MFA enroll/verify/reset, JWKS, courses, batches, students, enrollments, staff assignments, class sessions and own-record routes. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me and MFA enroll/verify/reset, JWKS, courses, batches, students, enrollments, staff assignments, class sessions, staff administration, invitations and own-record routes. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
 servers:
   - url: http://localhost:8080
@@ -601,6 +601,126 @@ paths:
             application/json:
               schema: {type: array, items: {$ref: '#/components/schemas/Assignment'}}
         '403': {description: Caller is not an instructor or attendance officer}
+  /api/v1/staff-accounts:
+    get:
+      summary: Staff accounts of the caller's academy, by email; students are never listed (implemented; owner/admin)
+      operationId: listStaffAccounts
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Staff accounts
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/StaffAccount'}}
+        '403': {description: Not an owner or administrator}
+    post:
+      summary: Create a staff account pending activation (implemented; owner/admin; only owners grant OWNER or ADMIN)
+      operationId: createStaffAccount
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, roles]
+              properties:
+                email: {type: string, maxLength: 254}
+                roles: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/StaffRole'}}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffAccount'}
+        '400': {description: Invalid email or roles (STUDENT is not a staff role)}
+        '403': {description: An administrator tried to grant OWNER or ADMIN}
+        '409': {description: Email already used}
+  /api/v1/staff-accounts/{accountId}:
+    get:
+      summary: Read a staff account (implemented; owner/admin)
+      operationId: getStaffAccount
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Staff account
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffAccount'}
+        '404': {description: Not a staff account of this academy}
+  /api/v1/staff-accounts/{accountId}/roles:
+    put:
+      summary: Replace a staff account's roles; takes effect on its next request (implemented; owner/admin)
+      operationId: replaceStaffRoles
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles, version]
+              properties:
+                roles: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/StaffRole'}}
+                version: {type: integer}
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffAccount'}
+        '403': {description: 'Own account, or an administrator touching OWNER/ADMIN'}
+        '404': {description: Not a staff account of this academy}
+        '409': {description: 'Stale version, or it would leave no active owner'}
+  /api/v1/staff-accounts/{accountId}/disable:
+    post:
+      summary: Disable a staff account and end all its sessions; repeating is harmless (implemented; owner/admin)
+      operationId: disableStaffAccount
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Disabled
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffAccount'}
+        '403': {description: 'Own account, or an administrator disabling an owner or administrator'}
+        '404': {description: Not a staff account of this academy}
+        '409': {description: It would leave no active owner}
+  /api/v1/accounts/{accountId}/invitations:
+    post:
+      summary: Issue an activation invitation for a pending staff or student account (implemented; owner/admin)
+      description: Replaces any earlier invitation. The token is shown once, is not stored, and is sent with Cache-Control no-store; there is no email delivery yet.
+      operationId: issueInvitation
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '201':
+          description: Invitation issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accountId, activationToken, expiresAt]
+                properties:
+                  accountId: {type: string, format: uuid}
+                  activationToken: {type: string}
+                  expiresAt: {type: string, format: date-time}
+        '403': {description: An administrator inviting an owner or administrator}
+        '404': {description: Account not in this academy}
+        '409': {description: The account is not pending activation}
   /api/v1/me/student:
     get:
       summary: The signed-in student's own record (implemented; STUDENT role)
@@ -894,6 +1014,20 @@ components:
         version: {type: integer}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
+    StaffRole:
+      type: string
+      enum: [ACADEMY_OWNER, ACADEMY_ADMIN, INSTRUCTOR, ATTENDANCE_OFFICER, ANALYST]
+    StaffAccount:
+      type: object
+      required: [id, email, roles, status, mfaEnrolled, version, createdAt]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string}
+        roles: {type: array, items: {$ref: '#/components/schemas/StaffRole'}}
+        status: {type: string, enum: [PENDING_ACTIVATION, ACTIVE, DISABLED]}
+        mfaEnrolled: {type: boolean}
+        version: {type: integer}
+        createdAt: {type: string, format: date-time}
   securitySchemes:
     bearerAuth:
       type: http

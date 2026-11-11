@@ -57,6 +57,22 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
         return id;
     }
 
+    /** Redeems an invitation over HTTP with the test passphrase; returns the HTTP status. */
+    protected int activateWithInvitation(String token) {
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("token", token);
+        body.put("password", PASSPHRASE);
+        return api.post("/api/v1/auth/activate", HttpApi.json(body)).statusCode();
+    }
+
+    /** Password sign-in over HTTP, for accounts without MFA; returns the raw response. */
+    protected HttpResponse<String> passwordLogin(String email) {
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("email", email);
+        body.put("password", PASSPHRASE);
+        return api.post("/api/v1/auth/login", HttpApi.json(body));
+    }
+
     /** Activates a pending account (for example one created with a student record) with the test passphrase. */
     protected void activate(UUID accountId) {
         accounts.setPassword(accountId, PASSPHRASE);
