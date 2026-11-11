@@ -28,6 +28,12 @@
 - Owners and administrators list receipts by status (`GET /api/v1/zoom/receipts`, no payloads) and requeue dead letters with a reason that is written to the audit trail (`POST /api/v1/zoom/receipts/{id}/replay`).
 - The only handler so far writes `zoom_occurrence_events` (webinar ID, occurrence UUID, event type, Zoom event time), one row per receipt, read in event-time order so late or out-of-order deliveries are harmless. It reads only `payload.object.id` and `payload.object.uuid`, which Zoom's event reference lists as required strings (checked 2026-11-11). Participant fields are documented there too but stay unparsed until a real test webinar confirms them.
 
+## As built (003D part 1, occurrence mapping)
+- A class session may carry a Zoom webinar ID (`zoomWebinarId`; spaces and hyphens as Zoom displays them are removed; digits, 9 to 20 long, is our assumption to confirm in 003A).
+- When the worker files an event, the occurrence is linked automatically only if exactly one SCHEDULED class on that webinar ID has a time, widened by 60 minutes on both sides, that contains the event. Recurring webinars (one ID, many days) and restarted webinars (new occurrence UUID, same class) link correctly. No match or several matches leave it for review; cancelled classes and other academies' classes never match.
+- Owners and administrators review occurrences (`GET /api/v1/zoom/occurrences?decided=false`), record a decision with a reason (`POST /api/v1/zoom/occurrence-links`, link or `sessionId: null` for "not a class"), and re-run matching after adding webinar IDs (`POST /api/v1/zoom/occurrences/auto-link`). Manual decisions are audited and never changed automatically.
+- Still open: matching participants to students (registrant and participant fields need a real test webinar), and attendance.
+
 ## First validation experiment
 Collect account capabilities, real Zoom webinar occurrence identifiers, signed joined/left webhook samples (redacted), participant report result, mapping inputs, and three student joins/rejoins. Confirm the events' order/timestamps, registration identifiers and report accuracy. Only then finalize DTOs and integration tests.
 

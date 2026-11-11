@@ -85,20 +85,21 @@ public class ClassSessionService {
 
     @Transactional
     public SessionView create(CurrentAccount caller, String title, Instant startsAt, Instant endsAt, String timeZone,
-                              List<UUID> batchIds) {
+                              List<UUID> batchIds, String zoomWebinarId) {
         caller.requireAcademyManager();
         ZoneId zone = zone(timeZone);
         checkTimes(startsAt, endsAt);
         Set<UUID> wanted = checkBatches(caller, batchIds, Set.of());
         ClassSession saved = sessions.saveAndFlush(
-                new ClassSession(caller.academyId(), title.strip(), startsAt, endsAt, zone, wanted));
+                new ClassSession(caller.academyId(), title.strip(), startsAt, endsAt, zone, wanted, webinarId(zoomWebinarId)));
         return views(caller, List.of(saved), new BatchScope(true, Set.of())).get(0);
     }
 
     /** Replaces every field, including the batch set. Batches being added must be active. */
     @Transactional
     public SessionView update(CurrentAccount caller, UUID sessionId, String title, Instant startsAt, Instant endsAt,
-                              String timeZone, List<UUID> batchIds, String status, long expectedVersion) {
+                              String timeZone, List<UUID> batchIds, String status, String zoomWebinarId,
+                              long expectedVersion) {
         caller.requireAcademyManager();
         ZoneId zone = zone(timeZone);
         checkTimes(startsAt, endsAt);
@@ -111,8 +112,40 @@ public class ClassSessionService {
             throw new ConflictException("The record was changed by someone else; reload and retry");
         }
         Set<UUID> wanted = checkBatches(caller, batchIds, session.batchIds());
-        session.update(title.strip(), startsAt, endsAt, zone, wanted, status);
+        session.update(title.strip(), startsAt, endsAt, zone, wanted, status, webinarId(zoomWebinarId));
         return views(caller, List.of(sessions.saveAndFlush(session)), new BatchScope(true, Set.of())).get(0);
+    }
+
+    /**
+     * For the Zoom module: scheduled sessions on the webinar whose time, widened by
+     * {@code slack} on both sides, contains {@code at}. No role check.
+     */
+    @Transactional(readOnly = true)
+    public List<UUID> scheduledOnWebinarAround(UUID academyId, String webinarId, Instant at, Duration slack) {
+        return sessions.scheduledOnWebinarAround(academyId, webinarId, at.plus(slack), at.minus(slack));
+    }
+
+    /** For other modules: the session's status if it belongs to the academy, else not found. No role check. */
+    @Transactional(readOnly = true)
+    public String requireStatusInAcademy(UUID academyId, UUID sessionId) {
+        return sessions.findByIdAndAcademyId(sessionId, academyId).map(ClassSession::getStatus)
+                .orElseThrow(() -> new ResourceNotFoundException("Class session"));
+    }
+
+    /**
+     * Zoom shows webinar IDs with spaces ("812 3456 7890"); they are stored as digits only.
+     * Zoom documents the ID as a string; digits-only, 9 to 20 long, is our assumption to
+     * confirm against the academy's account.
+     */
+    static String webinarId(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String digits = raw.replaceAll("[\\s-]", "");
+        if (!digits.matches("[0-9]{9,20}")) {
+            throw new InvalidRequestException("zoomWebinarId must be a Zoom webinar ID such as 812 3456 7890");
+        }
+        return digits;
     }
 
     private ClassSession readable(CurrentAccount caller, UUID sessionId, BatchScope scope) {
@@ -160,7 +193,7 @@ public class ClassSessionService {
         Map<UUID, BatchView> batchViews = batches.viewsInAcademy(caller.academyId(),
                 found.stream().flatMap(s -> s.batchIds().stream()).filter(scope::includes).collect(Collectors.toSet()));
         return found.stream().map(s -> new SessionView(s.getId(), s.getTitle(), s.getStartsAt(), s.getEndsAt(),
-                s.getTimeZone(), s.localDate(), s.getStatus(),
+                s.getTimeZone(), s.localDate(), s.getStatus(), s.getZoomWebinarId(),
                 s.batchIds().stream().filter(scope::includes).map(batchViews::get)
                         .map(b -> new SessionView.Batch(b.id(), b.courseId(), b.code(), b.name()))
                         .sorted(Comparator.comparing(SessionView.Batch::code).thenComparing(SessionView.Batch::batchId))

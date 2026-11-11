@@ -12,14 +12,17 @@ import org.springframework.stereotype.Component;
  * Records each webinar event against its occurrence. Reads only the two fields Zoom
  * documents as required strings on these events: {@code payload.object.id} (webinar
  * ID) and {@code payload.object.uuid} (unique per webinar instance). Participant
- * fields are left in the receipt until a real test webinar confirms them (003D).
+ * fields are left in the receipt until a real test webinar confirms them. The
+ * occurrence is then linked to its class session when that is unambiguous.
  */
 @Component
 class OccurrenceEventHandler implements ReceiptHandler {
     private final JdbcTemplate jdbc;
+    private final OccurrenceLinker linker;
 
-    OccurrenceEventHandler(JdbcTemplate jdbc) {
+    OccurrenceEventHandler(JdbcTemplate jdbc, OccurrenceLinker linker) {
         this.jdbc = jdbc;
+        this.linker = linker;
     }
 
     @Override
@@ -42,6 +45,7 @@ class OccurrenceEventHandler implements ReceiptHandler {
                 ON CONFLICT (receipt_id) DO NOTHING
                 """, UUID.randomUUID(), receipt.academyId(), receipt.id(), webinarId, occurrence, receipt.eventType(),
                 receipt.eventTs(), Timestamp.from(DbTime.now()));
+        linker.tryLink(receipt.academyId(), occurrence, webinarId, java.time.Instant.ofEpochMilli(receipt.eventTs()));
     }
 
     /** Zoom documents these as strings; a bare JSON number is accepted for the webinar ID. */

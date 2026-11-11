@@ -683,3 +683,42 @@ build runs the Next.js default bundler and repeats the smoke test.
   are still unproven against a real Zoom account (003A).
 - **Next planned feature:** 003D occurrence and identity mapping (participant
   parts need 003A); staff screens are the other large open area.
+
+## Checkpoint 003D-1 — 2026-11-11 — Zoom occurrence to class session linking
+
+- **003C evidence:** merged as PR #20, merge commit `e200a71`; backend CI and GitGuardian green.
+- **Feature ID / name:** 003D part 1 — webinar occurrence mapping. Part 2 (student
+  identity from registrants and participants) needs a real test webinar (003A).
+- **Branch:** `feature/003d-occurrence-mapping`. **PR / merge SHA:** see the merged
+  pull request titled "feat(zoom): link webinar occurrences to class sessions".
+- **Implemented behavior:** class sessions take an optional `zoomWebinarId`
+  (spaces and hyphens removed; digits, 9–20 long, an assumption to confirm in
+  003A). The worker links each new occurrence to the single SCHEDULED class on
+  that webinar whose time ±60 minutes contains the event; zero or several
+  candidates leave it for review. Recurring webinars and restarts link correctly;
+  cancelled and other academies' classes never match. Owners and administrators
+  list occurrences, record audited decisions (link, relink, or "not a class") that
+  the matcher never overrides, and re-run matching after adding webinar IDs.
+- **Database changes:** Flyway `V13__zoom_occurrence_links.sql`.
+- **API changes:** `zoomWebinarId` on class sessions (omitted on PUT clears it);
+  `GET /api/v1/zoom/occurrences`, `POST /api/v1/zoom/occurrence-links`,
+  `POST /api/v1/zoom/occurrences/auto-link`. Occurrence UUIDs can contain `/` and
+  `+`, so they travel in bodies and queries, never in paths.
+- **Frontend changes:** none.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker — 251 tests, 0 failures, 0 errors, 0 skipped on macOS, also in
+  random and reverse class order. 10 new PostgreSQL 17 tests: webinar ID input,
+  automatic link with one decision across three events, recurring and restarted
+  webinars, six no-guess cases (too late, other webinar, ambiguous, cancelled,
+  other academy) plus the exact one-hour edge, manual decisions with audit
+  contents and a later event not overruling them, validation, re-running the
+  matcher, 4 workers over 40 events creating one link, access control,
+  constraints. Two test mistakes fixed before commit (a value that was in range,
+  and a cross-academy setup that could silently fall back to a random ID).
+  Linux CI result is on the pull request.
+- **Known issues / not done:** no staff screen for the review list; changing a
+  class's webinar ID or time does not revisit existing links; the 60-minute
+  slack is fixed; nothing maps participants to students yet; still unproven
+  against a real Zoom account.
+- **Next planned feature:** staff screens for the academic API; attendance
+  (004A) waits for participant identity (003D part 2, needs 003A).

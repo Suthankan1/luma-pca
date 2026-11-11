@@ -22,7 +22,7 @@
 | 003A Zoom account authorization & secrets | Real sandbox account, scopes and safe token management | BLOCKED pending academy |
 | 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | DONE against fixtures: signature and timestamp checks, URL validation, idempotent durable receipt, off by default. Real Zoom delivery unproven until 003A |
 | 003C Outbox/worker | Retry, DLQ, dedup, out-of-order receipts | DONE with an in-database queue: multi-worker claiming, backoff, dead letter, audited replay, per-occurrence event log. SQS transport and separate worker deployment remain the production plan |
-| 003D Webinar occurrence identity and registration mapping | Real Zoom tests, stable student IDs, review unknown users | TODO |
+| 003D Webinar occurrence identity and registration mapping | Real Zoom tests, stable student IDs, review unknown users | PART 1 DONE: occurrence-to-class-session linking (automatic when unambiguous, audited manual decisions). Part 2, student identity from registrants and participants, needs a real test webinar (003A) |
 | 004A Provisional attendance timeline | Union/clip durations, SSE, late/missing and stale event handling | TODO |
 | 004B Official report reconciliation | Correct outcome vs golden dataset, audit finalization | TODO |
 | 004C Correction workflows + student history | Reasons, permissions, audit and appeal flow | TODO |
@@ -33,4 +33,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** `003D` webinar occurrence mapping (link a Zoom webinar ID and occurrence UUID to a class session) and registrant identity mapping. Both need a real test webinar (`003A`) to confirm participant fields before binding them; the occurrence-to-session link can be built first. In parallel, staff screens for the academic API.
+**Suggested next small slice:** staff screens for the academic API (courses, batches, students, enrollments, staff, invitations, class sessions, Zoom review), since everything so far is API-only. Attendance (`004A`) needs participant identity (`003D` part 2), which needs a real test webinar (`003A`).

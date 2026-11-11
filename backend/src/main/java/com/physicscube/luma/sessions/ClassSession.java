@@ -48,6 +48,9 @@ class ClassSession {
     @Column(nullable = false, length = 20)
     private String status;
 
+    @Column(name = "zoom_webinar_id", length = 20)
+    private String zoomWebinarId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -64,14 +67,17 @@ class ClassSession {
     protected ClassSession() {
     }
 
-    ClassSession(UUID academyId, String title, Instant startsAt, Instant endsAt, ZoneId zone, Set<UUID> batchIds) {
+    ClassSession(UUID academyId, String title, Instant startsAt, Instant endsAt, ZoneId zone, Set<UUID> batchIds,
+                 String zoomWebinarId) {
         this.id = UUID.randomUUID();
         this.academyId = academyId;
         this.status = "SCHEDULED";
-        update(title, startsAt, endsAt, zone, batchIds, "SCHEDULED");
+        update(title, startsAt, endsAt, zone, batchIds, "SCHEDULED", zoomWebinarId);
     }
 
-    void update(String title, Instant startsAt, Instant endsAt, ZoneId zone, Set<UUID> batchIds, String status) {
+    void update(String title, Instant startsAt, Instant endsAt, ZoneId zone, Set<UUID> batchIds, String status,
+                String zoomWebinarId) {
+        this.zoomWebinarId = zoomWebinarId;
         this.title = title;
         this.startsAt = DbTime.truncate(startsAt);
         this.endsAt = DbTime.truncate(endsAt);
@@ -116,6 +122,10 @@ class ClassSession {
 
     String getTimeZone() {
         return timeZone;
+    }
+
+    String getZoomWebinarId() {
+        return zoomWebinarId;
     }
 
     String getStatus() {
