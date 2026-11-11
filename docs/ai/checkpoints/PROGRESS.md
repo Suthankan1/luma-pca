@@ -912,3 +912,26 @@ build runs the Next.js default bundler and repeats the smoke test.
   Zoom account (003A).
 - **Next planned feature:** 003A when the academy's Zoom test webinar is
   available; otherwise real-stack browser test in CI, or password recovery.
+
+## Checkpoint CI-RS — 2026-11-11 — Real-stack browser test in CI
+
+- **UI-3c evidence:** merged as PR #26, merge commit `707142f`; frontend CI green.
+- **Feature ID / name:** CI-RS, real-stack browser test in CI.
+- **Branch:** `ci/real-stack-browser-test`. **PR / merge SHA:** see the merged pull
+  request titled "ci: run the real-stack browser test".
+- **Change:** new workflow `.github/workflows/real-stack.yml` ("Real-stack browser
+  test") on pushes and pull requests touching `backend/**`, `frontend/**`, the
+  script or the workflow. It packages the backend jar (tests skipped; the backend
+  workflow runs them), builds Next.js, and runs `scripts/staff-ui-real-stack.sh`
+  on the Ubuntu 24.04 runner itself: PostgreSQL 17 through Docker and the Google
+  Chrome GitHub preinstalls (Playwright `channel: "chrome"` when `CI` is set), so
+  no apt-get and no browser download. On failure the script prints the last 40
+  lines of the backend and frontend logs with this run's passphrase, invitation
+  and any JWT masked, and the job keeps the Playwright trace for 3 days (it holds
+  only throwaway per-run accounts).
+- **Also:** `forbidOnly` in CI for the real-stack config; a duplicated sentence
+  in IMPLEMENTATION-PLAN removed.
+- **Tests executed:** the script with `CI=1` on macOS (passed); the masking
+  pipeline checked by hand; the workflow's first runs are on the pull request.
+- **Next planned feature:** password recovery with email delivery, or 003A once
+  the academy's Zoom test webinar is available.

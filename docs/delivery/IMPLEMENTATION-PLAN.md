@@ -38,4 +38,4 @@
 | 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
-**Suggested next small slice:** every API area now has a staff screen. `003A` (a real Zoom test webinar with the academy's credentials) unblocks participant matching and attendance (`004A`); without it, candidates are running the real-stack browser test in CI, or password recovery and email delivery. Attendance (`004A`) still waits for participant identity, which needs a real Zoom test webinar (`003A`).
+**Suggested next small slice:** every API area now has a staff screen. `003A` (a real Zoom test webinar with the academy's credentials) unblocks participant matching and attendance (`004A`); meanwhile, password recovery and email delivery. The real-stack browser test runs in CI (workflow "Real-stack browser test") for every backend or frontend change.

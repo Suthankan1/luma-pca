@@ -60,7 +60,7 @@ npm --prefix frontend run lint
 npm --prefix frontend run build
 python3 scripts/verify_structure.py
 scripts/auth-stack-smoke.sh            # real backend + database + Next.js sign-in flow
-scripts/staff-ui-real-stack.sh         # real stack + Playwright: admin onboards a student end to end
+scripts/staff-ui-real-stack.sh         # real stack + Playwright, end to end (also the "Real-stack browser test" CI workflow)
 ```
 
 ## Repository anatomy

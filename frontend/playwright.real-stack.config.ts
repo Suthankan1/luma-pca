@@ -11,11 +11,14 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: "list",
+  forbidOnly: !!process.env.CI,
   timeout: 90_000,
   use: {
     baseURL: process.env.LUMA_REAL_STACK_URL,
     trace: "retain-on-failure",
     ...devices["Desktop Chrome"],
-    ...(process.platform === "darwin" ? { channel: "chrome" } : {}),
+    // Installed Google Chrome: present on macOS developer machines and preinstalled on
+    // GitHub's Ubuntu runners, so no browser download or apt-get is needed.
+    ...(process.platform === "darwin" || process.env.CI ? { channel: "chrome" } : {}),
   },
 });
