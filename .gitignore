@@ -17,6 +17,8 @@ backend/target/
 frontend/.next/
 frontend/out/
 frontend/coverage/
+**/test-results/
+**/playwright-report/
 *.tsbuildinfo
 # Tooling / editors
 .idea/
