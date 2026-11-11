@@ -4,7 +4,7 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/refresh/logout/logout-all/activate/me and MFA enroll/verify/reset, JWKS, courses, batches, students, enrollments, staff assignments, class sessions, staff administration, invitations, own-record routes and the Zoom webhook ingress. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me and MFA enroll/verify/reset, JWKS, courses, batches, students, enrollments, staff assignments, class sessions, staff administration, invitations, own-record routes, the Zoom webhook ingress and receipt operations. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
 servers:
   - url: http://localhost:8080
@@ -863,6 +863,58 @@ paths:
                     fullName: {type: string}
                     batchIds: {type: array, items: {type: string, format: uuid}}
         '404': {description: Not found or not readable}
+  /api/v1/zoom/receipts:
+    get:
+      summary: Webhook receipts by processing status, newest first, without payloads (implemented; owner/admin)
+      operationId: listZoomReceipts
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: status, required: false, schema: {type: string, enum: [RECEIVED, PROCESSED, DEAD], default: DEAD}}
+        - {in: query, name: limit, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200':
+          description: Receipts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, eventType, eventTs, status, attempts, receivedAt, nextAttemptAt]
+                  properties:
+                    id: {type: string, format: uuid}
+                    eventType: {type: string}
+                    eventTs: {type: integer}
+                    status: {type: string, enum: [RECEIVED, PROCESSED, DEAD]}
+                    attempts: {type: integer}
+                    lastError: {type: [string, 'null']}
+                    receivedAt: {type: string, format: date-time}
+                    nextAttemptAt: {type: string, format: date-time}
+                    processedAt: {type: [string, 'null'], format: date-time}
+        '400': {description: Invalid status or limit}
+  /api/v1/zoom/receipts/{receiptId}/replay:
+    post:
+      summary: Requeue a dead-lettered receipt; the reason is audited (implemented; owner/admin)
+      operationId: replayZoomReceipt
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: receiptId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: {type: string, minLength: 3, maxLength: 300, description: No personal data}
+      responses:
+        '204': {description: Requeued, due now, attempts reset}
+        '400': {description: Missing or unsuitable reason}
+        '404': {description: Not found in this academy}
+        '409': {description: Not a dead letter}
   /api/v1/class-sessions/{sessionId}/attendance:
     get:
       summary: Proposed scoped attendance — NOT IMPLEMENTED

@@ -50,3 +50,7 @@ luma:
       secret-token: ${LUMA_ZOOM_WEBHOOK_SECRET_TOKEN:}
       academy-id: ${LUMA_ZOOM_WEBHOOK_ACADEMY_ID:}
       max-clock-skew: ${LUMA_ZOOM_WEBHOOK_MAX_CLOCK_SKEW:PT5M}
+    processing:
+      # Polls stored webhook receipts in this process; safe with several instances.
+      enabled: ${LUMA_ZOOM_PROCESSING_ENABLED:true}
+      poll-interval: ${LUMA_ZOOM_PROCESSING_POLL_INTERVAL:PT5S}

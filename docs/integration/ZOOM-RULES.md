@@ -22,6 +22,12 @@
 - Limits: JSON content type only, 64 KiB body cap read before verification. Logs hold event type and outcome only; payloads with names and emails are never logged. Payload retention remains an academy decision (OPEN-QUESTIONS P0).
 - Not yet done: processing receipts (003C), occurrence mapping and identity resolution (003D), real-account proof (003A).
 
+## As built (003C, processing)
+- A poller in the API process (`LUMA_ZOOM_PROCESSING_ENABLED`, default on, every 5 s) claims due receipts with `FOR UPDATE SKIP LOCKED`, so several instances can run at once; each receipt is handled and marked in one transaction, so a crashed worker leaves it due again.
+- Handler failures are undone with a JDBC savepoint while the claim is kept, then recorded: retry after 30 s doubling to 1 h (ten attempts over about 3 hours), or `DEAD` at once for malformed payloads and unknown types. Stored error text is the exception type or our own fixed message, never payload content.
+- Owners and administrators list receipts by status (`GET /api/v1/zoom/receipts`, no payloads) and requeue dead letters with a reason that is written to the audit trail (`POST /api/v1/zoom/receipts/{id}/replay`).
+- The only handler so far writes `zoom_occurrence_events` (webinar ID, occurrence UUID, event type, Zoom event time), one row per receipt, read in event-time order so late or out-of-order deliveries are harmless. It reads only `payload.object.id` and `payload.object.uuid`, which Zoom's event reference lists as required strings (checked 2026-11-11). Participant fields are documented there too but stay unparsed until a real test webinar confirms them.
+
 ## First validation experiment
 Collect account capabilities, real Zoom webinar occurrence identifiers, signed joined/left webhook samples (redacted), participant report result, mapping inputs, and three student joins/rejoins. Confirm the events' order/timestamps, registration identifiers and report accuracy. Only then finalize DTOs and integration tests.
 
