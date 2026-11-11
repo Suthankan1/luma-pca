@@ -1,5 +1,6 @@
 package com.physicscube.luma.identity.domain;
 
+import com.physicscube.luma.shared.time.DbTime;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -109,13 +110,13 @@ public class Account {
 
     @PrePersist
     void onCreate() {
-        createdAt = Instant.now();
+        createdAt = DbTime.now();
         updatedAt = createdAt;
     }
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = Instant.now();
+        updatedAt = DbTime.now();
     }
 
     public UUID getId() {

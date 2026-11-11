@@ -1,5 +1,6 @@
 package com.physicscube.luma.courses;
 
+import com.physicscube.luma.shared.time.DbTime;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -56,13 +57,13 @@ class Course {
 
     @PrePersist
     void onCreate() {
-        createdAt = Instant.now();
+        createdAt = DbTime.now();
         updatedAt = createdAt;
     }
 
     @PreUpdate
     void onUpdate() {
-        updatedAt = Instant.now();
+        updatedAt = DbTime.now();
     }
 
     UUID getId() {

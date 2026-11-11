@@ -3,6 +3,7 @@ package com.physicscube.luma.identity;
 import com.physicscube.luma.identity.domain.Account;
 import com.physicscube.luma.identity.domain.AccountStatus;
 import com.physicscube.luma.identity.domain.Invitation;
+import com.physicscube.luma.shared.time.DbTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -44,7 +45,7 @@ public class InvitationService {
         if (account.getStatus() != AccountStatus.PENDING_ACTIVATION) {
             throw new IllegalStateException("Only an account pending activation can be invited");
         }
-        Instant now = Instant.now();
+        Instant now = DbTime.now();
         invitations.revokeOpen(accountId, now);
         String token = OpaqueToken.generate();
         Invitation invitation = invitations.saveAndFlush(Invitation.issue(accountId, OpaqueToken.digest(token), createdBy, now, ttl));
