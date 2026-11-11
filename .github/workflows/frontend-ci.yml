@@ -7,24 +7,45 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: npm --prefix frontend ci --no-audit --no-fund
       - name: ESLint
         run: npm --prefix frontend run lint
       - name: Type check
         run: npm --prefix frontend run typecheck
-      - name: Session policy tests
+      - name: Unit tests
         run: npm --prefix frontend test
       - name: Production build
         run: npm --prefix frontend run build
       - name: Session HTTP smoke test
         run: npm --prefix frontend run test:smoke
-      - name: Install Playwright browsers
-        run: npx --prefix frontend playwright install --with-deps chromium
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Microsoft's Playwright image ships Chromium and its Linux libraries, so this job
+    # needs no apt-get and no browser download (both slow, and failing whenever the
+    # runner cannot reach Ubuntu's package servers). The tag must equal the
+    # @playwright/test version in frontend/package-lock.json; the first step checks it.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm --prefix frontend ci --no-audit --no-fund
+      - name: Playwright version matches the container image
+        run: |
+          installed="$(node -p "require('./frontend/node_modules/@playwright/test/package.json').version")"
+          test "$installed" = "1.65.0" || { echo "::error::@playwright/test is $installed; update the container tag to v$installed"; exit 1; }
+      - name: Production build
+        run: npm --prefix frontend run build
       - name: End-to-end browser tests
         run: npm --prefix frontend run test:e2e

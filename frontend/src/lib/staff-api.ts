@@ -1,0 +1,57 @@
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { config } from "./auth-server";
+import { isSameOrigin, openAccess } from "./session-policy";
+
+/**
+ * Server-side calls from staff screens to the LUMA API, as the signed-in person.
+ * The access token never leaves the server: it is read from the sealed HttpOnly
+ * cookie and sent only to API_INTERNAL_URL. The API enforces every permission; this
+ * module only makes the call.
+ */
+export type ApiResult<T> = { ok: true; status: number; data: T } | { ok: false; status: number; detail?: string };
+
+async function accessToken() {
+  const { names, key } = config();
+  const sealed = (await cookies()).get(names.access)?.value;
+  const access = sealed ? openAccess(sealed, key) : null;
+  // An expired access token with a live refresh cookie shows "Continue session" on sign-in.
+  if (!access) redirect("/sign-in?portal=staff");
+  return access;
+}
+
+export async function staffApi<T>(path: `/api/v1/${string}`, init?: { method: "POST" | "PUT"; body: unknown }): Promise<ApiResult<T>> {
+  const access = await accessToken();
+  let response: Response;
+  try {
+    response = await fetch(new URL(path, process.env.API_INTERNAL_URL ?? "http://localhost:8080"), {
+      method: init?.method ?? "GET",
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(5000),
+      headers: { Authorization: `Bearer ${access}`, ...(init ? { "Content-Type": "application/json" } : {}) },
+      body: init ? JSON.stringify(init.body) : undefined,
+    });
+  } catch {
+    return { ok: false, status: 503 };
+  }
+  if (response.status === 401) redirect("/sign-in?portal=staff&error=expired");
+  const body = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = typeof body?.detail === "string" ? body.detail.slice(0, 300) : undefined;
+    return { ok: false, status: response.status, detail };
+  }
+  return { ok: true, status: response.status, data: body as T };
+}
+
+/**
+ * Server Actions already require the Origin to match the Host. This repeats the
+ * check against the configured public origin, as the session routes do, so a
+ * misconfigured proxy cannot widen it.
+ */
+export async function requireSameOriginAction() {
+  const requestHeaders = await headers();
+  if (!isSameOrigin(requestHeaders.get("origin"), config().origin, requestHeaders.get("sec-fetch-site"))) {
+    throw new Error("Cross-origin request refused");
+  }
+}

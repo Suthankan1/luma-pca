@@ -722,3 +722,50 @@ build runs the Next.js default bundler and repeats the smoke test.
   against a real Zoom account.
 - **Next planned feature:** staff screens for the academic API; attendance
   (004A) waits for participant identity (003D part 2, needs 003A).
+
+## Checkpoint UI-1 — 2026-11-11 — Staff screens: shell, courses and batches
+
+- **003D part 1 evidence:** merged as PR #21, merge commit `e04fbd8`; backend CI and GitGuardian green.
+- **Feature ID / name:** UI-1 — first staff screens (new roadmap rows UI-1 to UI-3).
+- **Branch:** `feature/staff-ui-courses-batches`. **PR / merge SHA:** see the merged
+  pull request titled "feat(web): staff layout and courses and batches screen".
+- **Design source:** Figma file QVzsewJyikM94Xp07hDwwi, frames "DESKTOP / 01 /
+  Your classroom, in focus." (12:27) and "DESKTOP / 10 / Identity mapping /
+  directory" (12:908), read 2026-11-11 (read-only). There is no Figma frame for
+  courses and batches; the screen uses those frames' shell and directory patterns.
+  The prototype's fictional figures were not copied. Fonts were not changed.
+- **Implemented behavior:** new staff shell (navy rail with numbered sections,
+  breadcrumb, heading, subtitle) on `/staff` and `/staff/courses`. Owners and
+  administrators see courses with their batches, create courses and batches, and
+  deactivate or reactivate either, with inline success and error messages; other
+  staff see an explanation instead of the forms. Data loads on the server through
+  `lib/staff-api.ts`, which reads the sealed HttpOnly access cookie and sends it
+  only to the API; an expired session goes to sign-in. Changes go through Server
+  Actions that repeat the configured-origin check, validate input (including
+  UUID shape for ids from hidden fields) and rely on the API for authorization.
+- **Defect found by the browser tests and fixed before commit:** React 19 resets
+  a form after its Server Action finishes, so a refused submission erased what the
+  person had typed. Refusals now return the submitted text, which becomes the
+  fields' defaults; successes still clear the form.
+- **API changes:** none. **Database changes:** none.
+- **Tests executed (macOS):** frontend lint, type-check, 22 unit tests (7 new:
+  roles, UUID guard, course and batch rules, error wording, dates, submitted
+  values), production build, HTTP smoke test; Playwright 22 tests (6 new: 3
+  scenarios × desktop and mobile: full create/refuse/deactivate/reactivate flow
+  with values kept after refusals, instructor sees explanation, signed-out
+  redirect and no horizontal overflow on a phone), run twice. Backend unchanged.
+- **Not verified:** the browser tests use the mock backend, which mirrors the
+  real API's status codes and problem details for these cases; the screens have
+  not been driven against the real backend in a browser.
+- **Known issues / not done:** no editing of codes, titles or dates yet (only
+  activation); no pagination needed yet (lists are academy-sized); other areas
+  still API-only (UI-2, UI-3); the Figma typeface is not adopted.
+- **CI change in the same PR:** the first two CI attempts failed before any test
+  ran: `playwright install --with-deps` runs apt-get on every build, and the runner
+  could not resolve Ubuntu's package servers (GitHub reported no incident; same
+  runner image as an earlier passing run). The browser tests now run in their own
+  job inside `mcr.microsoft.com/playwright:v1.65.0-noble`, which has Chromium and its
+  libraries preinstalled; a step fails clearly if `@playwright/test` in the lockfile
+  drifts from the image tag. Lint, type-check, unit, build and smoke run in a
+  parallel job with an npm cache. Both jobs have a 15-minute limit.
+- **Next planned feature:** UI-2 students and enrollments screens.
