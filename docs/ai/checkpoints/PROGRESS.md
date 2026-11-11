@@ -174,3 +174,49 @@ build runs the Next.js default bundler and repeats the smoke test.
   tokens.
 - **Next planned feature:** 001D — refresh-token rotation with reuse detection
   and logout, completing the contract the Next.js BFF already expects.
+
+## Checkpoint 001D — 2026-11-11 — Refresh sessions and logout
+
+- **001C evidence:** merged as PR #6, merge commit `5e904b0`.
+- **Feature ID / name:** 001D — refresh rotation, reuse revocation, logout.
+- **Branch:** `feature/001d-refresh-sessions`. **PR / merge SHA:** see the merged
+  pull request titled "feat(auth): add rotating refresh sessions and logout".
+- **Implemented behavior:** login now also returns `refreshToken` and
+  `refreshExpiresIn`. `POST /api/v1/auth/refresh` exchanges the token for a new
+  pair. Presenting an exchanged token again revokes the whole session,
+  including the newest token. `POST /api/v1/auth/logout` ends one session and
+  always returns 204; `POST /api/v1/auth/logout-all` (bearer) ends all of the
+  caller's sessions. Access tokens carry `sid` and stop working the moment
+  their session is revoked or expires. Idle limit 7 days, absolute limit 30
+  days (`LUMA_AUTH_REFRESH_TOKEN_TTL`, `LUMA_AUTH_SESSION_MAX_LIFETIME`).
+  Password change or disablement ends sessions at next use.
+- **Database changes:** Flyway `V4__identity_refresh_sessions.sql` adds
+  `refresh_sessions` and `refresh_tokens` (digest only; one current token per
+  session enforced by a partial unique index; revocation requires a reason).
+- **Decisions:** (1) every operation locks the session row, so two concurrent
+  refreshes of one token give exactly one winner and then revoke the session —
+  strict, with no grace window. (2) SHA-256 digest, not HMAC, as for
+  invitations. (3) `RefreshSessions` uses `JdbcTemplate` rather than JPA
+  entities to keep the locking SQL explicit.
+- **API changes:** three routes added, login response extended; OpenAPI updated.
+- **Frontend changes:** none needed. The existing Next.js sign-in, session
+  continuation and sign-out now work against the real backend.
+- **Tests executed:** (1) `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml
+  verify` with Docker — 96 tests, 0 failures, 0 errors, 0 skipped; 12 new
+  real-HTTP tests (rotation, reuse revocation, 8 concurrent refreshes, identical
+  failures, idle and absolute expiry, logout, logout-all, account change,
+  constraints). (2) New `scripts/auth-stack-smoke.sh`: PostgreSQL 17 + backend
+  jar + Next.js dev server, 26 checks passed, run three times. Frontend lint,
+  typecheck and unit tests were not re-run because no frontend file changed.
+- **Test-tooling note:** the first smoke runs reported a false failure caused
+  by the script itself (bash 3.2 brace-expanding a JSON literal inside
+  `"$(...)"`); the script now builds JSON with `printf`. No product defect.
+- **Known issues / not done:** no session list; expired/revoked rows are never
+  cleaned up; a legitimate client that sends the same refresh twice (double
+  submit, two tabs) is signed out; the BFF shows a generic "unavailable" error
+  for the 403 an owner/admin gets before MFA exists; the smoke script is not in
+  CI and uses `next dev`, not a production build; no Playwright browser tests.
+  Everything listed under 001C still applies (MFA, recovery, rate limiting by
+  client address, audit, first-account bootstrap, invitation delivery).
+- **Next planned feature:** 002A course/batch domain with the 001E scoped
+  authorization foundation; 001F admin MFA before any staff admin route.

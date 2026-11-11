@@ -15,7 +15,11 @@ public record AuthProperties(
         @DefaultValue("false") boolean ephemeralSigningKey,
         @DefaultValue("false") boolean allowElevatedLoginWithoutMfa,
         @DefaultValue("5") int maxFailedLogins,
-        @DefaultValue("PT15M") Duration lockDuration) {
+        @DefaultValue("PT15M") Duration lockDuration,
+        /** How long an unused refresh token stays valid (idle limit). */
+        @DefaultValue("P7D") Duration refreshTokenTtl,
+        /** Absolute limit for one sign-in, however often it is refreshed. */
+        @DefaultValue("P30D") Duration sessionMaxLifetime) {
 
     public AuthProperties {
         if (issuer == null || issuer.isBlank() || audience == null || audience.isBlank()) {
@@ -26,6 +30,11 @@ public record AuthProperties(
         }
         if (maxFailedLogins < 2 || lockDuration.isZero() || lockDuration.isNegative()) {
             throw new IllegalArgumentException("luma.auth lockout settings are invalid");
+        }
+        if (refreshTokenTtl.compareTo(accessTokenTtl) <= 0 || sessionMaxLifetime.compareTo(refreshTokenTtl) < 0
+                || sessionMaxLifetime.compareTo(Duration.ofDays(90)) > 0) {
+            throw new IllegalArgumentException("luma.auth refresh lifetimes must satisfy "
+                    + "access-token-ttl < refresh-token-ttl <= session-max-lifetime <= 90 days");
         }
     }
 

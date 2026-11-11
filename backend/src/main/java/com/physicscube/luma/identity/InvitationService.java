@@ -3,14 +3,8 @@ package com.physicscube.luma.identity;
 import com.physicscube.luma.identity.domain.Account;
 import com.physicscube.luma.identity.domain.AccountStatus;
 import com.physicscube.luma.identity.domain.Invitation;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,10 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class InvitationService {
     public static final Duration DEFAULT_TTL = Duration.ofHours(72);
     public static final Duration MAX_TTL = Duration.ofDays(14);
-    private static final int TOKEN_BYTES = 32;
-    private static final int MAX_TOKEN_LENGTH = 128;
 
-    private final SecureRandom random = new SecureRandom();
     private final AccountRepository accounts;
     private final InvitationRepository invitations;
     private final AccountService accountService;
@@ -55,10 +46,8 @@ public class InvitationService {
         }
         Instant now = Instant.now();
         invitations.revokeOpen(accountId, now);
-        byte[] bytes = new byte[TOKEN_BYTES];
-        random.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        Invitation invitation = invitations.saveAndFlush(Invitation.issue(accountId, digest(token), createdBy, now, ttl));
+        String token = OpaqueToken.generate();
+        Invitation invitation = invitations.saveAndFlush(Invitation.issue(accountId, OpaqueToken.digest(token), createdBy, now, ttl));
         return new IssuedInvitation(accountId, token, invitation.getExpiresAt());
     }
 
@@ -73,10 +62,10 @@ public class InvitationService {
      */
     @Transactional
     public AccountSummary accept(String token, String rawPassword) {
-        if (token == null || token.isEmpty() || token.length() > MAX_TOKEN_LENGTH) {
+        if (!OpaqueToken.plausible(token)) {
             throw new InvalidInvitationException();
         }
-        String tokenHash = digest(token);
+        String tokenHash = OpaqueToken.digest(token);
         if (invitations.consume(tokenHash, Instant.now()) != 1) {
             throw new InvalidInvitationException();
         }
@@ -87,14 +76,5 @@ public class InvitationService {
         }
         accountService.setPassword(accountId, rawPassword);
         return AccountSummary.of(account);
-    }
-
-    private static String digest(String token) {
-        try {
-            return HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

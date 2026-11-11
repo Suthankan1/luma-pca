@@ -39,5 +39,7 @@ luma:
     verification-keys-pem: ${LUMA_AUTH_VERIFICATION_KEYS_PEM:}
     # Local development and tests only: generate a throwaway key at startup.
     ephemeral-signing-key: ${LUMA_AUTH_EPHEMERAL_SIGNING_KEY:false}
+    refresh-token-ttl: ${LUMA_AUTH_REFRESH_TOKEN_TTL:P7D}
+    session-max-lifetime: ${LUMA_AUTH_SESSION_MAX_LIFETIME:P30D}
     # MFA is not implemented yet, so owner/admin sign-in stays blocked unless this is set.
     allow-elevated-login-without-mfa: ${LUMA_AUTH_ALLOW_ELEVATED_LOGIN_WITHOUT_MFA:false}

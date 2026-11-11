@@ -28,8 +28,16 @@ public final class HttpApi {
     }
 
     public HttpResponse<String> post(String path, String body) {
-        return send(HttpRequest.newBuilder(URI.create(base + path)).header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body)));
+        return post(path, body, null);
+    }
+
+    public HttpResponse<String> post(String path, String body, String bearerToken) {
+        HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
+                .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body));
+        if (bearerToken != null) {
+            request.header("Authorization", "Bearer " + bearerToken);
+        }
+        return send(request);
     }
 
     public HttpResponse<String> get(String path, String bearerToken) {

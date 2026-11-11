@@ -4,7 +4,7 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/activate/me and JWKS. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me and JWKS. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
 servers:
   - url: http://localhost:8080
@@ -23,7 +23,7 @@ paths:
                 $ref: '#/components/schemas/SystemStatus'
   /api/v1/auth/login:
     post:
-      summary: Password sign-in (implemented; no refresh token yet)
+      summary: Password sign-in, starts a refresh session (implemented)
       operationId: login
       tags: [Identity]
       requestBody:
@@ -38,7 +38,7 @@ paths:
                 password: {type: string, maxLength: 256, writeOnly: true}
       responses:
         '200':
-          description: RS256 access token
+          description: RS256 access token and opaque refresh token
           content:
             application/json:
               schema:
@@ -88,11 +88,45 @@ paths:
         '200': {description: JWK Set containing public RSA keys only}
   /api/v1/auth/refresh:
     post:
-      summary: Proposed opaque refresh rotation — NOT IMPLEMENTED
-      x-implementation-status: planned
+      summary: Exchange a refresh token for a new token pair (implemented)
+      description: The presented token can never be used again. Presenting an already exchanged token revokes the whole session.
+      operationId: refreshSession
       tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefreshTokenRequest'}
       responses:
-        '200': {description: Rotated session tokens}
+        '200':
+          description: New access and refresh tokens
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccessTokenResponse'}
+        '400': {description: Malformed request}
+        '401': {description: Unknown, expired, already used or revoked token (indistinguishable)}
+  /api/v1/auth/logout:
+    post:
+      summary: End the session a refresh token belongs to (implemented)
+      operationId: logout
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefreshTokenRequest'}
+      responses:
+        '204': {description: Always, whether or not the token was known}
+        '400': {description: Malformed request}
+  /api/v1/auth/logout-all:
+    post:
+      summary: End every session of the signed-in account (implemented)
+      operationId: logoutAll
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      responses:
+        '204': {description: All sessions revoked}
+        '401': {description: Missing or invalid access token}
   /api/v1/courses:
     get:
       summary: Proposed academy-scoped courses — NOT IMPLEMENTED
@@ -152,7 +186,14 @@ components:
         accessToken: {type: string}
         tokenType: {type: string, example: Bearer}
         expiresIn: {type: integer, description: Seconds, example: 600}
-      required: [accessToken, tokenType, expiresIn]
+        refreshToken: {type: string, description: Opaque single-use token}
+        refreshExpiresIn: {type: integer, description: Seconds, example: 604800}
+      required: [accessToken, tokenType, expiresIn, refreshToken, refreshExpiresIn]
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: {type: string, maxLength: 128, writeOnly: true}
     Identity:
       type: object
       properties:

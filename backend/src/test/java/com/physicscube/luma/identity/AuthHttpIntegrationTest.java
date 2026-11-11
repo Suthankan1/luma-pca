@@ -101,8 +101,9 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
 
     /** A token signed with the real key whose claims start valid and are then altered. */
     private String forged(JWSSigner signer, JWSHeader header, Consumer<JWTClaimsSet.Builder> change) throws Exception {
+        String sessionId = decoder.decode(accessToken()).getClaimAsString("sid");
         Instant now = Instant.now();
-        JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder()
+        JWTClaimsSet.Builder claims = new JWTClaimsSet.Builder().claim("sid", sessionId)
                 .issuer(properties.issuer()).audience(properties.audience()).subject(studentId.toString())
                 .jwtID(UUID.randomUUID().toString()).issueTime(Date.from(now)).notBeforeTime(Date.from(now))
                 .expirationTime(Date.from(now.plusSeconds(300)))
@@ -125,7 +126,7 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
         assertEquals(200, response.statusCode(), response.body());
         assertTrue(response.headers().firstValue("Cache-Control").orElse("").contains("no-store"));
         Map<String, Object> body = HttpApi.parse(response);
-        assertEquals(Set.of("accessToken", "tokenType", "expiresIn"), body.keySet());
+        assertEquals(Set.of("accessToken", "tokenType", "expiresIn", "refreshToken", "refreshExpiresIn"), body.keySet());
         assertEquals("Bearer", body.get("tokenType"));
         assertEquals(600, ((Number) body.get("expiresIn")).intValue());
 
@@ -138,7 +139,7 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
         assertNotNull(UUID.fromString(jwt.getId()));
         assertEquals(jwt.getIssuedAt(), jwt.getNotBefore());
         assertEquals(600, jwt.getExpiresAt().getEpochSecond() - jwt.getIssuedAt().getEpochSecond());
-        assertEquals(Set.of("iss", "aud", "sub", "jti", "iat", "nbf", "exp", "academy_id", "auth_version"),
+        assertEquals(Set.of("iss", "aud", "sub", "jti", "iat", "nbf", "exp", "academy_id", "auth_version", "sid"),
                 jwt.getClaims().keySet());
         assertFalse(jwt.getTokenValue().contains(EMAIL));
         assertEquals(0, account().get("failed_login_count"));
@@ -316,6 +317,9 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
         alterations.put("non-uuid subject", claims -> claims.subject("admin"));
         alterations.put("stale auth version", claims -> claims.claim("auth_version", 0));
         alterations.put("no auth version", claims -> claims.claim("auth_version", null));
+        alterations.put("no session", claims -> claims.claim("sid", null));
+        alterations.put("unknown session", claims -> claims.claim("sid", UUID.randomUUID().toString()));
+        alterations.put("malformed session", claims -> claims.claim("sid", "1"));
         alterations.put("other academy", claims -> claims.claim("academy_id", UUID.randomUUID().toString()));
         for (var alteration : alterations.entrySet()) {
             assertEquals(401, me(forged(alteration.getValue())), alteration.getKey());
@@ -417,6 +421,6 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
             assertTrue(status == 401 || status == 403, path + " returned " + status);
         }
         assertEquals(401, api.post("/api/v1/auth/me", "{}").statusCode());
-        assertEquals(401, api.post("/api/v1/auth/refresh", "{}").statusCode());
+        assertEquals(401, api.post("/api/v1/auth/sessions", "{}").statusCode());
     }
 }

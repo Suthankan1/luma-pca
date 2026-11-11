@@ -13,27 +13,34 @@ import org.springframework.stereotype.Component;
 
 /**
  * A valid signature is not enough: on every request the account must still be
- * active and the token must carry its current auth version, so disabling an account
- * or changing its password rejects tokens issued earlier. Authorities come from the
+ * active, the token must carry its current auth version and its sign-in session must
+ * not be revoked. So logout, disabling an account or changing its password all
+ * reject tokens issued earlier. Authorities come from the
  * roles stored now, never from the token.
  */
 @Component
 public class AccountJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
     private final AccountService accounts;
+    private final RefreshSessions sessions;
 
-    AccountJwtAuthenticationConverter(AccountService accounts) {
+    AccountJwtAuthenticationConverter(AccountService accounts, RefreshSessions sessions) {
         this.accounts = accounts;
+        this.sessions = sessions;
     }
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
         AccountSummary account;
+        boolean sessionActive;
         try {
             account = accounts.findById(UUID.fromString(jwt.getSubject())).orElse(null);
+            sessionActive = account != null && sessions.isActive(
+                    UUID.fromString(String.valueOf(jwt.getClaimAsString(AccessTokenIssuer.SESSION_CLAIM))), account.id());
         } catch (IllegalArgumentException e) {
             account = null;
+            sessionActive = false;
         }
-        if (account == null || account.status() != AccountStatus.ACTIVE
+        if (account == null || !sessionActive || account.status() != AccountStatus.ACTIVE
                 || !(jwt.getClaim(AccessTokenIssuer.AUTH_VERSION_CLAIM) instanceof Number version)
                 || version.longValue() != account.authVersion()
                 || !account.academyId().toString().equals(jwt.getClaimAsString(AccessTokenIssuer.ACADEMY_CLAIM))) {

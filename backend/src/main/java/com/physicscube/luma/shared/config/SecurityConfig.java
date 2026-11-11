@@ -23,8 +23,11 @@ public class SecurityConfig {
         http.authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**",
                             "/api/v1/system/status", "/.well-known/jwks.json").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/activate").permitAll()
+                    // The refresh token in the body is the credential for refresh and logout.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/activate",
+                            "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all").authenticated()
                     .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 class AccessTokenIssuer {
     static final String ACADEMY_CLAIM = "academy_id";
     static final String AUTH_VERSION_CLAIM = "auth_version";
+    static final String SESSION_CLAIM = "sid";
 
     private final JwtEncoder encoder;
     private final SigningKeys keys;
@@ -29,7 +30,7 @@ class AccessTokenIssuer {
         this.properties = properties;
     }
 
-    AccessToken issue(AccountSummary account) {
+    AccessToken issue(AccountSummary account, UUID sessionId) {
         Instant now = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(properties.issuer())
@@ -41,6 +42,7 @@ class AccessTokenIssuer {
                 .expiresAt(now.plus(properties.accessTokenTtl()))
                 .claim(ACADEMY_CLAIM, account.academyId().toString())
                 .claim(AUTH_VERSION_CLAIM, account.authVersion())
+                .claim(SESSION_CLAIM, sessionId.toString())
                 .build();
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keys.signingKeyId()).build();
         return new AccessToken(encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue(),
