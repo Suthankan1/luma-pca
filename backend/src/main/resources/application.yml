@@ -11,6 +11,9 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
 server:
   port: ${SERVER_PORT:8080}
 management:
@@ -25,3 +28,16 @@ management:
       group:
         readiness:
           include: readinessState,db
+luma:
+  auth:
+    issuer: ${LUMA_AUTH_ISSUER:http://localhost:8080}
+    audience: ${LUMA_AUTH_AUDIENCE:luma-api}
+    access-token-ttl: ${LUMA_AUTH_ACCESS_TOKEN_TTL:PT10M}
+    # PKCS#8 RSA private key (2048 bits or more) from a secrets manager. Never commit one.
+    signing-key-pem: ${LUMA_AUTH_SIGNING_KEY_PEM:}
+    # Comma-separated X.509 public keys of retired signing keys whose tokens may still be valid.
+    verification-keys-pem: ${LUMA_AUTH_VERIFICATION_KEYS_PEM:}
+    # Local development and tests only: generate a throwaway key at startup.
+    ephemeral-signing-key: ${LUMA_AUTH_EPHEMERAL_SIGNING_KEY:false}
+    # MFA is not implemented yet, so owner/admin sign-in stays blocked unless this is set.
+    allow-elevated-login-without-mfa: ${LUMA_AUTH_ALLOW_ELEVATED_LOGIN_WITHOUT_MFA:false}

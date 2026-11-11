@@ -235,7 +235,7 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
     @Test
     void accountsAreNotExposedOverHttp() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
-        for (String path : List.of("/api/v1/accounts", "/api/v1/auth/login", "/api/v1/identity/accounts")) {
+        for (String path : List.of("/api/v1/accounts", "/api/v1/auth/refresh", "/api/v1/identity/accounts")) {
             for (String method : List.of("GET", "POST")) {
                 HttpResponse<String> response = client.send(HttpRequest.newBuilder(
                                 URI.create("http://localhost:" + port + path))

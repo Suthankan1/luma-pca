@@ -120,3 +120,57 @@ build runs the Next.js default bundler and repeats the smoke test.
   exist.
 - **Next planned feature:** 001C — RS256 login, lockout using the existing
   counters, and the public activation route.
+
+## Checkpoint 001C — 2026-11-11 — Password sign-in and RS256 access tokens
+
+- **001B evidence:** merged as PR #5, merge commit `6d7aeff`.
+- **Feature ID / name:** 001C — JWT login, lockout and activation route.
+- **Branch:** `feature/001c-jwt-login`. **PR / merge SHA:** see the merged pull
+  request titled "feat(auth): add password sign-in with RS256 access tokens".
+- **Implemented behavior:** `POST /api/v1/auth/login` verifies the password and
+  returns `{accessToken, tokenType, expiresIn}`. Tokens are RS256, 10 minutes,
+  with `iss aud sub jti iat nbf exp academy_id auth_version` and a thumbprint
+  `kid`. Every authenticated request re-reads the account: it must be ACTIVE,
+  in the token's academy and at the token's `auth_version`; authorities come
+  from stored roles. Lockout: 5 failures lock for 15 minutes; each attempt is
+  counted atomically before the password check, so parallel guesses cannot
+  exceed the limit. Unknown email, wrong password, pending, disabled and locked
+  accounts return one identical 401. `POST /api/v1/auth/activate` redeems an
+  invitation. `GET /api/v1/auth/me` returns account, academy and current roles.
+  `GET /.well-known/jwks.json` publishes public keys only.
+- **Key handling:** signing key from `LUMA_AUTH_SIGNING_KEY_PEM` (PKCS#8 RSA,
+  2048 bits minimum); retired public keys in `LUMA_AUTH_VERIFICATION_KEYS_PEM`
+  keep their tokens valid during rotation. The application refuses to start
+  without a key unless `LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true`.
+- **Decisions:** (1) Owner/admin sign-in returns 403 until MFA exists, unless
+  `LUMA_AUTH_ALLOW_ELEVATED_LOGIN_WITHOUT_MFA=true`; MFA is split out as new
+  slice 001F. (2) Spring CSRF is disabled on the API because it never
+  authenticates from cookies. (3) A locked account is indistinguishable from a
+  wrong password, so the BFF's 429 path is not used yet.
+- **Database changes:** none (uses the V2 lockout columns).
+- **API changes:** the four routes above; `contracts/openapi/platform-v1.yaml`
+  updated. All other routes remain denied.
+- **Frontend changes:** none. **The Next.js sign-in does not work against the
+  real backend yet** because it requires `refreshToken` and `refreshExpiresIn`
+  in the login response; those arrive with 001D.
+- **Tests executed:** `JAVA_HOME=<JDK 21> mvn -B -ntp -f backend/pom.xml verify`
+  with Docker running. **Result:** 84 tests, 0 failures, 0 errors, 0 skipped.
+  New: 19 real-HTTP auth tests against PostgreSQL 17 (claims, identical
+  failures, lockout, 24 parallel guesses, token rejection for 15 claim
+  alterations, foreign key, unknown/missing `kid`, RS512, HS256 algorithm
+  confusion, unsigned token, tampered payload, disabled account, password
+  change, role change, activation, JWKS, deny-by-default), 8 key tests
+  (rotation, weak and malformed keys, startup without a key), 1 override test.
+  A first run failed one test: tokens without `iat` were accepted because
+  Spring fills that claim in; required claims are now enforced on the raw token.
+- **Security considerations:** no password, token or key appears in the test
+  run's log output (checked). Exceptions and `toString` redact tokens and keys.
+- **Known issues / not done:** no refresh tokens, logout or session list; no
+  MFA; no password recovery; no rate limiting by client address, so sign-in
+  costs one Argon2 hash per request for any caller; the failure counter does
+  not decay with time, only on success or lock expiry; an attacker who knows an
+  email can keep that account locked; no audit trail; old hashes are not
+  re-hashed on login; no first-account bootstrap; nothing delivers invitation
+  tokens.
+- **Next planned feature:** 001D — refresh-token rotation with reuse detection
+  and logout, completing the contract the Next.js BFF already expects.

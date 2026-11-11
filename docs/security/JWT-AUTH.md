@@ -1,6 +1,8 @@
 # Authentication and token security — implementation specification
 
-**Architecture decision:** first-party sign-in for both staff and students. **Status:** accepted design, not implemented in starter. No production logins exist.
+**Architecture decision:** first-party sign-in for both staff and students. **Status:** accounts, invitations, password sign-in, RS256 access tokens, key rotation and lockout are implemented (slices 001A–001C); refresh sessions, MFA, recovery, rate limiting by client address and audit are not. No production logins exist.
+
+**As built (001C):** access tokens live 10 minutes by default (1–15 allowed) and carry `iss`, `aud`, `sub`, `jti`, `iat`, `nbf`, `exp`, `academy_id`, `auth_version`; key ids are RFC 7638 thumbprints. Every request re-reads the account, so disabling it or changing its password rejects earlier tokens and roles are always current. Five failed sign-ins lock an account for 15 minutes; attempts are counted before the password is checked, and a locked account gets the same 401 as a wrong password. Owner/admin sign-in returns 403 until MFA exists unless `LUMA_AUTH_ALLOW_ELEVATED_LOGIN_WITHOUT_MFA=true` (development only). The API disables Spring CSRF because it never authenticates from cookies; CSRF protection belongs to the Next.js BFF.
 
 ## Data and identity
 - A single `accounts` table with UUID, academy ID, normalized unique email (or approved alternative student identifier), password hash, disabled/locked status, auth version, timestamps; distinct `students` record joins to account where applicable.

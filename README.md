@@ -2,7 +2,7 @@
 
 **Status: architecture-approved project bootstrap, NOT a production-ready attendance system.**
 
-A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. Accounts, Argon2id password hashing and activation invitations are persisted behind internal services, but backend JWT issuance/login, Zoom webhook ingestion, production attendance persistence, engagement and real deployment are **not implemented yet**. Do not onboard real students until the security and release gates pass.
+A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. Backend password sign-in with RS256 access tokens, account lockout and invitation activation exist, but refresh sessions, MFA, recovery, any way to create the first account, Zoom webhook ingestion, production attendance persistence, engagement and real deployment are **not implemented yet**. Do not onboard real students until the security and release gates pass.
 
 - GitHub: https://github.com/Suthankan1/luma-pca
 - Figma: https://www.figma.com/design/QVzsewJyikM94Xp07hDwwi
@@ -17,7 +17,7 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
 | --- | --- |
 | Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4 (responsive staff/student web) |
 | API/backend | Java 21, Spring Boot 4.1.2, modular monolith; later Spring Modulith tests |
-| Authentication | **Planned:** first-party RS256 JWT access tokens; hashed rotating refresh-token sessions; Next.js HttpOnly BFF cookies; Spring Security RBAC + scope checks |
+| Authentication | **Partly built:** first-party RS256 JWT access tokens and lockout are implemented; **planned:** hashed rotating refresh-token sessions, MFA; Next.js HttpOnly BFF cookies; Spring Security RBAC + scope checks |
 | Database | PostgreSQL 17, Flyway; schema evolves through reviewed migrations |
 | Zoom | **Planned:** academy-owned S2S OAuth, REST reports, signed webhooks, idempotent event inbox |
 | Async | **Planned:** transactional inbox/outbox, SQS + DLQ, separately scaled Spring worker |
@@ -39,7 +39,7 @@ docker compose up -d postgres           # wait for db health
 
 # Terminal 2: backend
 cd backend
-mvn spring-boot:run                      # default API port 8080
+LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true mvn spring-boot:run   # default API port 8080; throwaway token key
 # GET http://localhost:8080/api/v1/system/status
 # GET http://localhost:8080/actuator/health/readiness
 
@@ -50,7 +50,7 @@ npm ci
 npm run dev                            # http://localhost:3000
 ```
 
-There is **no backend login endpoint yet**: the Next.js sign-in flow is only tested against a mock API, so nobody can sign in against the real backend. The Spring security filter denies other API routes by default until authorized feature slices are built.
+The backend exposes `POST /api/v1/auth/login`, `POST /api/v1/auth/activate`, `GET /api/v1/auth/me` and `GET /.well-known/jwks.json`. The Next.js sign-in flow **does not work against it yet**: it expects a refresh token, which the backend does not issue until slice `001D`. Owner and admin accounts cannot sign in until MFA exists, and there is no supported way to create the first account. The Spring security filter denies other API routes by default until authorized feature slices are built.
 
 ## Commands
 

@@ -13,8 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Account persistence and password storage. Not reachable over HTTP in this slice:
- * invitation, login and token issuance build on it in later slices.
+ * Account persistence and password storage. Sign-in is in {@link AuthService} and
+ * activation in {@link InvitationService}.
  */
 @Service
 public class AccountService {
@@ -54,6 +54,11 @@ public class AccountService {
     @Transactional
     public void disable(UUID accountId) {
         accounts.findById(accountId).orElseThrow(() -> new AccountNotFoundException(accountId)).disable();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<AccountSummary> findById(UUID accountId) {
+        return accounts.findById(accountId).map(AccountSummary::of);
     }
 
     @Transactional(readOnly = true)

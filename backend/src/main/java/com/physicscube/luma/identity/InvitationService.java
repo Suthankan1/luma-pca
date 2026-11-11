@@ -16,8 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Issues and redeems activation invitations. Not reachable over HTTP yet, and it
- * does not deliver the token: the caller is responsible for sending it.
+ * Issues and redeems activation invitations. It does not deliver the token: the
+ * caller is responsible for sending it. Only {@link #accept} is reachable over HTTP.
  */
 @Service
 public class InvitationService {
