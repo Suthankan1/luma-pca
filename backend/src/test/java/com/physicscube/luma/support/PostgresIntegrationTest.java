@@ -9,7 +9,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * target version). Flyway applies every migration and Hibernate validates the
  * entity mappings against the result. One container is shared by all subclasses.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "luma.auth.ephemeral-signing-key=true")
 public abstract class PostgresIntegrationTest {
     @ServiceConnection
     protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");

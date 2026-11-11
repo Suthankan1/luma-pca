@@ -3,7 +3,7 @@
  * activation invitations. Other modules use
  * {@link com.physicscube.luma.identity.AccountService} and
  * {@link com.physicscube.luma.identity.InvitationService}, never the repositories
- * or entities directly. Login, JWT issuance and refresh sessions are not
- * implemented yet.
+ * or entities directly. Password sign-in issues RS256 access tokens; refresh
+ * sessions, MFA and recovery are not implemented yet.
  */
 package com.physicscube.luma.identity;

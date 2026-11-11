@@ -3,8 +3,9 @@ info:
   title: LUMA Physics Cube Academy Platform API
   version: 0.1.0-bootstrap
   description: |
-    PLANNING CONTRACT. Only GET /api/v1/system/status is implemented in the initial archive.
-    Remaining endpoints are proposal inventory, not production guarantees. Auth is not implemented.
+    Endpoints without x-implementation-status are implemented and tested: system status,
+    auth login/activate/me and JWKS. Endpoints marked "planned" are proposal inventory,
+    not production guarantees.
 servers:
   - url: http://localhost:8080
 paths:
@@ -22,12 +23,69 @@ paths:
                 $ref: '#/components/schemas/SystemStatus'
   /api/v1/auth/login:
     post:
-      summary: Proposed staff/student sign-in — NOT IMPLEMENTED
-      x-implementation-status: planned
+      summary: Password sign-in (implemented; no refresh token yet)
+      operationId: login
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, maxLength: 254}
+                password: {type: string, maxLength: 256, writeOnly: true}
+      responses:
+        '200':
+          description: RS256 access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '400': {description: Malformed request}
+        '401': {description: Invalid credentials. Identical for unknown email, wrong password, inactive and locked accounts}
+        '403': {description: Password was correct but the account needs MFA, which is not available yet}
+  /api/v1/auth/activate:
+    post:
+      summary: Redeem an invitation and set the first password (implemented)
+      operationId: activateAccount
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: {type: string, maxLength: 128, writeOnly: true}
+                password: {type: string, maxLength: 256, writeOnly: true}
+      responses:
+        '204': {description: Account activated}
+        '400': {description: Invitation invalid, expired, used or revoked (indistinguishable)}
+        '422': {description: Password rejected by policy; the invitation stays usable}
+  /api/v1/auth/me:
+    get:
+      summary: Current account, academy and stored roles (implemented)
+      operationId: getIdentity
+      tags: [Identity]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Identity'
+        '401': {description: Missing, invalid, expired or revoked token}
+  /.well-known/jwks.json:
+    get:
+      summary: Public access-token verification keys (implemented)
+      operationId: getJwks
       tags: [Identity]
       responses:
-        '200': {description: Planned session creation}
-        '401': {description: Invalid credentials}
+        '200': {description: JWK Set containing public RSA keys only}
   /api/v1/auth/refresh:
     post:
       summary: Proposed opaque refresh rotation — NOT IMPLEMENTED
@@ -88,6 +146,22 @@ components:
         stage: {type: string, example: BOOTSTRAP_ONLY}
         timestamp: {type: string, format: date-time}
       required: [service, status, stage, timestamp]
+    AccessTokenResponse:
+      type: object
+      properties:
+        accessToken: {type: string}
+        tokenType: {type: string, example: Bearer}
+        expiresIn: {type: integer, description: Seconds, example: 600}
+      required: [accessToken, tokenType, expiresIn]
+    Identity:
+      type: object
+      properties:
+        accountId: {type: string, format: uuid}
+        academyId: {type: string, format: uuid}
+        roles:
+          type: array
+          items: {type: string, enum: [ACADEMY_OWNER, ACADEMY_ADMIN, INSTRUCTOR, ATTENDANCE_OFFICER, ANALYST, STUDENT]}
+      required: [accountId, academyId, roles]
   securitySchemes:
     bearerAuth:
       type: http

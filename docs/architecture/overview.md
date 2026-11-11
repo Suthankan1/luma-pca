@@ -37,7 +37,8 @@ Students and staff receive first-party short-lived signed JWT **access** tokens 
 ## Critical status map
 
 - **Implemented in starter:** basic Next app previews, Java Boot REST bootstrap endpoint, Spring default-deny API security, Flyway V1 academy/course tables, deterministic connection interval union with unit tests, Docker PostgreSQL, persistent accounts with academy-level roles and Argon2id password hashing and single-use activation invitations (service layer only, no HTTP route), Next.js BFF session cookies tested against a mock API.
-- **Not implemented:** backend login/JWT/refresh, invitations, real user data, all course/batch CRUD, Zoom webhooks/oauth, attendance persistence/reconciliation, worker/SQS, SSE, reports and production infrastructure.
+- **Implemented since:** password sign-in issuing RS256 access tokens, per-request account/auth-version checks, lockout, invitation activation route, public JWKS.
+- **Not implemented:** refresh sessions, MFA, recovery, audit trail, first-account bootstrap, real user data, all course/batch CRUD, Zoom webhooks/oauth, attendance persistence/reconciliation, worker/SQS, SSE, reports and production infrastructure.
 - **Requires feasibility proof:** Zoom license and scopes; unique student registrations; recurring webinar UUID behavior; Q&A/poll data; native attendee emoji identity. See [Zoom rules](../integration/ZOOM-RULES.md).
 
 ## Diagrams and contracts
