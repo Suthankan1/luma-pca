@@ -1,0 +1,27 @@
+erDiagram
+  ACADEMY ||--o{ COURSE : has
+  ACADEMY ||--o{ STUDENT : registers
+  ACADEMY ||--o{ ACCOUNT : manages
+  COURSE ||--o{ BATCH : has
+  STUDENT ||--o{ ENROLLMENT : joins
+  BATCH ||--o{ ENROLLMENT : contains
+  BATCH ||--o{ SESSION_BATCH : participates
+  CLASS_SESSION ||--o{ SESSION_BATCH : serves
+  CLASS_SESSION ||--o{ WEBINAR_OCCURRENCE : maps
+  CLASS_SESSION ||--o{ ATTENDANCE_RECORD : aggregates
+  STUDENT ||--o{ ATTENDANCE_RECORD : has
+  ATTENDANCE_RECORD ||--o{ ATTENDANCE_INTERVAL : derived_from
+  ACCOUNT ||--o{ AUTH_SESSION : uses
+  ACCOUNT ||--o{ STAFF_ASSIGNMENT : holds
+  BATCH ||--o{ STAFF_ASSIGNMENT : scoped_to
+  CLASS_SESSION ||--o{ ENGAGEMENT_EVENT : contains
+  STUDENT ||--o{ ENGAGEMENT_EVENT : submits
+  ACADEMY { uuid id PK }
+  COURSE { uuid id PK uuid academy_id FK string code }
+  BATCH { uuid id PK uuid course_id FK }
+  STUDENT { uuid id PK uuid academy_id FK string student_code }
+  ENROLLMENT { uuid student_id FK uuid batch_id FK }
+  CLASS_SESSION { uuid id PK datetime begins_at datetime ends_at }
+  SESSION_BATCH { uuid class_session_id FK uuid batch_id FK }
+  WEBINAR_OCCURRENCE { string zoom_webinar_id string occurrence_uuid }
+  ATTENDANCE_RECORD { uuid student_id FK uuid class_session_id FK string status }

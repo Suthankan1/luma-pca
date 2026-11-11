@@ -1,0 +1,2 @@
+# Implement one LUMA feature slice
+Read AGENTS.md, docs/ai/checkpoints/PROGRESS.md, docs/delivery/IMPLEMENTATION-PLAN.md, related ADRs and contracts. Pick the requested slice only. Explain its acceptance criteria, dependencies and tests. Implement with smallest safe diff, including negative/cross-batch tests. Run tests and report actual results; update PROGRESS.md. Do not change adjacent features without a reason.

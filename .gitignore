@@ -1,0 +1,31 @@
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+!.env.local.example
+!.env.test.example
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+# Java / Maven
+backend/target/
+.mvn/wrapper/maven-wrapper.jar.tmp
+# Node / Next.js
+**/node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+*.tsbuildinfo
+# Tooling / editors
+.idea/
+.vscode/
+.DS_Store
+__pycache__/
+*.log
+# Infrastructure
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan

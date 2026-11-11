@@ -1,0 +1,2 @@
+# AI knowledge base maintenance
+Root AGENTS.md is authoritative. Keep START-HERE.md and PROMPT-LIBRARY.md aligned with actual implementation. Append factual checkpoints to checkpoints/PROGRESS.md after tested small features, including commit SHA only when known. Never invent test results, production deployment, Zoom feature availability, account credentials, academy policy decisions or student identities. Do not replace important source documents with shorter guesses.

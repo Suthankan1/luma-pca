@@ -1,0 +1,95 @@
+openapi: 3.1.0
+info:
+  title: LUMA Physics Cube Academy Platform API
+  version: 0.1.0-bootstrap
+  description: |
+    PLANNING CONTRACT. Only GET /api/v1/system/status is implemented in the initial archive.
+    Remaining endpoints are proposal inventory, not production guarantees. Auth is not implemented.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/system/status:
+    get:
+      summary: Bootstrap API status (implemented)
+      operationId: getSystemStatus
+      tags: [System]
+      responses:
+        '200':
+          description: Service bootstrap status; not readiness of all production modules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStatus'
+  /api/v1/auth/login:
+    post:
+      summary: Proposed staff/student sign-in — NOT IMPLEMENTED
+      x-implementation-status: planned
+      tags: [Identity]
+      responses:
+        '200': {description: Planned session creation}
+        '401': {description: Invalid credentials}
+  /api/v1/auth/refresh:
+    post:
+      summary: Proposed opaque refresh rotation — NOT IMPLEMENTED
+      x-implementation-status: planned
+      tags: [Identity]
+      responses:
+        '200': {description: Rotated session tokens}
+  /api/v1/courses:
+    get:
+      summary: Proposed academy-scoped courses — NOT IMPLEMENTED
+      x-implementation-status: planned
+      security: [{bearerAuth: []}]
+      tags: [Courses]
+      responses:
+        '200': {description: Authorized course page}
+  /api/v1/batches:
+    get:
+      summary: Proposed course/batch-scoped batches — NOT IMPLEMENTED
+      x-implementation-status: planned
+      security: [{bearerAuth: []}]
+      tags: [Batches]
+      responses:
+        '200': {description: Authorized batch page}
+  /api/v1/class-sessions:
+    get:
+      summary: Proposed assigned sessions — NOT IMPLEMENTED
+      x-implementation-status: planned
+      security: [{bearerAuth: []}]
+      tags: [Sessions]
+      responses:
+        '200': {description: Authorized session page}
+  /api/v1/class-sessions/{sessionId}/attendance:
+    get:
+      summary: Proposed scoped attendance — NOT IMPLEMENTED
+      x-implementation-status: planned
+      security: [{bearerAuth: []}]
+      tags: [Attendance]
+      parameters:
+        - {in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Provisional or reconciled attendance; scoped}
+  /api/v1/zoom/webhooks:
+    post:
+      summary: Proposed signed Zoom webhook ingress — NOT IMPLEMENTED
+      x-implementation-status: planned
+      tags: [Zoom]
+      description: This endpoint MUST verify Zoom webhook signatures/timestamp and persist receipts before 2xx.
+      responses:
+        '200': {description: Verified and durably recorded event}
+        '401': {description: Invalid webhook authenticity}
+components:
+  schemas:
+    SystemStatus:
+      type: object
+      properties:
+        service: {type: string, example: luma-api}
+        status: {type: string, example: UP}
+        stage: {type: string, example: BOOTSTRAP_ONLY}
+        timestamp: {type: string, format: date-time}
+      required: [service, status, stage, timestamp]
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

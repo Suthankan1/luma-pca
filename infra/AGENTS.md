@@ -1,0 +1,2 @@
+# Infrastructure agent guidance
+Read root AGENTS.md, docs/architecture/adr/ADR-0006-hosting-and-worker.md and docs/delivery/GO-LIVE-CHECKLIST.md. The Terraform folder is an architecture placeholder, NOT deployed IaC. Obtain budget, AWS region, domain, academy approval, production data-protection rules and RPO/RTO before creating resources. Never commit secrets or run `terraform apply` without an explicit request and reviewed plan. Prefer minimal-cost production design, private RDS, least privilege, SQS DLQ, monitored workers and tested restore.

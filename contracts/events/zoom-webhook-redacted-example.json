@@ -1,0 +1,12 @@
+{
+  "_example_only": true,
+  "_not_an_actual_captured_zoom_payload": true,
+  "event": "webinar.participant_joined",
+  "payload": {
+    "object": {
+      "id": "EXAMPLE-WEBINAR-ID",
+      "uuid": "EXAMPLE-OCCURRENCE-UUID",
+      "participant": { "user_name": "FICTIONAL-ATTENDEE" }
+    }
+  }
+}

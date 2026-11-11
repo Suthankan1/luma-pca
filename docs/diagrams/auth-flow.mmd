@@ -1,0 +1,16 @@
+sequenceDiagram
+  participant User as Staff / Student
+  participant BFF as Next.js BFF
+  participant API as Spring Identity API
+  participant DB as PostgreSQL
+  User->>BFF: Login credentials over HTTPS
+  BFF->>API: POST /auth/login (server side)
+  API->>DB: Check account, password hash, lockout, scopes
+  DB-->>API: Verified account + assigned scopes
+  API-->>BFF: Short-lived RS256 access JWT + opaque rotating refresh token
+  BFF-->>User: Secure HttpOnly SameSite session cookie
+  User->>BFF: Protected request with cookie + CSRF token
+  BFF->>API: Bearer JWT on server-side request
+  API->>API: Signature, issuer, aud, exp, scope + resource ownership
+  API-->>BFF: Authorized result only
+  Note over BFF,API: Refresh rotates opaque token; reuse revokes family

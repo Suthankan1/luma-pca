@@ -1,0 +1,6 @@
+---
+description: LUMA platform rules — always apply
+globs: "**/*"
+alwaysApply: true
+---
+Read `AGENTS.md`, `docs/ai/START-HERE.md` and current `docs/ai/checkpoints/PROGRESS.md`. Follow decided architecture and preserve role/scope authorization, safe JWT BFF, Zoom webhook verification/reconciliation and realistic prototype status. One small tested slice at a time.

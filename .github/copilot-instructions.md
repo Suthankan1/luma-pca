@@ -1,0 +1,2 @@
+# GitHub Copilot / coding agent instructions
+Before editing, read the repository root `AGENTS.md`, `docs/ai/START-HERE.md`, the current `docs/ai/checkpoints/PROGRESS.md`, and relevant specifications. Work in tiny, testable slices. Do not fabricate API support, student identities, real attendance or security readiness. Enforce course/batch authorization on the backend; preserve JWT cookie/BFF boundaries and webhook idempotency. Mention exactly which tests were actually run.

@@ -1,0 +1,13 @@
+flowchart LR
+  staff[Academy staff browser] --> next[Next.js staff + student BFF]
+  student[Student mobile/PWA] --> next
+  next -->|server-only bearer JWT| api[Spring Boot modular monolith API]
+  api --> pg[(PostgreSQL)]
+  api -->|SSE provisional updates| next
+  zoom[Zoom Webinars] -->|signed HTTPS events| api
+  api -->|academy S2S OAuth reports| zoom
+  api -->|outbox relay| queue[SQS + DLQ]
+  queue --> worker[Spring worker same codebase]
+  worker --> pg
+  worker -->|reconcile| zoom
+  api --> s3[Private S3 reports]

@@ -1,0 +1,1351 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy Zoom Webinar — Detailed Research & Project Blueprint</title>
+<meta name="description" content="Detailed academy Zoom Webinar attendance and engagement solution project blueprint with official Zoom API research, risks, architecture and implementation plan.">
+<style>
+:root{--ink:#182a3c;--muted:#687c8d;--bg:#eef2f6;--page:#fff;--navy:#14283d;--blue:#2675ac;--line:#d9e2e9;--soft:#f5f8fb;--mint:#dceee7;--orange:#fff1da;--shadow:0 16px 40px rgba(13,37,61,.10)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}a{color:#126ba0;text-decoration:none}a:hover{text-decoration:underline}a:focus-visible,button:focus-visible{outline:3px solid #f0a633;outline-offset:3px}
+.shell{max-width:1640px;margin:0 auto;display:grid;grid-template-columns:274px minmax(0,1fr);gap:26px;padding:26px}
+.sidebar{align-self:start;position:sticky;top:24px;height:calc(100vh - 48px);overflow:auto;background:var(--navy);border-radius:16px;padding:24px 16px;color:#f2f6fb;box-shadow:var(--shadow)}
+.brand{padding:4px 12px 18px;border-bottom:1px solid rgba(255,255,255,.17);margin-bottom:16px}.brand .mark{width:44px;height:44px;border-radius:12px;background:#347eac;display:grid;place-items:center;font-size:23px;margin-bottom:13px}.brand b{display:block;line-height:1.4;font-size:17px}.brand small{display:block;color:#b5c4d2;margin-top:6px;font-size:11px;line-height:1.5;letter-spacing:.05em;text-transform:uppercase}
+.sidebar nav{display:flex;flex-direction:column;gap:2px}.sidebar nav a{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border-radius:8px;color:#d8e4ef;font-size:12px;line-height:1.35}.sidebar nav a:hover{background:#233c55;text-decoration:none;color:#fff}.nav-index{flex:0 0 22px;font-variant-numeric:tabular-nums;color:#71b4e3;font-weight:750}.sidebar-note{margin:20px 9px 0;font-size:11px;color:#b7c5d1}
+.content{min-width:0}.hero{background:linear-gradient(116deg,#142c44,#1c4766 75%,#1a617e);border-radius:18px;padding:38px 43px 34px;color:#fff;box-shadow:var(--shadow);margin-bottom:20px;position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:340px;height:340px;border:1px solid rgba(255,255,255,.08);border-radius:50%;right:-90px;top:-180px;box-shadow:0 0 0 45px rgba(255,255,255,.025),0 0 0 100px rgba(255,255,255,.018)}.hero .eyebrow{color:#9ccfed;font-size:12px;letter-spacing:.15em;text-transform:uppercase;font-weight:750}.hero h1{max-width:890px;font-size:clamp(25px,3vw,37px);line-height:1.15;margin:13px 0 17px;letter-spacing:-.025em}.hero p{max-width:760px;color:#d7e7f0;margin:0}.hero .meta{display:flex;gap:9px;flex-wrap:wrap;margin-top:24px}.pill{display:inline-block;border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:6px 12px;font-size:11px;color:#e7f1f7;font-weight:650}.toolbar{display:flex;justify-content:flex-end;margin-bottom:13px;gap:8px}.toolbar button,.toolbar a{background:#fff;color:var(--ink);border:1px solid var(--line);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700}.toolbar button:hover{background:#e9f3fa}
+.article{background:var(--page);border-radius:18px;box-shadow:var(--shadow);padding:34px clamp(22px,3.5vw,66px) 48px;min-width:0}.article>h1:first-child{display:none}
+.article h2{color:#17344d;font-size:23px;line-height:1.35;margin:52px 0 20px;padding:0 0 12px;border-bottom:2px solid #d9e7ef;scroll-margin-top:25px}.article h2:first-of-type{margin-top:20px}.article h3{font-size:17px;color:#214965;margin:30px 0 10px;scroll-margin-top:20px}.article h4{font-size:14px;margin:24px 0 9px;color:#244963}.article p{margin:12px 0}.article ul,.article ol{padding-left:23px;margin:12px 0}.article li{padding-left:3px;margin:5px 0}.article strong{color:#163a54}.article hr{border:0;border-top:1px solid #e0e8ee;margin:32px 0}.article .callout{margin:16px 0;background:#eef6fa;border-left:4px solid #4281a6;border-radius:0 9px 9px 0;padding:13px 20px;color:#1f455c}.article .callout p{margin:5px 0}.article code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#eff4f7;padding:2px 5px;border-radius:4px;color:#7b3560;font-size:.9em}.article pre.code-wrap{background:#172839;color:#e6eef6;border-radius:11px;overflow-x:auto;padding:18px 19px;margin:18px 0;font-size:12px;line-height:1.55}.article pre.code-wrap code{background:transparent;color:inherit;padding:0;font-size:inherit}.article .table-wrap{overflow-x:auto;border:1px solid #dce5eb;border-radius:10px;margin:19px 0 24px}.article table{border-collapse:collapse;width:100%;min-width:600px;font-size:12.3px;line-height:1.5}.article th{background:#eaf1f5;color:#17384e;text-align:left;font-size:11px;letter-spacing:.025em;font-weight:800;vertical-align:top}.article td,.article th{padding:10px 12px;border-bottom:1px solid #e3eaef;vertical-align:top}.article tr:last-child td{border-bottom:none}.article tr:nth-child(even) td{background:#fafcfd}.reference-tag{border-radius:4px;background:#e8f0f6;padding:1px 5px;font-size:10px;font-weight:800;white-space:nowrap;margin:0 1px}.article a[href^="http"]{word-break:break-word}.article a[href^="http"]:after{content:" ↗";font-size:.75em}.article h2[data-section]::before{content:attr(data-section);color:#5894b6;font:800 12px/1 system-ui;display:block;margin-bottom:7px;letter-spacing:.1em}
+.foot{padding:20px 28px;text-align:center;color:#687b8d;font-size:12px}.skip{position:absolute;left:-9999px}.skip:focus{left:18px;top:18px;z-index:100;padding:10px;background:white;color:black}
+@media(max-width:1000px){.shell{grid-template-columns:1fr;padding:13px;gap:13px}.sidebar{position:relative;top:0;height:auto;padding:16px}.sidebar nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.brand{display:none}.sidebar-note{display:none}.hero{padding:26px}.article{padding:22px}.toolbar{margin:0 5px 13px}}
+@media(max-width:550px){.sidebar nav{grid-template-columns:1fr}.sidebar nav a{padding:4px 8px}.hero h1{font-size:25px}.hero{padding:24px}.article h2{font-size:20px}.article table{min-width:480px}}
+@page{size:A4;margin:13mm 13mm 15mm 13mm}
+@media print{html{scroll-behavior:auto}body{background:white;color:black;font:10px/1.42 Georgia,'Times New Roman',serif}.shell{display:block;padding:0}.sidebar,.toolbar,.foot{display:none!important}.hero{background:white!important;color:black;box-shadow:none;border:none;padding:0 0 15px;border-bottom:2px solid #222;border-radius:0;margin:0 0 10px}.hero h1{color:black;font-size:23px;margin:9px 0}.hero p,.hero .eyebrow{color:#333!important}.pill{color:#333!important;border:1px solid #aaa}.hero:after{display:none}.article{box-shadow:none;border-radius:0;padding:0}.article h2{font-size:16px;color:black;border-color:#888;margin:22px 0 9px;break-after:avoid}.article h3{font-size:12px;color:black;break-after:avoid;margin:15px 0 5px}.article h4{font-size:11px}.article li{margin:2px}.article th{background:#eaeaea!important;color:black}.article td,.article th{padding:5px}.article table{font-size:9px;min-width:0}.article .table-wrap{overflow:visible;break-inside:auto}.article tr{break-inside:avoid}.article .callout{background:#f6f6f6!important;color:black;border-color:#555;break-inside:avoid}.article pre.code-wrap{background:#f0f0f0!important;color:black;border:1px solid #bbb;white-space:pre-wrap;overflow-wrap:anywhere;font-size:8px;break-inside:avoid}.article p{margin:6px 0}.article a{color:black;text-decoration:underline}.article strong{color:black}.reference-tag{color:black;background:#eee!important}}
+</style></head><body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell"><aside class="sidebar" aria-label="Document navigation"><div class="brand"><div class="mark" aria-hidden="true">◈</div><b>Academy Webinar<br>Research Blueprint</b><small>Project context · System design · Zoom feasibility</small></div><nav><a href="#executive-summary"><span class="nav-index">01</span><span>Executive summary</span></a><a href="#1-project-background-and-context"><span class="nav-index">02</span><span>Project background and context</span></a><a href="#2-problem-definition"><span class="nav-index">03</span><span>Problem definition</span></a><a href="#3-scope-and-non-scope"><span class="nav-index">04</span><span>Scope and non-scope</span></a><a href="#4-official-zoom-capability-research"><span class="nav-index">05</span><span>Official Zoom capability research</span></a><a href="#5-future-state-business-process-to-be"><span class="nav-index">06</span><span>Future-state business process (TO-BE)</span></a><a href="#6-users-permissions-and-use-cases"><span class="nav-index">07</span><span>Users, permissions and use cases</span></a><a href="#7-functional-requirements"><span class="nav-index">08</span><span>Functional requirements</span></a><a href="#8-attendance-calculation-specification"><span class="nav-index">09</span><span>Attendance calculation specification</span></a><a href="#9-engagement-measurement-and-ranking-policy"><span class="nav-index">10</span><span>Engagement measurement and ranking policy</span></a><a href="#10-proposed-logical-architecture"><span class="nav-index">11</span><span>Proposed logical architecture</span></a><a href="#11-data-model-and-integrity-rules"><span class="nav-index">12</span><span>Data model and integrity rules</span></a><a href="#12-proposed-application-api-your-api-not-zoom-s-api"><span class="nav-index">13</span><span>Proposed application API (your API, not Zoom&#x27;s API)</span></a><a href="#13-ui-screens-wireframe-inventory"><span class="nav-index">14</span><span>UI screens / wireframe inventory</span></a><a href="#14-zoom-account-access-and-integration-setup-checklist"><span class="nav-index">15</span><span>Zoom account access and integration setup checklist</span></a><a href="#15-engineering-delivery-phases-and-work-breakdown"><span class="nav-index">16</span><span>Engineering delivery phases and work breakdown</span></a><a href="#16-test-strategy-and-acceptance-scenarios"><span class="nav-index">17</span><span>Test strategy and acceptance scenarios</span></a><a href="#17-risks-limitations-and-mitigations"><span class="nav-index">18</span><span>Risks, limitations and mitigations</span></a><a href="#18-management-information-systems-analysis"><span class="nav-index">19</span><span>Management Information Systems analysis</span></a><a href="#19-ai-enabled-functionality-meaningful-but-restrained"><span class="nav-index">20</span><span>AI-enabled functionality: meaningful but restrained</span></a><a href="#20-next-academy-meeting-validation-questions"><span class="nav-index">21</span><span>Next academy meeting: validation questions</span></a><a href="#21-assumptions-decisions-and-research-backlog"><span class="nav-index">22</span><span>Assumptions, decisions and research backlog</span></a><a href="#22-final-project-proposition-and-scope-statement"><span class="nav-index">23</span><span>Final project proposition and scope statement</span></a><a href="#23-research-reference-register"><span class="nav-index">24</span><span>Official sources</span></a><a href="#appendix-a-short-executive-message-to-send-to-the-academy"><span class="nav-index">25</span><span>Appendix A — Short executive message to send to the academy</span></a><a href="#appendix-b-glossary"><span class="nav-index">26</span><span>Appendix B — Glossary</span></a></nav><p class="sidebar-note">Based on the first academy meeting and official Zoom documentation. Unverified features are identified explicitly.</p></aside>
+<div class="content"><div class="toolbar"><a href="#main">Read document</a><button type="button" onclick="window.print()">Print / Save as PDF</button></div>
+<header class="hero"><div class="eyebrow">IS 3610 · Management Information Systems</div><h1>Smart Webinar Attendance<br>& Engagement Platform</h1><p>Detailed problem statement, researched Zoom integration constraints, proposed architecture, verified and experimental capabilities, complete requirements, monthly analytics, implementation roadmap, risks and official sources.</p><div class="meta"><span class="pill">Research as of 10 November 2026</span><span class="pill">Zoom Webinars</span><span class="pill">Detailed planning reference</span><span class="pill">Not a completed implementation</span></div></header>
+<main id="main" class="article"><h1 id="academy-smart-webinar-attendance-engagement-platform">Academy Smart Webinar Attendance &amp; Engagement Platform</h1>
+<p><strong>Detailed project context, problem analysis, Zoom API research, and implementation blueprint</strong><br/>
+<strong>Working title:</strong> Smart Webinar Attendance &amp; Engagement Management System (SWAEMS)<br/>
+<strong>Prepared for:</strong> IS 3610 – Management Information Systems group assignment<br/>
+<strong>Research snapshot:</strong> 10 November 2026<br/>
+<strong>Status:</strong> Proposed solution / technical research; no live academy Zoom integration or prototype is represented as completed.</p>
+<blockquote class="callout">
+<p><strong>How to read this document.</strong> <strong>[CONFIRMED BY ACADEMY]</strong> reflects the team's account of its first meeting. <strong>[VERIFIED IN ZOOM DOCUMENTATION]</strong> identifies official documented capabilities, with numbered links in the references. <strong>[PROPOSED DESIGN]</strong> is a recommended solution, not a statement about the academy's existing operation. <strong>[TO VALIDATE]</strong> denotes a decision, permission or technical experiment still outstanding. These distinctions matter for an honest university report.</p>
+</blockquote>
+<hr/>
+<h2 id="executive-summary">Executive summary</h2>
+<p>The academy delivers teaching sessions using <strong>Zoom Webinars</strong>. Its staff currently <strong>call individual student names, mark attendance manually, and check students again toward the end</strong> to assess whether they remained involved. The academy wants to reduce the manual effort and capture <strong>actual connection duration</strong>, not just a one-time present/absent response. The team has also identified a desired <strong>monthly student engagement report</strong>—including highest interaction or reaction counts and possible <strong>top 10 / top 100</strong> rankings. <strong>[CONFIRMED BY ACADEMY / TEAM DISCUSSION]</strong></p>
+<p>The recommended product has three coordinated modules:</p>
+<ol>
+<li><strong>Module A — Automated attendance:</strong> ingest Zoom participant join/leave webhooks, reconcile them against official post-webinar participant reports, link sessions to registered academy students, compute time present and attendance decisions, and support supervised corrections.</li>
+<li><strong>Module B — Engagement evidence:</strong> collect attributable Q&amp;A and poll participation where available; investigate whether native Zoom emoji reactions can lawfully and reliably be attributed to students through a separate Zoom Apps SDK test; if not, use an <strong>academy-owned, authenticated engagement portal</strong> for optional reaction buttons and learning checks.</li>
+<li><strong>Module C — Analytics and management:</strong> provide session dashboards, monthly summaries, raw reaction counts where defensible, top-10/top-100 rankings, trend reports, exports, and optional transparent AI-generated management summaries.</li>
+</ol>
+<p><strong>Main feasibility decision:</strong> A private internal Zoom integration can generally be built with <strong>Server-to-Server OAuth</strong> and academy admin consent <strong>without standard public Marketplace review</strong>. It is <em>not</em> unauthenticated public access to student records. The academy must grant appropriate scopes and hold the needed license. <a class="reference-tag" href="#source-z01">[Z01]</a> <a class="reference-tag" href="#source-z02">[Z02]</a> <a class="reference-tag" href="#source-z03">[Z03]</a></p>
+<p><strong>Critical limitation:</strong> Zoom's ordinary REST attendance/report endpoints do <strong>not establish a reliably identifiable per-attendee stream of native ❤️/👍/👏 reactions</strong>. The Zoom Apps SDK documents an <code>onEmojiReaction</code> event containing <code>participantUUID</code>, but separate Meeting SDK documentation explicitly describes anonymous webinar attendee reactions. Whether a particular host-side Zoom App can capture, identify, and map all attendees' events <strong>must be empirically tested</strong> before including it as a guaranteed core requirement. <a class="reference-tag" href="#source-z08">[Z08]</a> <a class="reference-tag" href="#source-z09">[Z09]</a> <a class="reference-tag" href="#source-z10">[Z10]</a></p>
+<p><strong>Research conclusion:</strong> Make attendance the production-ready core. Treat native emoji attribution as an experimental feature, not the dependency on which the project succeeds. Build flexible engagement analytics with a clearly labelled data source and a privacy-respecting fallback.</p>
+<hr/>
+<h2 data-section="01" id="1-project-background-and-context">1. Project background and context</h2>
+<h3 id="1-1-organization-and-course-context">1.1 Organization and course context</h3>
+<ul>
+<li><strong>Organization type:</strong> local educational academy. The team states that the organization is a registered company, uses Zoom <strong>Webinars</strong> (not merely a conventional Zoom Meeting), and holds online classes. <strong>[CONFIRMED BY TEAM]</strong></li>
+<li><strong>Unknown, not assumed:</strong> legal entity name, business registration number, licensing tier (standard Webinars vs Webinars Plus), Zoom admin privileges, student count, monthly webinar volume, enrollment system, current fee/HR processes, retention requirements, and ability to enable webinar registration. <strong>[TO VALIDATE]</strong></li>
+<li><strong>University project:</strong> IS 3610 – Management Information Systems. The uploaded assignment calls for analysis of the organization, functional processes, existing systems and their input/process/output/user details, Porter Five Forces and Value Chain, an AI-enabled information-system proposal, knowledge management, managerial decision support, user stories, wireframes, prototype, SDLC/Agile and PM tool justification, challenges and strategic system analysis.</li>
+<li><strong>Academic output:</strong> report of 6,000–7,000 words and 30-minute group video presentation, with organization-meeting evidence and separate meeting minutes. The stated assignment deadline is <strong>16 November 2026, 11:55 PM</strong>. Do not imply that a production-grade rollout is compulsory; the brief calls for a prototype.</li>
+</ul>
+<h3 id="1-2-what-happened-in-the-first-meeting">1.2 What happened in the first meeting</h3>
+<p>The team reported the following workflow: the academy conducts webinars; an employee calls student names and records who responds; staff also check attendance near the end to see whether students are still participating. The academy regards this as a process that should be automated. The desired evidence includes <strong>how long a student stayed connected</strong> and <strong>how much the student interacted</strong>. A simple beginning/end poll is not sufficient as the entire attendance mechanism. The subsequent team discussion expanded the desired analytics to Q&amp;A, polls, native emoji reactions if possible, and monthly leaderboards. <strong>[CONFIRMED BY TEAM]</strong></p>
+<p>The conversation does <strong>not</strong> establish that the academy approved a separate student portal, an attendance threshold, reaction-based grading, or automatic random polls; these are proposals requiring confirmation.</p>
+<h3 id="1-3-business-opportunity">1.3 Business opportunity</h3>
+<p><strong>Problem owner:</strong> academy management / attendance staff.<br/>
+<strong>Primary users:</strong> attendance administrators and instructors.<br/>
+<strong>Secondary users:</strong> directors, course coordinators and students.<br/>
+<strong>Core value:</strong> less clerical attendance work, repeatable evidence-based decisions, clearer reporting, and timely identification of disconnected or absent students.<br/>
+<strong>Potential competitive advantage:</strong> reliable online class administration, faster intervention on participation issues, more credible reporting for student services, and better capacity for increased enrollment without proportional manual work. These are <strong>hypothesized benefits</strong>, not measured outcomes.</p>
+<hr/>
+<h2 data-section="02" id="2-problem-definition">2. Problem definition</h2>
+<h3 id="2-1-current-state-process-as-is">2.1 Current-state process (AS-IS)</h3>
+<ol>
+<li>A course or batch schedules a Zoom webinar.</li>
+<li>Enrolled students join, sometimes late and sometimes with unstable connectivity.</li>
+<li>An attendance staff member calls names at the beginning, attempts to confirm who is connected and records attendance manually.</li>
+<li>During instruction, students may ask questions, answer polls or click reactions, but these are not consistently consolidated in the academy's attendance register.</li>
+<li>Near the end, the staff repeat a manual presence check.</li>
+<li>Staff may need to reconcile missed students, spelling differences, reconnects and absence claims.</li>
+<li>Management lacks a reliable automated monthly view of time-connected and identifiable engagement by student.</li>
+</ol>
+<p>Steps 1–5 reflect the problem as described; steps 6–7 are <strong>plausible process risks to validate</strong> rather than reported quantified defects.</p>
+<h3 id="2-2-problem-statement-report-ready">2.2 Problem statement (report-ready)</h3>
+<blockquote class="callout">
+<p>The academy's current Zoom Webinar attendance procedure relies on staff calling students individually and checking their presence at multiple points during a class. This process records an intermittent indication of attendance rather than a consistent measure of each student's total connected time, and it demands manual administration. The academy also wants actionable insight into identifiable learner participation across webinars, including monthly trends and rankings. A privacy-conscious information system is therefore proposed to automate the collection and reconciliation of Zoom Webinar participation records, apply transparent attendance rules, provide verified engagement indicators and support academy staff and managers with auditable, explainable reports.</p>
+</blockquote>
+<h3 id="2-3-root-causes-hypotheses">2.3 Root causes / hypotheses</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Current cause or hypothesis</th>
+<th>Effect</th>
+<th>Evidence still needed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Manual name calling</td>
+<td>Attendance is not integrated with webinar records</td>
+<td>Staff time spent on roll calls</td>
+<td>Minutes consumed per class</td>
+</tr>
+<tr>
+<td>Two-point presence check</td>
+<td>No consolidated join/leave timeline in academy process</td>
+<td>Session duration not known from register</td>
+<td>Current spreadsheet/register sample</td>
+</tr>
+<tr>
+<td>Identity mismatch</td>
+<td>Students may use different Zoom display names</td>
+<td>Possible incorrect attendance</td>
+<td>Registration/name policy</td>
+</tr>
+<tr>
+<td>Reconnection ambiguity</td>
+<td>One student may create several participation segments</td>
+<td>Under/overcount risk</td>
+<td>Example report from Zoom</td>
+</tr>
+<tr>
+<td>Engagement ambiguity</td>
+<td>Connection, Q&amp;A, polls and reactions are different signals</td>
+<td>Misleading 'active student' label</td>
+<td>Academy definition of interaction</td>
+</tr>
+<tr>
+<td>Reporting fragmentation</td>
+<td>Webinar records not linked to academy student and batch IDs</td>
+<td>Slow monthly analysis</td>
+<td>Current management reports</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="2-4-goals-and-measurable-success-criteria">2.4 Goals and measurable success criteria</h3>
+<p>The thresholds below are <strong>proposed acceptance targets</strong>, not academy-approved policy:</p>
+<ul>
+<li>Reduce staff time per class spent preparing and marking attendance by <strong>at least 70%</strong> against a measured baseline in a pilot.</li>
+<li>Achieve <strong>at least 98% matching</strong> of correctly registered pilot attendees to student records; unresolved identities appear in a review queue, never silently guessed.</li>
+<li>Calculate total connected time from normalized join/leave intervals with <strong>no duplicate counting</strong> for overlaps or reconnects.</li>
+<li>Produce an attendance report after session completion and Zoom report availability; show a <strong>preliminary</strong> live state while the webinar runs.</li>
+<li>Produce a monthly report filtered by batch, course, date and engagement source, including top 10 and top 100 where enough students exist.</li>
+<li>Keep an audit trail for all manual changes and consented processing.</li>
+<li>Clearly distinguish <strong>connected</strong> from <strong>engaged</strong> from <strong>attentive</strong>. None of these alone proves learning.</li>
+</ul>
+<hr/>
+<h2 data-section="03" id="3-scope-and-non-scope">3. Scope and non-scope</h2>
+<h3 id="3-1-in-scope">3.1 In scope</h3>
+<ul>
+<li>Authorized Zoom Webinar integration for the academy account.</li>
+<li>Batch/student enrollments and webinar-to-class mapping.</li>
+<li>Student matching using validated registrant mappings, with human review for uncertain cases.</li>
+<li>Near-real-time join/leave processing and post-webinar reconciliation.</li>
+<li>Connected-time calculation, attendance percentage, configurable policy thresholds, and reasoned overrides.</li>
+<li>Webinar Q&amp;A and poll-result ingestion where identifiable and authorized.</li>
+<li>Optional scheduled learning checks in an authenticated academy portal; native Zoom polls can be pre-created through API.</li>
+<li>Separate feasible-study track for native Zoom emoji reception and attribution.</li>
+<li>Monthly dashboards, rankings, downloads, management summaries and access control.</li>
+<li>Educational prototype and high-fidelity wireframes.</li>
+</ul>
+<h3 id="3-2-out-of-scope-for-the-first-implementation">3.2 Out of scope for the first implementation</h3>
+<ul>
+<li>Proving student attention, concentration or comprehension from connected time or emoji clicks.</li>
+<li>Automatically reading the student's camera, microphone, screen, gaze, or third-party application activity.</li>
+<li>Circumventing Zoom anonymity, collecting student credentials or scraping undocumented UI/network traffic.</li>
+<li>Replacing Zoom itself, providing streaming infrastructure, or modifying Zoom's official service.</li>
+<li>Full academy ERP/accounting unless separately justified.</li>
+<li>Publishing a commercial multi-organization app, formal proctoring or automatic disciplinary decisions.</li>
+<li>Claiming native Zoom poll launching can be triggered by an ordinary documented REST call; this was <strong>not verified</strong> in current public API references.</li>
+</ul>
+<hr/>
+<h2 data-section="04" id="4-official-zoom-capability-research">4. Official Zoom capability research</h2>
+<h3 id="4-1-classification-legend">4.1 Classification legend</h3>
+<ul>
+<li><strong>Documented:</strong> an official API, SDK callback or analytics feature explicitly describes the capability.</li>
+<li><strong>Conditional:</strong> capability exists, but requires account plan, settings, scopes, role, host action or non-anonymous user data.</li>
+<li><strong>Research / proof of concept:</strong> documentation indicates an avenue, but deployment-specific event behavior or identity mapping is not guaranteed.</li>
+<li><strong>Not established:</strong> cannot promise it from official REST docs reviewed.</li>
+</ul>
+<h3 id="4-2-feasibility-matrix">4.2 Feasibility matrix</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Requested capability</th>
+<th>Zoom route</th>
+<th>Assessment</th>
+<th>Design consequence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Webinar join/leave timestamps</td>
+<td><code>webinar.participant_joined</code> / <code>webinar.participant_left</code> webhooks</td>
+<td><strong>Documented / conditional</strong> <a class="reference-tag" href="#source-z04">[Z04]</a></td>
+<td>Live provisional attendance; signature verification and reconciliation required</td>
+</tr>
+<tr>
+<td>Official past-webinar participant report</td>
+<td><code>GET /report/webinars/{webinarId}/participants</code></td>
+<td><strong>Documented / conditional</strong> <a class="reference-tag" href="#source-z05">[Z05]</a></td>
+<td>Canonical report for completed webinar; paid + Webinar add-on; six-month report lookback</td>
+</tr>
+<tr>
+<td>Student connection time / reconnects</td>
+<td>Participant join/leave records</td>
+<td><strong>Derived</strong>, not native active-time measurement</td>
+<td>Normalize and merge intervals per identified student</td>
+</tr>
+<tr>
+<td>Attendee identity</td>
+<td>webinar registration IDs and authorized participant fields</td>
+<td><strong>Conditional</strong> <a class="reference-tag" href="#source-z04">[Z04]</a></td>
+<td>Require registration / secure mapping, review missing identifiers</td>
+</tr>
+<tr>
+<td>Webinar Q&amp;A</td>
+<td><code>GET /past_webinars/{webinarId}/qa</code>, <code>GET /report/webinars/{webinarId}/qa</code></td>
+<td><strong>Documented / conditional</strong> <a class="reference-tag" href="#source-z05">[Z05]</a></td>
+<td>Store identifiable question records; respect anonymous questions</td>
+</tr>
+<tr>
+<td>Create preconfigured poll</td>
+<td><code>POST /webinars/{webinarId}/polls</code></td>
+<td><strong>Documented / conditional</strong> <a class="reference-tag" href="#source-z05">[Z05]</a></td>
+<td>Instructor can launch prepared native Zoom polls</td>
+</tr>
+<tr>
+<td>Read past poll results</td>
+<td><code>GET /past_webinars/{webinarId}/polls</code>; report API</td>
+<td><strong>Documented / conditional</strong> <a class="reference-tag" href="#source-z05">[Z05]</a></td>
+<td>Only score student-specific polls when results contain valid identities; no guessing for anonymous responses</td>
+</tr>
+<tr>
+<td>Automatically click “Launch” in native webinar UI</td>
+<td>Standard Zoom REST API</td>
+<td><strong>Not established</strong> <a class="reference-tag" href="#source-z05">[Z05]</a></td>
+<td>Do not promise unattended native launching; manual instructor action or separate portal</td>
+</tr>
+<tr>
+<td>Individual native webinar emoji events via REST/webhooks</td>
+<td>Standard Zoom REST and event references</td>
+<td><strong>Not established</strong> <a class="reference-tag" href="#source-z04">[Z04]</a> <a class="reference-tag" href="#source-z05">[Z05]</a></td>
+<td>Cannot guarantee a per-student native emoji leaderboard</td>
+</tr>
+<tr>
+<td>Zoom Apps SDK emoji event</td>
+<td><code>onEmojiReaction</code> event with <code>participantUUID</code>, time and reaction</td>
+<td><strong>Documented SDK event; webinar identity coverage uncertain</strong> <a class="reference-tag" href="#source-z08">[Z08]</a> <a class="reference-tag" href="#source-z09">[Z09]</a></td>
+<td>Targeted pilot test with real attendee clients and roles</td>
+</tr>
+<tr>
+<td>Meeting SDK webinar reaction callback</td>
+<td><code>OnEmojiReactionReceivedInWebinar(type)</code></td>
+<td><strong>Documented as anonymous callback</strong> <a class="reference-tag" href="#source-z10">[Z10]</a></td>
+<td>Strong warning against assuming attendee attribution</td>
+</tr>
+<tr>
+<td>Webinars Plus reaction trend / attendee analytics</td>
+<td>Zoom Webinars Plus analytics UI</td>
+<td><strong>Conditional, product/tier-dependent</strong> <a class="reference-tag" href="#source-z11">[Z11]</a></td>
+<td>May inform reports, but access/export/API granularity require verification</td>
+</tr>
+<tr>
+<td>Automated internal-only access</td>
+<td>Server-to-Server OAuth</td>
+<td><strong>Documented</strong> <a class="reference-tag" href="#source-z01">[Z01]</a> <a class="reference-tag" href="#source-z02">[Z02]</a></td>
+<td>Account admin configures scopes; no general public Marketplace review</td>
+</tr>
+<tr>
+<td>External cross-account publication</td>
+<td>Marketplace distribution</td>
+<td><strong>Documented review route</strong> <a class="reference-tag" href="#source-z03">[Z03]</a></td>
+<td>Later commercial product requires additional compliance/review</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="4-3-authentication-approval-and-access-model">4.3 Authentication, approval and access model</h3>
+<p>An internal app is not an unauthenticated public endpoint. <strong>Server-to-Server OAuth</strong> supplies an account-scoped bearer token after an admin creates and activates an app and selects its permitted scopes. It uses an <code>account_credentials</code> grant, an account ID, client ID and client secret. The token is valid for about one hour and is renewed by making another token request; there is no refresh token for this grant. <a class="reference-tag" href="#source-z01">[Z01]</a></p>
+<p><strong>Recommended ownership:</strong> The academy Zoom administrator owns or explicitly authorizes the app and can revoke it. The team should never ask instructors or students for Zoom passwords. The backend stores credentials only as secrets, not in a browser bundle, code repository or assignment submission. Administrators need permissions to create the app and assign requested scopes. <a class="reference-tag" href="#source-z02">[Z02]</a></p>
+<p><strong>Review:</strong> Zoom states that internal apps restricted to users within a single account do not require standard public Marketplace review; public externally distributed apps do. This removes one potential approval delay, <strong>not</strong> the need for academy account authorization, licensing, role permissions, webinar settings and sometimes user consent for other app types. <a class="reference-tag" href="#source-z03">[Z03]</a></p>
+<h3 id="4-4-rest-endpoints-and-illustrative-granular-scopes">4.4 REST endpoints and illustrative granular scopes</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Method and path (relative to <code>https://api.zoom.us/v2</code>)</th>
+<th>Example documented scope or note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Completed attendee report</td>
+<td><code>GET /report/webinars/{webinarId}/participants</code></td>
+<td><code>report:read:list_webinar_participants:admin</code></td>
+</tr>
+<tr>
+<td>Q&amp;A report</td>
+<td><code>GET /report/webinars/{webinarId}/qa</code></td>
+<td><code>report:read:webinar_qna:admin</code></td>
+</tr>
+<tr>
+<td>Past webinar Q&amp;A</td>
+<td><code>GET /past_webinars/{webinarId}/qa</code></td>
+<td><code>webinar:read:past_qa:admin</code> (or appropriate user level)</td>
+</tr>
+<tr>
+<td>Create native webinar poll</td>
+<td><code>POST /webinars/{webinarId}/polls</code></td>
+<td><code>webinar:write:poll:admin</code> (or appropriate user level)</td>
+</tr>
+<tr>
+<td>List configured polls</td>
+<td><code>GET /webinars/{webinarId}/polls</code></td>
+<td><code>webinar:read:list_polls:admin</code></td>
+</tr>
+<tr>
+<td>Past poll results</td>
+<td><code>GET /past_webinars/{webinarId}/polls</code></td>
+<td><code>webinar:read:list_past_polls:admin</code></td>
+</tr>
+<tr>
+<td>Event subscriptions</td>
+<td>webinar join/left/ended webhook events</td>
+<td>Configure on app with accessible HTTPS endpoint and verification</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Technical note:</strong> Scope names and availability depend on app/account context. Use the live Zoom app's scope picker and endpoint reference at implementation time. Store a separate <strong>webinar UUID / instance ID</strong> for recurring sessions; a scheduled webinar ID alone may not uniquely identify a single occurrence. Some UUID values must be encoded carefully when used in paths. <a class="reference-tag" href="#source-z05">[Z05]</a> <a class="reference-tag" href="#source-z12">[Z12]</a></p>
+<h3 id="4-5-api-limits-reporting-windows-and-accuracy">4.5 API limits, reporting windows and accuracy</h3>
+<p>Zoom documents API limits at account level, rate limit categories (LIGHT, MEDIUM, HEAVY) and HTTP <strong>429</strong> on exceedance; exact quotas can differ by plan. Use event-driven ingestion, cache stable data, and fetch the completed participant report once with bounded retries rather than polling a report endpoint continually. <a class="reference-tag" href="#source-z06">[Z06]</a></p>
+<p>The participant-report endpoint documents a <strong>six-month lookback</strong>. The academy should store only the minimum justified derived attendance history it needs, under its own retention policy, rather than assuming Zoom will retain an API-accessible record indefinitely. Large reports may be paginated; process every returned page. <a class="reference-tag" href="#source-z05">[Z05]</a></p>
+<h3 id="4-6-zoom-s-reaction-identity-caveat-must-not-be-glossed-over">4.6 Zoom's reaction identity caveat (must not be glossed over)</h3>
+<p>There are three related but non-equivalent Zoom surfaces:</p>
+<ol>
+<li><strong>Standard REST / webhook APIs:</strong> available documentation establishes join/leave, poll and Q&amp;A data, but does not establish a standard, complete <strong>student-ID + timestamp + native reaction</strong> stream.</li>
+<li><strong>Zoom Apps SDK:</strong> <code>onEmojiReaction</code> is documented for webinar contexts, and <code>OnEmojiReactionEvent</code> declares <code>participantUUID</code>, <code>timestamp</code> and <code>reaction</code>. However, <strong>a declared field does not guarantee that a host-app instance receives every attendee event or that its UUID can be mapped to enrollment records in the academy's account</strong>. The webinar host is responsible for opening/inviting apps; attendee guest-mode and privacy rules apply. <a class="reference-tag" href="#source-z08">[Z08]</a> <a class="reference-tag" href="#source-z09">[Z09]</a> <a class="reference-tag" href="#source-z13">[Z13]</a></li>
+<li><strong>Meeting SDK:</strong> documentation describes a separate webinar reaction callback with only reaction type, specifically for <strong>anonymous webinar attendee reactions</strong>. This creates a real compatibility/privacy question that requires testing rather than optimism. <a class="reference-tag" href="#source-z10">[Z10]</a></li>
+</ol>
+<p><strong>Additional product nuance:</strong> Webinars Plus event analytics documents reaction-usage rates and trends; updated analytics also references reaction-count columns in attendee views. That is a <strong>product-UI capability with specific licensing</strong>, not proof that the ordinary webinar REST API exposes the desired personally identifiable events for independent collection. Ask the academy which Zoom plan it actually has; inspect available lawful export options before duplicating analytics. <a class="reference-tag" href="#source-z11">[Z11]</a> <a class="reference-tag" href="#source-z14">[Z14]</a></p>
+<p><strong>Go/no-go rule:</strong> Unless a test demonstrates both permitted attribution and complete event delivery in the academy's actual webinar setup, the application must label native Zoom reaction rankings as <strong>unsupported / experimental</strong>, and use <strong>identified custom-portal reactions</strong> or other attributable interactions for rankings instead.</p>
+<h3 id="4-7-native-zoom-polls-vs-an-academy-managed-engagement-check">4.7 Native Zoom polls vs an academy-managed engagement check</h3>
+<ul>
+<li>An internal app can prepare and <strong>create</strong> webinar polls with the documented poll creation endpoint. The instructor may then launch them from the Zoom webinar controls. <a class="reference-tag" href="#source-z05">[Z05]</a></li>
+<li>The reviewed public REST reference did <strong>not show a general endpoint</strong> to trigger a native poll's launch automatically at a chosen random minute. Absence from reviewed documentation does not prove that no other product surface exists; it means the team <strong>must not base the MVP on it</strong>.</li>
+<li>Alternative: a student portal authenticated to academy enrollment can schedule its own random low-stakes checks and store timestamps. But it cannot transparently inject those prompts into every student's Zoom native interface; a student must open the portal or a deliberately built supported in-client Zoom App.</li>
+<li>Anonymous Zoom poll answers cannot reliably become personal engagement scores. Require an identified response path or keep anonymous responses as <strong>aggregate class statistics</strong>.</li>
+<li>The academy previously rejected <strong>polls alone</strong> as a replacement for monitoring connected duration. Polls can be <strong>supplementary</strong>, not the only attendance evidence.</li>
+</ul>
+<hr/>
+<h2 data-section="05" id="5-future-state-business-process-to-be">5. Future-state business process (TO-BE)</h2>
+<pre class="code-wrap"><code class="language-mermaid">flowchart TD
+  A[Staff schedules webinar and assigns course / batch] --&gt; B[Students register using controlled identity]
+  B --&gt; C[Zoom webinar starts]
+  C --&gt; D[Join / leave webhooks received]
+  D --&gt; E[Verify, deduplicate and store raw receipts]
+  E --&gt; F[Match Zoom participant to academy student]
+  F --&gt; G[Calculate provisional attendance]
+  C --&gt; H[Q&amp;A / poll reports and optional portal checks]
+  H --&gt; I[Store attributable engagement evidence]
+  G --&gt; J[Webinar ends: retrieve official participant report]
+  J --&gt; K[Reconcile time intervals and resolve ambiguities]
+  I --&gt; L[Session and monthly analytics]
+  K --&gt; L
+  L --&gt; M[Staff review and export]
+  M --&gt; N[Optional AI-assisted management summary]
+</code></pre>
+<p><strong>Event sequence:</strong> Admin assigns a class to a unique webinar instance → student joins via approved Zoom registration path → webhook receiver verifies and records events → identity matcher links attendance segments → after completion official participant data reconciles gaps → business rule computes attendance status → authorized staff review any exceptions → optional engagement evidence is added separately → monthly job aggregates results and creates rankings.</p>
+<p><strong>Fallback path:</strong> If Zoom credentials or webhook connectivity are unavailable, import an authorized CSV export from the academy's Zoom reports into a supervised upload workflow; clearly mark this as <strong>file-based mode</strong> rather than claiming live integration.</p>
+<hr/>
+<h2 data-section="06" id="6-users-permissions-and-use-cases">6. Users, permissions and use cases</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Main actions</th>
+<th>Sensitive restrictions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Academy director / manager</td>
+<td>Set attendance policy, view monthly comparisons, approve exceptions</td>
+<td>Access organizational aggregates and authorized student details</td>
+</tr>
+<tr>
+<td>Attendance officer</td>
+<td>View roster, unresolved mappings, approve attendance corrections, export reports</td>
+<td>Corrections must include a reason; no API secret access</td>
+</tr>
+<tr>
+<td>Instructor / webinar host</td>
+<td>See own class report, prepare polls, review participation</td>
+<td>Cannot change other instructors' classes</td>
+</tr>
+<tr>
+<td>Student</td>
+<td>View own history and optional engagement checks</td>
+<td>Cannot view peers' personal rankings unless academy policy explicitly allows it</td>
+</tr>
+<tr>
+<td>Zoom account administrator</td>
+<td>Authorize Zoom app, configure scopes / webhook subscription</td>
+<td>No need to access educational grading content</td>
+</tr>
+<tr>
+<td>System maintainer</td>
+<td>Monitor integrations, jobs and security logs</td>
+<td>Minimal access; redact student PII in logs</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="representative-user-stories-assignment-ready">Representative user stories (assignment-ready)</h3>
+<ul>
+<li><strong>US-01:</strong> As an attendance officer, I want a class roster matched to Zoom registrants so I do not have to call every student's name.</li>
+<li><strong>US-02:</strong> As an attendance officer, I want the app to combine reconnects so I can see each student's total true connected minutes.</li>
+<li><strong>US-03:</strong> As a manager, I want to set attendance thresholds by course so the same transparent policy applies consistently.</li>
+<li><strong>US-04:</strong> As an instructor, I want a provisional attendance list during a webinar so I can see obvious connectivity issues without interrupting teaching.</li>
+<li><strong>US-05:</strong> As an attendance officer, I want an exception queue for unknown or ambiguous Zoom names so no attendance is silently assigned to the wrong student.</li>
+<li><strong>US-06:</strong> As an instructor, I want to create question-bank polls before class so I can conduct check-ins when I choose.</li>
+<li><strong>US-07:</strong> As a student, I want to see my own attendance duration, policy result and reason for any missing record so I can challenge errors.</li>
+<li><strong>US-08:</strong> As a manager, I want a top-10/top-100 monthly table broken down by interaction type and webinar count so high raw emoji counts are not confused with attendance or learning.</li>
+<li><strong>US-09:</strong> As a director, I want an optional plain-language summary of absent/late/reconnect patterns so I can plan operational improvements.</li>
+<li><strong>US-10:</strong> As an auditor, I want every manual attendance change linked to the staff member and reason so reports can be trusted.</li>
+<li><strong>US-11:</strong> As a student, I want any optional engagement check to be accessible and not penalize me unfairly for slow internet or disability.</li>
+<li><strong>US-12:</strong> As a system administrator, I want Zoom integration failures and delayed reports to be visible so staff know when results are incomplete.</li>
+</ul>
+<hr/>
+<h2 data-section="07" id="7-functional-requirements">7. Functional requirements</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Priority</th>
+<th>Acceptance evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FR-01</td>
+<td>Register/import student roster and map student to batch/course</td>
+<td>Must</td>
+<td>Two students enrolled; correct roster shown</td>
+</tr>
+<tr>
+<td>FR-02</td>
+<td>Register class sessions and associate Zoom webinar ID + instance UUID</td>
+<td>Must</td>
+<td>Two recurring sessions remain distinct</td>
+</tr>
+<tr>
+<td>FR-03</td>
+<td>Verify inbound Zoom webhook URL validation and signatures</td>
+<td>Must</td>
+<td>Forged request rejected; valid request stored</td>
+</tr>
+<tr>
+<td>FR-04</td>
+<td>Record join/leave event receipts idempotently</td>
+<td>Must</td>
+<td>Duplicate event does not duplicate time</td>
+</tr>
+<tr>
+<td>FR-05</td>
+<td>Resolve student using registrant ID/approved identity mapping</td>
+<td>Must</td>
+<td>Ambiguous participant flagged, not assigned</td>
+</tr>
+<tr>
+<td>FR-06</td>
+<td>Calculate interval-union connected duration and attendance percentage</td>
+<td>Must</td>
+<td>Rejoin test returns mathematically correct minutes</td>
+</tr>
+<tr>
+<td>FR-07</td>
+<td>Reconcile with past webinar participant report</td>
+<td>Must</td>
+<td>Missed webhook recovered in final report</td>
+</tr>
+<tr>
+<td>FR-08</td>
+<td>Apply configurable attendance policy and manual exception workflow</td>
+<td>Must</td>
+<td>Policy result and reason displayed; override audited</td>
+</tr>
+<tr>
+<td>FR-09</td>
+<td>Class-level attendance dashboard, filters and export</td>
+<td>Must</td>
+<td>CSV report matches database figures</td>
+</tr>
+<tr>
+<td>FR-10</td>
+<td>Monthly per-student attendance and enrollment reporting</td>
+<td>Must</td>
+<td>Month and batch filter tested</td>
+</tr>
+<tr>
+<td>FR-11</td>
+<td>Import attributable webinar Q&amp;A and poll participation</td>
+<td>Should</td>
+<td>Sample identifiable records appear with source label</td>
+</tr>
+<tr>
+<td>FR-12</td>
+<td>Schedule student-portal engagement questions and store responses</td>
+<td>Should</td>
+<td>Authorized student response timestamp saved</td>
+</tr>
+<tr>
+<td>FR-13</td>
+<td>Create polls via Zoom API, if account enables it</td>
+<td>Could</td>
+<td>Draft poll appears on webinar's poll list</td>
+</tr>
+<tr>
+<td>FR-14</td>
+<td>Capture identifiable native Zoom emoji reactions</td>
+<td>Research only</td>
+<td>Real webinar pilot proves permitted attendee identity and coverage</td>
+</tr>
+<tr>
+<td>FR-15</td>
+<td>Student-portal custom reaction buttons</td>
+<td>Should / fallback</td>
+<td>Reaction associated with logged-in student, class and time</td>
+</tr>
+<tr>
+<td>FR-16</td>
+<td>Monthly top-10/top-100 reaction and interaction reports</td>
+<td>Should</td>
+<td>Stable ranking/tie behavior; data-source labels</td>
+</tr>
+<tr>
+<td>FR-17</td>
+<td>Explainable AI management summary</td>
+<td>Could</td>
+<td>Summary grounded in numeric records, no invented metrics</td>
+</tr>
+<tr>
+<td>FR-18</td>
+<td>Retention controls, role permissions and audit events</td>
+<td>Must</td>
+<td>Unauthorized report blocked; deletion tested</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="nonfunctional-requirements">Nonfunctional requirements</h3>
+<ul>
+<li><strong>Privacy:</strong> minimum data necessary, purpose explanation, appropriate academy approvals, restrictions on sharing rankings, support for account-based deletion/retention.</li>
+<li><strong>Security:</strong> TLS, server-side tokens, OAuth least privilege, webhook signature checks, redacted logs, encrypted backups, RBAC, safe export authorization, audit logging.</li>
+<li><strong>Integrity:</strong> no duplicate event application; no overcounting overlapping join intervals; immutable raw receipts and traceable derived results.</li>
+<li><strong>Resilience:</strong> retries with backoff for API 429/5xx, DLQ/failed-job queue, replay and final report reconciliation.</li>
+<li><strong>Performance:</strong> scalable ingestion for class size; precomputed monthly aggregates and pagination; no need for a microservices architecture in the academic MVP.</li>
+<li><strong>Accessibility:</strong> keyboard support, screen-reader labels and low-bandwidth option; reactions/checks are never sole proof of learning.</li>
+<li><strong>Transparency:</strong> provisional vs finalized data states and source-of-evidence labels.</li>
+</ul>
+<hr/>
+<h2 data-section="08" id="8-attendance-calculation-specification">8. Attendance calculation specification</h2>
+<h3 id="8-1-essential-distinctions">8.1 Essential distinctions</h3>
+<ul>
+<li><strong>Presence duration:</strong> the sum of unique time intervals during which Zoom reports a student connected.</li>
+<li><strong>Class duration:</strong> configurable denominator; default planned policy is the finalized actual instructional interval, with scheduled interval also stored for audit.</li>
+<li><strong>Attendance status:</strong> policy result, not raw Zoom fact (e.g., <code>PRESENT</code>, <code>BELOW_THRESHOLD</code>, <code>ABSENT</code>, <code>PENDING_REVIEW</code>, <code>EXCUSED</code>).</li>
+<li><strong>Engagement events:</strong> attributable Q&amp;A/poll/portal interactions; not continuous attentiveness.</li>
+</ul>
+<h3 id="8-2-example">8.2 Example</h3>
+<p>Class is scheduled from 14:00 to 16:00 (120 minutes). Student A connects 14:05–14:45 (40 min), disconnects 14:45–14:55, reconnects 14:55–15:50 (55 min): <strong>95 connected minutes</strong> and <code>95 / 120 × 100 = 79.17%</code> attendance. If the academy approves a <strong>75%</strong> threshold, they qualify; this rule is illustrative, not the academy's confirmed policy.</p>
+<h3 id="8-3-algorithm">8.3 Algorithm</h3>
+<pre class="code-wrap"><code class="language-text">input: webinar_instance, academy_student, [join, leave] raw segments
+policy_window = [class_started_at, class_ended_at]  # confirmed academy policy
+intervals = []
+for segment in raw_segments:
+    if segment cannot be linked confidently to the student: queue_for_review
+    else:
+        start = max(segment.join_time, policy_window.start)
+        end   = min(segment.leave_time, policy_window.end)
+        if end &gt; start: intervals.append([start, end])
+sort intervals by start then end
+merge intervals when next.start &lt;= current.end
+connected_seconds = sum(end-start for merged intervals)
+percent = 100 * connected_seconds / max(1, class_duration_seconds)
+status = policy.resolve(percent, exceptions, data_completeness)
+store calculation_version, underlying receipt IDs, finalized_at, status
+</code></pre>
+<p><strong>Edge cases:</strong> duplicate webhooks; out-of-order join and leave; a missing leave; multiple devices; two concurrent sessions for one student; repeated webinar IDs; late teacher start; an early-ended class; timezone differences; canceled classes; lost connection; external attendee display names; partial post-webinar report; empty/anonymous identifiers. A participant on two devices must not automatically receive double attendance minutes. Prefer union of intervals across all sessions and explicitly review suspicious overlap.</p>
+<h3 id="8-4-reconciliation-state-machine">8.4 Reconciliation state machine</h3>
+<p><code>SCHEDULED → LIVE_PROVISIONAL → ENDED_RECONCILING → FINALIZED</code> with <code>NEEDS_REVIEW</code> or <code>SYNC_FAILED</code> for exceptions. A finalized attendance record can be revised only through an authorized, audited procedure. Staff must see whether values were calculated from webhooks, Zoom post-webinar report, manually verified records or simulated prototype data.</p>
+<hr/>
+<h2 data-section="09" id="9-engagement-measurement-and-ranking-policy">9. Engagement measurement and ranking policy</h2>
+<h3 id="9-1-recommended-data-source-categories">9.1 Recommended data-source categories</h3>
+<ol>
+<li><strong>Q&amp;A</strong> — attendee-linked questions and replies where not anonymous and accessible through authorized reports.</li>
+<li><strong>Native Zoom polls</strong> — responses where the academy configures non-anonymous participation and the API returns sufficient identifying fields.</li>
+<li><strong>Native Zoom reactions</strong> — a <strong>research track</strong> only; no guaranteed identifiable complete feed through core REST.</li>
+<li><strong>Custom portal reactions</strong> — fully attributable because a student is logged in; label them <strong>Portal Reactions</strong>, never “Zoom Reactions”.</li>
+<li><strong>Academy portal learning checks</strong> — time-stamped responses to instructor-approved questions; keep optional, accessible and tolerant of connectivity problems.</li>
+</ol>
+<h3 id="9-2-report-separate-dimensions">9.2 Report separate dimensions</h3>
+<p>For every student and month, show: enrolled classes, classes attended, total eligible class minutes, connected minutes, attendance percentage, Q&amp;A questions, polls answered, engagement checks completed, <strong>portal reaction count</strong>, <strong>verified native Zoom reaction count only if research proves it</strong>, and sources/coverage. Display <code>N/A</code> rather than zero when a source was not collected.</p>
+<p><strong>Ranking A — Most Reactions:</strong> top 10/top 100 ordered by attributable reaction count, optionally by type. The title must state <strong>Portal Reactions</strong> or another verified source. Tie-breaking: count desc, classes attended desc, anonymized student identifier asc (documented and reproducible).</p>
+<p><strong>Ranking B — Participation Breadth (optional):</strong> number of sessions with at least one legitimate interaction / sessions attended. Useful to reduce incentives for repetitive spam.</p>
+<p><strong>Ranking C — Attendance Consistency (optional):</strong> average attendance percentage by month; separate from reactions and learning performance.</p>
+<h3 id="9-3-avoid-deceptive-scoring">9.3 Avoid deceptive scoring</h3>
+<p>A student clicking 100 hearts is not demonstrably more attentive than a student listening silently and taking notes. Reaction totals favor devices and personalities comfortable with clicking. If the academy wants a composite <code>engagement_score</code>, make it <strong>opt-in, explainable and never disciplinary</strong>, cap repeated reactions, normalize by attendance opportunities, and involve teachers in design. Example <em>illustrative</em> weights: 50% attendance completeness, 25% check participation, 25% attributable Q&amp;A/poll breadth. Do not treat such a weight as validated learning science or as an objective grade.</p>
+<h3 id="9-4-responsible-random-checks">9.4 Responsible random checks</h3>
+<p>For academy-portal checks, let the instructor approve a question bank and class-time range. The scheduler can choose a random trigger within allowed windows, issue one short question with clear expiry and provide accessible alternatives. Record <code>issued_at</code>, <code>answered_at</code>, <code>question_id</code>, <code>class_id</code>, <code>student_id</code>, <code>result</code>, and <code>source</code>. Do not mark a nonresponding student absent if Zoom reports they remained connected; display <strong>check not answered</strong> separately.</p>
+<h3 id="9-5-native-reaction-proof-of-concept-plan">9.5 Native reaction proof-of-concept plan</h3>
+<p><strong>Goal:</strong> determine whether a host Zoom App running with allowed permissions can observe webinar attendee emoji events with identity values that map to enrolled students, and whether event coverage is complete.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Procedure</th>
+<th>Expected decision evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POC-01</td>
+<td>Host installs/opens test Zoom App in an academy-owned test webinar</td>
+<td>Confirm account/client/guest-mode requirements</td>
+</tr>
+<tr>
+<td>POC-02</td>
+<td>Three consenting test attendees join from separate Zoom accounts/devices</td>
+<td>Confirm mapping of registration IDs and attendee UUIDs</td>
+</tr>
+<tr>
+<td>POC-03</td>
+<td>Each sends a unique known pattern of ❤️/👍/👏</td>
+<td>Compare observed types/counts/timestamps</td>
+</tr>
+<tr>
+<td>POC-04</td>
+<td>Leave/rejoin; repeat reactions</td>
+<td>Confirm stability of identifiers and deduplication</td>
+</tr>
+<tr>
+<td>POC-05</td>
+<td>One attendee uses Zoom desktop, one web/mobile where supported</td>
+<td>Define client/device coverage gaps</td>
+</tr>
+<tr>
+<td>POC-06</td>
+<td>Observe reaction-event access from host vs panelist vs attendee SDK context</td>
+<td>Determine which app instance is permitted to receive what</td>
+</tr>
+<tr>
+<td>POC-07</td>
+<td>Turn anonymous/private settings on where allowed</td>
+<td>Confirm no identification bypass is attempted</td>
+</tr>
+<tr>
+<td>POC-08</td>
+<td>Compare captured counts with host-visible/Plus aggregate analytics</td>
+<td>Verify completeness and explain differences</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Pass:</strong> permitted, consistent, complete attendee identifiers + correctly mapped events across supported environments. <strong>Fail:</strong> missing identity, unreliable delivery, only anonymous aggregate events, or privacy/role restrictions. <strong>Outcome if fail:</strong> disable native reaction rankings and use authenticated portal interactions.</p>
+<hr/>
+<h2 data-section="10" id="10-proposed-logical-architecture">10. Proposed logical architecture</h2>
+<pre class="code-wrap"><code class="language-mermaid">flowchart LR
+  subgraph External[Zoom platform]
+    ZW[Zoom Webinar]
+    WH[Zoom Webhook Subscriptions]
+    REST[Zoom REST Reports and Poll APIs]
+    ZAPP[Optional Zoom Apps SDK POC]
+  end
+  subgraph App[Academy application]
+    IN[Verified Webhook Ingress]
+    SYNC[Report Sync Worker]
+    ID[Student Identity Resolver]
+    CALC[Attendance Engine]
+    ENG[Engagement Collector]
+    API[Application REST API]
+    DB[(PostgreSQL)]
+    DASH[React Staff Dashboard]
+    PORTAL[Optional Student Portal]
+    REPORT[Monthly Report Worker]
+  end
+  ZW --&gt; WH --&gt; IN --&gt; DB
+  REST &lt;--&gt; SYNC --&gt; DB
+  DB --&gt; ID --&gt; CALC --&gt; DB
+  ZAPP -. POC only .-&gt; ENG
+  PORTAL --&gt; ENG --&gt; DB
+  DB --&gt; REPORT --&gt; API --&gt; DASH
+  CALC --&gt; API
+  DASH --&gt; API
+</code></pre>
+<h3 id="10-1-stack-recommendation-not-a-requirement">10.1 Stack recommendation (not a requirement)</h3>
+<ul>
+<li><strong>Frontend:</strong> React + TypeScript, accessible component library, date and table filtering, charts, export controls.</li>
+<li><strong>Backend:</strong> one modular <strong>Spring Boot</strong> application (Java) or Node.js/TypeScript. Choose based on group experience; modular monolith is enough for an academic MVP.</li>
+<li><strong>Database:</strong> PostgreSQL for reliable session, receipt and reporting data.</li>
+<li><strong>Integrations:</strong> Zoom REST and webhook handler, OAuth token manager, a report-reconciliation scheduler.</li>
+<li><strong>Deployment:</strong> HTTPS service with environment-based secrets; local development through a tunnel only for controlled testing, or a test environment hosted with TLS.</li>
+<li><strong>Optional AI:</strong> an auditable report-summarization component operating on derived aggregate metrics and minimizing student personal data.</li>
+<li><strong>Project management:</strong> GitHub Projects or Trello for backlog/sprints; justify according to group size and integration complexity.</li>
+</ul>
+<h3 id="10-2-components-and-responsibilities">10.2 Components and responsibilities</h3>
+<ol>
+<li><strong>Zoom connector:</strong> credentials, scoped API client, pagination, retry/backoff, response validation.</li>
+<li><strong>Webhook ingress:</strong> URL challenge response, signature and timestamp verification, body size limits, event receipts and nonblocking acknowledgments. <a class="reference-tag" href="#source-z07">[Z07]</a></li>
+<li><strong>Identity resolver:</strong> approved student/registrant mappings, ambiguous identity review, versioned resolution decisions.</li>
+<li><strong>Session calculator:</strong> interval-union time computation and attendance policy evaluator.</li>
+<li><strong>Engagement collector:</strong> Q&amp;A, polls, optional portal and SDK research events, with per-event source evidence.</li>
+<li><strong>Reports:</strong> per-class snapshots, monthly aggregation, exports, ranking logic and audit trail.</li>
+<li><strong>User service:</strong> staff roles and student self-service visibility.</li>
+<li><strong>Operations:</strong> integration status, failed events, manual sync, error alerts and retention jobs.</li>
+</ol>
+<hr/>
+<h2 data-section="11" id="11-data-model-and-integrity-rules">11. Data model and integrity rules</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Entity / table</th>
+<th>Essential fields</th>
+<th>Constraints / purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>students</code></td>
+<td><code>id</code>, <code>student_no</code>, <code>display_name</code>, <code>email?</code>, <code>active</code></td>
+<td>unique academy identifier; private data</td>
+</tr>
+<tr>
+<td><code>courses</code></td>
+<td><code>id</code>, <code>title</code>, <code>status</code></td>
+<td>group lectures</td>
+</tr>
+<tr>
+<td><code>batches</code></td>
+<td><code>id</code>, <code>course_id</code>, <code>name</code></td>
+<td>class cohort</td>
+</tr>
+<tr>
+<td><code>enrollments</code></td>
+<td><code>student_id</code>, <code>batch_id</code>, <code>from_date</code>, <code>to_date?</code></td>
+<td>student belongs to a particular cohort</td>
+</tr>
+<tr>
+<td><code>class_sessions</code></td>
+<td><code>id</code>, <code>batch_id</code>, <code>scheduled_start</code>, <code>scheduled_end</code>, <code>actual_start?</code>, <code>actual_end?</code>, <code>status</code></td>
+<td>one educational session</td>
+</tr>
+<tr>
+<td><code>zoom_instances</code></td>
+<td><code>id</code>, <code>class_session_id</code>, <code>webinar_id</code>, <code>webinar_uuid</code>, <code>occurrence_id?</code></td>
+<td>use distinct webinar <strong>instance</strong> key</td>
+</tr>
+<tr>
+<td><code>zoom_student_links</code></td>
+<td><code>id</code>, <code>student_id</code>, <code>registrant_id?</code>, <code>participant_uuid?</code>, <code>source</code>, <code>confidence</code>, <code>verified_by?</code></td>
+<td>cannot auto-link based solely on untrusted name</td>
+</tr>
+<tr>
+<td><code>zoom_event_receipts</code></td>
+<td><code>id</code>, <code>zoom_event_key</code>, <code>kind</code>, <code>occurred_at</code>, <code>raw_minimized_payload</code>, <code>received_at</code></td>
+<td>idempotent unique key; trace source</td>
+</tr>
+<tr>
+<td><code>presence_segments</code></td>
+<td><code>id</code>, <code>instance_id</code>, <code>student_id?</code>, <code>join_at</code>, <code>leave_at?</code>, <code>source</code>, <code>link_status</code></td>
+<td>several segments for one student; optional unresolved</td>
+</tr>
+<tr>
+<td><code>attendance_results</code></td>
+<td><code>student_id</code>, <code>class_session_id</code>, <code>connected_seconds</code>, <code>percent</code>, <code>status</code>, <code>version</code>, <code>finalized_at?</code></td>
+<td>unique per student/session; derivation version</td>
+</tr>
+<tr>
+<td><code>attendance_overrides</code></td>
+<td><code>result_id</code>, <code>prior_status</code>, <code>new_status</code>, <code>reason</code>, <code>actor_id</code>, <code>created_at</code></td>
+<td>append-only corrections</td>
+</tr>
+<tr>
+<td><code>engagement_events</code></td>
+<td><code>id</code>, <code>student_id?</code>, <code>instance_id</code>, <code>type</code>, <code>source</code>, <code>occurred_at</code>, <code>external_event_key?</code>, <code>metadata</code></td>
+<td>native vs portal distinguished; no anonymous→identified guess</td>
+</tr>
+<tr>
+<td><code>learning_checks</code></td>
+<td><code>id</code>, <code>session_id</code>, <code>question</code>, <code>open_at</code>, <code>close_at</code>, <code>status</code></td>
+<td>portal-only checks if implemented</td>
+</tr>
+<tr>
+<td><code>learning_check_responses</code></td>
+<td><code>check_id</code>, <code>student_id</code>, <code>answered_at</code>, <code>answer_code</code></td>
+<td>one canonical response per student/check</td>
+</tr>
+<tr>
+<td><code>monthly_report_runs</code></td>
+<td><code>month</code>, <code>batch_id?</code>, <code>calculation_version</code>, <code>created_at</code>, <code>input_coverage</code></td>
+<td>reproducible reports</td>
+</tr>
+<tr>
+<td><code>audit_log</code></td>
+<td><code>id</code>, <code>actor</code>, <code>action</code>, <code>entity_ref</code>, <code>occurred_at</code>, <code>reason?</code></td>
+<td>no secrets in payload</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Key constraints:</strong> uniquely identify webhook receipts; deduplicate externally imported Q&amp;A/poll events; never write a presence segment for an unverified student link; unique <code>(student_id,class_session_id)</code> attendance result; maintain event source and data-quality flag; use UTC timestamps for storage and the academy's selected timezone in reports; protect personal fields via access policy.</p>
+<h3 id="example-derived-json-response-illustrative-not-zoom-s-native-api-schema">Example derived JSON response (illustrative, not Zoom's native API schema)</h3>
+<pre class="code-wrap"><code class="language-json">{
+  "studentId": "STU-1042",
+  "classSessionId": "CLASS-2026-11-10-A",
+  "webinarInstanceStatus": "FINALIZED",
+  "scheduledMinutes": 120,
+  "connectedMinutes": 95,
+  "attendancePercentage": 79.17,
+  "attendancePolicy": { "thresholdPercentage": 75, "version": 1 },
+  "status": "PRESENT",
+  "engagement": {
+    "identifiedQaQuestions": 2,
+    "identifiedPollResponses": 1,
+    "portalReactions": { "heart": 4, "clap": 1 },
+    "nativeZoomEmojiReactions": null,
+    "nativeZoomReactionAvailability": "UNVERIFIED"
+  },
+  "source": ["ZOOM_POST_WEBINAR_REPORT", "PORTAL"],
+  "identityMatch": "VERIFIED_REGISTRANT"
+}
+</code></pre>
+<hr/>
+<h2 data-section="12" id="12-proposed-application-api-your-api-not-zoom-s-api">12. Proposed application API (your API, not Zoom's API)</h2>
+<p>All endpoints below are an <strong>application design</strong>, not actual Zoom endpoints. Require session auth and permissions, validation, pagination and explicit error responses.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Method / path</th>
+<th>Consumer</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /api/v1/integrations/zoom/webhooks</code></td>
+<td>Zoom</td>
+<td>Validate and ingest signed event notifications</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/integrations/zoom/health</code></td>
+<td>Admin</td>
+<td>Last sync, scope/permission diagnostics (no secret exposure)</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/classes</code></td>
+<td>Staff</td>
+<td>Create a class and map webinar instance</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/classes/{classId}/attendance</code></td>
+<td>Staff</td>
+<td>Per-student duration, percentage, state, evidence source</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/classes/{classId}/reconcile</code></td>
+<td>Admin</td>
+<td>Initiate authorized post-webinar refresh job</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/identity/unresolved</code></td>
+<td>Attendance staff</td>
+<td>Review uncertain participant mappings</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/identity/links</code></td>
+<td>Authorized staff</td>
+<td>Approve mapping with justification</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/attendance/{attendanceId}/override</code></td>
+<td>Attendance staff</td>
+<td>Write audited correction</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/students/me/attendance</code></td>
+<td>Student</td>
+<td>Own attendance history only</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/classes/{classId}/engagement</code></td>
+<td>Instructor</td>
+<td>Per-class attributable interactions with provenance</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/classes/{classId}/checks</code></td>
+<td>Instructor</td>
+<td>Schedule portal engagement check</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/checks/{checkId}/responses</code></td>
+<td>Student</td>
+<td>Submit owned response, server validates window</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/classes/{classId}/reactions</code></td>
+<td>Student</td>
+<td>Optional custom portal reaction event</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/reports/monthly?month=2026-11&amp;batchId=...</code></td>
+<td>Manager</td>
+<td>Monthly attendance + engagement overview</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/leaderboards?month=...&amp;metric=portalReactions&amp;limit=10</code></td>
+<td>Manager</td>
+<td>Source-labelled rankings; limit 10 or 100</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/reports/{runId}/export?format=csv</code></td>
+<td>Manager</td>
+<td>Audited report export</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="example-error-handling">Example error handling</h3>
+<p><code>400</code> bad input/time range; <code>401</code> not authenticated; <code>403</code> wrong role; <code>404</code> resource not found or not visible; <code>409</code> duplicate/ambiguous mapping; <code>422</code> cannot finalize while mandatory source missing; <code>429</code> configured usage threshold; <code>503</code> Zoom integration temporarily unavailable. Show safe, user-friendly error text and a retry/manual-review path.</p>
+<hr/>
+<h2 data-section="13" id="13-ui-screens-wireframe-inventory">13. UI screens / wireframe inventory</h2>
+<p>The assignment requires a complete set of detailed wireframes aligned with user stories. Minimum suggested views:</p>
+<ol>
+<li><strong>Login + role selection/redirect:</strong> authorized staff/student landing experience.</li>
+<li><strong>Manager overview:</strong> attendance trend, sessions completed, exception count, report shortcuts.</li>
+<li><strong>Class calendar / list:</strong> course, batch, webinar ID, expected and actual times, sync state.</li>
+<li><strong>Session attendance detail:</strong> roster, join/leave timeline, minutes, percentage, status, evidence source.</li>
+<li><strong>Student detail view:</strong> all class sessions, reconnect visualization, Q&amp;A/poll/portal interactions, override history.</li>
+<li><strong>Unresolved student mapping queue:</strong> Zoom name/email/registrant metadata permitted, candidate matches, manual assignment and audit.</li>
+<li><strong>Attendance rules settings:</strong> threshold, class duration denominator, grace window, exceptions, effective date.</li>
+<li><strong>Q&amp;A and polls evidence:</strong> reported events labelled Zoom/anonymous/identified, filtering and caveats.</li>
+<li><strong>Engagement check builder:</strong> question bank, planned randomized window, response deadline, accessible alternative.</li>
+<li><strong>Student portal reaction/check page:</strong> simple responses and transparent notice of collection, no competitor leaderboard.</li>
+<li><strong>Monthly analytics:</strong> attendance distribution, reaction source switch, top 10/100, normalized engagement measures, data coverage.</li>
+<li><strong>Report export/preview:</strong> PDF/CSV, audience, date range, privacy warning and audit entry.</li>
+<li><strong>Zoom connection setup:</strong> S2S OAuth instructions, scopes, webhook health, last sync, errors; no credentials displayed in reports.</li>
+<li><strong>Admin audit &amp; corrections:</strong> who changed what, when, why; review action.</li>
+<li><strong>Prototype fallback demo mode:</strong> conspicuous simulated-data ribbon if live account access is not available.</li>
+</ol>
+<hr/>
+<h2 data-section="14" id="14-zoom-account-access-and-integration-setup-checklist">14. Zoom account access and integration setup checklist</h2>
+<p><strong>Academy confirmation:</strong> Zoom account ownership; standard Webinar license vs Webinars Plus; webinar host identity; ability to create Server-to-Server OAuth app; permission to request <code>report</code> and <code>webinar</code> scopes; ability to enable event subscriptions; webinar registration enabled / permitted; existing Zoom Q&amp;A and polls configuration; whether students sign into Zoom or join as guests; privacy/recording notice.</p>
+<p><strong>Engineering setup:</strong> separate development environment; Zoom admin creates S2S app and activates appropriate scopes; store credentials securely; request token and test least-privilege read API; configure HTTPS webhook endpoint; respond correctly to Zoom URL validation challenge; verify event signatures and freshness; subscribe to join/leave/ended; conduct controlled test webinar; fetch reports; validate field-level identity availability and pagination; perform end-to-end reconciliation and log failures. <a class="reference-tag" href="#source-z01">[Z01]</a> <a class="reference-tag" href="#source-z02">[Z02]</a> <a class="reference-tag" href="#source-z04">[Z04]</a> <a class="reference-tag" href="#source-z07">[Z07]</a></p>
+<p><strong>Important:</strong> Do not copy the academy's client secret into a WhatsApp group, university report, screenshots or client-side code. For a classroom prototype, a test academy-owned Zoom account or approved supervised environment is preferable.</p>
+<hr/>
+<h2 data-section="15" id="15-engineering-delivery-phases-and-work-breakdown">15. Engineering delivery phases and work breakdown</h2>
+<h3 id="phase-0-requirements-and-access-high-priority-0-5-1-day-for-assignment-planning">Phase 0 — requirements and access (high priority, 0.5–1 day for assignment planning)</h3>
+<ul>
+<li>Confirm webinars, plan/add-on, actual roles and data availability; obtain academy contact and approval.</li>
+<li>Agree on attendance policy, meaning of interaction, monthly reporting audience and whether custom portal is acceptable.</li>
+<li>Capture sanitized sample roster and webinar export, and prepare current-vs-future process diagrams.</li>
+<li><strong>Gate:</strong> Can we use authentic Zoom data and identifiable registration fields? If no, use realistic synthetic sample data and flag prototype status.</li>
+</ul>
+<h3 id="phase-1-attendance-minimum-viable-prototype-2-4-development-days-illustrative">Phase 1 — attendance minimum viable prototype (2–4 development days, illustrative)</h3>
+<ul>
+<li>Database entities for classes, students, enrollments, participation segments and results.</li>
+<li>Backend webhook receiver or simulated event input, identity mapping, interval union and attendance rules.</li>
+<li>Staff dashboard for session attendance, percentages and manual review states.</li>
+<li>Unit tests for join/rejoin/duplicates/overlaps/unknown identities.</li>
+<li><strong>Demo:</strong> event timeline → final 95-minute/79.17% record → downloadable class report.</li>
+</ul>
+<h3 id="phase-2-genuine-zoom-connector-and-data-quality-when-academy-authorization-is-available">Phase 2 — genuine Zoom connector and data quality (when academy authorization is available)</h3>
+<ul>
+<li>S2S token integration and scoped report reader.</li>
+<li>Webhook URL validation, signatures, durable receipts and replay.</li>
+<li>Post-webinar reconciliation and finalization; UI makes freshness visible.</li>
+<li><strong>Gate:</strong> test reports from 3–5 consenting accounts match Zoom's own UI/export within a defined tolerance.</li>
+</ul>
+<h3 id="phase-3-engagement-evidence-parallel-after-core">Phase 3 — engagement evidence (parallel after core)</h3>
+<ul>
+<li>Import identifiable Q&amp;A and poll data; record anonymous source as aggregate only.</li>
+<li>Create student portal (login, reactions, question checks, response timing) if academy accepts.</li>
+<li>Run isolated native Zoom Apps SDK emoji pilot. <strong>Do not merge experimental event capture into production scoring until the gate passes.</strong></li>
+<li><strong>Demo:</strong> interaction events displayed by type and source; no false 'attentive' label.</li>
+</ul>
+<h3 id="phase-4-monthly-analytics-and-knowledge-management">Phase 4 — monthly analytics and knowledge management</h3>
+<ul>
+<li>Month-by-month attendance and engagement aggregation, class/batch filters, top 10/100 by metric, CSV/PDF exports.</li>
+<li>Policy documentation and management dashboard (operational / tactical / strategic decisions).</li>
+<li>Optional AI summary grounded in computed aggregates with clear warnings and human approval.</li>
+<li><strong>Demo:</strong> select November → view ranking → inspect how a total was calculated → export report.</li>
+</ul>
+<h3 id="phase-5-verification-university-deliverables-and-presentation">Phase 5 — verification, university deliverables, and presentation</h3>
+<ul>
+<li>Run tests, validate sample figures and source citations, review privacy and accessible use.</li>
+<li>Draw all planned wireframes; demonstrate implemented prototype scope honestly.</li>
+<li>Complete university chapters and appendix (certified meeting minutes / evidence / member contribution statements).</li>
+<li>Explain SDLC/Agile choice and project management tool with explicit justification.</li>
+<li>Produce group video presentation and report before fixed submission deadline.</li>
+</ul>
+<p><strong>Schedule caveat:</strong> These are suggested small-slice engineering estimates, not promises that a real production deployment is possible before 16 November 2026. Prioritize a defensible academic prototype and honest feasibility evidence.</p>
+<hr/>
+<h2 data-section="16" id="16-test-strategy-and-acceptance-scenarios">16. Test strategy and acceptance scenarios</h2>
+<h3 id="16-1-core-automated-tests">16.1 Core automated tests</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Scenario</th>
+<th>Expected behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T01</td>
+<td>Student joins once for full class</td>
+<td>Full eligible duration calculated</td>
+</tr>
+<tr>
+<td>T02</td>
+<td>Student disconnects and rejoins</td>
+<td>Both valid intervals combined; gap excluded</td>
+</tr>
+<tr>
+<td>T03</td>
+<td>Same join webhook delivered twice</td>
+<td>Receipt deduplicated; duration unchanged</td>
+</tr>
+<tr>
+<td>T04</td>
+<td>Leave arrives before join</td>
+<td>Temporarily unresolved; eventual consistent pairing</td>
+</tr>
+<tr>
+<td>T05</td>
+<td>Overlapping device sessions</td>
+<td>Union duration, not sum of overlapping times</td>
+</tr>
+<tr>
+<td>T06</td>
+<td>Student attends before scheduled start</td>
+<td>Interval clipped to academy-approved class window</td>
+</tr>
+<tr>
+<td>T07</td>
+<td>Missing leave event</td>
+<td>Provisional flag; report reconciliation, not invented end time</td>
+</tr>
+<tr>
+<td>T08</td>
+<td>Zoom student name resembles two records</td>
+<td>No automatic assignment; review queue</td>
+</tr>
+<tr>
+<td>T09</td>
+<td>Anonymous Q&amp;A/poll result</td>
+<td>Aggregate only, no student-specific credit</td>
+</tr>
+<tr>
+<td>T10</td>
+<td>429 from Zoom</td>
+<td>Backoff and retry; do not block class application</td>
+</tr>
+<tr>
+<td>T11</td>
+<td>Invalid webhook signature</td>
+<td>4xx rejection and safe security log</td>
+</tr>
+<tr>
+<td>T12</td>
+<td>Repeated report import</td>
+<td>Idempotent result, no duplicate interaction count</td>
+</tr>
+<tr>
+<td>T13</td>
+<td>Staff correct attendance</td>
+<td>Audit trail records old/new values and reason</td>
+</tr>
+<tr>
+<td>T14</td>
+<td>Student tries to view peer report</td>
+<td>Access denied</td>
+</tr>
+<tr>
+<td>T15</td>
+<td>Monthly ranking tie</td>
+<td>Stable, documented tie handling</td>
+</tr>
+<tr>
+<td>T16</td>
+<td>No reaction data captured</td>
+<td><code>N/A</code>; never invent zero native reactions</td>
+</tr>
+<tr>
+<td>T17</td>
+<td>Session open and in progress</td>
+<td>UI explicitly says provisional, not final</td>
+</tr>
+<tr>
+<td>T18</td>
+<td>AI summary generated</td>
+<td>Every number traceable to report rows; no attention diagnosis</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="16-2-live-zoom-pilot-checklist">16.2 Live Zoom pilot checklist</h3>
+<ul>
+<li>Run with consenting test students rather than real student records initially.</li>
+<li>Validate timestamps, timezone and duration against Zoom report for at least three reconnection patterns.</li>
+<li>Test a registrant who changes their displayed name.</li>
+<li>Test how participant identifiers behave for non-signed-in external attendees.</li>
+<li>Test recurring webinar instances and post-webinar report availability.</li>
+<li>Test one non-anonymous poll and one anonymous poll; compare data fields.</li>
+<li>Test one identifiable Q&amp;A and one anonymous Q&amp;A.</li>
+<li>Test whether emoji events can be observed and mapped through supported Zoom Apps SDK context.</li>
+<li>Record evidence, screenshot redactions and app/SDK version in a test log.</li>
+</ul>
+<hr/>
+<h2 data-section="17" id="17-risks-limitations-and-mitigations">17. Risks, limitations and mitigations</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Likelihood / impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No academy admin authorization</td>
+<td>Medium / High</td>
+<td>Synthetic prototype, supervised CSV report import, no credential sharing</td>
+</tr>
+<tr>
+<td>Missing appropriate Webinar add-on/Plus analytics</td>
+<td>Medium / High</td>
+<td>Confirm license and feature access before sprint commitment</td>
+</tr>
+<tr>
+<td>Native emoji attendee data anonymous/unavailable</td>
+<td>High / High for emoji leaderboard</td>
+<td>Separate POC; portal reactions fallback; clear source labels</td>
+</tr>
+<tr>
+<td>Ambiguous student identity from display names</td>
+<td>High / High</td>
+<td>Registration-first approach, manual verification, confidence states</td>
+</tr>
+<tr>
+<td>Webhook loss, duplication or reordering</td>
+<td>Medium / High</td>
+<td>Durable receipt table, idempotency, reconcile against official reports</td>
+</tr>
+<tr>
+<td>Zoom REST limits or latency</td>
+<td>Medium / Medium</td>
+<td>Batching/pagination, caching, backoff, deferred sync, status display</td>
+</tr>
+<tr>
+<td>Poll responses anonymous</td>
+<td>Medium / Medium</td>
+<td>Use aggregates or identified portal checks; no guessing</td>
+</tr>
+<tr>
+<td>Artificial reaction spamming</td>
+<td>High / Medium</td>
+<td>Rate-limit custom reactions, measure participation breadth, no punitive raw-count score</td>
+</tr>
+<tr>
+<td>Privacy of student participation histories</td>
+<td>Medium / High</td>
+<td>Academy policy, RBAC, consent/notice, retention, data minimization</td>
+</tr>
+<tr>
+<td>Misusing engagement score as learning grade</td>
+<td>Medium / High</td>
+<td>Separate metrics, transparent caveats, instructor judgement, appeal process</td>
+</tr>
+<tr>
+<td>AI invents conclusions</td>
+<td>Medium / High</td>
+<td>Structured numeric input, cite records, human review, disable if unsafe</td>
+</tr>
+<tr>
+<td>Deadline too close for full production integration</td>
+<td>High / High</td>
+<td>Tight MVP scope, documented feasibility, synthetic demonstrator</td>
+</tr>
+<tr>
+<td>Monthly report based on incomplete source coverage</td>
+<td>Medium / Medium</td>
+<td>Coverage labels, missing data as N/A, report audit metadata</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 data-section="18" id="18-management-information-systems-analysis">18. Management Information Systems analysis</h2>
+<h3 id="18-1-functional-processes-and-information-system-types">18.1 Functional processes and information system types</h3>
+<p><strong>Operational level / TPS:</strong> store class registration and attendance receipts, process webinars, save raw and normalized intervals, flag unknown participants.<br/>
+<strong>Tactical level / MIS:</strong> weekly/monthly reports, absence rates, reconnect patterns, cohort attendance and teacher workload insights.<br/>
+<strong>Strategic level / DSS/ESS:</strong> compare sustained attendance across courses and teaching schedules, detect demand or student-service gaps, decide where to invest administrative resources, and assess whether digital learning engagement supports the academy's differentiation.<br/>
+<strong>Knowledge management:</strong> preserved policy definitions, FAQs on attendance, exception reasons, historical reporting definitions, staff procedures and lessons learned from attendance problems.</p>
+<h3 id="18-2-porter-five-forces-questions-to-research-do-not-invent-conclusions">18.2 Porter Five Forces questions to research (do not invent conclusions)</h3>
+<ul>
+<li>Rivalry: other local academies' online delivery, class quality, support and fees.</li>
+<li>Threat of entrants: ease of launching online tutoring and cost of Webinar tools.</li>
+<li>Substitute services: recorded courses, free tutorials, in-person classes and self-study.</li>
+<li>Buyer bargaining power: learner switching costs, parents' expectations, demand for reliable attendance evidence.</li>
+<li>Supplier bargaining power: dependency on Zoom, educational content creators, payment channels and instructors.</li>
+</ul>
+<p>The proposed system might differentiate the academy through reliable online student support, but the actual strategic claims need competitor and student evidence.</p>
+<h3 id="18-3-value-chain">18.3 Value Chain</h3>
+<p><strong>Primary activities:</strong> course marketing and enrollment → webinar delivery → instructor-student communication → attendance follow-up → examinations/certification and student support.<br/>
+<strong>Support activities:</strong> IT integration, staff training, administrative planning, vendor/license management, privacy and policy governance.<br/>
+<strong>Potential efficiency improvement:</strong> replace clerical roll calls with exception management; improve accuracy of student support and leadership reporting.</p>
+<h3 id="18-4-competitive-advantage-justification">18.4 Competitive advantage justification</h3>
+<p>The system could support <strong>operational excellence</strong> (less manual marking), <strong>service quality</strong> (transparent records and timely support), <strong>better decision making</strong> (aggregated comparable reports), and <strong>organizational learning</strong> (historical attendance patterns). These are prospective business benefits to evaluate with the academy; they are not guaranteed results.</p>
+<h3 id="18-5-sdlc-and-agile-model-recommendation">18.5 SDLC and Agile model recommendation</h3>
+<p>Use a short requirements/prototyping lifecycle with <strong>iterative Agile delivery</strong>. A Scrum-inspired mini-backlog or lightweight Kanban is appropriate because Zoom integration feasibility contains unresolved risks and the academic timebox is short. Separate sprint increments: (1) roster and calculations, (2) webhooks/reports, (3) engagement, (4) analytics/AI and polish. Compare this with sequential waterfall, explaining why early Zoom-reaction assumptions could invalidate a fully fixed specification. A simple <strong>GitHub Projects</strong> board supports task ownership, issues, progress columns and GitHub code evidence; Trello is an acceptable alternative if the team does not use GitHub.</p>
+<hr/>
+<h2 data-section="19" id="19-ai-enabled-functionality-meaningful-but-restrained">19. AI-enabled functionality: meaningful but restrained</h2>
+<p><strong>AI-F01 — Monthly management narrative:</strong> an LLM can summarize already-calculated attendance/engagement aggregates, e.g., “Batch A recorded more incomplete sessions this month; investigate connection difficulties.” Every sentence should link back to an explicit statistic and include uncertainty where coverage is missing.</p>
+<p><strong>AI-F02 — Rule-based early support alerts:</strong> simple deterministic rules first (e.g., attendance below academy-defined threshold twice in four sessions), with optional AI-assisted explanation. This is not a diagnosis of motivation or ability. Have staff review before any contact.</p>
+<p><strong>AI-F03 — Common issue clustering:</strong> group free-text <em>staff-authored</em> reasons for attendance exceptions (unstable connection, wrong registration email, class schedule conflict) into themes, with minimum sample thresholds and privacy controls.</p>
+<p><strong>Not recommended:</strong> face/gaze attention detection, emotion classification, automated penalty based on emoji counts, or inferring learning ability from reaction frequency. These are not needed to solve the initial MIS problem and would increase privacy and fairness risks.</p>
+<p><strong>AI acceptance tests:</strong> no invented percentages, reproducible prompt input and calculation provenance, visible model limitations, authorized human sign-off, removal of sensitive details before external AI processing when used.</p>
+<hr/>
+<h2 data-section="20" id="20-next-academy-meeting-validation-questions">20. Next academy meeting: validation questions</h2>
+<p>Ask these questions <strong>before finalizing the prototype scope</strong>:</p>
+<ol>
+<li>Which Zoom product/license is active—regular Zoom Webinars, Zoom Webinars Plus or another Events license? Can a Zoom administrator authorize a private internal app?</li>
+<li>Is registration enabled? Are students required to sign in? Do you already collect a unique student ID and registration email?</li>
+<li>How many students per webinar, webinars per week, recurring webinar instances and batches are typical?</li>
+<li>Does “present” mean 70%, 75%, 80%, 90% or another connected-time rule? Is the denominator scheduled class time or actual delivery time?</li>
+<li>How should connectivity issues, late arrival, multiple devices and approved absences be treated?</li>
+<li>What information does staff manually record today, and how many minutes does it take per session?</li>
+<li>Which participation matters: Q&amp;A, native emoji reactions, nonanonymous polls, messages, instructor-marked participation, or separate-app questions?</li>
+<li>Are <strong>native Zoom reaction buttons mandatory</strong>, or would an optional academy-owned student portal be acceptable if Zoom does not expose identified native events?</li>
+<li>Is a top 10/100 report intended for <strong>internal staff only</strong>? Should it rank raw reactions, sessions with interactions, or another metric?</li>
+<li>May the team test the integration with consenting test students and sanitized existing reports? Who can approve access and certify findings?</li>
+<li>What student privacy notice and retention policy should apply? Are some learners minors? Who approves access to personal records?</li>
+<li>Can a representative review wireframes and prototype screenshots before submission?</li>
+</ol>
+<p><strong>Recommended meeting output:</strong> approved attendance policy; feature prioritization; valid sample roster and an anonymized Zoom export; signed/verified meeting minutes; written Zoom admin authorization plan; recorded research unknowns and fallback decisions.</p>
+<hr/>
+<h2 data-section="21" id="21-assumptions-decisions-and-research-backlog">21. Assumptions, decisions and research backlog</h2>
+<h3 id="confirmed-from-the-discussion">Confirmed from the discussion</h3>
+<ul>
+<li>The organization is an educational academy using Zoom <strong>Webinars</strong> for classes.</li>
+<li>It currently calls names to mark attendance and performs a later participation/presence check.</li>
+<li>It wants to reduce manual attendance work and capture connected duration.</li>
+<li>The team wants engagement reporting, including reactions and monthly top-10/top-100 style analysis.</li>
+</ul>
+<h3 id="still-unknown-must-not-be-represented-as-confirmed">Still unknown / must not be represented as confirmed</h3>
+<ul>
+<li>Exact account license; access to Webinars Plus and its analytics/export options.</li>
+<li>Which student identifiers Zoom provides in this specific account and webinar configuration.</li>
+<li>Whether staff will allow a separate academy student portal.</li>
+<li>Whether individual native emoji events are available <strong>with reliable attendee identity</strong> through a host-side Zoom App.</li>
+<li>Academy policies on attendance thresholds, scoring and student privacy.</li>
+<li>The number of courses, users, classes, staffing cost and actual efficiency baseline.</li>
+</ul>
+<h3 id="pending-engineering-decisions">Pending engineering decisions</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Proposed default</th>
+<th>When to revisit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MVP centerpiece</td>
+<td>Attendance duration and reliable identity mapping</td>
+<td>Only after academy validation</td>
+</tr>
+<tr>
+<td>App architecture</td>
+<td>Modular monolith + PostgreSQL + React</td>
+<td>If team expertise strongly favors other stack</td>
+</tr>
+<tr>
+<td>Realtime collection</td>
+<td>Zoom webhooks plus final reports</td>
+<td>If admin denies webhooks</td>
+</tr>
+<tr>
+<td>Native emoji rankings</td>
+<td><strong>Do not promise</strong></td>
+<td>Only after successful Zoom Apps SDK POC</td>
+</tr>
+<tr>
+<td>Reaction fallback</td>
+<td>Academy-authenticated portal</td>
+<td>If academy accepts dual-screen interaction</td>
+</tr>
+<tr>
+<td>Polls</td>
+<td>Supplement attendance; host launches native poll</td>
+<td>If verified supported in-client launch alternative exists</td>
+</tr>
+<tr>
+<td>AI</td>
+<td>Manager-reviewed aggregate narrative</td>
+<td>If privacy or time constraints forbid it</td>
+</tr>
+<tr>
+<td>Evidence</td>
+<td>Screenshots/test logs with synthetic records</td>
+<td>When actual academy data use is approved</td>
+</tr>
+</tbody>
+</table></div>
+<hr/>
+<h2 data-section="22" id="22-final-project-proposition-and-scope-statement">22. Final project proposition and scope statement</h2>
+<blockquote class="callout">
+<p><strong>Proposed project:</strong> Develop a web-based Smart Webinar Attendance &amp; Engagement Management System for a local academy using Zoom Webinars. The system will connect to authorized Zoom webinar participant records, automate attendance-duration calculation with reconnect handling, associate the evidence with academy students, and provide transparent session/monthly reports. Where allowed, it will also incorporate identifiable webinar Q&amp;A and poll records, optional academy-portal interactions, and data-quality-aware leaderboards. Because native Zoom webinar attendee emoji attribution is not reliably established through standard REST APIs, a separate technical feasibility experiment will determine whether direct reaction capture is permissible and dependable. The academic prototype will prioritize attendance accuracy, explainable calculations, privacy, user-friendly dashboards, and appropriately bounded AI-assisted management insight.</p>
+</blockquote>
+<p><strong>Definition of success for IS 3610:</strong> an evidence-backed AS-IS/TO-BE process analysis, functional and nonfunctional requirements, correctly justified Zoom feasibility matrix, management-value analysis, user stories, full wireframes and a demonstrable prototype with a transparent distinction between simulated and genuinely integrated features.</p>
+<hr/>
+<h2 data-section="23" id="23-research-reference-register">23. Research reference register</h2>
+<p>All external references below are <strong>official Zoom documentation or Zoom Support materials</strong>, checked in this research session on <strong>10 November 2026</strong>. Product behavior can change; re-check scope names and app distribution rules before deploying. The source labels in this document map to the following URLs. General API reference pages contain many endpoints; use the page search for the named operations.</p>
+<ul>
+<li id="source-z01"><strong><a class="reference-tag" href="#source-z01">[Z01]</a></strong> Zoom Developer Docs — Server-to-Server OAuth: <a href="https://developers.zoom.us/docs/internal-apps/s2s-oauth/">https://developers.zoom.us/docs/internal-apps/s2s-oauth/</a></li>
+<li id="source-z02"><strong><a class="reference-tag" href="#source-z02">[Z02]</a></strong> Zoom Developer Docs — Internal apps and account admin permissions: <a href="https://developers.zoom.us/docs/internal-apps/">https://developers.zoom.us/docs/internal-apps/</a></li>
+<li id="source-z03"><strong><a class="reference-tag" href="#source-z03">[Z03]</a></strong> Zoom Developer Docs — App distribution, private vs externally published apps: <a href="https://developers.zoom.us/docs/distribute/">https://developers.zoom.us/docs/distribute/</a></li>
+<li id="source-z04"><strong><a class="reference-tag" href="#source-z04">[Z04]</a></strong> Zoom Developer Docs — Meetings/Webinars Webhooks, especially <code>webinar.participant_joined</code>, <code>webinar.participant_left</code> and <code>webinar.ended</code>: <a href="https://developers.zoom.us/docs/api/meetings/events/">https://developers.zoom.us/docs/api/meetings/events/</a></li>
+<li id="source-z05"><strong><a class="reference-tag" href="#source-z05">[Z05]</a></strong> Zoom Developer Docs — Meetings &amp; Webinars REST API (webinar participant reports, polls, Q&amp;A): <a href="https://developers.zoom.us/docs/api/meetings/">https://developers.zoom.us/docs/api/meetings/</a></li>
+<li id="source-z06"><strong><a class="reference-tag" href="#source-z06">[Z06]</a></strong> Zoom Developer Docs — API rate limits: <a href="https://developers.zoom.us/docs/api/rate-limits/">https://developers.zoom.us/docs/api/rate-limits/</a></li>
+<li id="source-z07"><strong><a class="reference-tag" href="#source-z07">[Z07]</a></strong> Zoom Developer Docs — Using webhooks (validation / webhook integrity): <a href="https://developers.zoom.us/docs/api/webhooks/">https://developers.zoom.us/docs/api/webhooks/</a></li>
+<li id="source-z08"><strong><a class="reference-tag" href="#source-z08">[Z08]</a></strong> Zoom Apps SDK — <code>OnEmojiReactionEvent</code> type (<code>participantUUID</code>, <code>timestamp</code>, <code>reaction</code>): <a href="https://appssdk.zoom.us/types/ZoomSdkTypes.OnEmojiReactionEvent.html">https://appssdk.zoom.us/types/ZoomSdkTypes.OnEmojiReactionEvent.html</a></li>
+<li id="source-z09"><strong><a class="reference-tag" href="#source-z09">[Z09]</a></strong> Zoom Apps SDK — <code>onEmojiReaction</code> and webinar running contexts: <a href="https://appssdk.zoom.us/classes/ZoomSdk.ZoomSdk.html">https://appssdk.zoom.us/classes/ZoomSdk.ZoomSdk.html</a></li>
+<li id="source-z10"><strong><a class="reference-tag" href="#source-z10">[Z10]</a></strong> Zoom Meeting SDK — Webinar emoji reactions anonymous callback: <a href="https://developers.zoom.us/docs/meeting-sdk/windows/custom-ui/basic-features/emojis/">https://developers.zoom.us/docs/meeting-sdk/windows/custom-ui/basic-features/emojis/</a></li>
+<li id="source-z11"><strong><a class="reference-tag" href="#source-z11">[Z11]</a></strong> Zoom Support — Webinars Plus event-level analytics glossary: <a href="https://support.zoom.com/hc/en/article?id=zm_kb&amp;sysparm_article=KB0083415">https://support.zoom.com/hc/en/article?id=zm_kb&amp;sysparm_article=KB0083415</a></li>
+<li id="source-z12"><strong><a class="reference-tag" href="#source-z12">[Z12]</a></strong> Zoom Developer Docs — Granular OAuth scopes reference: <a href="https://developers.zoom.us/docs/integrations/oauth-scopes-granular/">https://developers.zoom.us/docs/integrations/oauth-scopes-granular/</a></li>
+<li id="source-z13"><strong><a class="reference-tag" href="#source-z13">[Z13]</a></strong> Zoom Developer Docs — Zoom Apps for Webinars; webinar roles, guest mode and privacy requirements: <a href="https://developers.zoom.us/docs/zoom-apps/guides/webinar/">https://developers.zoom.us/docs/zoom-apps/guides/webinar/</a></li>
+<li id="source-z14"><strong><a class="reference-tag" href="#source-z14">[Z14]</a></strong> Zoom Support — Webinars Plus / Events release notes (reaction analytics coverage): <a href="https://support.zoom.com/hc/en/article?id=zm_kb&amp;sysparm_article=KB0066826">https://support.zoom.com/hc/en/article?id=zm_kb&amp;sysparm_article=KB0066826</a></li>
+<li id="source-z15"><strong><a class="reference-tag" href="#source-z15">[Z15]</a></strong> Zoom Developer Docs — Testing Zoom Apps: <a href="https://developers.zoom.us/docs/zoom-apps/guides/testing/">https://developers.zoom.us/docs/zoom-apps/guides/testing/</a></li>
+<li id="source-z16"><strong><a class="reference-tag" href="#source-z16">[Z16]</a></strong> Zoom Support — Using webinar reactions: <a href="https://support.zoom.com/hc/en/article?id=zm_kb&amp;sysparm_article=KB0059395">https://support.zoom.com/hc/en/article?id=zm_kb&amp;sysparm_article=KB0059395</a></li>
+</ul>
+<p><strong>Academic source material referenced separately:</strong> the group's uploaded <em>Group Assignment.pdf</em>, <em>Overall_Guidelines_Group_Assignment.pdf</em>, <em>Group Assignment Report Template.pdf</em>, <em>Group Assignment Presentation Template.pdf</em> and <em>Organization Meeting Minutes Template.docx</em>. These determine <strong>assignment deliverables</strong>, not Zoom product behavior.</p>
+<hr/>
+<h2 id="appendix-a-short-executive-message-to-send-to-the-academy">Appendix A — Short executive message to send to the academy</h2>
+<blockquote class="callout">
+<p>Thank you for explaining the manual attendance challenges in your Zoom Webinars. Our group proposes an academic prototype that automatically calculates each registered student's connected duration (including reconnects), produces class and monthly attendance reports, and explores additional participation indicators such as webinar Q&amp;A and polls. We are also investigating student-level Zoom reactions; this particular feature depends on Zoom's privacy rules and API/SDK capabilities, so it requires a technical test before we can promise it. We would appreciate confirmation of your Zoom Webinar license, permission for an internal API integration or anonymized sample reports, your attendance rules, and whether a small optional student engagement portal would be acceptable. We will demonstrate the planned system and collect your feedback before finalizing the assignment.</p>
+</blockquote>
+<h2 id="appendix-b-glossary">Appendix B — Glossary</h2>
+<ul>
+<li><strong>Webhook:</strong> event notification that Zoom sends to the application's HTTPS endpoint when an event occurs.</li>
+<li><strong>REST API:</strong> authenticated programmatic endpoints for fetching reports or managing webinar resources.</li>
+<li><strong>Server-to-Server OAuth:</strong> Zoom account-level integration token flow without individual user authorization screens for each request.</li>
+<li><strong>Webinar instance/UUID:</strong> a unique occurrence of a webinar; important when recurring webinar IDs are reused.</li>
+<li><strong>Participant / registrant ID:</strong> Zoom-side identifiers; their presence, lifetime and linkability depend on how attendees join.</li>
+<li><strong>Presence segment:</strong> one joined-to-left interval for an attendee; multiple may occur due to reconnects.</li>
+<li><strong>Reconciliation:</strong> combining provisional webhook observations with the authoritative completed webinar report and resolving inconsistencies.</li>
+<li><strong>Engagement event:</strong> an attributable participation record from an explicitly identified source, not proof of attention.</li>
+<li><strong>AI-enabled MIS:</strong> management information system that uses AI for bounded, meaningful tasks such as summarizing validated operational measures.</li>
+</ul>
+</main><footer class="foot">Prepared as an academic project-planning reference. Zoom plan, permissions and native reaction attribution require academy verification.</footer>
+</div></div></body></html>

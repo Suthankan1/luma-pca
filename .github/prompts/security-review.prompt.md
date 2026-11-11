@@ -1,0 +1,2 @@
+# Review LUMA authentication and authorization
+Read docs/security/JWT-AUTH.md, AUTHORIZATION-MATRIX.md and THREAT-MODEL.md. Trace requests: browser → Next.js BFF → Spring Security → scoped query. Test CSRF, cookie flags, short TTL, refresh rotation/reuse, revocation, cross-academy and cross-batch IDOR, logs and JWT algorithm/audience validation. Distinguish design-only from implemented controls; return prioritized findings with file/line references.

@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant Zoom as Zoom Webinars
+  participant API as Spring webhook API
+  participant DB as PostgreSQL inbox/outbox
+  participant Q as SQS
+  participant W as Worker
+  participant Reports as Zoom participant reports
+  Zoom->>API: Signed participant join/leave webhook
+  API->>API: Validate signature + timestamp + payload
+  API->>DB: Transaction: unique receipt + outbox event
+  DB-->>API: Commit durable record
+  API-->>Zoom: 2xx acknowledgement
+  DB->>Q: Outbox relay publishes at least once
+  Q->>W: Delivery / duplicates possible
+  W->>DB: Idempotent upsert provisional attendance evidence
+  W-->>Q: Ack after commit
+  Zoom->>API: Webinar ended
+  API->>DB: Reconciliation job receipt
+  Q->>W: Run report reconciliation
+  W->>Reports: Fetch participants for specific occurrence
+  Reports-->>W: Paginated report
+  W->>DB: Merge intervals, flag mismatches, finalize or review
+  Note over W,DB: Never interpret missing event as proven absence

@@ -1,0 +1,2 @@
+# Implement a Zoom integration slice
+Read docs/integration/ZOOM-RULES.md, full Zoom research, AGENTS.md and checkpoint. Verify current official docs and actual licensed sandbox capabilities. Never promise native webinar poll auto-launch or identifiable Zoom native emoji events. Validate webhook authenticity, persist receipts atomically, use idempotent replay, separate provisional from reconciled attendance, and add unit plus Testcontainers integration tests.

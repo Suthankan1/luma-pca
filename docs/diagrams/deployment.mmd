@@ -1,0 +1,17 @@
+flowchart TB
+  browser[Staff + Student browsers] --> tls[TLS/CDN]
+  tls --> vercel[Next.js host / Vercel or AWS]
+  vercel -->|Private server API calls| alb[Public API ALB / protected endpoints]
+  zoom[Zoom Webinars] -->|Signed HTTPS webhooks| alb
+  subgraph VPC[Proposed AWS VPC - NOT DEPLOYED]
+    alb --> api[ECS Fargate Spring API]
+    api --> rds[(Private RDS PostgreSQL)]
+    api --> q[SQS + DLQ]
+    q --> worker[ECS Fargate Spring Worker]
+    worker --> rds
+    worker --> s3[Private S3 export bucket]
+    api --> sm[Secrets Manager]
+    worker --> sm
+  end
+  api --> cw[CloudWatch/Tracing]
+  worker --> cw
