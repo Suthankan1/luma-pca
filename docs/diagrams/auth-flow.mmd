@@ -1,16 +1,33 @@
 sequenceDiagram
   participant User as Staff / Student
   participant BFF as Next.js BFF
+  participant Client as Staff API client
   participant API as Spring Identity API
   participant DB as PostgreSQL
-  User->>BFF: Login credentials over HTTPS
-  BFF->>API: POST /auth/login (server side)
-  API->>DB: Check account, password hash, lockout, scopes
-  DB-->>API: Verified account + assigned scopes
-  API-->>BFF: Short-lived RS256 access JWT + opaque rotating refresh token
-  BFF-->>User: Secure HttpOnly SameSite session cookie
-  User->>BFF: Protected request with cookie + CSRF token
-  BFF->>API: Bearer JWT on server-side request
-  API->>API: Signature, issuer, aud, exp, scope + resource ownership
-  API-->>BFF: Authorized result only
-  Note over BFF,API: Refresh rotates opaque token; reuse revokes family
+  alt Browser sign-in for an account without MFA
+    User->>BFF: Login credentials over HTTPS
+    BFF->>API: POST /auth/login
+    API->>DB: Check password, account status and lockout
+    API-->>BFF: Access JWT and opaque refresh token
+    BFF-->>User: HttpOnly SameSite session cookies
+    User->>BFF: Protected request with session cookie
+    Note over User,BFF: BFF checks Origin on mutations
+    BFF->>API: Bearer JWT on server-side request
+  else Owner or administrator sign-in through the API
+    User->>Client: Login credentials
+    Client->>API: POST /auth/login
+    API->>DB: Check password and store challenge digest
+    API-->>Client: MFA challenge with enrolment status
+    opt First sign-in or authenticator reset
+      Client->>API: POST /auth/mfa/enroll with challenge
+      API->>DB: Store encrypted authenticator secret
+      API-->>Client: Setup secret and authenticator URI
+    end
+    User->>Client: Authenticator or recovery code
+    Client->>API: POST /auth/mfa/verify with challenge and code
+    API->>DB: Verify factor, consume challenge and start MFA session
+    API-->>Client: Access JWT, refresh token and recovery codes on enrolment
+    Client->>API: Protected request with bearer JWT
+  end
+  API->>API: Check token, session, privileged MFA, roles and resource scope
+  Note over BFF,API: Refresh rotates the opaque token and reuse revokes the session

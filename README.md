@@ -2,7 +2,7 @@
 
 **Status: architecture-approved project bootstrap, NOT a production-ready attendance system.**
 
-A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. Backend password sign-in with RS256 access tokens, rotating refresh sessions, logout, account lockout and invitation activation exist and work through the Next.js sign-in, and owners/admins can manage courses and batches through the API, but MFA, recovery, any way to create the first account, Zoom webhook ingestion, production attendance persistence, engagement and real deployment are **not implemented yet**. Do not onboard real students until the security and release gates pass.
+A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. The backend supports password sign-in with RS256 access tokens, rotating refresh sessions, logout, account lockout and invitation activation. The Next.js sign-in supports accounts that do not require MFA. Owners and administrators complete MFA and manage courses and batches through the API. Browser MFA, password recovery, first-account provisioning, Zoom webhook ingestion, production attendance persistence, engagement and deployment are planned. Do not onboard real students until the security and release gates pass.
 
 - GitHub: https://github.com/Suthankan1/luma-pca
 - Figma: https://www.figma.com/design/QVzsewJyikM94Xp07hDwwi
@@ -17,7 +17,7 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
 | --- | --- |
 | Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4 (responsive staff/student web) |
 | API/backend | Java 21, Spring Boot 4.1.2, modular monolith; later Spring Modulith tests |
-| Authentication | **Partly built:** first-party RS256 JWT access tokens, lockout and hashed rotating refresh-token sessions are implemented; **planned:** MFA, recovery; Next.js HttpOnly BFF cookies; Spring Security RBAC + scope checks |
+| Authentication | **Implemented:** first-party RS256 JWTs, account lockout, rotating refresh sessions, Next.js HttpOnly session cookies, backend TOTP MFA for owners and administrators, and Spring Security role and academy checks for courses and batches. **Planned:** browser MFA and password recovery. |
 | Database | PostgreSQL 17, Flyway; schema evolves through reviewed migrations |
 | Zoom | **Planned:** academy-owned S2S OAuth, REST reports, signed webhooks, idempotent event inbox |
 | Async | **Planned:** transactional inbox/outbox, SQS + DLQ, separately scaled Spring worker |
@@ -50,7 +50,7 @@ npm ci
 npm run dev                            # http://localhost:3000
 ```
 
-The backend exposes `POST /api/v1/auth/login`, `refresh`, `logout`, `logout-all` and `activate`, `GET /api/v1/auth/me` and `GET /.well-known/jwks.json`. The Next.js sign-in, session continuation and sign-out work against it (`scripts/auth-stack-smoke.sh`). Owner and admin accounts cannot sign in until MFA exists, and there is no supported way to create the first account, so accounts can only be seeded directly in the database for now. The Spring security filter denies other API routes by default until authorized feature slices are built.
+The backend exposes `POST /api/v1/auth/login`, `refresh`, `logout`, `logout-all` and `activate`, `GET /api/v1/auth/me` and `GET /.well-known/jwks.json`. The Next.js sign-in, session continuation and sign-out work against it (`scripts/auth-stack-smoke.sh`). Owners and administrators complete MFA through the API using `POST /api/v1/auth/mfa/enroll` and `POST /api/v1/auth/mfa/verify`. They can reset their own authenticator with `POST /api/v1/auth/mfa/reset`. Browser MFA is planned for 001G. There is no supported way to create the first account, so accounts can only be seeded directly in the database for now. The Spring security filter denies other API routes by default until authorized feature slices are built.
 
 ## Commands
 

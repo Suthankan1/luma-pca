@@ -6,7 +6,7 @@ This repository provides the **first implementation foundation**, not the comple
 1. **Organization:** Physics Cube Academy uses Zoom Webinars, has multiple courses and batches; manual roll calls are the core pain.
 2. **Product:** Staff desktop, student mobile portal, reliable connected-duration attendance, optional participation checks and source-attributed rankings.
 3. **Chosen stack:** Next.js 16/TS, Java 21/Spring Boot 4.1.2 modular monolith, PostgreSQL/Flyway, later SQS worker and AWS.
-4. **Authentication:** First-party staff/student JWT access tokens + opaque rotating refresh sessions via Next.js secure BFF cookies; role + batch/course/academy scope checks. **NOT IMPLEMENTED**.
+4. **Authentication:** First-party JWTs and rotating refresh sessions, Next.js session cookies, and backend TOTP MFA for owners and administrators are implemented. The course and batch API enforces academy scope. Browser MFA and staff assignment checks are planned.
 5. **Zoom:** S2S OAuth + signed webhooks + delayed official reports, pending real account proof. Native attendee emoji identity and native poll auto-launch are not guaranteed.
 6. **Design:** logo-inspired navy/blue/cyan/white, exact Figma link in README, old HTML demo under `references/` strictly for visual patterns.
 

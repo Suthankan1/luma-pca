@@ -17,7 +17,7 @@
 
 | Package | Owns | Never does |
 | --- | --- | --- |
-| `identity` | Account lifecycle, password policies, session rotation, JWT | Assume a role implies every batch |
+| `identity` | Account lifecycle, password policies, MFA, session rotation, JWT | Assume a role implies every batch |
 | `academy` | Org settings, registration and academy policy | Treat future multi-tenant as currently delivered |
 | `courses`, `batches`, `enrollments` | Enrollments, memberships and staff assignments | Copy the same student per batch |
 | `webinars`, `zoom` | Class-occurrence mapping, authorized REST calls, webhook receipts | Infer native reaction identities |
@@ -40,7 +40,8 @@ Students and staff receive first-party short-lived signed JWT **access** tokens 
 - **Implemented since:** password sign-in issuing RS256 access tokens, per-request account/auth-version checks, lockout, invitation activation route, public JWKS.
 - **Implemented since (001D):** rotating refresh sessions with reuse detection, logout and logout-all; access tokens are bound to their session.
 - **Implemented since (002A):** academy-scoped course and batch create/read/update API for owners and administrators.
-- **Not implemented:** MFA, recovery, audit trail, first-account bootstrap, real user data, all course/batch CRUD, Zoom webhooks/oauth, attendance persistence/reconciliation, worker/SQS, SSE, reports and production infrastructure.
+- **Implemented since (001F):** TOTP MFA for owner/admin sign-in with recovery codes; backend only.
+- **Not implemented:** browser MFA step, password recovery, audit trail, first-account bootstrap, real user data, all course/batch CRUD, Zoom webhooks/oauth, attendance persistence/reconciliation, worker/SQS, SSE, reports and production infrastructure.
 - **Requires feasibility proof:** Zoom license and scopes; unique student registrations; recurring webinar UUID behavior; Q&A/poll data; native attendee emoji identity. See [Zoom rules](../integration/ZOOM-RULES.md).
 
 ## Diagrams and contracts

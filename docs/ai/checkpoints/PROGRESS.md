@@ -280,3 +280,58 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Process change for agents:** PRs have been merged within about a minute of
   opening, before checks finish. Open PRs as **drafts**, wait for all checks,
   then mark ready and merge. Local green on macOS is not sufficient evidence.
+
+## Checkpoint 001F — 2026-11-11 — MFA for owner and administrator accounts (backend)
+
+- **002A evidence:** merged as PR #8 (`dc808cc`), fixed by PR #9 (`ad7e013`).
+- **Feature ID / name:** 001F — admin MFA.
+- **Branch:** `feature/001f-admin-mfa`. **Backend commit:** `f7bf93a`.
+  See the [001F pull request](https://github.com/Suthankan1/luma-pca/pulls?q=is%3Apr+head%3Afeature%2F001f-admin-mfa)
+  for Linux CI and merge status.
+- **Implemented behavior:** the password step returns an MFA challenge instead
+  of tokens for owner/admin accounts and for any account with an authenticator.
+  `POST /auth/mfa/enroll` issues a TOTP secret on first use; `POST
+  /auth/mfa/verify` accepts a 6-digit code or a recovery code and starts the
+  session; `POST /auth/mfa/reset` (bearer plus password) removes the
+  authenticator and ends all sessions. Ten recovery codes are returned once, at
+  enrolment. Codes cannot be replayed. Five wrong codes lock the account for 15
+  minutes by default. Access and refresh reject pre-MFA sessions for accounts
+  promoted to owner/admin. Verification and session creation commit together.
+  Reset clears MFA and revokes sessions in one transaction.
+- **Removed:** `LUMA_AUTH_ALLOW_ELEVATED_LOGIN_WITHOUT_MFA` and the 403 it
+  guarded. Tests now sign administrators in through real MFA.
+- **Configuration:** new required `LUMA_AUTH_MFA_ENCRYPTION_KEY` (Base64, 32
+  bytes). The backend refuses to start without it unless the ephemeral
+  development flag is set.
+- **Rollout:** provision a stable MFA encryption key before starting the
+  backend in a persistent environment. Existing sessions default to
+  `mfa_verified = false`. Preserve the key and the applied migration when
+  planning a rollback, and account for the earlier elevated-login policy.
+- **Database changes:** Flyway `V6__identity_mfa.sql` adds `account_totp`
+  (AES-256-GCM ciphertext), `account_recovery_codes` and `mfa_challenges`
+  (digests), and `refresh_sessions.mfa_verified`.
+- **API changes:** three routes; login may now return an MFA challenge. OpenAPI updated.
+- **Frontend changes:** none. **The Next.js sign-in cannot complete MFA**: it
+  shows a generic "unavailable" error for administrators (they could not sign
+  in before this slice either). New slice 001G covers the browser step.
+- **Tests executed on macOS:** Java 21 `mvn -B -ntp -f backend/pom.xml clean
+  verify` with Docker and PostgreSQL 17 passed 154 tests, with zero failures,
+  errors or skips. Coverage includes RFC 6238 vectors, encrypted storage,
+  parallel attempts, replay, recovery codes, session rejection after promotion,
+  reset and retry after a session write fails. Frontend lint, typecheck, four
+  unit tests, production build and session HTTP smoke passed. The real-stack
+  `scripts/auth-stack-smoke.sh` passed 26 checks of student sessions. The
+  repository structure check passed and the OpenAPI YAML parsed.
+- **Decisions:** (1) required only for owner/admin; other roles cannot enrol
+  yet. (2) Trust on first use: the first password sign-in to a new owner/admin
+  account enrols the authenticator. (3) SHA-1 TOTP for authenticator-app
+  compatibility. (4) No key identifier is stored with ciphertexts, so rotating
+  the MFA encryption key means re-enrolling everyone.
+- **Known issues / not done:** no browser MFA step; no way for an owner to
+  reset another person's MFA (a locked-out administrator without recovery codes
+  needs a database change); recovery codes cannot be regenerated without a full
+  reset; signing in twice within one 30-second step fails the second time by
+  design; no audit trail; expired challenges are only cleaned up at the next
+  sign-in of the same account. All earlier open items still apply (recovery,
+  rate limiting by client address, first-account bootstrap, invitation delivery).
+- **Next planned feature:** 001G browser MFA step, then 002B.
