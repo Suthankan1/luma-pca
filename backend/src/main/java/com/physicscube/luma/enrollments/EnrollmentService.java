@@ -83,6 +83,26 @@ public class EnrollmentService {
         }
     }
 
+    /** Checks the batch can take enrolments: in the caller's academy (else not found) and active. */
+    @Transactional(readOnly = true)
+    public BatchView requireOpenBatch(CurrentAccount caller, UUID batchId) {
+        caller.requireAcademyManager();
+        BatchView batch = batches.requireInAcademy(caller.academyId(), batchId);
+        if (!batch.active()) {
+            throw new ConflictException("Students cannot be enrolled in an inactive batch");
+        }
+        return batch;
+    }
+
+    /** Enrols students just created in this transaction (so active and not yet enrolled) in one batch insert. */
+    @Transactional
+    public int enrollNew(CurrentAccount caller, UUID batchId, Collection<UUID> studentIds, LocalDate enrolledOn) {
+        requireOpenBatch(caller, batchId);
+        enrollments.saveAllAndFlush(studentIds.stream()
+                .map(studentId -> new Enrollment(caller.academyId(), batchId, studentId, enrolledOn)).toList());
+        return studentIds.size();
+    }
+
     /** Sets the dates; a withdrawal date withdraws, clearing it re-enrols. */
     @Transactional
     public EnrollmentView update(CurrentAccount caller, UUID enrollmentId, LocalDate enrolledOn, LocalDate withdrawnOn,

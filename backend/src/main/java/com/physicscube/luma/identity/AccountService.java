@@ -6,12 +6,13 @@ import com.physicscube.luma.identity.domain.PasswordPolicy;
 import com.physicscube.luma.identity.domain.Role;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,30 @@ public class AccountService {
             return AccountSummary.of(accounts.saveAndFlush(Account.pending(academyId, normalized, roles)));
         } catch (DataIntegrityViolationException e) {
             // A concurrent registration won the race; the unique constraint is the authority.
+            if (String.valueOf(e.getMessage()).contains("uq_accounts_email")) {
+                throw new DuplicateEmailException();
+            }
+            throw e;
+        }
+    }
+
+    /** Of the normalised emails, those already used by an account (in any academy). */
+    @Transactional(readOnly = true)
+    public Set<String> existingEmails(Collection<String> normalizedEmails) {
+        return normalizedEmails.isEmpty() ? Set.of() : Set.copyOf(accounts.existingEmails(normalizedEmails));
+    }
+
+    /**
+     * Registers several pending accounts in one batch, in the given order. The caller has
+     * checked the emails are new and distinct; a clash found by the unique constraint
+     * (a concurrent registration) is reported as a duplicate and rolls everything back.
+     */
+    @Transactional
+    public List<AccountSummary> registerAll(UUID academyId, List<String> emails, Set<Role> roles) {
+        List<Account> created = emails.stream().map(email -> Account.pending(academyId, EmailAddress.normalize(email), roles)).toList();
+        try {
+            return accounts.saveAllAndFlush(created).stream().map(AccountSummary::of).toList();
+        } catch (DataIntegrityViolationException e) {
             if (String.valueOf(e.getMessage()).contains("uq_accounts_email")) {
                 throw new DuplicateEmailException();
             }

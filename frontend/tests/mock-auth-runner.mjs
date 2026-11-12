@@ -288,6 +288,42 @@ const enrollmentView = e => {
     studentName: student.fullName, status: e.withdrawnOn ? "WITHDRAWN" : "ENROLLED" };
 };
 
+// Same checks and messages as the real import (fewer validation details): all rows first, then all or nothing.
+function importStudents(body, send) {
+  const rows = body.rows;
+  if (!Array.isArray(rows) || rows.length === 0 || rows.length > 1000) return send(400, { detail: "Send between 1 and 1000 rows" });
+  if (!body.batchId !== !body.enrolledOn) return send(400, { detail: "batchId and enrolledOn go together" });
+  const batch = body.batchId && batches.find(b => b.id === body.batchId);
+  if (body.batchId && !batch) return send(404, { detail: "Not found" });
+  if (batch && !batch.active) return send(409, { detail: "Students cannot be enrolled in an inactive batch" });
+  const problems = [];
+  const numbers = new Map(), emails = new Map();
+  rows.forEach((row, i) => {
+    const line = i + 1;
+    const number = String(row.studentNumber ?? "").trim().toUpperCase();
+    const email = String(row.email ?? "").trim().toLowerCase();
+    if (!/^[A-Z0-9][A-Z0-9._-]{0,59}$/.test(number)) {
+      problems.push({ row: line, field: "studentNumber", message: "Use up to 60 letters, digits, dots, dashes or underscores, starting with a letter or digit" });
+    } else if (numbers.has(number)) problems.push({ row: line, field: "studentNumber", message: `Same student number as row ${numbers.get(number)}` });
+    else if (students.some(s => s.studentNumber === number)) problems.push({ row: line, field: "studentNumber", message: "A student with this student number already exists" });
+    else numbers.set(number, line);
+    if (!String(row.fullName ?? "").trim()) problems.push({ row: line, field: "fullName", message: "A full name of up to 200 characters is required" });
+    if (!/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) problems.push({ row: line, field: "email", message: "Email is not a valid address" });
+    else if (emails.has(email)) problems.push({ row: line, field: "email", message: `Same email as row ${emails.get(email)}` });
+    else if (students.some(s => s.email === email)) problems.push({ row: line, field: "email", message: "An account with this email already exists" });
+    else emails.set(email, line);
+  });
+  problems.sort((a, b) => a.row - b.row || a.field.localeCompare(b.field));
+  if (problems.length || body.dryRun) return send(200, { imported: false, rows: rows.length, enrolled: 0, problems });
+  for (const row of rows) {
+    const created = { id: uuid(), studentNumber: row.studentNumber.trim().toUpperCase(), fullName: row.fullName.trim(),
+      email: row.email.trim().toLowerCase(), accountId: uuid(), accountStatus: "PENDING_ACTIVATION", active: true, version: 0 };
+    students.push(created);
+    if (batch) enrollments.push({ id: uuid(), batchId: batch.id, studentId: created.id, enrolledOn: body.enrolledOn, withdrawnOn: null, version: 0 });
+  }
+  return send(200, { imported: true, rows: rows.length, enrolled: batch ? rows.length : 0, problems: [] });
+}
+
 function academicApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const [path, query = ""] = req.url.split("?");
@@ -311,6 +347,7 @@ function academicApi(req, body, send) {
       const items = matching.slice(0, limit).map(publicStudent);
       return send(200, { items, nextAfter: matching.length > limit ? items[items.length - 1].studentNumber : null });
     }
+    if (req.method === "POST" && id === "import") return importStudents(body, send);
     const student = id && students.find(s => s.id === id);
     if (req.method === "POST" && !id) {
       const studentNumber = String(body.studentNumber).trim().toUpperCase();

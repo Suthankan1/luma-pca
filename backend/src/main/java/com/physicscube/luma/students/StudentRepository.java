@@ -17,6 +17,9 @@ interface StudentRepository extends JpaRepository<Student, UUID> {
 
     boolean existsByAcademyIdAndStudentNumber(UUID academyId, String studentNumber);
 
+    @Query("select s.studentNumber from Student s where s.academyId = :academyId and s.studentNumber in :numbers")
+    List<String> existingNumbers(@Param("academyId") UUID academyId, @Param("numbers") Collection<String> numbers);
+
     List<Student> findByAcademyIdAndIdIn(UUID academyId, Collection<UUID> ids);
 
     /** Keyset page ordered by student number; {@code after} is "" for the first page. */

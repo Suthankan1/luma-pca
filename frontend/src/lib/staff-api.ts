@@ -20,9 +20,10 @@ async function accessToken(portal: "staff" | "student") {
   return access;
 }
 
+/** @param timeoutMs longer only for bulk requests such as a student import */
 export function staffApi<T>(path: `/api/v1/${string}`,
-                            init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }): Promise<ApiResult<T>> {
-  return callApi<T>("staff", path, init);
+                            init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }, timeoutMs = 5000): Promise<ApiResult<T>> {
+  return callApi<T>("staff", path, init, timeoutMs);
 }
 
 /** The student portal reads only the signed-in student's own records (`/api/v1/me/...`). */
@@ -31,7 +32,7 @@ export function studentApi<T>(path: `/api/v1/me/${string}`): Promise<ApiResult<T
 }
 
 async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`,
-                          init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }): Promise<ApiResult<T>> {
+                          init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }, timeoutMs = 5000): Promise<ApiResult<T>> {
   const requestBody = init && "body" in init ? JSON.stringify(init.body) : undefined;
   const access = await accessToken(portal);
   let response: Response;
@@ -40,7 +41,7 @@ async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`
       method: init?.method ?? "GET",
       cache: "no-store",
       redirect: "error",
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { Authorization: `Bearer ${access}`, ...(requestBody ? { "Content-Type": "application/json" } : {}) },
       body: requestBody,
     });
