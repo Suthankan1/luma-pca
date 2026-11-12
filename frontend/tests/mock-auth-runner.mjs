@@ -351,13 +351,23 @@ function importStudents(body, send) {
 const invitedAccounts = new Set();
 const queuedInvites = new Set();
 let sentInvites = 0;
+// Addresses containing "bounce" fail every attempt, as an unreachable mailbox would.
+const failedInvites = new Map();
 function studentInvitations(req, body, send, sub) {
   if (req.method === "GET" && sub === "progress") {
-    const now = { waiting: queuedInvites.size, sent: sentInvites, failed: 0, cancelled: 0 };
-    for (const account of queuedInvites) invitedAccounts.add(account);
-    sentInvites += queuedInvites.size;
+    const now = { waiting: queuedInvites.size, sent: sentInvites, failed: failedInvites.size, cancelled: 0 };
+    for (const account of queuedInvites) {
+      const student = students.find(s => s.accountId === account);
+      if (student?.email.includes("bounce")) failedInvites.set(account, new Date().toISOString());
+      else { invitedAccounts.add(account); sentInvites++; }
+    }
     queuedInvites.clear();
     return send(200, now);
+  }
+  if (req.method === "GET" && sub === "failures") {
+    return send(200, [...failedInvites.keys()].map(account => students.find(s => s.accountId === account))
+      .filter(s => s && s.accountStatus === "PENDING_ACTIVATION").map(s => ({ studentId: s.id, studentNumber: s.studentNumber,
+        fullName: s.fullName, email: s.email, reason: "MailSendException", failedAt: failedInvites.get(s.accountId), attempts: 5 })));
   }
   if (req.method !== "POST" || sub) return send(404);
   if (body.batchId && !batches.some(b => b.id === body.batchId)) return send(404, { detail: "Not found" });
@@ -368,10 +378,10 @@ function studentInvitations(req, body, send, sub) {
   const counts = { pending: pending.length, queued: 0, alreadyQueued: 0, alreadyInvited: 0 };
   for (const student of pending) {
     if (queuedInvites.has(student.accountId)) counts.alreadyQueued++;
-    else if (!body.resend && invitedAccounts.has(student.accountId)) counts.alreadyInvited++;
+    else if (!body.resend && invitedAccounts.has(student.accountId) && !failedInvites.has(student.accountId)) counts.alreadyInvited++;
     else {
       counts.queued++;
-      if (!body.dryRun) queuedInvites.add(student.accountId);
+      if (!body.dryRun) { queuedInvites.add(student.accountId); failedInvites.delete(student.accountId); }
     }
   }
   return send(200, counts);
@@ -423,7 +433,7 @@ function audit(action, targetType, targetId, targetLabel, details) {
   auditEvents.push({ id: uuid(), seq: auditEvents.length + 1, occurredAt: new Date().toISOString(), action,
     actorAccountId: SELF_ID, actorEmail: "admin-enrolled@example.invalid", targetType, targetId, targetLabel, details });
 }
-const auditCategories = { staff: /^(STAFF_|OWNER_)/, "sign-in": /^(INVITATIONS?_|PASSWORD_RESET_)/, students: /^STUDENTS_/, zoom: /^ZOOM_/ };
+const auditCategories = { staff: /^(STAFF_|OWNER_)/, "sign-in": /^(INVITATIONS?_|PASSWORD_RESET_)/, students: /^STUDENTS_/, classes: /^CLASS_/, zoom: /^ZOOM_/ };
 function auditApi(query, send) {
   const params = new URLSearchParams(query);
   const category = params.get("category");
@@ -434,7 +444,7 @@ function auditApi(query, send) {
     && (!params.get("targetId") || e.targetId === params.get("targetId")) && e.seq < before).reverse();
   const page = matching.slice(0, limit);
   const last = page[page.length - 1];
-  return send(200, { items: page.map(({ seq, ...e }) => e), nextBefore: matching.length > limit ? `${last.seq}_${last.id}` : null });
+  return send(200, { items: page.map(e => Object.fromEntries(Object.entries(e).filter(([key]) => key !== "seq"))), nextBefore: matching.length > limit ? `${last.seq}_${last.id}` : null });
 }
 
 function academicApi(req, body, send) {
@@ -619,6 +629,8 @@ function academicApi(req, body, send) {
         batchIds: [...body.batchIds], version: 0 };
       classSessions.push(created);
       reviseLinks([created.zoomWebinarId]);
+      audit("CLASS_SCHEDULED", "CLASS_SESSION", created.id, created.title, { startsAt: created.startsAt, endsAt: created.endsAt,
+        timeZone: created.timeZone, batches: String(created.batchIds.length), webinar: created.zoomWebinarId ? "set" : "none" });
       return send(201, sessionView(created));
     }
     if (id === "series" && req.method === "POST") return classSeries(body, send, sub, path.split("/")[6]);

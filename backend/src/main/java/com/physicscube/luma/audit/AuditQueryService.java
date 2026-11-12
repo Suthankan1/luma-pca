@@ -31,6 +31,7 @@ public class AuditQueryService {
             "staff", List.of("STAFF\\_%", "OWNER\\_%"),
             "sign-in", List.of("INVITATION\\_%", "INVITATIONS\\_%", "PASSWORD\\_RESET\\_%"),
             "students", List.of("STUDENTS\\_%"),
+            "classes", List.of("CLASS\\_%"),
             "zoom", List.of("ZOOM\\_%"));
 
     private final JdbcTemplate jdbc;

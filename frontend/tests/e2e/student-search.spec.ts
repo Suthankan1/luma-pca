@@ -30,7 +30,7 @@ test.describe("Student search", () => {
 
     await page.goto("/staff/students");
     const search = page.getByRole("search");
-    const rows = page.locator(".dir-list .dir-course");
+    const rows = page.getByRole("region", { name: "STUDENT DIRECTORY" }).locator(".dir-list .dir-course");
     await search.getByLabel("Find a student").fill(family.toUpperCase());
     await search.getByRole("button", { name: "Search" }).click();
     await expect(page).toHaveURL(new RegExp(`\\?q=${family.toUpperCase()}$`));

@@ -32,6 +32,22 @@ public class StudentInvitationService {
         this.queue = queue;
     }
 
+    /** A student whose invitation email failed, for staff to check the address or send a link another way. */
+    public record FailedInvitation(UUID studentId, String studentNumber, String fullName, String email, String reason,
+                                   java.time.Instant failedAt, int attempts) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<FailedInvitation> failures(CurrentAccount caller) {
+        List<InvitationEmailQueue.Failure> failed = queue.failures(caller);
+        java.util.Map<UUID, com.physicscube.luma.students.StudentView> found = students.byAccountIds(caller.academyId(),
+                failed.stream().map(InvitationEmailQueue.Failure::accountId).toList());
+        return failed.stream().filter(f -> found.containsKey(f.accountId())).map(f -> {
+            com.physicscube.luma.students.StudentView s = found.get(f.accountId());
+            return new FailedInvitation(s.id(), s.studentNumber(), s.fullName(), s.email(), f.reason(), f.failedAt(), f.attempts());
+        }).toList();
+    }
+
     @Transactional
     public QueueResult invite(CurrentAccount caller, UUID batchId, boolean resend, boolean dryRun) {
         caller.requireAcademyManager();

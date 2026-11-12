@@ -112,10 +112,10 @@ test.describe("Staff students and enrolments", () => {
     await expect(page.getByText("Reactivate the student to enrol them in a batch.")).toBeVisible();
 
     await page.goto("/staff/students");
-    await expect(page.locator(".dir-list")).not.toContainText(`PCA-${p.toUpperCase()}-900`);
+    await expect(page.getByRole("region", { name: "STUDENT DIRECTORY" }).locator(".dir-list")).not.toContainText(`PCA-${p.toUpperCase()}-900`);
     await page.getByRole("link", { name: "Inactive", exact: true }).click();
     await expect(page).toHaveURL(/status=inactive/);
-    await expect(page.locator(".dir-list")).toContainText(`PCA-${p.toUpperCase()}-900 Leaving Student`);
+    await expect(page.getByRole("region", { name: "STUDENT DIRECTORY" }).locator(".dir-list")).toContainText(`PCA-${p.toUpperCase()}-900 Leaving Student`);
   });
 
   test("Instructors see explanations, their batch list, and no student records", async ({ page }) => {

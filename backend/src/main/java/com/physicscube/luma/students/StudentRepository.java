@@ -22,6 +22,8 @@ interface StudentRepository extends JpaRepository<Student, UUID> {
 
     List<Student> findByAcademyIdAndIdIn(UUID academyId, Collection<UUID> ids);
 
+    List<Student> findByAcademyIdAndAccountIdIn(UUID academyId, Collection<UUID> accountIds);
+
     @Query("select s.accountId from Student s where s.academyId = :academyId and s.active = true")
     List<UUID> activeAccountIds(@Param("academyId") UUID academyId);
 

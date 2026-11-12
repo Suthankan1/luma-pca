@@ -189,6 +189,16 @@ public class StudentService {
                 .collect(Collectors.toMap(StudentView::id, Function.identity()));
     }
 
+    /** For other modules: the academy's students holding these sign-in accounts, by account id. No role check. */
+    @Transactional(readOnly = true)
+    public Map<UUID, StudentView> byAccountIds(UUID academyId, Collection<UUID> accountIds) {
+        if (accountIds.isEmpty()) {
+            return Map.of();
+        }
+        return views(students.findByAcademyIdAndAccountIdIn(academyId, accountIds)).stream()
+                .collect(Collectors.toMap(StudentView::accountId, Function.identity()));
+    }
+
     /** For other modules: sign-in account ids of the academy's active students, or of those among {@code studentIds}. No role check. */
     @Transactional(readOnly = true)
     public List<UUID> activeAccountIds(UUID academyId, Collection<UUID> studentIds) {

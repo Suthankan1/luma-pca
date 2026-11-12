@@ -51,7 +51,7 @@ test.describe("Bulk invitation emails", () => {
     await expect(panel.locator("#bulk-invite-feedback")).toHaveText("3 invitations queued. They are sent in the background.");
     // Progress refreshes while emails wait, then shows them sent.
     await expect(panel.locator("#bulk-invite-progress")).toContainText(/\d+ waiting/);
-    await expect(panel.locator("#bulk-invite-progress")).toContainText(/0 waiting · \d+ sent · 0 failed/, { timeout: 10000 });
+    await expect(panel.locator("#bulk-invite-progress")).toContainText(/0 waiting · \d+ sent · \d+ failed/, { timeout: 10000 });
 
     // Asking again reaches nobody new; resending is a deliberate choice.
     await panel.getByRole("button", { name: "Check who will be emailed" }).click();
@@ -67,5 +67,44 @@ test.describe("Bulk invitation emails", () => {
     // The students page offers the same for every active student.
     await page.goto("/staff/students");
     await expect(page.getByRole("region", { name: "INVITE BY EMAIL" })).toContainText("Emails a sign-in link to every active student");
+  });
+
+  test("A student whose invitation email fails is listed for staff to follow up", async ({ page }) => {
+    await signInAsAdmin(page);
+    const P = p.toUpperCase();
+    await page.goto("/staff/courses");
+    await page.locator("#course-code").fill(`${p}-bnc`);
+    await page.locator("#course-title").fill("Bounce course");
+    await page.getByRole("button", { name: "Create course" }).click();
+    await page.locator("#batch-course").selectOption({ label: `${P}-BNC · Bounce course` });
+    await page.locator("#batch-code").fill(`${p}-fri`);
+    await page.locator("#batch-name").fill("Friday bounce");
+    await page.locator("#batch-starts").fill("2027-01-10");
+    await page.getByRole("button", { name: "Create batch" }).click();
+    await expect(page.locator("#batch-feedback")).toHaveText(`Batch ${P}-FRI created.`);
+    await page.goto("/staff/students/import");
+    await page.locator("#import-file").setInputFiles({ name: "s.csv", mimeType: "text/csv", buffer: Buffer.from(
+      `number,name,email\n${p}-b1,Bounced Student,${p}.bounce@example.invalid\n${p}-b2,Fine Student,${p}.fine@example.invalid\n`) });
+    await page.locator("#import-batch").selectOption({ label: `${P}-BNC · ${P}-FRI · Friday bounce` });
+    await page.getByRole("button", { name: "Check file" }).click();
+    await page.getByRole("button", { name: "Import 2 students" }).click();
+    await expect(page.locator("#import-feedback")).toContainText("Imported 2 students");
+
+    await page.goto("/staff/courses");
+    await page.getByRole("link", { name: new RegExp(`${P}-FRI`) }).first().click();
+    const panel = page.getByRole("region", { name: "INVITE BY EMAIL" });
+    await panel.getByRole("button", { name: "Check who will be emailed" }).click();
+    await panel.getByRole("button", { name: "Email 2 invitations" }).click();
+    await expect(panel.locator("#bulk-invite-feedback")).toHaveText("2 invitations queued. They are sent in the background.");
+
+    // Sending is in the background: the failure shows once it has been tried.
+    const failed = page.getByRole("region", { name: "EMAILS THAT FAILED" });
+    await expect(async () => {
+      await page.goto("/staff/students");
+      await expect(failed).toContainText(`${P}-B1 Bounced Student`, { timeout: 1000 });
+    }).toPass({ timeout: 20000 });
+    await expect(failed).toContainText(`${p}.bounce@example.invalid · 5 tries`);
+    await expect(failed).not.toContainText(`${P}-B2`);
+    await expect(failed.locator(".status").first()).toHaveText("Mail server refused or unreachable");
   });
 });

@@ -33,6 +33,11 @@ class StudentInvitationController {
                 Boolean.TRUE.equals(request.dryRun()));
     }
 
+    @GetMapping("/api/v1/student-invitations/failures")
+    java.util.List<StudentInvitationService.FailedInvitation> failures(JwtAuthenticationToken authentication) {
+        return invitations.failures(CurrentAccount.from(authentication));
+    }
+
     @GetMapping("/api/v1/student-invitations/progress")
     Progress progress(JwtAuthenticationToken authentication) {
         return queue.progress(CurrentAccount.from(authentication));

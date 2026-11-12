@@ -121,6 +121,24 @@ public class InvitationEmailQueue {
         return new QueueResult(counts[0], queued, counts[1] + chosen.size() - queued, counts[2]);
     }
 
+    /** A student account whose most recent invitation email failed and which still waits for activation. */
+    public record Failure(UUID accountId, String reason, Instant failedAt, int attempts) {
+    }
+
+    /** Accounts of the academy whose latest invitation email (in the last 14 days) failed, newest first, at most 200. */
+    @Transactional(readOnly = true)
+    public List<Failure> failures(CurrentAccount caller) {
+        caller.requireAcademyManager();
+        return jdbc.query("""
+                SELECT q.account_id, q.last_error, q.finished_at, q.attempts FROM invitation_emails q
+                JOIN accounts a ON a.id = q.account_id AND a.status = 'PENDING_ACTIVATION'
+                WHERE q.academy_id = ? AND q.status = 'FAILED' AND q.created_at > ?
+                  AND NOT EXISTS (SELECT 1 FROM invitation_emails later WHERE later.account_id = q.account_id AND later.created_at > q.created_at)
+                ORDER BY q.finished_at DESC, q.account_id LIMIT 200
+                """, (row, i) -> new Failure(row.getObject("account_id", UUID.class), row.getString("last_error"),
+                row.getTimestamp("finished_at").toInstant(), row.getInt("attempts")), caller.academyId(), since());
+    }
+
     @Transactional(readOnly = true)
     public Progress progress(CurrentAccount caller) {
         caller.requireAcademyManager();
