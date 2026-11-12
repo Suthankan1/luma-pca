@@ -14,7 +14,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"luma.auth.ephemeral-signing-key=true",
         // Tests drive the receipt processor directly; no background polling.
-        "luma.zoom.processing.enabled=false"})
+        "luma.zoom.processing.enabled=false",
+        // Every test signs in from this machine; AuthRateLimitIntegrationTest turns limits on with small values.
+        "luma.rate-limit.enabled=false"})
 public abstract class PostgresIntegrationTest {
     @ServiceConnection
     protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");

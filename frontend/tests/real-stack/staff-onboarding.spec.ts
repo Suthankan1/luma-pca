@@ -282,4 +282,23 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.fill("#email", "nobody.here@example.invalid");
   await page.getByRole("button", { name: "Email me a reset link" }).click();
   await expect(page).toHaveURL(/\/forgot-password\?sent=1$/);
+
+  // 11. Per-visitor limits: with one trusted proxy, the address it reports reaches the API.
+  // This run allows 3 reset requests per hour per visitor.
+  const askFrom = async (address: string) => {
+    const visitor = await browser.newContext({ extraHTTPHeaders: { "X-Forwarded-For": address } });
+    const tab = await visitor.newPage();
+    const results: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      await tab.goto("/forgot-password");
+      await tab.fill("#email", `visitor${i}@example.invalid`);
+      await tab.getByRole("button", { name: "Email me a reset link" }).click();
+      await expect(tab).toHaveURL(/\/forgot-password\?(sent=1|error=limited)$/);
+      results.push(new URL(tab.url()).search);
+    }
+    await visitor.close();
+    return results;
+  };
+  expect(await askFrom("203.0.113.7")).toEqual(["?sent=1", "?sent=1", "?sent=1", "?error=limited"]);
+  expect((await askFrom("203.0.113.8")).slice(0, 3)).toEqual(["?sent=1", "?sent=1", "?sent=1"]);
 });
