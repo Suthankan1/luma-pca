@@ -182,6 +182,11 @@ export function activationProblem(token: string | null, password: string, confir
   return null;
 }
 
+/** The reset page, like the activation page: the code stays in the fragment. */
+export function resetPath(error?: string, token?: string | null) {
+  return `/reset-password${error ? `?error=${encodeURIComponent(error)}` : ""}${token ? `#token=${token}` : ""}`;
+}
+
 /** The activation page, keeping the code in the fragment so it never reaches a server or log. */
 export function activationPath(error?: string, token?: string | null) {
   return `/activate${error ? `?error=${encodeURIComponent(error)}` : ""}${token ? `#token=${token}` : ""}`;

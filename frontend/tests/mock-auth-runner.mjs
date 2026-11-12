@@ -7,6 +7,7 @@ let latestRefresh = "";
 const jwt = "fake-access-token.for-bff.e2e-test";
 let roles = [];
 const activatedTokens = new Set();
+const usedResetTokens = new Set();
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -96,6 +97,20 @@ const backend = createServer(async (req, res) => {
         return send(204);
       }
       return send(400, { detail: "Invitation is invalid or has expired" });
+
+    // Password reset: requests always look the same (reset-off@ simulates email not being set up);
+    // "R" × 43 (desktop) and "S" × 43 (mobile) are single-use reset codes.
+    case "/api/v1/auth/password-reset/request":
+      if (String(body.email).startsWith("reset-off@")) return send(503, { detail: "Password reset by email is not available." });
+      return send(202);
+
+    case "/api/v1/auth/password-reset/confirm":
+      if (/^([RS])\1{42}$/.test(String(body.token)) && !usedResetTokens.has(body.token)) {
+        if (typeof body.password !== "string" || body.password.includes("weak")) return send(422, { detail: "Password rejected" });
+        usedResetTokens.add(body.token);
+        return send(204);
+      }
+      return send(400, { detail: "This reset link is invalid, already used or expired. Ask for a new one." });
 
     case "/api/v1/auth/refresh":
       if (body.refreshToken !== latestRefresh) return send(401);
