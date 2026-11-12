@@ -87,8 +87,9 @@ SERVER_ADDRESS=127.0.0.1 SERVER_PORT=$API LUMA_ZOOM_WEBHOOK_SECRET_TOKEN="$TOKEN
 unset TOKEN
 for i in $(seq 1 90); do curl -sf 127.0.0.1:$API/actuator/health/readiness >/dev/null && break; sleep 1; done
 curl -sf 127.0.0.1:$API/actuator/health/readiness >/dev/null || { echo "backend did not start"; grep -E " ERROR |Caused by" "$S/backend.log" | head -5; exit 1; }
+# exec: the web server replaces the subshell, so stopping FPID stops the server itself.
 (cd "$ROOT/frontend" && LUMA_WEB_ORIGIN=$ORIGIN LUMA_SESSION_KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=') \
-  API_INTERNAL_URL=http://127.0.0.1:$API node node_modules/next/dist/bin/next start -H 127.0.0.1 -p $WEB > "$S/frontend.log" 2>&1) & FPID=$!
+  API_INTERNAL_URL=http://127.0.0.1:$API exec node node_modules/next/dist/bin/next start -H 127.0.0.1 -p $WEB > "$S/frontend.log" 2>&1) & FPID=$!
 
 # Only the webhook path is forwarded; the backend sees the request from this Mac.
 cat > "$S/nginx.conf" <<NGINX
