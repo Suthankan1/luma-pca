@@ -248,3 +248,33 @@ hashing at 8 sign-ins per second, plus about 0.6 for staff pages and sessions, w
 headroom: at least 2 vCPUs, or two tasks); the web tier at about 1 vCPU; the database
 lightly loaded. These are estimates from this model to be confirmed by that run. **Still no
 capacity claim.**
+
+### Re-run after the fix (2026-11-12, commit `b35019d`)
+
+Same workflow and settings as the failed run: 1,500 students, all three scenarios, one 4-vCPU
+`ubuntu-24.04` runner ([run 43209730397](https://github.com/Suthankan1/luma-pca/actions/runs/43209730397)).
+**Every target in section 2 was met, with no failures.**
+
+| Flow | p95 before the fix | p95 after | p99 after | Failures after |
+| --- | --- | --- | --- | --- |
+| Sign-in through the web app | 6.93 s | 144 ms | 281 ms | 0 of 1,500 |
+| Student portal page | 6.56 s | 48 ms | 110 ms | 0 of 4,500 |
+| Staff class page (1,500 expected students) | 3.79 s | 335 ms | 1.17 s | 0 of 855 |
+| Staff roster | 2.53 s | 143 ms | 517 ms | 0 of 855 |
+| Zoom webhook acknowledgement | 41 ms | 10 ms | 26 ms | 0 of 3,600 |
+
+All 3,600 receipts processed once with no backlog; 11 staff sessions refreshed; peak CPU API
+159%, web 44%, database 15% (was 63%); 162.9 / 115.9 / 34.9 CPU seconds over 619 s; no
+ERROR lines in either log.
+
+**Correction to the model above:** the fix helped far more than the laptop costs
+predicted. Those counted only the database CPU of the extra role queries; on the slower
+runner, about 1.7 million extra round trips also cost API time and waiting, and pushed the
+shared machine into saturation. Removing them, not extra capacity, is what brought the
+targets within reach.
+
+**What this does and does not show.** The combined class-start scenario (L4) now meets its
+targets even with the load generator, both servers and the database on one 4-vCPU machine.
+It is still not the gate in section 8: that needs a production-like environment with the
+load generator on separate hosts, the 60-minute soak (L5), and later the live-attendance and
+finalisation scenarios (L6, L7). **LUMA is still not described as supporting 1,500 users.**
