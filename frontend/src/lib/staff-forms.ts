@@ -248,10 +248,10 @@ export function isRealDate(value: unknown): value is string {
 export const SESSION_WINDOW_DAYS = 14;
 
 /** The fortnight of classes shown: from the given academy date (default today) for 14 days. */
-export function sessionWindow(fromParam: unknown, today = academyToday()) {
+export function sessionWindow(fromParam: unknown, today = academyToday(), days = SESSION_WINDOW_DAYS) {
   const from = isRealDate(fromParam) ? fromParam : today;
-  const to = addDays(from, SESSION_WINDOW_DAYS);
-  return { from, to, lastDay: addDays(to, -1), previous: addDays(from, -SESSION_WINDOW_DAYS), next: to,
+  const to = addDays(from, days);
+  return { from, to, lastDay: addDays(to, -1), previous: addDays(from, -days), next: to,
     fromInstant: zonedToInstant(from, "00:00", ACADEMY_TIME_ZONE), toInstant: zonedToInstant(to, "00:00", ACADEMY_TIME_ZONE) };
 }
 

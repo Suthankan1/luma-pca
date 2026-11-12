@@ -1340,3 +1340,25 @@ build runs the Next.js default bundler and repeats the smoke test.
   CI is unaffected.
 - **Next:** test webinar on 13 Nov 11:00; then compare webhook events with the API's
   participants and registrants to design participant-to-student matching (003D part 2).
+
+## Checkpoint STU-1 — 2026-11-12 — Student portal: my classes and batches
+
+- **Branch:** `feature/student-portal-classes`. **PR / merge SHA:** see the merged pull request
+  titled "feat(student): student portal shows the student's classes and batches".
+- **Implemented:** `GET /api/v1/me/class-sessions?from&to` (STUDENT role, window at most 92
+  days). A class is listed when the student is enrolled, on the class's local date, in at least
+  one of its batches; only those batches are named; cancelled classes are included; the Zoom
+  webinar ID is not returned. The student portal (`/student`) now shows "My classes" in
+  four-week pages (times in each class's own zone) and "My batches" with enrolment and
+  withdrawal dates, replacing the placeholder. Attendance history is still to come.
+- **Tests:** backend `MyClassSessionHttpIntegrationTest` (2 tests over real HTTP: before
+  enrolment, shared class, after withdrawal, other batch, cancelled, exact response fields,
+  other students, staff 403, anonymous 401, long or reversed window 400). Playwright
+  `student-portal.spec.ts` (desktop and mobile; 62 mock-backend tests pass). The real-stack
+  test now signs the activated student in again and checks the class scheduled by the
+  administrator appears in their portal (run in CI, not locally: the Zoom test tunnel is
+  running from the local backend jar).
+- **Tooling:** `scripts/backend-test-docker.sh` runs the backend Maven build in a throwaway
+  `maven:3.9.9-eclipse-temurin-21` container (source mounted read-only, Maven cache in the
+  `luma-m2-cache` volume, Testcontainers through the host Docker socket), so tests run without
+  touching the host JDK, `target/`, or other running processes. 297 backend tests passed with it.

@@ -6,6 +6,7 @@ let rotation = 0;
 let latestRefresh = "";
 const jwt = "fake-access-token.for-bff.e2e-test";
 let roles = [];
+let studentHasEnrolments = true;
 const activatedTokens = new Set();
 const usedResetTokens = new Set();
 
@@ -22,11 +23,14 @@ const backend = createServer(async (req, res) => {
     return academicApi(req, body, send);
   }
 
+  if (req.url.startsWith("/api/v1/me/")) return studentApi(req, send);
+
   switch (req.url) {
     case "/api/v1/auth/login":
       if (body.password !== "correct-password") return send(401);
-      if (body.email === "student@example.invalid") {
+      if (body.email === "student@example.invalid" || body.email === "new-student@example.invalid") {
         roles = ["STUDENT"];
+        studentHasEnrolments = body.email === "student@example.invalid";
       } else if (body.email === "instructor@example.invalid") {
         roles = ["INSTRUCTOR"];
       } else if (body.email === "admin-unenrolled@example.invalid") {
@@ -131,6 +135,39 @@ const backend = createServer(async (req, res) => {
   latestRefresh = `fake-opaque-refresh-${++rotation}`;
   return send(200, { accessToken: jwt, refreshToken: latestRefresh, expiresIn: 300, refreshExpiresIn: 600 });
 });
+
+// The signed-in student's own records: two batches (one left), and classes in the coming
+// days in Sri Lanka time, one cancelled and one shared by both batches. The real API's
+// per-date enrolment filtering is covered by the backend tests.
+function studentApi(req, send) {
+  if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+  if (!roles.includes("STUDENT")) return send(403);
+  const url = new URL(req.url, "http://mock");
+  const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
+  const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
+  const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
+  if (url.pathname === "/api/v1/me/enrollments") {
+    return send(200, !studentHasEnrolments ? [] : [
+      { id: "00000000-0000-4000-8000-0000000000e1", batchId: mon.batchId, batchCode: "MON", batchName: mon.name, enrolledOn: "2026-01-05",
+        withdrawnOn: null, status: "ENROLLED" },
+      { id: "00000000-0000-4000-8000-0000000000e2", batchId: sat.batchId, batchCode: "SAT", batchName: sat.name, enrolledOn: "2026-01-05",
+        withdrawnOn: "2026-03-31", status: "WITHDRAWN" },
+    ]);
+  }
+  if (url.pathname === "/api/v1/me/class-sessions") {
+    const from = Date.parse(url.searchParams.get("from")), to = Date.parse(url.searchParams.get("to"));
+    if (!(to > from) || to - from > 92 * 86400_000) return send(400, { detail: "to must be after from and at most 92 days later" });
+    // 18:00–20:00 Sri Lanka time (UTC+05:30) is 12:30–14:30 UTC.
+    const classes = !studentHasEnrolments ? [] : [
+      { id: "00000000-0000-4000-8000-0000000000f1", title: "Waves and oscillations", offset: 2, status: "SCHEDULED", batches: [mon] },
+      { id: "00000000-0000-4000-8000-0000000000f2", title: "Revision for both batches", offset: 4, status: "CANCELLED", batches: [mon, sat] },
+      { id: "00000000-0000-4000-8000-0000000000f3", title: "Far future class", offset: 40, status: "SCHEDULED", batches: [mon] },
+    ];
+    return send(200, classes.map(({ offset, ...c }) => ({ ...c, startsAt: `${day(offset)}T12:30:00Z`, endsAt: `${day(offset)}T14:30:00Z`,
+      timeZone: "Asia/Colombo", localDate: day(offset) })).filter(c => Date.parse(c.startsAt) >= from && Date.parse(c.startsAt) < to));
+  }
+  return send(404);
+}
 
 // A small in-memory stand-in for the academic API, with the same status codes and
 // problem details as the real backend for the cases the staff screens handle.

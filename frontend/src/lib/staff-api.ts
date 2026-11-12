@@ -11,19 +11,29 @@ import { isSameOrigin, openAccess } from "./session-policy";
  */
 export type ApiResult<T> = { ok: true; status: number; data: T } | { ok: false; status: number; detail?: string };
 
-async function accessToken() {
+async function accessToken(portal: "staff" | "student") {
   const { names, key } = config();
   const sealed = (await cookies()).get(names.access)?.value;
   const access = sealed ? openAccess(sealed, key) : null;
   // An expired access token with a live refresh cookie shows "Continue session" on sign-in.
-  if (!access) redirect("/sign-in?portal=staff");
+  if (!access) redirect(`/sign-in?portal=${portal}`);
   return access;
 }
 
-export async function staffApi<T>(path: `/api/v1/${string}`,
-                                  init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }): Promise<ApiResult<T>> {
+export function staffApi<T>(path: `/api/v1/${string}`,
+                            init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }): Promise<ApiResult<T>> {
+  return callApi<T>("staff", path, init);
+}
+
+/** The student portal reads only the signed-in student's own records (`/api/v1/me/...`). */
+export function studentApi<T>(path: `/api/v1/me/${string}`): Promise<ApiResult<T>> {
+  return callApi<T>("student", path);
+}
+
+async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`,
+                          init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }): Promise<ApiResult<T>> {
   const requestBody = init && "body" in init ? JSON.stringify(init.body) : undefined;
-  const access = await accessToken();
+  const access = await accessToken(portal);
   let response: Response;
   try {
     response = await fetch(new URL(path, process.env.API_INTERNAL_URL ?? "http://localhost:8080"), {
@@ -37,7 +47,7 @@ export async function staffApi<T>(path: `/api/v1/${string}`,
   } catch {
     return { ok: false, status: 503 };
   }
-  if (response.status === 401) redirect("/sign-in?portal=staff&error=expired");
+  if (response.status === 401) redirect(`/sign-in?portal=${portal}&error=expired`);
   const body = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const detail = typeof body?.detail === "string" ? body.detail.slice(0, 300) : undefined;
