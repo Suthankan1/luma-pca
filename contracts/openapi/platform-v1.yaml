@@ -426,6 +426,7 @@ paths:
       tags: [Students]
       security: [{bearerAuth: []}]
       parameters:
+        - {in: query, name: q, required: false, schema: {type: string, maxLength: 100}, description: 'Part of a student number or full name (any letter case; % and _ literal), or a whole email address'}
         - {in: query, name: active, required: false, schema: {type: boolean}}
         - {in: query, name: after, required: false, schema: {type: string}, description: nextAfter from the previous page}
         - {in: query, name: limit, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}

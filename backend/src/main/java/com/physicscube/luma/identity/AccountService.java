@@ -97,6 +97,16 @@ public class AccountService {
                 .collect(Collectors.toMap(AccountSummary::id, Function.identity()));
     }
 
+    /** As {@link #findByEmail}, but empty instead of an error when the text is not an email address. */
+    @Transactional(readOnly = true)
+    public Optional<AccountSummary> findByEmailIfValid(String text) {
+        try {
+            return findByEmail(text);
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
     @Transactional(readOnly = true)
     public Optional<AccountSummary> findByEmail(String email) {
         return accounts.findByEmail(EmailAddress.normalize(email)).map(AccountSummary::of);
