@@ -729,6 +729,32 @@ paths:
         '403': {description: 'Own account, or an administrator touching OWNER/ADMIN'}
         '404': {description: Not a staff account of this academy}
         '409': {description: 'Stale version, or it would leave no active owner'}
+  /api/v1/staff-accounts/{accountId}/enable:
+    post:
+      summary: Re-enable a disabled staff account (implemented; owner/admin, only an owner for owner or administrator accounts)
+      description: >-
+        The account becomes ACTIVE with its existing password (and two-step sign-in, if
+        enrolled), or PENDING_ACTIVATION when requireNewPassword is true or it never had a
+        password; then the old password is removed and any open invitation revoked, so an
+        invitation is needed. Sessions and tokens ended by the disable stay invalid; lockout is
+        cleared. Enabling an account that is not disabled changes nothing. Audited.
+      operationId: enableStaffAccount
+      tags: [Staff]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requireNewPassword: {type: boolean, default: false}
+      responses:
+        '200': {description: The account as it is now}
+        '403': {description: Caller may not manage this account}
+        '404': {description: No such staff account in the caller's academy (students are not staff accounts)}
   /api/v1/staff-accounts/{accountId}/disable:
     post:
       summary: Disable a staff account and end all its sessions; repeating is harmless (implemented; owner/admin)

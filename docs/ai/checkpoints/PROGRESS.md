@@ -1454,7 +1454,8 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint ZM-5 — 2026-11-12 — Zoom links follow the timetable
 
 - **Branch:** `feature/zoom-link-revision`. **PR / merge SHA:** see the merged pull request titled
-  "feat(zoom): re-check automatic Zoom links when a class changes".
+  "feat(zoom): re-check automatic Zoom links when a class changes" (PR #51, merge commit
+  `9a1903c`; all CI checks green).
 - **Problem:** an automatic occurrence-to-class link was made once and never revisited, so moving a
   class, changing its webinar ID or cancelling it left Zoom events (and later attendance) on the
   wrong class; and occurrences that arrived before a class existed waited for "Run automatic linking".
@@ -1478,3 +1479,24 @@ build runs the Next.js default bundler and repeats the smoke test.
   is scheduled.
 - **Not covered:** a manual link to a class that is later cancelled stays (an administrator's
   decision); the review page lists it as linked by an administrator.
+
+## Checkpoint 001N — 2026-11-13 — Re-enable staff accounts
+
+- **Branch:** `feature/staff-reenable`. **PR / merge SHA:** see the merged pull request titled
+  "feat(staff): re-enable disabled staff accounts".
+- **Implemented:** `POST /api/v1/staff-accounts/{id}/enable {requireNewPassword}` under the same
+  rules as disabling (only an owner for owner or administrator accounts; staff of the caller's
+  academy only, never students). The account returns ACTIVE with its existing password and
+  two-step sign-in, or to PENDING_ACTIVATION (old password removed, open invitations revoked) when
+  a new password is required or it never had one. Sessions and tokens ended by the disable stay
+  invalid; lockout is cleared; `STAFF_ACCOUNT_ENABLED` is audited with the outcome only. Staff
+  view gains `passwordSet` (whether one exists, nothing more). Staff record page: "Re-enable
+  account" with an optional "make them choose a new password"; the disable form no longer says it
+  cannot be undone.
+- **Tests:** 4 backend tests (same password signs in while old tokens and refresh stay dead;
+  new-password path through a fresh invitation; disabled-before-activation returns to pending and
+  the old invitation is dead; owner-only for administrators, other academies 404, students 404).
+  Playwright team spec on desktop and mobile.
+- **Environment note:** overnight the Mac slept; Cloudflare dropped the quick tunnel ("Tunnel not
+  found", 18:55 UTC 12 Nov) while the local services kept running. The tunnel must be restarted
+  and the Zoom subscription URL updated and re-validated before the 13 Nov 11:00 test webinar.

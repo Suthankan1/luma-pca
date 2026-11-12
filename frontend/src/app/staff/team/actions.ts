@@ -37,12 +37,25 @@ export async function disableStaff(_previous: FormState, form: FormData): Promis
   await requireSameOriginAction();
   const id = uuidOrNull(form.get("id"));
   if (!id) return { ok: false, message: "That request was not valid. Reload the page." };
-  if (form.get("confirm") !== "yes") return { ok: false, message: "Tick the box to confirm. Disabling cannot be undone yet." };
+  if (form.get("confirm") !== "yes") return { ok: false, message: "Tick the box to confirm." };
   const result = await staffApi(`/api/v1/staff-accounts/${id}/disable`, { method: "POST", body: {} });
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
   revalidatePath(`/staff/team/${id}`);
   revalidatePath("/staff/team");
   return { ok: true, message: "Account disabled. The person has been signed out everywhere." };
+}
+
+export async function enableStaff(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const id = uuidOrNull(form.get("id"));
+  if (!id) return { ok: false, message: "That request was not valid. Reload the page." };
+  const result = await staffApi<{ status: string }>(`/api/v1/staff-accounts/${id}/enable`,
+    { method: "POST", body: { requireNewPassword: form.get("requireNewPassword") === "yes" } });
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
+  revalidatePath(`/staff/team/${id}`);
+  revalidatePath("/staff/team");
+  return { ok: true, message: result.data.status === "ACTIVE" ? "Account re-enabled. They can sign in again."
+    : "Account re-enabled and waiting for activation. Send them an invitation to choose a password." };
 }
 
 export async function assignStaff(_previous: FormState, form: FormData): Promise<FormState> {

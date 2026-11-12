@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { assignStaff, changeRoles, createStaff, disableStaff, unassignStaff } from "@/app/staff/team/actions";
+import { assignStaff, changeRoles, createStaff, disableStaff, enableStaff, unassignStaff } from "@/app/staff/team/actions";
 import { staffRoleLabels, type FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, id }: { state: FormState; id: string }) {
@@ -49,8 +49,8 @@ export function DisableForm({ id, email }: { id: string; email: string }) {
   return <form action={action} className="session-form staff-form danger-zone" aria-describedby="disable-feedback">
     <h3 className="form-title">Disable account</h3>
     <input type="hidden" name="id" value={id} />
-    <p className="panel-sub">Blocks sign-in and signs {email} out everywhere. There is no way to re-enable an account yet.</p>
-    <label className="check-row"><input type="checkbox" name="confirm" value="yes" required /> I understand this cannot be undone yet</label>
+    <p className="panel-sub">Blocks sign-in and signs {email} out everywhere. You can re-enable the account later.</p>
+    <label className="check-row"><input type="checkbox" name="confirm" value="yes" required /> Sign this person out everywhere and block sign-in</label>
     <button className="action danger" type="submit" disabled={pending}>{pending ? "Disabling…" : "Disable account"}</button>
     <Feedback state={state} id="disable-feedback" />
   </form>;
@@ -82,5 +82,21 @@ export function UnassignButton({ id, batchId, label }: { id: string; batchId: st
     <input type="hidden" name="batchId" value={batchId} />
     <button className="link-button" type="submit" disabled={pending} aria-label={`Remove ${label}`}>{pending ? "…" : "Remove"}</button>
     {state && !state.ok && <span className="inline-error" role="alert">{state.message}</span>}
+  </form>;
+}
+
+/** Re-enabling keeps the old password unless a new one is required; earlier sessions stay ended either way. */
+export function EnableForm({ id, email, hadPassword }: { id: string; email: string; hadPassword: boolean }) {
+  const [state, action, pending] = useActionState(enableStaff, null);
+  return <form action={action} className="session-form staff-form" aria-describedby="enable-feedback">
+    <h3 className="form-title">Re-enable account</h3>
+    <input type="hidden" name="id" value={id} />
+    <p className="panel-sub">{hadPassword
+      ? `${email} can sign in again with their existing password (and 2-step sign-in, if they had it). Sessions ended when the account was disabled stay ended.`
+      : `${email} never set a password, so they will need a new invitation.`}</p>
+    {hadPassword && <label className="check-row"><input type="checkbox" name="requireNewPassword" value="yes" />
+      Make them choose a new password (send a new invitation afterwards)</label>}
+    <button className="action" type="submit" disabled={pending}>{pending ? "Saving…" : "Re-enable account"}</button>
+    <Feedback state={state} id="enable-feedback" />
   </form>;
 }
