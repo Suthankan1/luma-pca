@@ -130,9 +130,8 @@ scenarios together with the plan's windows (10-minute sign-in window, 3-minute j
 - **Connection timeouts (182, 3.1% of student requests):** k6 got "dial: i/o timeout"
   before any HTTP exchange; server-side latencies stayed low and the servers logged no
   errors. Suspected local causes: macOS's listen backlog (`kern.ipc.somaxconn` 128, against
-  Linux's 4096) and Docker Desktop's forwarding to the host. **Unexplained until the same run
-  passes on Linux** (the manual "Load test (local baseline)" workflow, or the
-  production-like environment); not to be dismissed.
+  Linux's 4096) and Docker Desktop's forwarding to the host. **Resolved:** the same
+  1,500-student run on Linux (below) had none, so they belong to the local harness.
 - **Staff sign-in redirects (35):** the run lasts longer than the 10-minute access token and
   the first version of `staff-reads.js` did not refresh the session as the browser's
   "Continue session" does. Fixed in the script; a re-run with 1-minute access tokens
@@ -159,6 +158,43 @@ database 15%; no ERROR lines; no connection timeouts. This run does **not** sett
 needs the same 1,500-student run on Linux (about 20 runner minutes). No session refresh
 happened in this short run (`refresh` count 0), so its threshold passed without data.
 
-**What this shows:** the scripts work end to end and nothing gross broke at 1,500 on one
-laptop or at 300 on a Linux runner. **What it does not show:** that LUMA supports 1,500 users. That needs sections 3 and
+**Linux runner, 1,500 students (2026-11-12, commit `9b5164e`).** Same workflow
+([run 43195499238](https://github.com/Suthankan1/luma-pca/actions/runs/43195499238)), the
+plan's full windows, all three scenarios on one 4-vCPU `ubuntu-24.04` runner. **Failed its
+latency targets.**
+
+| Flow | Requests | p50 | p95 | p99 | Failures |
+| --- | --- | --- | --- | --- | --- |
+| Sign-in through the web app | 1,500 | 2.48 s | 6.93 s | 7.42 s | 0 (target p95 ≤ 2 s missed) |
+| Student portal page | 4,500 | 774 ms | 6.56 s | 7.07 s | 0 (target p95 ≤ 500 ms missed) |
+| Zoom webhook acknowledgement | 3,600 | 6 ms | 41 ms | 132 ms | 0 (met) |
+| Staff class page (1,500 expected students) | 651 | 948 ms | 3.79 s | 7.52 s | 2 HTTP 500, 1 "couldn't load" page |
+| Staff roster | 650 | 336 ms | 2.53 s | 4.15 s | 0 |
+| Staff class list | 657 | 43 ms | 1.48 s | 2.19 s | 0 |
+
+- **The laptop's connection timeouts did not occur on Linux** at the same scale (0 of 6,000
+  student requests failed). They are therefore attributed to the local macOS / Docker
+  Desktop harness, and that question is closed.
+- **Webhooks and the worker held up:** every event acknowledged (p99 132 ms), all 3,600
+  processed once with no backlog.
+- **Everything else slowed sharply.** Peak CPU: API 168%, web 56%, database 63%, while three
+  k6 load generators shared the same 4 vCPUs. The run saturated one small machine; **which
+  tier limits throughput was not isolated** (sign-in hashing runs outside database
+  transactions, so connection-pool starvation by Argon2id is ruled out; the pool is
+  Spring's default of 10 and remains a suspect).
+- **Staff page errors under saturation:** one class page showed the app's own "couldn't
+  load" message (its 5-second API timeout tripped, a graceful outcome), and two returned
+  HTTP 500 with no backend ERROR lines, so they came from the web tier; the script did not
+  capture the web log then. It now prints a masked summary of web-log errors.
+- **227 failed staff sign-ins were a script defect:** after a failed page the script signed
+  in again while still holding a session, and the web app (correctly) sent it to "Continue
+  session" instead; the script never recovered. It now clears its cookies before signing in
+  again. This fix is reasoned, not yet exercised at 1,500.
+
+**What this shows:** the scripts work end to end. A single 4-vCPU machine hosting the load
+generator, both servers and the database cannot meet the targets for a 1,500-student class
+start. That is expected for this setup and says nothing yet about the production sizing.
+**Next diagnostic step:** run the load generator on a separate machine from the servers,
+record per-tier timings (API request durations, web render time, database waits), and
+try a larger Hikari pool, before the production-like gate run. **What it does not show:** that LUMA supports 1,500 users. That needs sections 3 and
 8 in a production-like environment.

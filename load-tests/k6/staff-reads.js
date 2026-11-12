@@ -38,10 +38,14 @@ export default function () {
   const vu = __VU;
   const headers = { "X-Forwarded-For": `198.19.255.${vu % 250}` };
   if (!signedIn) {
+    // A browser that still holds a session is sent to "Continue session", not signed in again:
+    // start clean so a failed page earlier does not leave this user stuck.
+    http.cookieJar().clear(BASE);
     const signIn = http.post(`${BASE}/api/session/login`,
       { email: `load.instructor${((vu - 1) % STAFF) + 1}@example.invalid`, password: PASSWORD, portal: "staff" },
       { headers: { ...headers, Origin: ORIGIN }, redirects: 0, tags: { name: "staff-sign-in" } });
     if (!check(signIn, { "staff sign-in": r => r.status === 303 && /\/staff$/.test(r.headers.Location || "") })) {
+      console.warn(`staff-sign-in: status ${signIn.status} location ${signIn.headers.Location || "-"} ${signIn.error || ""}`.trim());
       sleep(5);
       return;
     }
