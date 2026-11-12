@@ -1,0 +1,38 @@
+name: Load test (local baseline)
+# Manual only: runs scripts/load-test-local.sh on one GitHub runner. A baseline for the
+# scripts and for regressions, never capacity evidence (see docs/testing/LOAD-TEST-PLAN.md).
+on:
+  workflow_dispatch:
+    inputs:
+      students:
+        description: Students in the simulated class
+        default: '300'
+      scenarios:
+        description: Space-separated subset of "sign-in webhooks staff"
+        default: 'sign-in webhooks staff'
+jobs:
+  load:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Package the backend
+        run: mvn -B -ntp -f backend/pom.xml -DskipTests package
+      - name: Build the frontend
+        run: npm --prefix frontend ci --no-audit --no-fund && npm --prefix frontend run build
+      - name: Load test
+        env:
+          STUDENTS: ${{ inputs.students }}
+          SCENARIOS: ${{ inputs.scenarios }}
+        run: bash scripts/load-test-local.sh

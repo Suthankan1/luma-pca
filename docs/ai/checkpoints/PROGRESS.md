@@ -1134,3 +1134,28 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Next planned feature:** 003A when the academy's Zoom test webinar is available;
   otherwise deployment infrastructure (needs the academy's authorisation for cloud
   resources) or the load-test plan.
+
+## Checkpoint PERF-1 — 2026-11-12 — Load-test plan, scripts and a local baseline
+
+- **001M evidence:** merged as PR #32, merge commit `884725b`; all CI green.
+- **Feature ID / name:** PERF-1. **No capacity claim:** LUMA is not stated to support
+  1,500 users; the gate is a production-like run (docs/testing/LOAD-TEST-PLAN.md §8).
+- **Branch:** `feature/perf-load-test-plan`. **PR / merge SHA:** see the merged pull
+  request titled "test: load-test plan, k6 scenarios and local baseline".
+- **Delivered:** `docs/testing/LOAD-TEST-PLAN.md` (assumptions for the academy to
+  confirm, targets, scenarios L1–L8 with what is blocked, environments, data, risks, exit
+  criteria, local baseline); k6 scripts in `load-tests/k6` (sign-in burst through the BFF,
+  signed webhook bursts, instructor reads with session refresh); `scripts/load-test-local.sh`
+  (seeds the owner with `bootstrap-owner.sh` and 1,500 synthetic students via SQL with one
+  real Argon2id hash, runs k6 in Docker, measures worker drain and CPU); a manual GitHub
+  workflow "Load test (local baseline)"; `LUMA_ZOOM_PROCESSING_BATCH_SIZE` setting exposed.
+- **Local baseline (one M4 laptop, 1,500 students, all scenarios):** sign-in p95 62 ms,
+  portal p95 11 ms, webhook ack p99 14 ms with 0 failures, 3,600 receipts processed once
+  each with no backlog, staff class page p95 446 ms; API peak ~1 core. 182 connection
+  timeouts (3.1% of student requests) before any HTTP exchange: suspected macOS listen
+  backlog / Docker Desktop forwarding, **unexplained until reproduced or cleared on Linux**.
+  35 staff redirects came from the first script not refreshing sessions; fixed and re-run
+  with 1-minute tokens (40 refreshes, 0 failures).
+- **Next:** run the manual workflow on a Linux runner to settle the connection timeouts
+  (uses GitHub Actions minutes), then the production-like gate run once cloud resources
+  are authorised.

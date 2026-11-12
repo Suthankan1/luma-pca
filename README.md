@@ -62,6 +62,7 @@ python3 scripts/verify_structure.py
 scripts/auth-stack-smoke.sh            # real backend + database + Next.js sign-in flow
 scripts/staff-ui-real-stack.sh         # real stack + Playwright, end to end (also the "Real-stack browser test" CI workflow)
 scripts/bootstrap-owner.sh "Academy" owner@example.com   # create an academy's first owner (operator command)
+STUDENTS=150 scripts/load-test-local.sh   # k6 load scenarios on this machine (baseline only; see docs/testing/LOAD-TEST-PLAN.md)
 ```
 
 ## Repository anatomy
