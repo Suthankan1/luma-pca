@@ -1189,3 +1189,22 @@ build runs the Next.js default bundler and repeats the smoke test.
   the web tier, whose log was not captured).
 - **Next:** load generator on a separate machine, per-tier timings, a larger Hikari pool,
   then the production-like gate run (needs cloud authorisation). Still no capacity claim.
+
+## Checkpoint PERF-2 — 2026-11-12 — Bottleneck isolated; N+1 query fixed
+
+- **PERF-1b evidence:** PR #35, merge commit `b55f11d`.
+- **Branch:** `perf/isolate-bottleneck`. **PR / merge SHA:** see the merged pull request
+  titled "perf: fix the roles N+1 query and add per-tier load-test measurement".
+- **Method:** each flow measured alone on the laptop with new instrumentation in
+  `scripts/load-test-local.sh` (CPU seconds per tier, API access log with method/path/
+  status/ms only, `pg_stat_statements`, sampled busy connections; `DB_POOL` setting).
+- **Fixed:** an N+1 query. Rosters and the class page loaded each student's account and
+  then that account's roles one query at a time (522,020 role queries in 3 minutes of staff
+  reads). `hibernate.default_batch_fetch_size: 100` cut it to 5,260; class page p50 320 →
+  84 ms, class-students API p50 290 → 46 ms, database CPU 19.2 → 8.4 s. 287 backend tests pass.
+- **Ruled out:** the 10-connection database pool (at most about 2 ms of database time per
+  request; under 1% busy at peak).
+- **Explained:** the Linux run was CPU-saturated. Peak app demand is about 0.9 M4 cores (API
+  0.56, web 0.22, DB 0.09; sign-ins 45%, staff pages 41%, portal 14%); the runner used about
+  3× that per tier (~2.9 of 4 vCPUs) alongside three k6 processes. Argon2id cost is kept and
+  sized for. Details and sizing estimates in LOAD-TEST-PLAN.md §10. Still no capacity claim.
