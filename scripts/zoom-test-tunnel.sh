@@ -3,6 +3,10 @@
 #
 #   scripts/zoom-test-tunnel.sh          # start; prints the webhook URL to give Zoom; Ctrl+C stops
 #   scripts/zoom-test-tunnel.sh summary  # what has been stored so far
+#   scripts/zoom-test-tunnel.sh resume   # restart only the backend and web app behind a tunnel
+#                                        # that is still running (same public URL, so the Zoom
+#                                        # subscription needs no change); for when the shell that
+#                                        # started the script was closed without stopping it
 #
 # What runs: PostgreSQL 17 (data kept in the Docker volume luma-zoom-test-data), the backend
 # jar with webhook receipt and processing on, the web app for reviewing results, an nginx
@@ -38,6 +42,7 @@ summary() {
 }
 
 if [ "${1:-}" = summary ]; then summary; exit; fi
+MODE=start; [ "${1:-}" = resume ] && MODE=resume
 
 [ -f "$SETTINGS" ] || { echo "Create $SETTINGS first (see the header of this script)."; exit 2; }
 # Read only the two expected keys; never echo their values.
@@ -61,10 +66,19 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+if [ $MODE = resume ]; then
+  for c in $PG $PROXY $TUNNEL; do
+    [ "$(docker inspect -f '{{.State.Running}}' $c 2>/dev/null)" = true ] || { echo "Nothing to resume: $c is not running. Start normally."; exit 2; }
+  done
+  for p in $API $WEB; do
+    lsof -nP -iTCP:$p -sTCP:LISTEN >/dev/null 2>&1 && { echo "Port $p is in use; is the backend or web app still running?"; exit 2; }
+  done
+else
 docker rm -f $PG $PROXY $TUNNEL >/dev/null 2>&1
 docker network create $NET >/dev/null 2>&1
 docker run -d --rm --name $PG --network $NET -v $VOLUME:/var/lib/postgresql/data -e POSTGRES_USER=luma \
   -e POSTGRES_PASSWORD=$DBPASS -e POSTGRES_DB=luma -p 127.0.0.1:55435:5432 postgres:17-alpine >/dev/null
+fi
 for i in $(seq 1 60); do docker exec $PG pg_isready -U luma -d luma >/dev/null 2>&1 && break; sleep 1; done; sleep 2
 export DB_URL=jdbc:postgresql://localhost:55435/luma DB_USERNAME=luma DB_PASSWORD=$DBPASS LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true
 
@@ -91,6 +105,10 @@ curl -sf 127.0.0.1:$API/actuator/health/readiness >/dev/null || { echo "backend 
 (cd "$ROOT/frontend" && LUMA_WEB_ORIGIN=$ORIGIN LUMA_SESSION_KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=') \
   API_INTERNAL_URL=http://127.0.0.1:$API exec node node_modules/next/dist/bin/next start -H 127.0.0.1 -p $WEB > "$S/frontend.log" 2>&1) & FPID=$!
 
+if [ $MODE = resume ]; then
+  URL=$(docker logs $TUNNEL 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | head -1)
+  STARTED=1
+else
 # Only the webhook path is forwarded; the backend sees the request from this Mac.
 cat > "$S/nginx.conf" <<NGINX
 events {}
@@ -123,6 +141,7 @@ docker logs $TUNNEL 2>&1 | grep -q "Registered tunnel connection" || { echo "The
 STARTED=1
 # A new quick-tunnel name can take a little while to resolve.
 for i in $(seq 1 45); do [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/")" = 404 ] && break; sleep 2; done
+fi
 [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/")" = 404 ] || echo "  (warning: $URL is not answering yet; give it a minute)"
 
 cat <<EOF
@@ -133,8 +152,8 @@ cat <<EOF
 
   Allowed webinar(s): $ALLOW    Academy: $ACADEMY
   Review results: $ORIGIN/staff/zoom (sign in as zoom.test.owner@example.invalid)
-  Anything else at $URL answers 404. The URL changes every time this script starts,
-  so update the Zoom app's endpoint (and validate it) after each restart.
+  Anything else at $URL answers 404. The URL changes every time this script starts
+  (not on resume), so update the Zoom app's endpoint (and validate it) after a normal start.
   Press Ctrl+C to stop.
 EOF
 while kill -0 $BPID 2>/dev/null; do
