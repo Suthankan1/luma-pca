@@ -1,5 +1,6 @@
 package com.physicscube.luma.shared.config;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -16,6 +17,8 @@ import org.springframework.security.web.SecurityFilterChain;
  * only together with its authorization tests.
  */
 @Configuration
+// Only a running server has HTTP routes to protect; the operator command (owner bootstrap) runs without one.
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
