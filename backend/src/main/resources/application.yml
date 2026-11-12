@@ -13,6 +13,9 @@ spring:
       # Loads lazy and eager collections (such as account roles) for up to 100 entities per
       # query instead of one query each; a 500-student roster made about 1,000 queries without it.
       hibernate.default_batch_fetch_size: 100
+      # Bulk student import inserts rows in JDBC batches rather than one round trip each.
+      hibernate.jdbc.batch_size: 100
+      hibernate.order_inserts: true
   flyway:
     enabled: true
   mvc:

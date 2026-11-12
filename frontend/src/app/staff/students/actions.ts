@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireSameOriginAction, staffApi } from "@/lib/staff-api";
+import { validImportRows } from "@/lib/student-import";
 import {
   isIsoDate, parseEnrollForm, parseStudentForm, problemMessage, submittedValues, uuidOrNull, type FormState,
 } from "@/lib/staff-forms";
@@ -70,4 +71,27 @@ export async function updateEnrollment(_previous: FormState, form: FormData): Pr
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
   revalidatePath(`/staff/students/${studentId}`);
   return { ok: true, message: withdrawnOn ? "Withdrawn." : "Re-enrolled." };
+}
+
+export type ImportProblem = { row: number; field: "studentNumber" | "fullName" | "email"; message: string };
+export type ImportOutcome = { ok: true; imported: boolean; rows: number; enrolled: number; problems: ImportProblem[] }
+  | { ok: false; message: string };
+
+/** Checks (dryRun) or imports rows read from a CSV file in the browser; nothing is written unless every row is valid. */
+export async function importStudents(input: { rows: unknown; batchId: unknown; enrolledOn: unknown; dryRun: unknown }): Promise<ImportOutcome> {
+  await requireSameOriginAction();
+  const rows = validImportRows(input?.rows);
+  const batchId = input?.batchId === "" || input?.batchId == null ? null : (typeof input.batchId === "string" ? uuidOrNull(input.batchId) : null);
+  const enrolledOn = batchId ? input?.enrolledOn : null;
+  if (!rows || (input?.batchId && !batchId) || (batchId && !isIsoDate(enrolledOn)) || typeof input?.dryRun !== "boolean") {
+    return { ok: false, message: "That request was not valid. Reload the page and choose the file again." };
+  }
+  const result = await staffApi<Omit<Extract<ImportOutcome, { ok: true }>, "ok">>("/api/v1/students/import",
+    { method: "POST", body: { rows, batchId, enrolledOn, dryRun: input.dryRun } }, 30000);
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
+  if (result.data.imported) {
+    revalidatePath("/staff/students");
+    if (batchId) revalidatePath(`/staff/batches/${batchId}`);
+  }
+  return { ok: true, ...result.data };
 }

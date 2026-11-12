@@ -129,6 +129,27 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.goto("/staff/students");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-001" })).toContainText("Account active");
 
+  // 6b. Two more students from a CSV file, enrolled in the same batch; the real API checks then imports.
+  await page.getByRole("link", { name: "Import many students from a CSV file →" }).click();
+  await page.locator("#import-file").setInputFiles({ name: "students.csv", mimeType: "text/csv", buffer: Buffer.from(
+    "Student number,Full name,Email\npca-real-001,Clash,real.student@example.invalid\npca-real-002,\"Import, One\",real.import1@example.invalid\n") });
+  await page.getByRole("button", { name: "Check file" }).click();
+  await expect(page.getByRole("list", { name: "Problems in the file" }).getByRole("listitem")).toHaveText([
+    "Line 2 · Email: An account with this email already exists",
+    "Line 2 · Student number: A student with this student number already exists",
+  ]);
+  await page.locator("#import-file").setInputFiles({ name: "students.csv", mimeType: "text/csv", buffer: Buffer.from(
+    "Student number,Full name,Email\npca-real-002,\"Import, One\",real.import1@example.invalid\npca-real-003,Import Two,real.import2@example.invalid\n") });
+  await page.locator("#import-batch").selectOption({ label: "REAL-PHY · MON · Monday evening" });
+  await page.locator("#import-date").fill("2027-01-12");
+  await page.getByRole("button", { name: "Check file" }).click();
+  await expect(page.locator("#import-feedback")).toHaveText("All 2 rows are ready. Nothing has been saved yet.");
+  await page.getByRole("button", { name: "Import 2 students" }).click();
+  await expect(page.locator("#import-feedback")).toContainText("Imported 2 students and enrolled them in REAL-PHY · MON · Monday evening.");
+  await page.goto("/staff/students");
+  await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-002" })).toContainText("Import, One");
+  await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-003" })).toContainText("Invitation pending");
+
   // 7. The owner adds an instructor, invites them and assigns them to the batch.
   await page.goto("/staff/team");
   await page.locator("#staff-email").fill("real.instructor@example.invalid");

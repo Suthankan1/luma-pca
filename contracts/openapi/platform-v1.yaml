@@ -799,6 +799,64 @@ paths:
               schema: {$ref: '#/components/schemas/Student'}
         '403': {description: Caller is not a student}
         '404': {description: The account has no student record}
+  /api/v1/students/import:
+    post:
+      summary: Create many students at once, optionally enrolling them all in one batch (implemented; owner/admin)
+      description: >-
+        Every row is checked first (format, repeats within the request, student numbers already
+        used in the academy, emails already used by any account). If any row has a problem,
+        nothing is written and every problem is returned with 200 and imported=false. A dry run
+        only checks. Accounts are created pending activation; no invitations are sent. The audit
+        trail records counts and the batch only.
+      operationId: importStudents
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows]
+              properties:
+                rows:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    type: object
+                    properties:
+                      studentNumber: {type: string}
+                      fullName: {type: string}
+                      email: {type: string}
+                batchId: {type: string, format: uuid, description: 'Optional; requires enrolledOn'}
+                enrolledOn: {type: string, format: date, description: 'Required with batchId'}
+                dryRun: {type: boolean, default: false}
+      responses:
+        '200':
+          description: The check or import result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [imported, rows, enrolled, problems]
+                properties:
+                  imported: {type: boolean, description: 'True only when the students were created'}
+                  rows: {type: integer}
+                  enrolled: {type: integer}
+                  problems:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, field, message]
+                      properties:
+                        row: {type: integer, description: 1-based position in rows}
+                        field: {type: string, enum: [studentNumber, fullName, email]}
+                        message: {type: string}
+        '400': {description: No rows, more than 1000, or batchId and enrolledOn not given together}
+        '403': {description: Caller is not an academy owner or administrator}
+        '404': {description: The batch is not in the caller's academy}
+        '409': {description: The batch is inactive, or a number or email was taken by a concurrent change}
   /api/v1/me/enrollments:
     get:
       summary: The signed-in student's own enrollments (implemented; STUDENT role)

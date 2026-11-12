@@ -18,6 +18,9 @@ interface AccountRepository extends JpaRepository<Account, UUID> {
 
     boolean existsByEmail(String email);
 
+    @Query("select a.email from Account a where a.email in :emails")
+    java.util.List<String> existingEmails(@Param("emails") java.util.Collection<String> emails);
+
     Optional<Account> findByIdAndAcademyId(UUID id, UUID academyId);
 
     @Query("select distinct a from Account a join a.roles r where a.academyId = :academyId and r in :roles order by a.email")

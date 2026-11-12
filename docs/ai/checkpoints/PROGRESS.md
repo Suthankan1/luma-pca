@@ -1362,3 +1362,26 @@ build runs the Next.js default bundler and repeats the smoke test.
   `maven:3.9.9-eclipse-temurin-21` container (source mounted read-only, Maven cache in the
   `luma-m2-cache` volume, Testcontainers through the host Docker socket), so tests run without
   touching the host JDK, `target/`, or other running processes. 297 backend tests passed with it.
+
+## Checkpoint STU-2 — 2026-11-12 — Bulk student import from CSV
+
+- **Branch:** `feature/student-import`. **PR / merge SHA:** see the merged pull request titled
+  "feat(students): bulk student import from CSV".
+- **Implemented:** `POST /api/v1/students/import` (owner/admin; 1–1,000 rows; optional
+  `batchId` + `enrolledOn`; `dryRun`). Every row is checked before anything is written: number
+  format, name, email, repeats within the file, numbers already in the academy, emails already
+  used by any account. Any problem → nothing written, every problem returned by row. Accounts
+  are created pending activation (no invitations sent), inserted in JDBC batches
+  (`hibernate.jdbc.batch_size: 100`). Audit event `STUDENTS_IMPORTED` with counts and batch only.
+  Staff screen `/staff/students/import`: the CSV is read in the browser (columns found by name;
+  quotes, commas, line breaks, BOM handled), "Check file" shows problems by the file's own line
+  numbers, and "Import N students" appears only after a clean check of the same file, batch and date.
+- **Measured:** 600 students with enrolments imported in about 300 ms in the integration test
+  (Testcontainers PostgreSQL in Docker on the Mac; not a capacity claim).
+- **Tests:** backend `StudentImportHttpIntegrationTest` (dry run writes nothing; 600-row import
+  with enrolments, roles and audit without personal data; same file again → every row clashes;
+  10 problem cases by row with nothing written; 403/401/400/404/409 refusals). Frontend unit
+  tests for the CSV reader; Playwright `student-import.spec.ts` (desktop and mobile); real-stack
+  test imports two students into the batch after a refused clash.
+- **Privacy:** the tool exists, but real student data still waits for the privacy questions
+  in `docs/product/OPEN-QUESTIONS.md` to be signed off.

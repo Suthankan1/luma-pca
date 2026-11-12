@@ -93,6 +93,49 @@ public class StudentService {
         }
     }
 
+    /** Of the normalised student numbers, those already used in the academy. */
+    @Transactional(readOnly = true)
+    public Set<String> existingNumbers(UUID academyId, Collection<String> normalizedNumbers) {
+        return normalizedNumbers.isEmpty() ? Set.of() : Set.copyOf(students.existingNumbers(academyId, normalizedNumbers));
+    }
+
+    /** A validated row for {@link #createAll}: normalised number, stripped name, raw email. */
+    public record NewStudent(String studentNumber, String fullName, String email) {
+    }
+
+    /**
+     * Creates students and their pending sign-in accounts in batches, all or nothing. The
+     * caller has validated the rows and checked numbers and emails are new and distinct;
+     * a clash with a concurrent change is reported as a conflict and rolls everything back.
+     */
+    @Transactional
+    public List<StudentView> createAll(CurrentAccount caller, List<NewStudent> rows) {
+        caller.requireAcademyManager();
+        List<AccountSummary> created;
+        try {
+            created = accounts.registerAll(caller.academyId(), rows.stream().map(NewStudent::email).toList(), Set.of(Role.STUDENT));
+        } catch (DuplicateEmailException e) {
+            throw new ConflictException("An email in the file was used by another account meanwhile; check again and retry");
+        }
+        List<Student> made = new java.util.ArrayList<>(rows.size());
+        for (int i = 0; i < rows.size(); i++) {
+            made.add(new Student(caller.academyId(), created.get(i).id(), rows.get(i).studentNumber(), rows.get(i).fullName()));
+        }
+        try {
+            List<Student> saved = students.saveAllAndFlush(made);
+            List<StudentView> views = new java.util.ArrayList<>(saved.size());
+            for (int i = 0; i < saved.size(); i++) {
+                views.add(StudentView.of(saved.get(i), created.get(i)));
+            }
+            return views;
+        } catch (DataIntegrityViolationException e) {
+            if (String.valueOf(e.getMessage()).contains("uq_students_academy_number")) {
+                throw new ConflictException("A student number in the file was used meanwhile; check again and retry");
+            }
+            throw e;
+        }
+    }
+
     /** The student number is the academy's stable identifier and cannot be changed. */
     @Transactional
     public StudentView update(CurrentAccount caller, UUID studentId, String fullName, boolean active, long expectedVersion) {

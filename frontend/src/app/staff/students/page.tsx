@@ -63,6 +63,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
         <h2 id="add-student-title" className="panel-title">ADD</h2>
         <p className="panel-sub">Adding a student also creates their sign-in, waiting for an invitation. Student numbers are stored in capitals and cannot be changed later.</p>
         <AddStudentForm />
+        <p><Link className="text-link" href="/staff/students/import">Import many students from a CSV file →</Link></p>
       </section>
     </div>
   </StaffShell>;
