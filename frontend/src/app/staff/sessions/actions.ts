@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireSameOriginAction, staffApi } from "@/lib/staff-api";
-import { formatClassTime, formatDate, isRealDate, parseSeriesForm, parseSessionForm, problemMessage, submittedValues, uuidOrNull, type FormState } from "@/lib/staff-forms";
+import { formatClassTime, formatDate, isRealDate, isTimeZone, parseSeriesForm, parseSessionForm, problemMessage, submittedValues, uuidOrNull, type FormState } from "@/lib/staff-forms";
 
 // Every action re-validates its input; the API re-checks the caller's role, the academy
 // of every batch, that added batches are active, and the record version.
@@ -102,4 +102,53 @@ export async function cancelSeries(_previous: FormState, form: FormData): Promis
   revalidatePath(`/staff/sessions/${sessionId}`);
   const n = result.data.cancelled;
   return { ok: true, message: n === 0 ? "No scheduled classes in this series from that date." : `${n} class${n === 1 ? "" : "es"} cancelled from ${formatDate(fromDate)}.` };
+}
+
+type SeriesEditResult = { applied: boolean; occurrences: SeriesResult["occurrences"]; conflicts: SeriesResult["conflicts"] };
+export type SeriesEditState = SeriesState;
+
+/** Previews (intent "preview") or applies changes to the rest of a series; applying needs a clean preview of the same details. */
+export async function editSeries(_previous: SeriesEditState, form: FormData): Promise<SeriesEditState> {
+  await requireSameOriginAction();
+  const fields = ["fromDate", "title", "startTime", "endTime", "zoomWebinarId"] as const;
+  const values: Record<string, string> = { ...submittedValues(form, fields), clearWebinar: form.get("clearWebinar") === "yes" ? "yes" : "" };
+  const seriesId = uuidOrNull(form.get("seriesId"));
+  const sessionId = uuidOrNull(form.get("sessionId"));
+  const zone = String(form.get("timeZone") ?? "");
+  if (!seriesId || !sessionId || !isTimeZone(zone)) return { ok: false, message: "That request was not valid. Reload the page.", values };
+  const fromDate = values.fromDate;
+  const title = (values.title ?? "").trim();
+  const startTime = values.startTime ?? "";
+  const endTime = values.endTime ?? "";
+  const webinar = (values.zoomWebinarId ?? "").replace(/[\s-]/g, "");
+  const clearWebinar = values.clearWebinar === "yes";
+  if (!isRealDate(fromDate)) return { ok: false, message: "Enter the first date to change.", values };
+  if (title.length > 200) return { ok: false, message: "A title can be at most 200 characters.", values };
+  if (!startTime !== !endTime) return { ok: false, message: "Give both a start and an end time, or neither.", values };
+  if (startTime && endTime <= startTime) return { ok: false, message: "The class must end after it starts, on the same day.", values };
+  if (webinar && !/^\d{9,20}$/.test(webinar)) return { ok: false, message: "Enter the Zoom webinar ID as digits, such as 812 3456 7890.", values };
+  if (webinar && clearWebinar) return { ok: false, message: "Enter a new webinar ID or remove it, not both.", values };
+  if (!title && !startTime && !webinar && !clearWebinar) return { ok: false, message: "Change the title, the time or the webinar.", values };
+  const body = { fromDate, title: title || null, startTime: startTime || null, endTime: endTime || null, zoomWebinarId: webinar || null, clearWebinar };
+  const key = JSON.stringify(body);
+  const apply = form.get("intent") === "apply";
+  if (apply && form.get("previewKey") !== key) return { ok: false, message: "The details changed since the preview. Preview again.", values };
+  const result = await staffApi<SeriesEditResult>(`/api/v1/class-sessions/series/${seriesId}/changes`,
+    { method: "POST", body: { ...body, dryRun: !apply } }, 15000);
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
+  const { occurrences, conflicts } = result.data;
+  if (conflicts.length > 0) {
+    return { ok: false, values,
+      message: `${conflicts.length === 1 ? "One class would overlap" : `${conflicts.length} classes would overlap`} a class already scheduled for these batches. Nothing has changed.`,
+      conflicts: conflicts.map(c => ({ label: `${formatDate(c.localDate)} overlaps “${c.title}”, ${formatClassTime(c.startsAt, c.endsAt, zone)}`,
+        link: `/staff/sessions/${c.sessionId}` })) };
+  }
+  const n = occurrences.length;
+  if (!result.data.applied) {
+    return { ok: true, values, message: `${n} class${n === 1 ? "" : "es"} will change. Nothing has been changed yet.`,
+      preview: { key, classes: occurrences.map(o => formatClassTime(o.startsAt, o.endsAt, zone)) } };
+  }
+  revalidatePath("/staff/sessions");
+  revalidatePath(`/staff/sessions/${sessionId}`);
+  return { ok: true, message: `Changed ${n} class${n === 1 ? "" : "es"} from ${formatDate(fromDate)}. Zoom links follow the new time and webinar.` };
 }

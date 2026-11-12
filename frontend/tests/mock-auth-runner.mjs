@@ -389,6 +389,42 @@ function studentInvitations(req, body, send, sub) {
 
 // Weekly series (Asia/Colombo only, UTC+05:30): the same preview, overlap and cancellation rules as the API.
 function classSeries(body, send, seriesId, action) {
+  if (seriesId && action === "changes") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(body.fromDate ?? "")) return send(400, { detail: "fromDate is required" });
+    const series = classSessions.filter(s => s.seriesId === seriesId);
+    if (series.length === 0) return send(404, { detail: "Not found" });
+    const affected = series.filter(s => s.status === "SCHEDULED" && localDate(s.startsAt, s.timeZone) >= body.fromDate);
+    if (affected.length === 0) return send(400, { detail: "This series has no scheduled classes on or after that date" });
+    const webinar = body.clearWebinar ? null : body.zoomWebinarId?.replace(/[\s-]/g, "") || undefined;
+    const planned = affected.map(s => {
+      const day = localDate(s.startsAt, s.timeZone);
+      const startsAt = body.startTime ? new Date(Date.parse(`${day}T${body.startTime}:00+05:30`)).toISOString() : s.startsAt;
+      const endsAt = body.startTime ? new Date(Date.parse(`${day}T${body.endTime}:00+05:30`)).toISOString() : s.endsAt;
+      return { session: s, localDate: day, startsAt, endsAt, id: s.id };
+    });
+    const conflicts = [];
+    for (const o of planned) {
+      for (const other of classSessions) {
+        if (other.status === "SCHEDULED" && !affected.includes(other) && other.batchIds.some(b => o.session.batchIds.includes(b))
+          && other.startsAt < o.endsAt && other.endsAt > o.startsAt) {
+          conflicts.push({ localDate: o.localDate, sessionId: other.id, title: other.title, startsAt: other.startsAt, endsAt: other.endsAt });
+        }
+      }
+    }
+    const occurrences = planned.map(o => ({ localDate: o.localDate, startsAt: o.startsAt, endsAt: o.endsAt, id: o.id }));
+    if (body.dryRun || conflicts.length) return send(200, { applied: false, occurrences, conflicts });
+    const webinars = new Set(affected.map(s => s.zoomWebinarId));
+    for (const o of planned) {
+      Object.assign(o.session, { startsAt: o.startsAt, endsAt: o.endsAt, version: o.session.version + 1,
+        ...(body.title ? { title: String(body.title).trim() } : {}), ...(webinar !== undefined ? { zoomWebinarId: webinar } : {}) });
+      webinars.add(o.session.zoomWebinarId);
+    }
+    reviseLinks([...webinars]);
+    audit("CLASS_SERIES_UPDATED", "CLASS_SERIES", seriesId, null, { fromDate: body.fromDate, classes: String(affected.length),
+      changed: [body.startTime && "time", body.title && "title", webinar !== undefined && "webinar"].filter(Boolean),
+      ...(body.startTime ? { startTime: body.startTime, endTime: body.endTime } : {}) });
+    return send(200, { applied: true, occurrences, conflicts: [] });
+  }
   if (seriesId) {
     if (action !== "cancellations" || !/^\d{4}-\d{2}-\d{2}$/.test(body.fromDate ?? "")) return send(400, { detail: "fromDate is required" });
     const series = classSessions.filter(s => s.seriesId === seriesId);

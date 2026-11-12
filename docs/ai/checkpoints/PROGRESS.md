@@ -1551,7 +1551,8 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint AUD-2 — 2026-11-13 — Timetable changes audited; failed invitations listed
 
 - **Branch:** `feature/timetable-audit`. **PR / merge SHA:** see the merged pull request titled
-  "feat(audit): record timetable changes and list failed invitation emails".
+  "feat(audit): record timetable changes and list failed invitation emails" (PR #57, merge commit
+  `50ff4cd`; all CI checks green).
 - **Timetable audit:** attendance is judged against the timetable, so every change is now in the
   activity log: `CLASS_SCHEDULED` (time, zone, batch count, webinar set or not), `CLASS_UPDATED` (which
   fields changed; old and new time when it moved; batches added/removed), `CLASS_CANCELLED`,
@@ -1568,3 +1569,20 @@ build runs the Next.js default bundler and repeats the smoke test.
   runs: backend 330 tests, 48 unit tests, 80 Playwright tests passed.
 - **Tooling:** `src/lib/activity.ts` imports `./staff-forms.ts` with its extension so Node's test
   runner can load it; `allowImportingTsExtensions` is on (the app never emits TypeScript).
+
+## Checkpoint SES-3 — 2026-11-13 — Change the rest of a weekly series
+
+- **Branch:** `feature/series-edit`. **PR / merge SHA:** see the merged pull request titled
+  "feat(sessions): change the rest of a weekly series at once".
+- **Implemented:** `POST /api/v1/class-sessions/series/{id}/changes` (fromDate; any of title, start and
+  end time, webinar ID or clearing it; dryRun). Applies to the series' scheduled classes from the date,
+  each keeping its own date, zone and batches; cancelled ones are left alone. If a class would overlap a
+  scheduled class of the same batches outside the change, nothing changes and the overlaps are listed.
+  Zoom links are re-checked per class; one `CLASS_SERIES_UPDATED` audit event. Class page: "Change the
+  rest of the series" (preview, then apply only after a clean preview of the same details); the activity
+  log describes it.
+- **Tests:** 4 new backend tests (preview then apply with earlier and cancelled classes untouched and the
+  audit details; overlap refusal including with a title change; webinar change and clear; validation and
+  access). Playwright series spec retimes the rest of a series and finds it in the activity log. Full
+  local runs: backend 334, unit 49, Playwright 80 passed.
+- **Closes** the SES-2 caveat "editing a whole series at once".

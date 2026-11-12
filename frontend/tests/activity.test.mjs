@@ -53,3 +53,9 @@ test("timetable changes, in the class's own time zone", () => {
   assert.deepEqual(describeActivity(event("CLASS_SERIES_CANCELLED", { fromDate: "2027-03-22", cancelled: "1" },
     { targetType: "CLASS_SERIES", targetLabel: null })), { summary: "Cancelled 1 class of a weekly series", detail: "From 22 Mar 2027" });
 });
+
+test("changing the rest of a series", () => {
+  assert.deepEqual(describeActivity(event("CLASS_SERIES_UPDATED", { fromDate: "2027-01-18", classes: "3", changed: ["time", "title"],
+    startTime: "17:30", endTime: "19:30" }, { targetType: "CLASS_SERIES", targetLabel: null })),
+    { summary: "Changed 3 classes of a weekly series", detail: "From 18 Jan 2027; changed time 17:30–19:30, title" });
+});
