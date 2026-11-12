@@ -351,4 +351,75 @@ class StaffAccountHttpIntegrationTest extends StaffApiIntegrationTest {
         assertThrows(DataAccessException.class, () -> jdbc.update("DELETE FROM audit_events"));
         assertEquals(4, jdbc.queryForObject("SELECT count(*) FROM audit_events", Integer.class));
     }
+
+    private HttpResponse<String> enable(String token, Object accountId, String body) {
+        return api.post("/api/v1/staff-accounts/" + accountId + "/enable", body, token);
+    }
+
+    @Test
+    void aReEnabledAccountSignsInWithItsPasswordButOldSessionsStayEnded() {
+        String address = activeStaff(admin, "INSTRUCTOR");
+        Map<String, Object> before = HttpApi.parse(passwordLogin(address));
+        Object id = accounts.findByEmail(address).orElseThrow().id();
+        assertEquals(200, disable(admin, id).statusCode());
+
+        HttpResponse<String> response = enable(admin, id, "");
+
+        assertEquals(200, response.statusCode(), response.body());
+        assertEquals("ACTIVE", HttpApi.parse(response).get("status"));
+        assertEquals(401, api.get("/api/v1/auth/me", (String) before.get("accessToken")).statusCode(), "old tokens stay invalid");
+        assertEquals(401, api.post("/api/v1/auth/refresh", HttpApi.json(Map.of("refreshToken", (String) before.get("refreshToken"))))
+                .statusCode(), "old sessions stay ended");
+        HttpResponse<String> again = passwordLogin(address);
+        assertEquals(200, again.statusCode(), "signs in with the same password");
+        assertEquals(200, api.get("/api/v1/auth/me", (String) HttpApi.parse(again).get("accessToken")).statusCode());
+
+        assertEquals(200, enable(admin, id, "").statusCode(), "enabling an active account changes nothing");
+        assertEquals(1, auditCount("STAFF_ACCOUNT_ENABLED"));
+        assertEquals("{\"statusNow\": \"ACTIVE\", \"newPasswordRequired\": \"false\"}", jdbc.queryForObject(
+                "SELECT details::text FROM audit_events WHERE action = 'STAFF_ACCOUNT_ENABLED'", String.class));
+    }
+
+    @Test
+    void reEnablingCanRequireANewPasswordFromAFreshInvitation() {
+        String address = activeStaff(admin, "INSTRUCTOR");
+        Object id = accounts.findByEmail(address).orElseThrow().id();
+        assertEquals(200, disable(admin, id).statusCode());
+
+        HttpResponse<String> response = enable(admin, id, "{\"requireNewPassword\":true}");
+
+        assertEquals(200, response.statusCode(), response.body());
+        assertEquals("PENDING_ACTIVATION", HttpApi.parse(response).get("status"));
+        assertEquals(401, passwordLogin(address).statusCode(), "the old password no longer works");
+        assertEquals(204, activateWithInvitation((String) HttpApi.parse(invite(admin, id)).get("activationToken")));
+        assertEquals(200, passwordLogin(address).statusCode());
+    }
+
+    @Test
+    void anAccountDisabledBeforeActivationReturnsToPending() {
+        Object id = created(admin, email("pending"), "INSTRUCTOR").get("id");
+        String token = (String) HttpApi.parse(invite(admin, id)).get("activationToken");
+        assertEquals(200, disable(admin, id).statusCode());
+
+        assertEquals("PENDING_ACTIVATION", HttpApi.parse(enable(admin, id, "")).get("status"));
+        assertEquals(400, activateWithInvitation(token), "the invitation issued before the disable no longer works");
+        assertEquals(204, activateWithInvitation((String) HttpApi.parse(invite(admin, id)).get("activationToken")));
+    }
+
+    @Test
+    void onlyOwnersReEnableOwnersAndAdministratorsAndNobodyOutsideTheAcademy() {
+        String adminAddress = activeStaff(owner, "ACADEMY_ADMIN");
+        Object otherAdmin = accounts.findByEmail(adminAddress).orElseThrow().id();
+        assertEquals(200, disable(owner, otherAdmin).statusCode());
+        assertEquals(403, enable(admin, otherAdmin, "").statusCode(), "an administrator cannot re-enable an administrator");
+        assertEquals(403, enable(tokenFor(academyId, Role.INSTRUCTOR), otherAdmin, "").statusCode());
+        assertEquals(404, enable(tokenFor(academy("Other Academy"), Role.ACADEMY_OWNER), otherAdmin, "").statusCode());
+        assertEquals("DISABLED", HttpApi.parse(api.get("/api/v1/staff-accounts/" + otherAdmin, owner)).get("status"));
+        assertEquals(200, enable(owner, otherAdmin, "").statusCode());
+
+        Map<String, Object> studentRecord = new com.physicscube.luma.support.AcademyFixtures(api, admin)
+                .student("PCA-1", "student.enable@example.invalid");
+        assertEquals(404, enable(admin, studentRecord.get("accountId"), "").statusCode(), "students are not staff accounts");
+        assertEquals(404, enable(admin, UUID.randomUUID(), "").statusCode());
+    }
 }

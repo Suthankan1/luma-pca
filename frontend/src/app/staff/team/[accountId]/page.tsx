@@ -2,13 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
 import { InviteForm } from "@/components/staff/InviteForm";
-import { DisableForm, RolesForm } from "@/components/staff/TeamForms";
+import { DisableForm, EnableForm, RolesForm } from "@/components/staff/TeamForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { accountStatusLabels, canManageStaff, grantableRoles, isAcademyManager, roleList, uuidOrNull } from "@/lib/staff-forms";
 
-type StaffAccount = { id: string; email: string; roles: string[]; status: string; mfaEnrolled: boolean; version: number };
+type StaffAccount = { id: string; email: string; roles: string[]; status: string; mfaEnrolled: boolean; version: number; passwordSet?: boolean };
 
 export const metadata = { title: "Staff member · LUMA" };
 
@@ -45,6 +45,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ ac
         {person.status !== "DISABLED" && manageable && <DisableForm id={person.id} email={person.email} />}
         {(self || !manageable) && <p className="panel-sub">{self ? "You can’t disable your own account." : "Only an owner can manage this account."}</p>}
         {person.status === "DISABLED" && <p className="panel-sub">Disabled accounts cannot sign in.</p>}
+        {person.status === "DISABLED" && manageable && <EnableForm id={person.id} email={person.email} hadPassword={person.passwordSet === true} />}
       </section>
     </div>
   </StaffShell>;

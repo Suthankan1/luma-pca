@@ -54,7 +54,7 @@ test.describe("Staff accounts and batch assignments", () => {
     await addStaff(page, `leaver.${p}@example.invalid`, ["Analyst"]);
     await page.getByRole("link", { name: "Open their record →" }).click();
     await expect(page.getByRole("button", { name: "Disable account" })).toBeVisible();
-    await page.getByLabel("I understand this cannot be undone yet").check();
+    await page.getByLabel("Sign this person out everywhere and block sign-in").check();
     await page.getByRole("button", { name: "Disable account" }).click();
     // The page re-renders with the new state; the disable form is gone because there is nothing left to disable.
     await expect(page.getByText("Disabled accounts cannot sign in.")).toBeVisible();
@@ -62,6 +62,34 @@ test.describe("Staff accounts and batch assignments", () => {
     await page.reload();
     await expect(page.locator(".sub").first()).toContainText("Account disabled");
     await expect(page.getByRole("button", { name: "Disable account" })).toHaveCount(0);
+
+    // Never activated: re-enabling returns the account to waiting for an invitation.
+    await expect(page.getByText(`leaver.${p}@example.invalid never set a password, so they will need a new invitation.`)).toBeVisible();
+    await page.getByRole("button", { name: "Re-enable account" }).click();
+    await expect(page.locator(".sub").first()).toContainText("Invitation pending");
+    await expect(page.getByRole("button", { name: "Create invitation link" })).toBeVisible();
+  });
+
+  test("A disabled staff member is re-enabled with their password, or made to choose a new one", async ({ page }) => {
+    await signInAsAdmin(page);
+    await page.goto("/staff/team");
+    await page.getByRole("link", { name: `former.${p}@example.invalid` }).click();
+    await page.getByLabel("Sign this person out everywhere and block sign-in").check();
+    await page.getByRole("button", { name: "Disable account" }).click();
+    await expect(page.locator(".sub").first()).toContainText("Account disabled");
+
+    await expect(page.getByText(/can sign in again with their existing password/)).toBeVisible();
+    await page.getByRole("button", { name: "Re-enable account" }).click();
+    await expect(page.locator(".sub").first()).toContainText("Account active");
+    await expect(page.getByRole("button", { name: "Disable account" })).toBeVisible();
+
+    await page.getByLabel("Sign this person out everywhere and block sign-in").check();
+    await page.getByRole("button", { name: "Disable account" }).click();
+    await expect(page.locator(".sub").first()).toContainText("Account disabled");
+    await page.getByLabel(/Make them choose a new password/).check();
+    await page.getByRole("button", { name: "Re-enable account" }).click();
+    await expect(page.locator(".sub").first()).toContainText("Invitation pending");
+    await expect(page.getByRole("button", { name: "Create invitation link" })).toBeVisible();
   });
 
   test("Invitations are emailed to the person, or refused clearly when email is not set up", async ({ page }) => {

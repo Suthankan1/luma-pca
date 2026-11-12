@@ -128,7 +128,7 @@ public class StaffAccountService {
         return view(saved);
     }
 
-    /** Blocks sign-in, ends every session and rejects existing tokens. There is no re-enable yet. */
+    /** Blocks sign-in, ends every session and rejects existing tokens. {@link #enable} undoes it. */
     @Transactional
     public StaffAccountView disable(CurrentAccount caller, UUID accountId) {
         Account me = lockAndReloadCaller(caller);
@@ -147,6 +147,30 @@ public class StaffAccountService {
         Account saved = accounts.saveAndFlush(target);
         sessions.revokeAll(target.getId());
         audit.record(caller.academyId(), me.getId(), "STAFF_ACCOUNT_DISABLED", "ACCOUNT", target.getId(), Map.of());
+        return view(saved);
+    }
+
+    /**
+     * Lets a disabled staff member sign in again, under the same rules as disabling (only an
+     * owner may re-enable an owner or administrator). With {@code requireNewPassword} the
+     * account returns to pending activation, its old password removed and any open invitation
+     * revoked, so they set a new password from a fresh invitation. Sessions ended by the
+     * disable stay ended. Enabling an account that is not disabled changes nothing.
+     */
+    @Transactional
+    public StaffAccountView enable(CurrentAccount caller, UUID accountId, boolean requireNewPassword) {
+        Account me = lockAndReloadCaller(caller);
+        Account target = staff(caller, accountId);
+        requireMayManage(me, target);
+        if (target.getStatus() != AccountStatus.DISABLED) {
+            return view(target);
+        }
+        target.enable(requireNewPassword);
+        Account saved = accounts.saveAndFlush(target);
+        invitations.revoke(target.getId());
+        audit.record(caller.academyId(), me.getId(), "STAFF_ACCOUNT_ENABLED", "ACCOUNT", target.getId(),
+                Map.of("newPasswordRequired", String.valueOf(saved.getStatus() == AccountStatus.PENDING_ACTIVATION),
+                        "statusNow", saved.getStatus().name()));
         return view(saved);
     }
 
@@ -257,6 +281,6 @@ public class StaffAccountService {
 
     private StaffAccountView view(Account account) {
         return new StaffAccountView(account.getId(), account.getEmail(), names(account.getRoles()), account.getStatus().name(),
-                mfa.isEnrolled(account.getId()), account.getVersion(), account.getCreatedAt());
+                mfa.isEnrolled(account.getId()), account.getVersion(), account.getCreatedAt(), account.getPasswordHash() != null);
     }
 }

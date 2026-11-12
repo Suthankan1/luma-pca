@@ -181,6 +181,9 @@ const staff = [
   { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["ACADEMY_ADMIN"], status: "ACTIVE", mfaEnrolled: true, version: 0 },
   { id: "00000000-0000-4000-8000-0000000000bb", email: "owner@example.invalid", roles: ["ACADEMY_OWNER"], status: "ACTIVE", mfaEnrolled: true, version: 0 },
   { id: "00000000-0000-4000-8000-0000000000cc", email: "analyst@example.invalid", roles: ["ANALYST"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
+  // Active instructors the team spec disables and re-enables, one per browser project.
+  { id: "00000000-0000-4000-8000-0000000000d7", email: "former.d@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
+  { id: "00000000-0000-4000-8000-0000000000d8", email: "former.m@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
 ];
 const assignments = [];
 const ELEVATED = ["ACADEMY_OWNER", "ACADEMY_ADMIN"];
@@ -486,7 +489,15 @@ function academicApi(req, body, send) {
       return send(200, person);
     }
     if (req.method === "POST" && sub === "disable") {
+      if (person.status !== "DISABLED") person.passwordSet = person.status === "ACTIVE" || person.passwordSet === true;
       Object.assign(person, { status: "DISABLED" });
+      return send(200, person);
+    }
+    if (req.method === "POST" && sub === "enable") {
+      if (person.status === "DISABLED") {
+        const fresh = body?.requireNewPassword === true || !person.passwordSet;
+        Object.assign(person, { status: fresh ? "PENDING_ACTIVATION" : "ACTIVE", passwordSet: !fresh, version: person.version + 1 });
+      }
       return send(200, person);
     }
     return send(405);

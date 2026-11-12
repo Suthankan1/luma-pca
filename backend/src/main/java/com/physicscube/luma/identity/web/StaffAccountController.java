@@ -73,6 +73,17 @@ class StaffAccountController {
         return staff.replaceRoles(CurrentAccount.from(authentication), accountId, request.roles(), request.version());
     }
 
+    record EnableRequest(Boolean requireNewPassword) {
+    }
+
+    /** Re-enables a disabled staff account; with requireNewPassword it returns to pending activation. */
+    @PostMapping("/api/v1/staff-accounts/{accountId}/enable")
+    StaffAccountView enable(JwtAuthenticationToken authentication, @PathVariable UUID accountId,
+                            @RequestBody(required = false) EnableRequest request) {
+        return staff.enable(CurrentAccount.from(authentication), accountId,
+                request != null && Boolean.TRUE.equals(request.requireNewPassword()));
+    }
+
     @PostMapping("/api/v1/staff-accounts/{accountId}/disable")
     StaffAccountView disable(JwtAuthenticationToken authentication, @PathVariable UUID accountId) {
         return staff.disable(CurrentAccount.from(authentication), accountId);
