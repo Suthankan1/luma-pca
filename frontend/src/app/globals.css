@@ -94,7 +94,7 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .link-button { color: var(--pca-blue); font-size: 12px; text-decoration: underline; background: none; padding: 6px 2px; cursor: pointer; min-height: 32px; }
 .inline-error { color: #a4161a; font-size: 12px; white-space: normal; }
 :focus-visible { outline: 3px solid var(--pca-cyan); outline-offset: 2px; }
-@media (max-width: 960px) { .staff-grid { grid-template-columns: 1fr; } .staff-nav { flex-direction: row; flex-wrap: wrap; } .staff-railfoot { margin-top: 0; } }
+@media (max-width: 960px) { .staff-grid { grid-template-columns: 1fr; } .staff-nav { flex-direction: row; flex-wrap: wrap; width: 100%; min-width: 0; } .shell { grid-template-columns: minmax(0, 1fr); } .staff-railfoot { margin-top: 0; } }
 @media (max-width: 580px) { .dir-row { flex-direction: column; align-items: flex-start; gap: 6px; } .form-pair { grid-template-columns: 1fr; } }
 .text-link { color: var(--pca-blue); text-decoration: underline; text-underline-offset: 3px; }
 .text-link strong { color: inherit; }

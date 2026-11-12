@@ -46,6 +46,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ ac
         {(self || !manageable) && <p className="panel-sub">{self ? "You can’t disable your own account." : "Only an owner can manage this account."}</p>}
         {person.status === "DISABLED" && <p className="panel-sub">Disabled accounts cannot sign in.</p>}
         {person.status === "DISABLED" && manageable && <EnableForm id={person.id} email={person.email} hadPassword={person.passwordSet === true} />}
+        <p className="panel-sub"><Link className="text-link" href={`/staff/activity?target=${person.id}`}>See this account’s activity →</Link></p>
       </section>
     </div>
   </StaffShell>;

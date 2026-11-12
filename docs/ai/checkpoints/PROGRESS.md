@@ -1505,3 +1505,27 @@ build runs the Next.js default bundler and repeats the smoke test.
   → 401), everything else 404. The owner must update the Zoom subscription URL and validate it.
   The stop also showed the script left its web server running (it killed the wrapper subshell);
   the server is now started with `exec`, so stopping the script stops it.
+
+## Checkpoint AUD-1 — 2026-11-13 — Activity log
+
+- **Branch:** `feature/activity-log`. **PR / merge SHA:** see the merged pull request titled
+  "feat(audit): activity log for owners and administrators".
+- **Implemented:** `GET /api/v1/audit-events` (owner/admin, read-only): newest first, keyset paging
+  on (time, id) so events sharing a timestamp page correctly, filters by area (staff, sign-in,
+  students, zoom) or by one record (`targetId`), with the actor's email and a target label
+  (account email, batch code, class title). `/staff/activity` describes each action in plain
+  language ("Disabled …", "Imported 600 students", "Zoom links re-checked after … changed") with
+  who did it and when; the staff record page links to that account's history. New "Activity log"
+  item in the staff navigation.
+- **Found and fixed:** the seventh navigation item made the rail wider than a phone screen, which
+  stretched every staff page on phones (412 px screen, 449 px page) and made taps land in the wrong
+  place. The phone layout's column can no longer grow past the screen, and the menu wraps inside it.
+- **Tests:** backend `AuditEventHttpIntegrationTest` (4 tests: order and labels, area and record
+  filters, paging across same-instant events without gaps or repeats, access and validation).
+  Unit tests for the descriptions; Playwright `activity-log.spec.ts` (desktop and mobile, including
+  a phone-fit check on the record and activity pages).
+- **Local verification note:** the full backend suite could not finish locally: another project's
+  ~20 containers took most of Docker's 4 GB and the test JVM was killed before running ("forked VM
+  terminated"); the new audit test had passed on its own earlier. The CI job is the full run.
+- **Also on 13 Nov:** an app restart closed the tunnel's terminal; the backend behind the still-running
+  tunnel was restarted with the new `resume` mode (PR #54, `0582e8f`), keeping the validated Zoom URL.

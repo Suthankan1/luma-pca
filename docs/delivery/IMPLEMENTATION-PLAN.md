@@ -16,6 +16,7 @@
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | DONE for the routes that exist: cross-academy, batch-scope, student-ownership and role tests (002A, 002B). Extend with every new resource |
 | 001H Staff account administration | Create staff, change roles, disable, issue invitations; escalation and last-owner rules; audit trail | DONE (API; staff screens in UI-3a) |
 | 001N Re-enable staff accounts | Undo a disable, optionally requiring a new password; same role rules | DONE: enable API (old sessions stay ended, lockout cleared, audited), "Re-enable account" on the staff record |
+| AUD-1 Activity log | Owners and administrators read the audit trail in plain language, by area or per record | DONE: read-only keyset-paged API with actor and target labels, `/staff/activity` page, per-account history link |
 | 001I Browser account activation | Next.js page that redeems an invitation and sets a password | DONE: `/activate`, code read from the link fragment, Playwright and real-stack tests |
 | 001J Password reset by email | Self-service reset link by SMTP; browser pages | DONE: API and SMTP sender (part 1); `/forgot-password` and `/reset-password` pages, real SMTP run through Mailpit in the real-stack test (part 2). Email provider still to be chosen by the academy |
 | 001K Emailed invitations | Administrators email the activation link instead of copying it; shared email settings | DONE: `delivery: EMAIL` on the invitation API (link not returned), "Email invitation" button, real SMTP run for an instructor |
