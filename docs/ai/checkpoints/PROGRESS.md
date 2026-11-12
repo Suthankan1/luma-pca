@@ -1483,7 +1483,8 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint 001N — 2026-11-13 — Re-enable staff accounts
 
 - **Branch:** `feature/staff-reenable`. **PR / merge SHA:** see the merged pull request titled
-  "feat(staff): re-enable disabled staff accounts".
+  "feat(staff): re-enable disabled staff accounts" (PR #52, merge commit `992dcf0`; all CI
+  checks green).
 - **Implemented:** `POST /api/v1/staff-accounts/{id}/enable {requireNewPassword}` under the same
   rules as disabling (only an owner for owner or administrator accounts; staff of the caller's
   academy only, never students). The account returns ACTIVE with its existing password and
@@ -1498,5 +1499,9 @@ build runs the Next.js default bundler and repeats the smoke test.
   the old invitation is dead; owner-only for administrators, other academies 404, students 404).
   Playwright team spec on desktop and mobile.
 - **Environment note:** overnight the Mac slept; Cloudflare dropped the quick tunnel ("Tunnel not
-  found", 18:55 UTC 12 Nov) while the local services kept running. The tunnel must be restarted
-  and the Zoom subscription URL updated and re-validated before the 13 Nov 11:00 test webinar.
+  found", 18:55 UTC 12 Nov) while the local services kept running. Restarted at 00:40 Colombo on
+  13 Nov under `caffeinate -i` (idle sleep prevented while the script runs; a closed lid still
+  sleeps); checked from outside: only `POST /api/v1/zoom/webhooks` reaches the backend (unsigned
+  → 401), everything else 404. The owner must update the Zoom subscription URL and validate it.
+  The stop also showed the script left its web server running (it killed the wrapper subshell);
+  the server is now started with `exec`, so stopping the script stops it.
