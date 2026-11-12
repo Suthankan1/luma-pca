@@ -85,3 +85,11 @@ public URL stops working while the local services keep running. Start the tunnel
 `caffeinate -i scripts/zoom-test-tunnel.sh` to prevent idle sleep for as long as it runs (a
 closed lid still sleeps). After any restart, paste the new URL into the Zoom app's event
 subscription and validate it.
+
+## If the terminal running the tunnel was closed
+
+Closing the shell that ran the script (for example an app restart) ends the backend and web app
+but can leave the PostgreSQL, proxy and Cloudflare containers running, so the public URL answers
+404 for everything while webhooks fail behind it. Run `caffeinate -i scripts/zoom-test-tunnel.sh resume`:
+it restarts only the backend and web app behind the running tunnel, so the URL — and the Zoom
+subscription — stay the same. (This happened on 13 Nov at about 01:20 Colombo and was resumed this way.)
