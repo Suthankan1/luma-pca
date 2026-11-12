@@ -16,6 +16,12 @@ attendance. Fixture tests cannot show that.
   and a temporary Cloudflare quick tunnel. Stop the script after the test; the URL dies with it.
 - Secrets live only in `.env.zoom-test` (gitignored, mode 600). Never paste them into chat,
   tickets or commits.
+- **Do not let browser automation read the app's Features or App Credentials pages.** Zoom puts
+  the Secret Token inside the token field's accessible label, so any element search or page
+  read there returns it. Do the event-subscription step by hand, or regenerate the token
+  afterwards.
+- The test owner's activation link is written to `.env.zoom-test-owner-link` (gitignored,
+  mode 600), never to the screen.
 
 ## Steps
 
