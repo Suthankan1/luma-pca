@@ -77,3 +77,11 @@ With a throwaway token, over the live tunnel URL: every other path answered 404 
 webhook path 403); Zoom-style URL validation returned the correct signed token; a signed
 join for the allowed webinar was stored and processed into an occurrence; a signed join for
 another webinar was acknowledged but not stored; an unsigned one got 401.
+
+## Keep the Mac awake
+
+A sleeping Mac loses the quick tunnel: Cloudflare forgets the name ("Tunnel not found") and the
+public URL stops working while the local services keep running. Start the tunnel with
+`caffeinate -i scripts/zoom-test-tunnel.sh` to prevent idle sleep for as long as it runs (a
+closed lid still sleeps). After any restart, paste the new URL into the Zoom app's event
+subscription and validate it.
