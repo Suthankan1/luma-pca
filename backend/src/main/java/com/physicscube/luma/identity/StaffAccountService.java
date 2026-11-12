@@ -8,6 +8,7 @@ import com.physicscube.luma.identity.domain.Role;
 import com.physicscube.luma.shared.api.ConflictException;
 import com.physicscube.luma.shared.api.InvalidRequestException;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
+import com.physicscube.luma.shared.api.ServiceUnavailableException;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import java.util.EnumSet;
 import java.util.List;
@@ -46,9 +47,13 @@ public class StaffAccountService {
     private final RefreshSessions sessions;
     private final AuditLog audit;
     private final JdbcTemplate jdbc;
+    private final MailProperties mail;
+    private final AccountMailer mailer;
+    private final MailDelivery delivery;
 
     StaffAccountService(AccountRepository accounts, AccountService accountService, InvitationService invitations,
-                        MfaService mfa, RefreshSessions sessions, AuditLog audit, JdbcTemplate jdbc) {
+                        MfaService mfa, RefreshSessions sessions, AuditLog audit, JdbcTemplate jdbc,
+                        MailProperties mail, AccountMailer mailer, MailDelivery delivery) {
         this.accounts = accounts;
         this.accountService = accountService;
         this.invitations = invitations;
@@ -56,6 +61,9 @@ public class StaffAccountService {
         this.sessions = sessions;
         this.audit = audit;
         this.jdbc = jdbc;
+        this.mail = mail;
+        this.mailer = mailer;
+        this.delivery = delivery;
     }
 
     @Transactional(readOnly = true)
@@ -148,6 +156,19 @@ public class StaffAccountService {
      */
     @Transactional
     public IssuedInvitation invite(CurrentAccount caller, UUID accountId) {
+        return invite(caller, accountId, false);
+    }
+
+    /**
+     * As {@link #invite(CurrentAccount, UUID)}; with {@code email} the link is also emailed
+     * to the account's address after the change commits. Refused (503) when email is not
+     * configured, before anything changes.
+     */
+    @Transactional
+    public IssuedInvitation invite(CurrentAccount caller, UUID accountId, boolean email) {
+        if (email && !mail.enabled()) {
+            throw new ServiceUnavailableException("Email is not set up for this academy yet. Create a link to copy instead.");
+        }
         Account me = lockAndReloadCaller(caller);
         Account target = accounts.findByIdAndAcademyId(accountId, caller.academyId())
                 .orElseThrow(() -> new ResourceNotFoundException("Account"));
@@ -157,7 +178,12 @@ public class StaffAccountService {
         }
         IssuedInvitation issued = invitations.issue(target.getId(), me.getId());
         audit.record(caller.academyId(), me.getId(), "INVITATION_ISSUED", "ACCOUNT", target.getId(),
-                Map.of("expiresAt", issued.expiresAt().toString()));
+                Map.of("expiresAt", issued.expiresAt().toString(), "delivery", email ? "EMAIL" : "LINK"));
+        if (email) {
+            String to = target.getEmail();
+            String link = mail.webOrigin() + "/activate#token=" + issued.token();
+            delivery.afterCommit(target.getId(), "Invitation", () -> mailer.invitation(to, link, issued.expiresAt()));
+        }
         return issued;
     }
 

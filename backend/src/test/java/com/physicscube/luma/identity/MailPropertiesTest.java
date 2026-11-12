@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mail.MailSender;
 import org.springframework.mail.SimpleMailMessage;
 
-class PasswordResetPropertiesTest {
-    private static PasswordResetProperties enabled(String from, String origin) {
-        return new PasswordResetProperties(true, from, origin, Duration.ofMinutes(30), 3);
+class MailPropertiesTest {
+    private static MailProperties enabled(String from, String origin) {
+        return new MailProperties(true, from, origin);
     }
 
     @Test
@@ -29,17 +29,18 @@ class PasswordResetPropertiesTest {
         }
         assertThrows(IllegalArgumentException.class, () -> enabled(null, "https://x.invalid"));
         assertThrows(IllegalArgumentException.class, () -> enabled("Name <a@b.c>", "https://x.invalid"));
+        new MailProperties(false, null, null);
     }
 
     @Test
-    void disabledNeedsNoSenderOrOriginButLimitsAreAlwaysChecked() {
-        new PasswordResetProperties(false, null, null, Duration.ofMinutes(30), 3);
-        assertThrows(IllegalArgumentException.class, () -> new PasswordResetProperties(false, null, null, Duration.ofMinutes(1), 3));
-        assertThrows(IllegalArgumentException.class, () -> new PasswordResetProperties(false, null, null, Duration.ofMinutes(30), 0));
+    void resetLimitsAreChecked() {
+        new PasswordResetProperties(Duration.ofMinutes(30), 3);
+        assertThrows(IllegalArgumentException.class, () -> new PasswordResetProperties(Duration.ofMinutes(1), 3));
+        assertThrows(IllegalArgumentException.class, () -> new PasswordResetProperties(Duration.ofMinutes(30), 0));
     }
 
     @Test
-    void theEmailIsPlainTextWithTheLinkAndItsLifetime() {
+    void emailsArePlainTextWithTheLinkAndItsLifetime() {
         List<SimpleMailMessage> sent = new ArrayList<>();
         MailSender sender = new MailSender() {
             @Override
@@ -52,13 +53,20 @@ class PasswordResetPropertiesTest {
                 sent.addAll(List.of(messages));
             }
         };
-        new SmtpPasswordResetMailer(sender, "no-reply@example.invalid")
-                .send("person@example.invalid", "https://luma.example.invalid/reset-password#token=abc", Instant.now().plusSeconds(1800));
-        SimpleMailMessage message = sent.get(0);
-        assertEquals("no-reply@example.invalid", message.getFrom());
-        assertEquals("person@example.invalid", message.getTo()[0]);
-        assertEquals("Reset your LUMA password", message.getSubject());
-        assertTrue(message.getText().contains("within 30 minutes:\nhttps://luma.example.invalid/reset-password#token=abc\n"), message.getText());
-        assertTrue(message.getText().contains("still need their authenticator code"));
+        SmtpAccountMailer mailer = new SmtpAccountMailer(sender, "no-reply@example.invalid");
+        mailer.passwordReset("person@example.invalid", "https://luma.example.invalid/reset-password#token=abc", Instant.now().plusSeconds(1800));
+        mailer.invitation("person@example.invalid", "https://luma.example.invalid/activate#token=def", Instant.now().plusSeconds(72 * 3600));
+
+        SimpleMailMessage reset = sent.get(0);
+        assertEquals("no-reply@example.invalid", reset.getFrom());
+        assertEquals("person@example.invalid", reset.getTo()[0]);
+        assertEquals("Reset your LUMA password", reset.getSubject());
+        assertTrue(reset.getText().contains("within 30 minutes:\nhttps://luma.example.invalid/reset-password#token=abc\n"), reset.getText());
+        assertTrue(reset.getText().contains("still need their authenticator code"));
+
+        SimpleMailMessage invitation = sent.get(1);
+        assertEquals("Your Physics Cube Academy LUMA account", invitation.getSubject());
+        assertTrue(invitation.getText().contains("within 72 hours and choose a password:\nhttps://luma.example.invalid/activate#token=def\n"),
+                invitation.getText());
     }
 }

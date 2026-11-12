@@ -68,7 +68,7 @@ paths:
         '422': {description: Password rejected by policy; the invitation stays usable}
   /api/v1/auth/password-reset/request:
     post:
-      summary: Email a password reset link to an active account (implemented; off unless SMTP is configured)
+      summary: Email a password reset link to an active account (implemented; off unless luma.mail is enabled)
       description: >
         The answer is the same whether or not the address has an account. Only active accounts get an
         email; at most luma.password-reset.max-requests-per-hour (default 3) per account per hour, and a
@@ -742,12 +742,24 @@ paths:
   /api/v1/accounts/{accountId}/invitations:
     post:
       summary: Issue an activation invitation for a pending staff or student account (implemented; owner/admin)
-      description: Replaces any earlier invitation. The token is shown once, is not stored, and is sent with Cache-Control no-store; there is no email delivery yet.
+      description: >
+        Replaces any earlier invitation. With delivery LINK (the default, also with no body) the token
+        is returned once, is not stored, and is sent with Cache-Control no-store. With delivery EMAIL
+        the link (<luma.mail.web-origin>/activate#token=...) is emailed to the account's address after
+        the change commits and is not returned. The audit record notes the delivery method.
       operationId: issueInvitation
       tags: [Identity]
       security: [{bearerAuth: []}]
       parameters:
         - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                delivery: {type: string, enum: [LINK, EMAIL], default: LINK}
       responses:
         '201':
           description: Invitation issued
@@ -755,15 +767,18 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [accountId, activationToken, activationPath, expiresAt]
+                required: [accountId, expiresAt, delivery]
                 properties:
                   accountId: {type: string, format: uuid}
-                  activationToken: {type: string}
-                  activationPath: {type: string, description: 'Append to the web app origin to form the invitation link, e.g. /activate#token=...'}
+                  activationToken: {type: string, nullable: true, description: Null when emailed}
+                  activationPath: {type: string, nullable: true, description: 'Append to the web app origin to form the invitation link, e.g. /activate#token=...; null when emailed'}
                   expiresAt: {type: string, format: date-time}
+                  delivery: {type: string, enum: [LINK, EMAIL]}
+        '400': {description: Unknown delivery method}
         '403': {description: An administrator inviting an owner or administrator}
         '404': {description: Account not in this academy}
         '409': {description: The account is not pending activation}
+        '503': {description: delivery EMAIL while email is not configured; nothing was changed}
   /api/v1/me/student:
     get:
       summary: The signed-in student's own record (implemented; STUDENT role)
