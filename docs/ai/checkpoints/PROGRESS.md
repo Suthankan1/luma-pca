@@ -1366,7 +1366,7 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint STU-2 — 2026-11-12 — Bulk student import from CSV
 
 - **Branch:** `feature/student-import`. **PR / merge SHA:** see the merged pull request titled
-  "feat(students): bulk student import from CSV".
+  "feat(students): bulk student import from CSV" (PR #45, merge commit `72007a8`; all CI checks green, including the real-stack import step).
 - **Implemented:** `POST /api/v1/students/import` (owner/admin; 1–1,000 rows; optional
   `batchId` + `enrolledOn`; `dryRun`). Every row is checked before anything is written: number
   format, name, email, repeats within the file, numbers already in the academy, emails already
