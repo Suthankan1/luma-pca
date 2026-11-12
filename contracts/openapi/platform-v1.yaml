@@ -66,6 +66,48 @@ paths:
         '204': {description: Account activated}
         '400': {description: Invitation invalid, expired, used or revoked (indistinguishable)}
         '422': {description: Password rejected by policy; the invitation stays usable}
+  /api/v1/auth/password-reset/request:
+    post:
+      summary: Email a password reset link to an active account (implemented; off unless SMTP is configured)
+      description: >
+        The answer is the same whether or not the address has an account. Only active accounts get an
+        email; at most luma.password-reset.max-requests-per-hour (default 3) per account per hour, and a
+        new request revokes the earlier link. The link is <web-origin>/reset-password#token=<token>.
+      operationId: requestPasswordReset
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: {type: string, maxLength: 254}
+      responses:
+        '202': {description: Accepted; an email is sent if the address belongs to an active account}
+        '400': {description: Missing or over-long email}
+        '503': {description: Password reset by email is not configured}
+  /api/v1/auth/password-reset/confirm:
+    post:
+      summary: Set a new password with an emailed reset token (implemented)
+      description: Ends every session of the account and clears a lockout. MFA is unchanged.
+      operationId: confirmPasswordReset
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: {type: string, maxLength: 128, writeOnly: true}
+                password: {type: string, maxLength: 256, writeOnly: true}
+      responses:
+        '204': {description: Password changed}
+        '400': {description: Link invalid, expired, used or revoked, or the account is no longer active (indistinguishable)}
+        '422': {description: Password rejected by policy; the link stays usable}
   /api/v1/auth/me:
     get:
       summary: Current account, academy and current roles (implemented)
