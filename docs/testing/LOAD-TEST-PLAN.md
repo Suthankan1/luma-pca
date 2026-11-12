@@ -141,6 +141,24 @@ scenarios together with the plan's windows (10-minute sign-in window, 3-minute j
   header must be the web app's configured origin, not the address k6 connects to; k6 clears
   cookies at each iteration unless `noCookiesReset` is set.
 
+**Linux runner, 300 students (2026-11-12, commit `180edb3`).** The manual "Load test (local
+baseline)" workflow ([run 43194535303](https://github.com/Suthankan1/luma-pca/actions/runs/43194535303))
+on one GitHub `ubuntu-24.04` runner, all three scenarios, windows scaled to 300 students:
+
+| Flow | Requests | p50 | p95 | p99 | Failures |
+| --- | --- | --- | --- | --- | --- |
+| Sign-in through the web app | 300 | 71 ms | 265 ms | 457 ms | 0 |
+| Student portal page | 900 | 10 ms | 64 ms | 191 ms | 0 |
+| Zoom webhook acknowledgement | 720 | 4 ms | 55 ms | 148 ms | 0 |
+| Staff class page | 171 | 89 ms | 463 ms | 878 ms | 0 |
+| Staff roster | 171 | 47 ms | 221 ms | 313 ms | 0 |
+
+All 720 receipts processed once with no backlog; API peak about 1.5 cores, web 41%,
+database 15%; no ERROR lines; no connection timeouts. This run does **not** settle the
+1,500-student timeouts above: the laptop also had none at 150 students, so the question
+needs the same 1,500-student run on Linux (about 20 runner minutes). No session refresh
+happened in this short run (`refresh` count 0), so its threshold passed without data.
+
 **What this shows:** the scripts work end to end and nothing gross broke at 1,500 on one
-laptop. **What it does not show:** that LUMA supports 1,500 users. That needs sections 3 and
+laptop or at 300 on a Linux runner. **What it does not show:** that LUMA supports 1,500 users. That needs sections 3 and
 8 in a production-like environment.
