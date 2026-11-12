@@ -10,7 +10,8 @@
 # a Cloudflare quick tunnel (no account) giving that proxy a temporary https URL. The API and
 # web app listen on this Mac only (127.0.0.1); nothing else is reachable from the internet.
 #
-# Settings come from .env.zoom-test in the repository root (gitignored; create it yourself,
+# Settings come from .env.zoom-test in the repository root (gitignored; create it with
+# scripts/zoom-test-setup.sh, which asks for each value at hidden prompts,
 # never commit or paste it anywhere):
 #   LUMA_ZOOM_WEBHOOK_SECRET_TOKEN=<Secret Token from the Zoom app's Features page>
 #   LUMA_ZOOM_WEBHOOK_WEBINAR_ALLOW_LIST=<test webinar ID, digits; comma-separated for several>

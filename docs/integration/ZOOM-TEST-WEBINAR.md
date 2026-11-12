@@ -20,13 +20,17 @@ attendance. Fixture tests cannot show that.
 ## Steps
 
 1. **Zoom app (Marketplace → Develop → Build App → Server-to-Server OAuth)**, separate from
-   any existing app, named for example "LUMA Attendance (test)". On **Features**, copy the
-   **Secret Token** into `.env.zoom-test` yourself:
+   any existing app, named for example "LUMA Attendance (test)". Then store its values with:
 
+   ```bash
+   scripts/zoom-test-setup.sh
    ```
-   LUMA_ZOOM_WEBHOOK_SECRET_TOKEN=<Secret Token>
-   LUMA_ZOOM_WEBHOOK_WEBINAR_ALLOW_LIST=<test webinar ID, digits>
-   ```
+
+   It asks for the **Secret Token** (Features page), the test webinar ID, and optionally the
+   Account ID, Client ID and Client Secret (App Credentials page; not used yet), at hidden
+   prompts, and writes `.env.zoom-test` readable by you only. The file is gitignored; the
+   tracked template is `.env.zoom-test.example`. Nobody else (including an AI assistant)
+   needs to see these values.
 
 2. **Schedule the test webinar** (or pick one that only test participants attend) and put
    its ID in the allow-list above.

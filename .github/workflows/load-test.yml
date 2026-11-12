@@ -6,7 +6,7 @@ on:
     inputs:
       students:
         description: Students in the simulated class
-        default: '300'
+        default: '600'
       scenarios:
         description: Space-separated subset of "sign-in webhooks staff"
         default: 'sign-in webhooks staff'

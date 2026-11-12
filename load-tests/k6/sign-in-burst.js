@@ -2,7 +2,7 @@
 // Each iteration is one student: form post to /api/session/login (cookies, 303 redirect),
 // then the student portal page a few times. Run via scripts/load-test-local.sh or k6.
 //
-// Env: BASE_URL, WEB_ORIGIN (if different), STUDENTS (1500), WINDOW_S (600: arrivals spread over it, half in the
+// Env: BASE_URL, WEB_ORIGIN (if different), STUDENTS (600), WINDOW_S (600: arrivals spread over it, half in the
 // first 30%), PORTAL_VIEWS (3), THINK_S (20), PASSWORD, PER_ADDRESS (1: one student per
 // client address; 50 models carrier NAT).
 import http from "k6/http";
@@ -12,7 +12,7 @@ import exec from "k6/execution";
 const BASE = __ENV.BASE_URL;
 // The web app's configured origin; differs from BASE_URL when k6 runs in Docker on macOS.
 const ORIGIN = __ENV.WEB_ORIGIN || BASE;
-const STUDENTS = Number(__ENV.STUDENTS || 1500);
+const STUDENTS = Number(__ENV.STUDENTS || 600);
 const WINDOW_S = Number(__ENV.WINDOW_S || 600);
 const VIEWS = Number(__ENV.PORTAL_VIEWS || 3);
 const THINK_S = Number(__ENV.THINK_S || 20);

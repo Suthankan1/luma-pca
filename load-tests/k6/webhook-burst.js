@@ -3,7 +3,7 @@
 // over LEAVE_S. Fixture payloads only (fictional participants at example.invalid).
 // The worker's drain time is measured by scripts/load-test-local.sh from the database.
 //
-// Env: API_URL, WEBHOOK_SECRET, STUDENTS (1500), JOIN_S (180), CLASS_S (120), LEAVE_S (120),
+// Env: API_URL, WEBHOOK_SECRET, STUDENTS (600), JOIN_S (180), CLASS_S (120), LEAVE_S (120),
 // WEBINAR_ID, OCCURRENCE (unique per run).
 import http from "k6/http";
 import { check } from "k6";
@@ -12,7 +12,7 @@ import exec from "k6/execution";
 
 const API = __ENV.API_URL;
 const SECRET = __ENV.WEBHOOK_SECRET;
-const N = Number(__ENV.STUDENTS || 1500);
+const N = Number(__ENV.STUDENTS || 600);
 const JOIN_S = Number(__ENV.JOIN_S || 180);
 const CLASS_S = Number(__ENV.CLASS_S || 120);
 const LEAVE_S = Number(__ENV.LEAVE_S || 120);

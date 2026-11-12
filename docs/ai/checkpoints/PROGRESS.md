@@ -1245,3 +1245,26 @@ build runs the Next.js default bundler and repeats the smoke test.
   failed because cloudflared's default QUIC never registered; HTTP/2 fixed it.
 - **Next:** create the dedicated Zoom app with the owner (Chrome), owner adds the secret token,
   validate the URL, run a test webinar with test participants only.
+
+## Checkpoint PERF-3 — 2026-11-12 — Target 600 concurrent users; Zoom app and env template
+
+- **003A-prep evidence:** PR #38, merge commit `506b550`; CI green (289 backend tests).
+- **Academy decision:** one webinar at a time, at most 500 students; capacity target **600
+  concurrent users** (was 1,500). LOAD-TEST-PLAN, k6 defaults (600), the local runner's window
+  scaling (plan windows at 600) and the manual workflow default (600) updated;
+  OPEN-QUESTIONS records the partial answer. Earlier 1,500 runs kept as recorded (2.5× headroom).
+- **600-student local baseline:** every latency target met (sign-in p95 82 ms, portal 17 ms,
+  class page 96 ms, webhook ack p99 23 ms, 1,440 receipts processed once); 23 local-harness
+  connection timeouts. Not capacity evidence.
+- **Zoom (owner's Chrome, owner's request):** created Server-to-Server OAuth app "LUMA
+  Attendance Test" (account level, not for publishing; separate from "BulkRegister"),
+  Information filled with the academy's details, and four read-only scopes:
+  `webinar:read:webinar:admin`, `webinar:read:list_past_instances:admin`,
+  `webinar:read:list_past_participants:admin`, `webinar:read:list_registrants:admin`. Not
+  activated; no event subscription yet. The credentials and Features pages were not read
+  (live secrets). An app name with parentheses failed silently in Zoom's create dialog.
+- **Secrets:** `.env.zoom-test.example` (tracked template) and `scripts/zoom-test-setup.sh`,
+  which writes the gitignored `.env.zoom-test` from hidden prompts (mode 600, refuses if the
+  file is not gitignored). The assistant does not handle the live values; the owner pastes them.
+- **Next:** owner stores the secrets; then activate the app and add the event subscription
+  (tunnel URL, the four webinar events), with a test webinar on the allow-list.

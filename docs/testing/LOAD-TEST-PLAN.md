@@ -1,26 +1,27 @@
-# Load and capacity test plan — 1,500 concurrent users
+# Load and capacity test plan — 600 concurrent users
 
 **Status:** plan, tooling and one local baseline (section 9). **No capacity claim is made by this document.** LUMA must not be
-described as supporting 1,500 users until the gate scenarios below pass in a
+described as supporting 600 concurrent users until the gate scenarios below pass in a
 production-like environment and the results are recorded in the repository checkpoint.
 
-## 1. What "1,500 users" means here (assumptions to confirm)
+## 1. What "600 users" means here
 
-The academy has not yet given real numbers (see `docs/product/OPEN-QUESTIONS.md`, P0). Until
-it does, the target is the brief's figure, modelled as the worst realistic moment: **one
-class of 1,500 students starting at once**. Each item below needs the academy's confirmation;
-the scripts take every number as a parameter.
+**Confirmed by the academy (2026-11-12):** only one webinar runs at a time, with at most 500
+students (the account has Zoom Webinars for 500 attendees). The target is **600 concurrent
+users** (500 plus headroom), replacing the brief's earlier 1,500. Modelled as the worst
+realistic moment: **one class of 600 students starting at once**. The other assumptions
+below still need the academy's confirmation; the scripts take every number as a parameter.
 
 | Assumption | Value used | Why it matters |
 | --- | --- | --- |
-| Students in the largest class | 1,500, one Zoom webinar | Size of every burst below |
-| Sign-ins at class start | 1,500 within 10 minutes, half in the first 3 | Argon2id hashing is deliberately expensive (19 MiB, 2 passes) |
+| Students in the largest class | 600, one Zoom webinar (confirmed: one at a time, at most 500) | Size of every burst below |
+| Sign-ins at class start | 600 within 10 minutes, half in the first 3 | Argon2id hashing is deliberately expensive (19 MiB, 2 passes) |
 | Already signed in | 0% (worst case; a refresh is far cheaper than a sign-in) | |
 | Shared addresses | Many students behind mobile carrier NAT | Per-visitor limits (001L) must not block a class |
-| Zoom events | 1,500 joins in 3 min; 20% reconnect once (leave + join); 1,500 leaves in 2 min at the end | Webhook ingress and the receipt worker |
+| Zoom events | 600 joins in 3 min; 20% reconnect once (leave + join); 600 leaves in 2 min at the end | Webhook ingress and the receipt worker |
 | Student activity during class | Portal page every 60 s on average | Session refresh every 10 min |
 | Staff | 20 staff reading rosters, classes and Zoom review | Heavier queries |
-| Other classes at the same time | None in the gate scenario; a mixed scenario adds 3 × 300 | |
+| Other classes at the same time | None (confirmed: one webinar at a time) | |
 
 ## 2. Service levels to pass (proposed, to agree)
 
@@ -39,16 +40,16 @@ the scripts take every number as a parameter.
 
 | ID | Scenario | Status | Script |
 | --- | --- | --- | --- |
-| L1 | **Class-start sign-in burst:** 1,500 students sign in through the Next.js BFF (form post, cookies, redirect) with distinct client addresses, then open the student portal | Testable now | `load-tests/k6/sign-in-burst.js` |
-| L2 | **Webhook burst:** signed `participant_joined` for 1,500 participants in 3 min, 20% reconnects, then 1,500 `participant_left` in 2 min; measure ack latency and worker drain | Testable now (fixture payloads, not a real Zoom account) | `load-tests/k6/webhook-burst.js` |
+| L1 | **Class-start sign-in burst:** 600 students sign in through the Next.js BFF (form post, cookies, redirect) with distinct client addresses, then open the student portal | Testable now | `load-tests/k6/sign-in-burst.js` |
+| L2 | **Webhook burst:** signed `participant_joined` for 600 participants in 3 min, 20% reconnects, then 600 `participant_left` in 2 min; measure ack latency and worker drain | Testable now (fixture payloads, not a real Zoom account) | `load-tests/k6/webhook-burst.js` |
 | L3 | **Staff during class:** 20 staff reading rosters, the class, expected students and Zoom review while L1 and L2 run | Testable now | `load-tests/k6/staff-reads.js` |
 | L4 | **Combined gate:** L1 + L2 + L3 together | Testable now | run the three together |
-| L5 | **Soak:** 1,500 signed-in students at steady activity for 60 min | Testable now | `sign-in-burst.js` with a long hold |
+| L5 | **Soak:** 600 signed-in students at steady activity for 60 min | Testable now | `sign-in-burst.js` with a long hold |
 | L6 | **Live attendance updates** (SSE) for staff during class | Blocked: SSE not built | — |
-| L7 | **Attendance finalisation** for 1,500 students after class | Blocked: attendance (004A) waits on 003A | — |
+| L7 | **Attendance finalisation** for 600 students after class | Blocked: attendance (004A) waits on 003A | — |
 | L8 | **Reports and exports** | Blocked: not built | — |
 
-The gate for any "supports 1,500 users" statement is **L4 and L5 passing in a
+The gate for any "supports 600 concurrent users" statement is **L4 and L5 passing in a
 production-like environment**, then **L6 and L7** once those features exist.
 
 ## 4. Environments
@@ -69,7 +70,7 @@ production-like environment**, then **L6 and L7** once those features exist.
 Synthetic only, never real student data: `load.studentN@example.invalid`, generated names,
 one course, three batches, one class session on webinar `81234567890`. Students share one
 test password; the seed copies a single Argon2id hash (computed by activating one account
-through the real API) to all accounts, so seeding 1,500 students takes seconds while every
+through the real API) to all accounts, so seeding hundreds or thousands of students takes seconds while every
 sign-in still verifies a real Argon2id hash. The first owner is created with
 `scripts/bootstrap-owner.sh`.
 
@@ -88,11 +89,11 @@ labelled as a local baseline.
 
 ## 7. Known risks the tests should expose
 
-- **Argon2id cost:** each sign-in hashes 19 MiB twice. 1,500 sign-ins in a few minutes is
+- **Argon2id cost:** each sign-in hashes 19 MiB twice. 600 sign-ins in a few minutes is
   CPU- and memory-heavy; the API task size and Hikari pool must be sized from L1.
 - **Worker drain rate:** the receipt worker handles at most 50 receipts per 5-second poll
   (`LUMA_ZOOM_PROCESSING_BATCH_SIZE`, `LUMA_ZOOM_PROCESSING_POLL_INTERVAL`), about 10 per second per
-  instance, so a 1,500-join burst needs roughly 2.5 minutes to process. Within the 5-minute
+  instance, so a 600-join burst needs about a minute to process (the 1,500-join runs below never built a backlog). Within the 5-minute
   target, but L2 must confirm, and the settings may need tuning.
 - **Per-visitor limits:** 60 sign-ins per 5 minutes per address. A school or carrier NAT
   sending more than that from one address would be refused; the NAT variant of L1 measures
@@ -105,9 +106,13 @@ labelled as a local baseline.
 A run passes when every target in section 2 holds for the whole run and the correctness
 checks find nothing. A failed target is a finding to fix and re-run, not a number to quote.
 Only a passing production-like L4 + L5 run may be cited, with its date, environment and
-commit, as evidence for 1,500 concurrent users on the features tested.
+commit, as evidence for 600 concurrent users on the features tested.
 
 ## 9. Local baseline results (not capacity evidence)
+
+> These runs used **1,500 students**, the target before the academy confirmed 600. They are
+> kept as recorded; at 2.5 times the current target they are extra headroom evidence, still
+> not a capacity claim.
 
 **2026-11-12**, commit `884725b` plus this change, on one Apple M4 laptop (10 cores, 16 GB,
 macOS 27.2): API (JVM, default heap), Next.js production server and k6 on the host or in
@@ -277,4 +282,22 @@ targets within reach.
 targets even with the load generator, both servers and the database on one 4-vCPU machine.
 It is still not the gate in section 8: that needs a production-like environment with the
 load generator on separate hosts, the 60-minute soak (L5), and later the live-attendance and
-finalisation scenarios (L6, L7). **LUMA is still not described as supporting 1,500 users.**
+finalisation scenarios (L6, L7). **LUMA is still not described as supporting 600 (or 1,500) users.**
+
+### Local baseline at the 600-user target (2026-11-12, commit `506b550` plus the retarget)
+
+`STUDENTS=600`, all three scenarios, the plan's full windows, on the M4 laptop. Every latency
+target met; the only failures were 23 connection timeouts (0.96% of student requests), the
+local macOS / Docker Desktop harness issue already ruled out on Linux.
+
+| Flow | Requests | p50 | p95 | p99 |
+| --- | --- | --- | --- | --- |
+| Sign-in through the web app | 600 | 55 ms | 82 ms | 116 ms |
+| Student portal page | 1,773 | 8 ms | 17 ms | 37 ms |
+| Zoom webhook acknowledgement | 1,440 | 6 ms | 10 ms | 23 ms |
+| Staff class page (600 expected students) | 861 | 54 ms | 96 ms | 195 ms |
+| Staff roster (200 students) | 856 | 34 ms | 68 ms | 156 ms |
+
+All 1,440 receipts processed once with no backlog; 15 staff sessions refreshed; CPU over
+614 s: API 102 s, web 66 s, database 29 s (peaks 91%, 68%, 23%); at most 1 busy database
+connection; no errors in either log. A local baseline, not capacity evidence.
