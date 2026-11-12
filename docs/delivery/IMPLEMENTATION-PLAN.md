@@ -46,7 +46,7 @@
 | 006A Source-attributed engagement | Q&A/poll where available, portal reactions with consent | TODO |
 | 006B Portal pulse checks | Instructor-controlled learning questions, timing, abuse controls | TODO |
 | 006C Top 10/100 analytics | Valid source provenance, fair normalization and opt-in | TODO |
-| 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | TODO |
+| 007A Reliability + ops | RDS/S3/SQS/alerts, load and restore tests, zero secrets in logs | IN PROGRESS: restore tested (backup script, restore drill, CI restore test), load-test tooling (PERF-1), secrets-in-logs scan in the real-stack run. Cloud resources and alerts wait for budget and account access |
 | 007B Academy production pilot | Approved Zoom proof, UAT, sign-off, reversible rollout | TODO |
 
 **Suggested next small slice:** every API area now has a staff screen. `003A` (a real Zoom test webinar with the academy's credentials) unblocks participant matching and attendance (`004A`); meanwhile, candidates are deployment infrastructure once the academy authorises cloud resources, the 1,500-user load test plan, or a reviewed owner-recovery procedure. The real-stack browser test runs in CI (workflow "Real-stack browser test") for every backend or frontend change.
