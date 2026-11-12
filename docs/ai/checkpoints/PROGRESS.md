@@ -1344,7 +1344,7 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint STU-1 — 2026-11-12 — Student portal: my classes and batches
 
 - **Branch:** `feature/student-portal-classes`. **PR / merge SHA:** see the merged pull request
-  titled "feat(student): student portal shows the student's classes and batches".
+  titled "feat(student): student portal shows the student's classes and batches" (PR #43, merge commit `a737ad0`; all CI checks green, including the real-stack job with the new student step).
 - **Implemented:** `GET /api/v1/me/class-sessions?from&to` (STUDENT role, window at most 92
   days). A class is listed when the student is enrolled, on the class's local date, in at least
   one of its batches; only those batches are named; cancelled classes are included; the Zoom
