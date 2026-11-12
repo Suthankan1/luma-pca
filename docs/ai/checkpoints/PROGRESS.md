@@ -1208,3 +1208,17 @@ build runs the Next.js default bundler and repeats the smoke test.
   0.56, web 0.22, DB 0.09; sign-ins 45%, staff pages 41%, portal 14%); the runner used about
   3× that per tier (~2.9 of 4 vCPUs) alongside three k6 processes. Argon2id cost is kept and
   sized for. Details and sizing estimates in LOAD-TEST-PLAN.md §10. Still no capacity claim.
+
+## Checkpoint PERF-2a — 2026-11-12 — 1,500-student Linux re-run after the N+1 fix
+
+- **PERF-2 evidence:** PR #36, merge commit `b35019d`.
+- Re-ran the manual load workflow at the owner's request (run 43209730397, 1,500 students,
+  all scenarios, one 4-vCPU runner): **every target met, no failures.** p95 before → after:
+  sign-in 6.93 s → 144 ms, portal 6.56 s → 48 ms, staff class page 3.79 s → 335 ms, roster
+  2.53 s → 143 ms; webhook ack p99 26 ms; 3,600 receipts processed once; database peak CPU
+  63% → 15%; no ERROR lines in either log.
+- The N+1 fix mattered more than the laptop model predicted (it counted only database CPU;
+  on the runner the extra round trips also loaded the API and the shared machine). Recorded
+  in LOAD-TEST-PLAN.md.
+- **Still not the capacity gate** (needs a production-like environment with a separate load
+  generator, the 60-minute soak, and the live-attendance scenarios once built). No capacity claim.
