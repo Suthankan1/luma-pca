@@ -1308,3 +1308,35 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Open:** the tunnel URL changes on each start, so the subscription's URL must be updated
   and re-validated after any restart; keep the tunnel running through the test or restart it
   before 11:00 on 13 Nov. After the test, stop the tunnel and switch the subscription off.
+
+## Checkpoint 003A-3 — 2026-11-12 — Zoom API client verified against the real account
+
+- **003A-2 evidence:** PR #41, merge commit `e94599b`; by 20:11 Colombo 147 real events from
+  live classes passed signature verification and were dropped by the allow-list (0 stored).
+- **Branch:** `feature/003a-zoom-api-client`. **PR / merge SHA:** see the merged pull request
+  titled "feat(zoom): read-only Zoom API client with an operator check".
+- **Implemented:** `ZoomApiClient` (Server-to-Server OAuth): token from
+  `POST https://zoom.us/oauth/token?grant_type=account_credentials&account_id=…` with Basic
+  client credentials, reused until a minute before its 1-hour expiry, one refetch on 401;
+  `GET /webinars/{id}?show_previous_occurrences=true`, `GET /past_webinars/{id}/instances`,
+  `GET /past_webinars/{id or uuid}/participants` and `GET /webinars/{id}/registrants` with
+  `next_page_token` paging (300 per page); UUIDs starting with "/" or containing "//" are
+  double-encoded; errors carry Zoom's code and Retry-After, never credentials; participant and
+  registrant records print no personal data. Endpoints, fields and scopes were checked against
+  Zoom's API reference first. Off unless `LUMA_ZOOM_API_ACCOUNT_ID/_CLIENT_ID/_CLIENT_SECRET`
+  are all set.
+- **Operator check:** `scripts/zoom-api-check.sh` (jar without a web server, throwaway DB,
+  credentials from `.env.zoom-test`). Against the real account: token obtained; scopes granted
+  were the four read-only webinar scopes plus `webinar:read:participant:admin` (added by Zoom
+  for the participant events); the test webinar read correctly (type 5, 05:30Z, 60 min,
+  auto-approve); 0 registrants; no past instances yet. A live class's ID was refused before any call.
+- **Tests:** 8 new against a fake Zoom server (token reuse and renewal, single 401 retry,
+  webinar and occurrences, paging, double-encoding, 429 Retry-After, bad credentials, no
+  identities printed by the check). Backend `mvn verify` 297 tests, 0 failures, also in random
+  order.
+- **Environment note:** the user's global `~/.testcontainers.properties` was rewritten at 19:13
+  by something outside this project (docker.raw.sock), breaking every Testcontainers test
+  locally; not edited by the assistant; tests run with `DOCKER_HOST=unix:///var/run/docker.sock`.
+  CI is unaffected.
+- **Next:** test webinar on 13 Nov 11:00; then compare webhook events with the API's
+  participants and registrants to design participant-to-student matching (003D part 2).
