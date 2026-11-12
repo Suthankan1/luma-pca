@@ -935,3 +935,46 @@ build runs the Next.js default bundler and repeats the smoke test.
   pipeline checked by hand; the workflow's first runs are on the pull request.
 - **Next planned feature:** password recovery with email delivery, or 003A once
   the academy's Zoom test webinar is available.
+
+## Checkpoint 001J part 1 — 2026-11-12 — Password reset by email (API)
+
+- **CI-RS evidence:** merged as PR #27, merge commit `5824af6`; the new real-stack
+  job passed on its first runs ("1 passed", no secrets in logs).
+- **Feature ID / name:** 001J part 1, self-service password reset (backend).
+- **Branch:** `feature/001j-password-reset`. **PR / merge SHA:** see the merged
+  pull request titled "feat(auth): password reset by email (API)".
+- **Implemented behavior:** `POST /api/v1/auth/password-reset/request {email}`
+  answers 202 with no body whatever the address (unknown, pending, disabled,
+  malformed all look the same); only an active account gets an email, at most 3
+  requests per account per hour (configurable), and a new request revokes the
+  earlier link. The email (plain text, via any SMTP server) holds
+  `<web origin>/reset-password#token=<256-bit token>`, valid 30 minutes, and is
+  sent after the request has committed on a small bounded background queue, so
+  the response does not wait for the mail server. `POST
+  /api/v1/auth/password-reset/confirm {token, password}` claims the link
+  atomically (single use), applies the password policy (a rejected password keeps
+  the link usable), bumps the auth version, revokes every refresh session and
+  clears any lockout. MFA is unchanged: owners and administrators still need
+  their authenticator. Both steps are audited (PASSWORD_RESET_REQUESTED,
+  PASSWORD_RESET_COMPLETED) with no address or token. Neither the address nor the
+  link is ever logged.
+- **Configuration:** off by default (request answers 503 with an explanation).
+  `LUMA_PASSWORD_RESET_ENABLED=true` requires `LUMA_PASSWORD_RESET_FROM`,
+  `LUMA_PASSWORD_RESET_WEB_ORIGIN` (https, or http only for localhost) and
+  `SPRING_MAIL_HOST` (+ port, username, password); the backend refuses to start
+  otherwise. Documented in `backend/.env.example` and the OpenAPI contract.
+- **Database:** Flyway `V14__password_resets.sql` (digest only, one open reset
+  per account, index for the hourly count). New dependency
+  `spring-boot-starter-mail`.
+- **Tests executed (macOS, JDK 21, Docker):** `mvn verify` 264 tests, 0
+  failures (13 new: 9 HTTP integration with captured email, 1 disabled-mode, 3
+  unit for settings and email text), also passing in random class order. Includes
+  8 concurrent confirmations of one link → exactly one success.
+- **Known issues / not done:** a request for an existing account does slightly
+  more database work than for an unknown address, a small timing difference;
+  rate limiting is per account only (no per-client limit yet); no browser pages
+  yet (part 2); not yet sent through a real SMTP server (part 2 adds Mailpit to
+  the real-stack test). No email provider is chosen or provisioned: that is the
+  academy's decision.
+- **Next planned feature:** 001J part 2, the `/forgot-password` and
+  `/reset-password` pages and a real SMTP run.

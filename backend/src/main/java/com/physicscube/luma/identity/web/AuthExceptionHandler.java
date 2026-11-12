@@ -4,6 +4,8 @@ import com.physicscube.luma.identity.InvalidCredentialsException;
 import com.physicscube.luma.identity.InvalidInvitationException;
 import com.physicscube.luma.identity.InvalidSessionException;
 import com.physicscube.luma.identity.InvalidMfaException;
+import com.physicscube.luma.identity.InvalidPasswordResetException;
+import com.physicscube.luma.identity.PasswordResetUnavailableException;
 import com.physicscube.luma.identity.domain.PasswordPolicyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -31,6 +33,16 @@ class AuthExceptionHandler {
     @ExceptionHandler(InvalidInvitationException.class)
     ProblemDetail invalidInvitation(InvalidInvitationException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPasswordResetException.class)
+    ProblemDetail invalidPasswordReset(InvalidPasswordResetException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(PasswordResetUnavailableException.class)
+    ProblemDetail passwordResetUnavailable(PasswordResetUnavailableException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
     }
 
     @ExceptionHandler(PasswordPolicyException.class)

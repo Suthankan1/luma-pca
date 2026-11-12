@@ -16,6 +16,7 @@
 | 001E Scoped authorization | Cross-academy, course, batch and student IDOR tests | DONE for the routes that exist: cross-academy, batch-scope, student-ownership and role tests (002A, 002B). Extend with every new resource |
 | 001H Staff account administration | Create staff, change roles, disable, issue invitations; escalation and last-owner rules; audit trail | DONE (API; staff screens in UI-3a) |
 | 001I Browser account activation | Next.js page that redeems an invitation and sets a password | DONE: `/activate`, code read from the link fragment, Playwright and real-stack tests |
+| 001J Password reset by email | Self-service reset link by SMTP; browser pages | IN PROGRESS: API, SMTP sender and tests done (part 1); browser pages and real SMTP test next (part 2) |
 | 002A Course/batch domain | CRUD + uniqueness + academy authorization | DONE (API only, owner/admin; create/read/update, deactivate instead of delete). Staff UI TODO |
 | 002B Students, enrollments and staff assignment | M:N enrollment and scoped staff management, import validation | DONE: student records with linked accounts, batch enrollments, student own-record routes (part 1); staff assignments with batch-scoped read access for instructors and attendance officers (part 2). Bulk import and staff account administration TODO |
 | 002C Sessions and shared-batch schedule | No duplicate class records for shared sessions | DONE: class sessions shared by up to 20 batches, expected students listed once per session, batch-scoped staff reads. Attendance uniqueness itself arrives with 004A |

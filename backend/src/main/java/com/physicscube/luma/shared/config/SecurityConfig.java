@@ -25,6 +25,8 @@ public class SecurityConfig {
                             "/api/v1/system/status", "/.well-known/jwks.json").permitAll()
                     // The refresh token in the body is the credential for refresh and logout.
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/activate",
+                            // The emailed reset token is the credential for confirming a reset.
+                            "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm",
                             "/api/v1/auth/refresh", "/api/v1/auth/logout",
                             // The challenge token from the password step is the credential here.
                             "/api/v1/auth/mfa/enroll", "/api/v1/auth/mfa/verify",

@@ -3,6 +3,7 @@ package com.physicscube.luma.identity.web;
 import com.physicscube.luma.identity.SessionTokens;
 import com.physicscube.luma.identity.AuthService;
 import com.physicscube.luma.identity.InvitationService;
+import com.physicscube.luma.identity.PasswordResetService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -23,10 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 class AuthController {
     private final AuthService auth;
     private final InvitationService invitations;
+    private final PasswordResetService passwordResets;
 
-    AuthController(AuthService auth, InvitationService invitations) {
+    AuthController(AuthService auth, InvitationService invitations, PasswordResetService passwordResets) {
         this.auth = auth;
         this.invitations = invitations;
+        this.passwordResets = passwordResets;
     }
 
     record LoginRequest(@NotBlank @Size(max = 254) String email, @NotBlank @Size(max = 256) String password) {
@@ -62,6 +65,12 @@ class AuthController {
     }
 
     record ActivateRequest(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 256) String password) {
+    }
+
+    record PasswordResetRequest(@NotBlank @Size(max = 254) String email) {
+    }
+
+    record PasswordResetConfirmRequest(@NotBlank @Size(max = 128) String token, @NotBlank @Size(max = 256) String password) {
     }
 
     record IdentityResponse(String accountId, String academyId, List<String> roles) {
@@ -123,6 +132,22 @@ class AuthController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void activate(@Valid @RequestBody ActivateRequest request) {
         invitations.accept(request.token(), request.password());
+    }
+
+    /**
+     * Always 202 with no body when reset is available, whether or not the address has an
+     * account, so the answer cannot be used to find accounts. 503 when email is not set up.
+     */
+    @PostMapping("/password-reset/request")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    void requestPasswordReset(@Valid @RequestBody PasswordResetRequest request) {
+        passwordResets.request(request.email());
+    }
+
+    @PostMapping("/password-reset/confirm")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        passwordResets.confirm(request.token(), request.password());
     }
 
     /** Roles are the ones stored now, resolved while authenticating this request. */
