@@ -97,7 +97,8 @@ labelled as a local baseline.
 - **Per-visitor limits:** 60 sign-ins per 5 minutes per address. A school or carrier NAT
   sending more than that from one address would be refused; the NAT variant of L1 measures
   how real that is, and the limit is configurable.
-- **Session refresh churn** and **connection pool size** (Hikari default 10) under L5.
+- **Session refresh churn** and **connection pool size** (Hikari default 10) under L5. The
+  pool has since been ruled out as a bottleneck at the plan's peak (section 10).
 
 ## 8. Exit criteria and reporting
 
@@ -198,3 +199,52 @@ start. That is expected for this setup and says nothing yet about the production
 record per-tier timings (API request durations, web render time, database waits), and
 try a larger Hikari pool, before the production-like gate run. **What it does not show:** that LUMA supports 1,500 users. That needs sections 3 and
 8 in a production-like environment.
+
+## 10. Bottleneck analysis (2026-11-12)
+
+The 1,500-student Linux run missed its latency targets on one 4-vCPU runner. To find out
+why without more runner time, each flow was measured alone on the laptop (which has spare
+capacity) with per-tier instrumentation now built into `scripts/load-test-local.sh`: CPU
+seconds per tier, the API's own per-route times (Tomcat access log: method, path, status
+and milliseconds only), the busiest database statements (`pg_stat_statements`) and sampled
+busy database connections.
+
+**CPU per request (M4 core-milliseconds):**
+
+| Request | API | Web | Database |
+| --- | --- | --- | --- |
+| Sign-in (Argon2id hash + session) | 39.5 | 3.4 | 4.1 |
+| Student portal page (`/auth/me` + render) | 1.4 | 3.0 | 0.5 |
+| Staff page, average of the four (before the fix below) | 35.9 | 16.3 | 18.0 |
+| Staff page, average of the four (after the fix) | 34.0 | 20.6 | 7.8 |
+
+**Finding 1: an N+1 query, fixed.** Rosters and the class page load each student's
+sign-in account; every account's roles were then fetched with one query each: 522,020
+role queries in three minutes of staff reads, about 1,000 per page. Hibernate batch
+fetching (`hibernate.default_batch_fetch_size: 100`) cut that to 5,260; class-students API
+p50 290 → 46 ms, roster API p50 110 → 27 ms, class page end to end p50 320 → 84 ms (p95
+440 → 110 ms), database CPU for the same work 19.2 → 8.4 s. All 287 backend tests pass.
+
+**Finding 2: the database pool is not a bottleneck.** No request spent more than about
+2 ms in the database, so even the peak request rate keeps the 10-connection pool well
+under 1% busy; sampled busy connections never exceeded 1. (The samples are every 5 seconds,
+so the conclusion rests on the measured database time, not the samples.)
+
+**Finding 3: the runner was CPU-saturated.** At the plan's peak (sign-ins ramping to 8.3
+per second, about 25 portal views per second, 20 staff reading continuously) the app tiers
+need about **0.9 M4 cores** (API 0.56, web 0.22, database 0.09). Sign-ins take about 45% of
+that, staff pages 41%, portal views 14%. On the runner each tier used about 3× its predicted
+M4 CPU (API 3.0×, web 2.9×, database 4.2× before the fix), i.e. roughly 2.9 of its 4 vCPUs,
+while three k6 processes with up to 1,500 virtual users ran on the same vCPUs. The API's
+Argon2id hashing is deliberately expensive and is not changed; it must be sized for.
+
+**Not measured:** the webhook worker's CPU on its own (its acknowledgements stayed fast in
+every run) and the k6 processes' CPU on the runner. The 3× factor is inferred from the
+runner's per-tier peaks, not benchmarked directly.
+
+**Implications for the production-like gate run:** put the load generator on separate
+hosts; size the API for the sign-in burst first (on runner-class vCPUs, about 1 vCPU for
+hashing at 8 sign-ins per second, plus about 0.6 for staff pages and sessions, with
+headroom: at least 2 vCPUs, or two tasks); the web tier at about 1 vCPU; the database
+lightly loaded. These are estimates from this model to be confirmed by that run. **Still no
+capacity claim.**

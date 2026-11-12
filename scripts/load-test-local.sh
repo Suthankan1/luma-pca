@@ -43,7 +43,8 @@ if [ "$(uname)" = Darwin ]; then K6_NET=(); TARGET=host.docker.internal; else K6
 
 docker rm -f $PG >/dev/null 2>&1
 docker run -d --rm --name $PG -e POSTGRES_USER=luma -e POSTGRES_PASSWORD=$DBPASS -e POSTGRES_DB=luma \
-  -p 127.0.0.1:55434:5432 postgres:17-alpine -c max_connections=200 >/dev/null
+  -p 127.0.0.1:55434:5432 postgres:17-alpine -c max_connections=200 \
+  -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=top >/dev/null
 for i in $(seq 1 60); do docker exec $PG pg_isready -U luma -d luma >/dev/null 2>&1 && break; sleep 1; done; sleep 2
 psql_q() { docker exec -i $PG psql -At -q -U luma -d luma -v ON_ERROR_STOP=1 "$@"; }
 export DB_URL=jdbc:postgresql://localhost:55434/luma DB_USERNAME=luma DB_PASSWORD=$DBPASS LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true
@@ -53,8 +54,14 @@ LUMA_BACKEND_JAR="$JAR" LUMA_BOOTSTRAP_WEB_ORIGIN=$ORIGIN "$ROOT/scripts/bootstr
   > "$S/bootstrap.out" 2>&1 || { echo "owner bootstrap failed"; grep "LUMA owner bootstrap" "$S/bootstrap.out"; exit 1; }
 INVITE=$(grep -oE "activate#token=[A-Za-z0-9_-]{43}" "$S/bootstrap.out" | head -1 | cut -d= -f2)
 ACADEMY=$(psql_q -c "SELECT id FROM academies WHERE name = 'Load Test Academy'")
+psql_q -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" >/dev/null
 
 # ACCESS_TTL (e.g. PT1M) shortens access tokens so a short run exercises session refresh.
+# DB_POOL sets the API's database connection pool (Spring's default is 10). The access log
+# records method, path, status and milliseconds only: no query strings or client addresses.
+SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE=${DB_POOL:-10} SERVER_TOMCAT_ACCESSLOG_ENABLED=true SERVER_TOMCAT_ACCESSLOG_DIRECTORY="$S" \
+  SERVER_TOMCAT_ACCESSLOG_PREFIX=api-access SERVER_TOMCAT_ACCESSLOG_SUFFIX=.log SERVER_TOMCAT_ACCESSLOG_BUFFERED=false \
+  SERVER_TOMCAT_ACCESSLOG_PATTERN='%m %U %s %{ms}T' \
 SERVER_PORT=$API LUMA_AUTH_ACCESS_TOKEN_TTL=${ACCESS_TTL:-PT10M} LUMA_ZOOM_WEBHOOK_SECRET_TOKEN=$WEBHOOK_SECRET LUMA_ZOOM_WEBHOOK_ACADEMY_ID=$ACADEMY \
   "$JAVA" ${API_JAVA_OPTS:-} -jar "$JAR" > "$S/backend.log" 2>&1 & BPID=$!
 for i in $(seq 1 90); do curl -sf localhost:$API/actuator/health/readiness >/dev/null && break; sleep 1; done
@@ -104,11 +111,25 @@ LUMA_TRUSTED_PROXY_HOPS=1 LUMA_WEB_ORIGIN=$ORIGIN LUMA_SESSION_KEY=$(openssl ran
   API_INTERNAL_URL=http://127.0.0.1:$API node node_modules/next/dist/bin/next start -H 127.0.0.1 -p $WEB > "$S/frontend.log" 2>&1 & FPID=$!
 for i in $(seq 1 60); do curl -sf -o /dev/null $ORIGIN/sign-in && break; sleep 1; done
 JAVA_PID=$BPID
-# Resource use every 5 s: API and web process CPU/RSS, database container.
+# CPU seconds used so far by a process and its children (Linux /proc, or macOS ps), and by the database container.
+proc_cpu() {
+  local total=0 p
+  for p in $1 $(pgrep -P "$1" 2>/dev/null); do
+    if [ -r /proc/$p/stat ]; then
+      total=$(awk -v t="$(getconf CLK_TCK)" -v acc="$total" '{ sub(/^.*\) /, ""); print acc + ($12 + $13) / t }' /proc/$p/stat)
+    else
+      total=$(ps -o time= -p "$p" | awk -v acc="$total" '{ gsub(/-/, ":"); n = split($1, a, ":"); s = 0; for (i = 1; i <= n; i++) s = s * 60 + a[i]; print acc + s }')
+    fi
+  done
+  echo "$total"
+}
+db_cpu() { docker exec $PG cat /sys/fs/cgroup/cpu.stat 2>/dev/null | awk '/^usage_usec/ { print $2 / 1e6 }'; }
+# Resource use every 5 s: API and web process CPU/RSS, database container, busy database connections.
 ( while true; do
-    printf '%s api %s web %s db %s\n' "$(date +%T)" "$(ps -o %cpu=,rss= -p $JAVA_PID | awk '{printf "cpu=%s%% rss=%dMB", $1, $2/1024}')" \
+    printf '%s api %s web %s db %s dbconn %s\n' "$(date +%T)" "$(ps -o %cpu=,rss= -p $JAVA_PID | awk '{printf "cpu=%s%% rss=%dMB", $1, $2/1024}')" \
       "$(ps -o %cpu=,rss= -p $FPID | awk '{printf "cpu=%s%% rss=%dMB", $1, $2/1024}')" \
-      "$(docker stats --no-stream --format 'cpu={{.CPUPerc}} mem={{.MemUsage}}' $PG 2>/dev/null)"
+      "$(docker stats --no-stream --format 'cpu={{.CPUPerc}} mem={{.MemUsage}}' $PG 2>/dev/null)" \
+      "$(psql_q -c "SELECT 'active=' || count(*) FILTER (WHERE state = 'active') || ' open=' || count(*) FROM pg_stat_activity WHERE application_name LIKE 'PostgreSQL JDBC%'" 2>/dev/null)"
     sleep 5; done ) > "$S/resources.log" 2>&1 & STATS_PID=$!
 disown $STATS_PID
 
@@ -119,6 +140,9 @@ k6() { # name, script, env...
   echo "k6 $name exit $?" >> "$S/k6-exits.txt"
 }
 WEB_ENV=(-e BASE_URL=http://$TARGET:$WEB -e WEB_ORIGIN=$ORIGIN -e PASSWORD="$PASSWORD")
+psql_q -c "SELECT pg_stat_statements_reset()" >/dev/null
+: > "$S"/api-access*.log 2>/dev/null
+CPU0_API=$(proc_cpu $JAVA_PID); CPU0_WEB=$(proc_cpu $FPID); CPU0_DB=$(db_cpu); T0=$(date +%s)
 K6_PIDS=()
 echo "--- running: $SCENARIOS (students=$STUDENTS window=${WINDOW_S}s joins=${JOIN_S}s)"
 for scenario in $SCENARIOS; do
@@ -135,6 +159,7 @@ for scenario in $SCENARIOS; do
 done
 wait "${K6_PIDS[@]}"
 BURST_END=$(date +%s)
+CPU1_API=$(proc_cpu $JAVA_PID); CPU1_WEB=$(proc_cpu $FPID); CPU1_DB=$(db_cpu)
 
 status=0
 if [[ " $SCENARIOS " == *" webhooks "* ]]; then
@@ -158,6 +183,26 @@ for file in "$S"/k6-*.txt; do
 done
 cat "$S/k6-exits.txt" 2>/dev/null || { echo "no k6 run finished"; status=1; }
 grep -q "exit [^0]" "$S/k6-exits.txt" 2>/dev/null && status=1
+delta() { awk -v a="${1:-0}" -v b="${2:-0}" 'BEGIN { printf "%.1f", b - a }'; }
+echo "--- CPU seconds used during the scenarios ($(( BURST_END - T0 )) s):" \
+  "api $(delta "$CPU0_API" "$CPU1_API") web $(delta "$CPU0_WEB" "$CPU1_WEB") db $(delta "$CPU0_DB" "$CPU1_DB")"
+echo "--- API time per route (server side, from the access log): count p50 p95 max ms"
+cat "$S"/api-access*.log 2>/dev/null | python3 -c '
+import re, sys, collections
+routes = collections.defaultdict(list)
+for line in sys.stdin:
+    parts = line.split()
+    if len(parts) != 4: continue
+    method, path, status, ms = parts
+    path = re.sub(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "{id}", path)
+    routes[method + " " + path].append(float(ms))
+for route, times in sorted(routes.items(), key=lambda r: -sum(r[1]))[:10]:
+    times.sort(); n = len(times)
+    print(f"  {route:55s} {n:6d} {times[n // 2]:7.0f} {times[min(n - 1, int(n * 0.95))]:7.0f} {times[-1]:7.0f}")'
+echo "--- database: busiest statements (calls, mean ms, total s)"
+psql_q -F ' | ' -c "SELECT calls, round(mean_exec_time::numeric, 2), round((total_exec_time / 1000)::numeric, 1), left(regexp_replace(query, '\s+', ' ', 'g'), 90)
+  FROM pg_stat_statements WHERE query NOT ILIKE '%pg_stat%' ORDER BY total_exec_time DESC LIMIT 6" | sed 's/^/  /'
+echo "--- database connections: most busy at once $(grep -o 'active=[0-9]*' "$S/resources.log" | cut -d= -f2 | sort -n | tail -1) of a pool of ${DB_POOL:-10}"
 echo "--- peak resources (from 5-second samples)"
 awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^cpu=/) { split($i, a, "="); v = a[2] + 0; k = $(i-1); if (v > max[k]) max[k] = v } }
      END { for (k in max) printf "  %s peak cpu %s%%\n", k, max[k] }' "$S/resources.log"
