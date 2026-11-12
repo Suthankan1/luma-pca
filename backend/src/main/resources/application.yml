@@ -16,6 +16,14 @@ spring:
       enabled: true
 server:
   port: ${SERVER_PORT:8080}
+  # The client address is taken from X-Forwarded-For only when the request comes from a
+  # trusted proxy (the Next.js server, a load balancer). Set LUMA_TRUSTED_PROXIES to a regular
+  # expression matching their addresses, e.g. '10\.0\.\d{1,3}\.\d{1,3}' for a 10.0.0.0/16
+  # network. Anyone else's X-Forwarded-For is ignored. Default: this machine only.
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      internal-proxies: ${LUMA_TRUSTED_PROXIES:127\.0\.0\.1|0:0:0:0:0:0:0:1}
 management:
   endpoints:
     web:
@@ -56,6 +64,21 @@ luma:
   password-reset:
     ttl: ${LUMA_PASSWORD_RESET_TTL:PT30M}
     max-requests-per-hour: ${LUMA_PASSWORD_RESET_MAX_REQUESTS_PER_HOUR:3}
+  rate-limit:
+    # Per-client limits on the public auth routes (429 with Retry-After). See RateLimitProperties.
+    enabled: ${LUMA_RATE_LIMIT_ENABLED:true}
+    sign-in:
+      limit: ${LUMA_RATE_LIMIT_SIGN_IN_LIMIT:60}
+      window: ${LUMA_RATE_LIMIT_SIGN_IN_WINDOW:PT5M}
+    mfa:
+      limit: ${LUMA_RATE_LIMIT_MFA_LIMIT:60}
+      window: ${LUMA_RATE_LIMIT_MFA_WINDOW:PT5M}
+    link-redemption:
+      limit: ${LUMA_RATE_LIMIT_LINK_REDEMPTION_LIMIT:30}
+      window: ${LUMA_RATE_LIMIT_LINK_REDEMPTION_WINDOW:PT10M}
+    reset-request:
+      limit: ${LUMA_RATE_LIMIT_RESET_REQUEST_LIMIT:10}
+      window: ${LUMA_RATE_LIMIT_RESET_REQUEST_WINDOW:PT1H}
   zoom:
     webhook:
       # Webhook ingress stays off (404) until a secret token is set. Never commit one.

@@ -1053,3 +1053,46 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Next planned feature:** 003A when the academy's Zoom test webinar is
   available; otherwise per-client rate limiting on public auth routes, or a
   first-owner provisioning command.
+
+## Checkpoint 001L — 2026-11-12 — Per-visitor limits on the public auth routes
+
+- **001K evidence:** merged as PR #30, merge commit `0904650`; all CI green.
+- **Feature ID / name:** 001L, per-client rate limiting.
+- **Branch:** `feature/001l-auth-rate-limits`. **PR / merge SHA:** see the merged
+  pull request titled "feat(auth): per-visitor limits on public auth routes".
+- **Implemented behavior:** a servlet filter ahead of Spring Security counts POSTs
+  to `/auth/login` (60 per 5 min), `/auth/mfa/enroll` and `/auth/mfa/verify` (60 per
+  5 min together), `/auth/activate` and `/auth/password-reset/confirm` (30 per 10
+  min) and `/auth/password-reset/request` (10 per hour) per visitor address, and
+  answers 429 with `Retry-After` and a problem detail beyond that. All limits are
+  configurable (`LUMA_RATE_LIMIT_*`) and can be switched off. Counters are fixed
+  windows in an UNLOGGED PostgreSQL table (Flyway V15), so every API instance
+  counts together; rows older than a day are deleted hourly. IPv4 addresses are
+  counted as is, IPv6 per /64. If the counter store fails the request is allowed
+  (fail open) and a warning logged; per-account lockouts still apply. Addresses
+  are never logged. Refresh, logout and authenticated routes are not limited here.
+- **Client address:** the API uses Tomcat's RemoteIpValve
+  (`server.forward-headers-strategy: native`): `X-Forwarded-For` is honoured only
+  from `LUMA_TRUSTED_PROXIES` (regex; default loopback), so a forged header from
+  anyone else is ignored (tested). The Next.js BFF passes the visitor's address on
+  every public auth call, read `LUMA_TRUSTED_PROXY_HOPS` entries from the right of
+  its own `X-Forwarded-For` (default 0: nothing forwarded). Production needs both
+  set: hops = number of load balancers in front of Next.js, and the API's trusted
+  proxies = the Next.js servers' addresses.
+- **Why generous defaults:** many students reach the internet through mobile
+  carrier NAT, sharing one public address; the limits slow spraying and email
+  bombing without blocking a class signing in together. Revisit with real traffic.
+- **Tests executed (macOS, JDK 21, Docker):** backend `mvn verify` 279 tests, 0
+  failures (10 new: limit and Retry-After, other clients unaffected, separate
+  buckets, unlimited routes, reset requests limited even when email is off, IPv6
+  /64, 10 concurrent attempts → exactly 3 allowed, cleanup, untrusted forwarding
+  ignored, address parsing), also in random class order. Frontend lint,
+  type-check, 36 unit tests (2 new for the address helper), build, smoke;
+  Playwright 58 run twice. Real stack: Next.js with one trusted hop; two
+  "visitors" (203.0.113.7 and .8) each get 3 reset requests and the first one's
+  4th is refused; the database shows their separate counters. Passed twice.
+- **Known issues / not done:** fixed windows allow up to twice the limit across a
+  window boundary; no allow-list for the academy's own network; limits are per
+  address, so a large botnet is only slowed by the per-account lockouts.
+- **Next planned feature:** 003A when the academy's Zoom test webinar is
+  available; otherwise a first-owner provisioning command.

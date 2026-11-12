@@ -41,6 +41,12 @@ public final class HttpApi {
         return send(request);
     }
 
+    /** A POST as if relayed by a trusted proxy for the given client address. */
+    public HttpResponse<String> postFrom(String clientAddress, String path, String body) {
+        return send(HttpRequest.newBuilder(URI.create(base + path)).header("Content-Type", "application/json")
+                .header("X-Forwarded-For", clientAddress).POST(HttpRequest.BodyPublishers.ofString(body)));
+    }
+
     public HttpResponse<String> put(String path, String body, String bearerToken) {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(base + path))
                 .header("Content-Type", "application/json").PUT(HttpRequest.BodyPublishers.ofString(body));

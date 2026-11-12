@@ -8,6 +8,7 @@ import {
   readMfaVerification,
   readTokens,
 } from "@/lib/auth-server";
+import { clientAddressFrom, trustedProxyHops } from "@/lib/client-address";
 import {
   activationPath,
   activationProblem,
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     };
 
     const refreshToken = request.cookies.get(names.refresh)?.value;
+    const client = clientAddressFrom(request.headers.get("x-forwarded-for"), trustedProxyHops());
 
     if (action === "logout") {
       if (refreshToken) {
@@ -112,6 +114,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       }
 
       const verifyResult = await authRequest("mfa/verify", {
+        client,
         body: { mfaToken: mfaState.mfaToken, code },
       });
 
@@ -155,7 +158,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       const password = form.get("password") ?? "";
       const problem = activationProblem(token, password, form.get("confirm") ?? "");
       if (problem) return go(activationPath(problem, problem === "token" ? null : token));
-      const activated = await authRequest("activate", { body: { token, password } });
+      const activated = await authRequest("activate", { body: { token, password }, client });
       if (activated.status === 204) return go("/sign-in?activated=1");
       if (activated.status === 400) return go(activationPath("invalid"));
       if (activated.status === 422) return go(activationPath("weak", token));
@@ -167,7 +170,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       // The address is never put in a URL; every outcome for a well-formed address looks the same.
       const address = form.get("email")?.trim();
       if (!address || address.length > 254) return go("/forgot-password?error=email");
-      const requested = await authRequest("password-reset/request", { body: { email: address } });
+      const requested = await authRequest("password-reset/request", { body: { email: address }, client });
       if (requested.status === 202) return go("/forgot-password?sent=1");
       if (requested.status === 503) return go("/forgot-password?error=disabled");
       if (requested.status === 429) return go("/forgot-password?error=limited");
@@ -180,7 +183,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       const newPassword = form.get("password") ?? "";
       const problem = activationProblem(token, newPassword, form.get("confirm") ?? "");
       if (problem) return go(resetPath(problem, problem === "token" ? null : token));
-      const reset = await authRequest("password-reset/confirm", { body: { token, password: newPassword } });
+      const reset = await authRequest("password-reset/confirm", { body: { token, password: newPassword }, client });
       if (reset.status === 204) return go("/sign-in?reset=1");
       if (reset.status === 400) return go(resetPath("invalid"));
       if (reset.status === 422) return go(resetPath("weak", token));
@@ -196,7 +199,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
 
     const result = await authRequest(
       action as "login" | "refresh",
-      { body: action === "login" ? { email: email!, password: password! } : { refreshToken: refreshToken! } }
+      { body: action === "login" ? { email: email!, password: password! } : { refreshToken: refreshToken! }, client }
     );
 
     if (result.status === 401 || result.status === 400) {
@@ -214,6 +217,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
 
       if (!challenge.mfaEnrolled) {
         const enrollResult = await authRequest("mfa/enroll", {
+          client,
           body: { mfaToken: challenge.mfaToken },
         });
         if (!enrollResult.ok) {
