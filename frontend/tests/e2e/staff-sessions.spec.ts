@@ -42,7 +42,8 @@ async function fillClass(page: Page, fields: { title: string; date: string; star
   await page.locator("#schedule-date").fill(fields.date);
   await page.locator("#schedule-start").fill(fields.start);
   await page.locator("#schedule-end").fill(fields.end);
-  for (const batch of fields.batches) await page.getByLabel(batch, { exact: true }).check();
+  const single = page.locator("form", { has: page.locator("#schedule-title") });
+  for (const batch of fields.batches) await single.getByLabel(batch, { exact: true }).check();
   if (fields.webinar) await page.locator("#schedule-webinar").fill(fields.webinar);
 }
 
@@ -65,11 +66,12 @@ test.describe("Classes", () => {
     await expect(page.locator("#schedule-feedback")).toHaveText("The class must end after it starts, on the same day.");
     // A refusal keeps what was typed and chosen.
     await expect(page.locator("#schedule-title")).toHaveValue("Waves");
-    await expect(page.getByLabel(`${C} · A · Batch A`, { exact: true })).toBeChecked();
+    const singleForm = page.locator("form", { has: page.locator("#schedule-title") });
+    await expect(singleForm.getByLabel(`${C} · A · Batch A`, { exact: true })).toBeChecked();
 
     await page.locator("#schedule-start").fill("18:00");
     await page.locator("#schedule-end").fill("20:00");
-    await page.getByLabel(`${C} · B · Batch B`, { exact: true }).check();
+    await singleForm.getByLabel(`${C} · B · Batch B`, { exact: true }).check();
     await page.locator("#schedule-webinar").fill("812 3456 7890");
     await page.getByRole("button", { name: "Schedule class" }).click();
     await expect(page.locator("#schedule-feedback")).toHaveText("Waves scheduled.");

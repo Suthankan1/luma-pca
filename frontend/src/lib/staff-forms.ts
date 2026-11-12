@@ -291,6 +291,39 @@ export function parseSessionForm(form: FormData): SessionInput | { error: string
     batchIds: batchIds as string[], zoomWebinarId: webinar || null };
 }
 
+export const WEEKDAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
+export type SeriesInput = { title: string; firstDate: string; lastDate: string; weekdays: string[]; startTime: string; endTime: string;
+  timeZone: string; batchIds: string[]; zoomWebinarId: string | null; skipDates: string[] };
+
+/**
+ * A weekly series from the form: the class fields plus first and last dates, weekdays and
+ * dates to skip (holidays), typed as YYYY-MM-DD separated by commas, spaces or new lines.
+ * The API re-checks everything and counts the classes.
+ */
+export function parseSeriesForm(form: FormData): SeriesInput | { error: string } {
+  const single = new FormData();
+  for (const key of ["title", "startTime", "endTime", "timeZone", "zoomWebinarId"]) single.set(key, String(form.get(key) ?? ""));
+  for (const id of form.getAll("batchIds")) single.append("batchIds", id);
+  single.set("date", text(form, "firstDate"));
+  const parsed = parseSessionForm(single);
+  if ("error" in parsed) return { error: parsed.error.replace("the date of the class", "the first date") };
+  const firstDate = text(form, "firstDate");
+  const lastDate = text(form, "lastDate");
+  if (!isRealDate(lastDate) || lastDate < firstDate) return { error: "Enter a last date on or after the first date." };
+  if (addDays(firstDate, 366) < lastDate) return { error: "A series can span at most a year." };
+  const weekdays = form.getAll("weekdays").map(String);
+  if (weekdays.length === 0 || weekdays.some(day => !(WEEKDAYS as readonly string[]).includes(day)) || new Set(weekdays).size !== weekdays.length) {
+    return { error: "Choose at least one weekday." };
+  }
+  const skipDates: string[] = text(form, "skipDates").split(/[\s,;]+/).filter(Boolean);
+  const badSkip: string | undefined = skipDates.find(date => !dateShape.test(date) || !isRealDate(date));
+  if (badSkip) return { error: `“${badSkip.slice(0, 20)}” is not a date. Write dates to skip as YYYY-MM-DD.` };
+  if (skipDates.length > 100) return { error: "List at most 100 dates to skip." };
+  return { title: parsed.title, firstDate, lastDate, weekdays: WEEKDAYS.filter(day => weekdays.includes(day)),
+    startTime: text(form, "startTime"), endTime: text(form, "endTime"), timeZone: parsed.timeZone, batchIds: parsed.batchIds,
+    zoomWebinarId: parsed.zoomWebinarId, skipDates: [...new Set(skipDates)].sort() };
+}
+
 /** "81234567890" → "812 3456 7890", the way Zoom shows 11-digit IDs; other lengths in groups of four. */
 export function formatWebinarId(id: string | null) {
   if (!id) return "";
@@ -299,7 +332,7 @@ export function formatWebinarId(id: string | null) {
 }
 
 export type ClassSession = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
-  zoomWebinarId: string | null; batches: { batchId: string; courseId: string; code: string; name: string }[]; version: number };
+  zoomWebinarId: string | null; seriesId?: string | null; batches: { batchId: string; courseId: string; code: string; name: string }[]; version: number };
 export type CourseRef = { id: string; code: string };
 type BatchRef = { id: string; courseId: string; code: string; name: string; active: boolean };
 

@@ -45,6 +45,34 @@ class ClassSessionController {
                                 @Size(max = 40) String zoomWebinarId, @NotNull @PositiveOrZero Long version) {
     }
 
+    record CreateSeriesRequest(@NotBlank @Size(max = 200) String title, @NotNull java.time.LocalDate firstDate,
+                               @NotNull java.time.LocalDate lastDate, @NotNull @Size(max = 7) List<String> weekdays,
+                               @NotNull java.time.LocalTime startTime, @NotNull java.time.LocalTime endTime,
+                               @Size(max = 64) String timeZone, @NotNull List<UUID> batchIds, @Size(max = 40) String zoomWebinarId,
+                               List<java.time.LocalDate> skipDates, Boolean dryRun) {
+    }
+
+    record CancelSeriesRequest(@NotNull java.time.LocalDate fromDate) {
+    }
+
+    record CancelledCount(int cancelled) {
+    }
+
+    /** A weekly series; 200 with created=false for a preview or when classes would overlap. */
+    @PostMapping("/series")
+    com.physicscube.luma.sessions.SeriesResult createSeries(JwtAuthenticationToken authentication,
+                                                            @Valid @RequestBody CreateSeriesRequest request) {
+        return sessions.createSeries(CurrentAccount.from(authentication), request.title(), request.firstDate(), request.lastDate(),
+                request.weekdays(), request.startTime(), request.endTime(), request.timeZone(), request.batchIds(),
+                request.zoomWebinarId(), request.skipDates(), Boolean.TRUE.equals(request.dryRun()));
+    }
+
+    @PostMapping("/series/{seriesId}/cancellations")
+    CancelledCount cancelSeries(JwtAuthenticationToken authentication, @PathVariable UUID seriesId,
+                                @Valid @RequestBody CancelSeriesRequest request) {
+        return new CancelledCount(sessions.cancelSeriesFrom(CurrentAccount.from(authentication), seriesId, request.fromDate()));
+    }
+
     @GetMapping
     List<SessionView> list(JwtAuthenticationToken authentication, @RequestParam Instant from, @RequestParam Instant to,
                            @RequestParam(required = false) UUID batchId) {

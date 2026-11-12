@@ -123,3 +123,8 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .decision { margin: 0 6px 6px; font-size: 14px; }
 .decision summary { cursor: pointer; color: var(--pca-blue); text-decoration: underline; padding: 6px 0; min-height: 32px; }
 .receipt code { font-size: 12px; overflow-wrap: anywhere; }
+
+.weekday-choices { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.weekday-choices legend { width: 100%; }
+.series-preview { margin: 10px 0 0 18px; font-size: 13px; color: var(--pca-muted); max-height: 260px; overflow-y: auto; }
+.series-preview li { padding: 2px 0; }

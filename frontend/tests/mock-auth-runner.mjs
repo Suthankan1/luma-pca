@@ -354,6 +354,44 @@ function studentInvitations(req, body, send, sub) {
   return send(200, counts);
 }
 
+// Weekly series (Asia/Colombo only, UTC+05:30): the same preview, overlap and cancellation rules as the API.
+function classSeries(body, send, seriesId, action) {
+  if (seriesId) {
+    if (action !== "cancellations" || !/^\d{4}-\d{2}-\d{2}$/.test(body.fromDate ?? "")) return send(400, { detail: "fromDate is required" });
+    const series = classSessions.filter(s => s.seriesId === seriesId);
+    if (series.length === 0) return send(404, { detail: "Not found" });
+    const cancelled = series.filter(s => s.status === "SCHEDULED" && localDate(s.startsAt, s.timeZone) >= body.fromDate);
+    for (const s of cancelled) { s.status = "CANCELLED"; s.version++; }
+    return send(200, { cancelled: cancelled.length });
+  }
+  const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+  const skip = new Set(body.skipDates ?? []);
+  const planned = [];
+  for (let t = Date.parse(`${body.firstDate}T00:00:00Z`); t <= Date.parse(`${body.lastDate}T00:00:00Z`); t += 86400_000) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    if (!body.weekdays.includes(days[new Date(t).getUTCDay()]) || skip.has(day)) continue;
+    planned.push({ localDate: day, startsAt: new Date(Date.parse(`${day}T${body.startTime}:00+05:30`)).toISOString(),
+      endsAt: new Date(Date.parse(`${day}T${body.endTime}:00+05:30`)).toISOString(), id: null });
+  }
+  if (planned.length < 1 || planned.length > 100) return send(400, { detail: `A series makes between 1 and 100 classes; it would make ${planned.length}` });
+  const conflicts = [];
+  for (const o of planned) {
+    for (const s of classSessions) {
+      if (s.status === "SCHEDULED" && s.batchIds.some(b => body.batchIds.includes(b)) && s.startsAt < o.endsAt && s.endsAt > o.startsAt) {
+        conflicts.push({ localDate: o.localDate, sessionId: s.id, title: s.title, startsAt: s.startsAt, endsAt: s.endsAt });
+      }
+    }
+  }
+  if (body.dryRun || conflicts.length) return send(200, { created: false, seriesId: null, occurrences: planned, conflicts });
+  const seriesIdNew = uuid();
+  for (const o of planned) {
+    o.id = uuid();
+    classSessions.push({ id: o.id, title: String(body.title).trim(), startsAt: o.startsAt, endsAt: o.endsAt, timeZone: "Asia/Colombo",
+      status: "SCHEDULED", zoomWebinarId: body.zoomWebinarId || null, batchIds: [...body.batchIds], seriesId: seriesIdNew, version: 0 });
+  }
+  return send(200, { created: true, seriesId: seriesIdNew, occurrences: planned, conflicts: [] });
+}
+
 function academicApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const [path, query = ""] = req.url.split("?");
@@ -518,6 +556,7 @@ function academicApi(req, body, send) {
       classSessions.push(created);
       return send(201, sessionView(created));
     }
+    if (id === "series" && req.method === "POST") return classSeries(body, send, sub, path.split("/")[6]);
     const session = classSessions.find(s => s.id === id);
     if (!session) return notFound();
     if (req.method === "GET" && sub === "students") {

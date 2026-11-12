@@ -1414,3 +1414,24 @@ build runs the Next.js default bundler and repeats the smoke test.
   refusals) plus 503 when email is off. Playwright `bulk-invitations.spec.ts` (desktop and
   mobile). Real-stack: the worker emails two imported students through Mailpit and the link
   activates one of them.
+
+## Checkpoint SES-2 — 2026-11-12 — Weekly class series
+
+- **Branch:** `feature/class-series`. **PR / merge SHA:** see the merged pull request titled
+  "feat(sessions): weekly class series with preview and overlap checks".
+- **Implemented:** `POST /api/v1/class-sessions/series` (title, first and last date, weekdays,
+  local start and end time, zone, batches, webinar ID, dates to skip, `dryRun`): 1–100 classes
+  within a year, each an ordinary class session sharing a `series_id` (V17). Local times follow
+  the zone's daylight-saving changes. A class that would overlap a scheduled class of any of the
+  same batches is reported and nothing is created (cancelled classes, other batches and
+  back-to-back classes do not clash). `POST …/series/{id}/cancellations {fromDate}` cancels the
+  series' scheduled classes from a date. Classes page: "Schedule a weekly series" form (preview
+  list, overlaps linked to the existing class, Create only after a clean preview of the same
+  details). Class page: "Cancel the rest of the series".
+- **Tests:** backend `ClassSeriesHttpIntegrationTest` (5 tests: preview vs create, overlap rules,
+  cancel from a date and refusals, Europe/London across the March 2027 clock change, validation).
+  Unit tests for the series form. Playwright `class-series.spec.ts` (desktop and mobile); three
+  existing specs now pick batch checkboxes inside the single-class form, since the classes page
+  has two batch lists. Real-stack test creates a two-class series on the real API.
+- **Not covered:** editing a whole series at once (each class is edited alone); changes to a
+  class's time or webinar ID still do not revisit existing Zoom links.
