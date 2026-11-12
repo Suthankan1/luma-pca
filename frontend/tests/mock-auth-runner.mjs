@@ -412,7 +412,9 @@ function academicApi(req, body, send) {
       const limit = Number(params.get("limit") ?? 50);
       const after = (params.get("after") ?? "").toUpperCase();
       const active = params.get("active");
-      const matching = students.filter(s => (active === null || String(s.active) === active) && s.studentNumber > after)
+      const q = (params.get("q") ?? "").trim().toLowerCase();
+      const matching = students.filter(s => (active === null || String(s.active) === active) && s.studentNumber > after
+        && (!q || s.studentNumber.toLowerCase().includes(q) || s.fullName.toLowerCase().includes(q) || (q.includes("@") && s.email === q)))
         .sort((a, b) => a.studentNumber.localeCompare(b.studentNumber));
       const items = matching.slice(0, limit).map(publicStudent);
       return send(200, { items, nextAfter: matching.length > limit ? items[items.length - 1].studentNumber : null });

@@ -44,8 +44,9 @@ class StudentController {
 
     @GetMapping("/api/v1/students")
     StudentPage list(JwtAuthenticationToken authentication, @RequestParam(required = false) Boolean active,
-                     @RequestParam(required = false) String after, @RequestParam(defaultValue = "50") int limit) {
-        return students.list(CurrentAccount.from(authentication), active, after, limit);
+                     @RequestParam(required = false) String after, @RequestParam(defaultValue = "50") int limit,
+                     @RequestParam(required = false) String q) {
+        return students.list(CurrentAccount.from(authentication), active, after, limit, q);
     }
 
     @GetMapping("/api/v1/students/{studentId}")

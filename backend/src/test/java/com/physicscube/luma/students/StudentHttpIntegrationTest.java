@@ -254,4 +254,34 @@ class StudentHttpIntegrationTest extends StaffApiIntegrationTest {
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("DELETE FROM accounts WHERE id = ?", localAccount),
                 "an account with a student record cannot be removed");
     }
+
+    @Test
+    void studentsAreFoundByPartOfANameOrNumberOrByAWholeEmail() {
+        assertEquals(201, fixtures.postStudent("PCA-101", "Nimal Perera", "nimal@example.invalid").statusCode());
+        assertEquals(201, fixtures.postStudent("PCA-102", "Kamala Perera-Silva", "kamala@example.invalid").statusCode());
+        assertEquals(201, fixtures.postStudent("PCA-203", "Ann 100% Sure_Thing", "ann@example.invalid").statusCode());
+        assertEquals(201, fixtures.postStudent("ZX-9", "Someone Else", "someone@example.invalid").statusCode());
+        UUID other = academy("Other Academy");
+        assertEquals(201, new AcademyFixtures(api, tokenFor(other, Role.ACADEMY_ADMIN))
+                .postStudent("PCA-104", "Other Perera", "other.perera@example.invalid").statusCode());
+
+        assertEquals(List.of("PCA-101", "PCA-102"), numbers(page("?q=perera")), "any letter case, other academies never");
+        assertEquals(List.of("PCA-101", "PCA-102"), numbers(page("?q=%20PCA-10%20")), "part of a number, trimmed");
+        assertEquals(List.of("PCA-203"), numbers(page("?q=100%25")), "% is matched literally, not as a wildcard");
+        assertEquals(List.of("PCA-203"), numbers(page("?q=e_t")), "_ is matched literally");
+        assertEquals(List.of(), numbers(page("?q=nobody")));
+        assertEquals(List.of("PCA-102"), numbers(page("?q=KAMALA@example.invalid")), "a whole email address");
+        assertEquals(List.of(), numbers(page("?q=kamala@")), "not part of an address");
+        assertEquals(List.of(), numbers(page("?q=other.perera@example.invalid")), "not another academy's student");
+
+        // Search keeps paging and the active filter.
+        Map<String, Object> first = page("?q=pca&limit=2");
+        assertEquals(List.of("PCA-101", "PCA-102"), numbers(first));
+        assertEquals(List.of("PCA-203"), numbers(page("?q=pca&limit=2&after=" + first.get("nextAfter"))));
+        String id = (String) ((Map<?, ?>) ((List<?>) page("?q=nimal").get("items")).get(0)).get("id");
+        assertEquals(200, api.put("/api/v1/students/" + id, updateBody("Nimal Perera", false, 0), admin).statusCode());
+        assertEquals(List.of("PCA-102"), numbers(page("?q=perera&active=true")));
+        assertEquals(400, api.get("/api/v1/students?q=" + "x".repeat(101), admin).statusCode());
+        assertEquals(403, api.get("/api/v1/students?q=perera", tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+    }
 }

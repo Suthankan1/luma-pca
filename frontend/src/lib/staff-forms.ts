@@ -126,8 +126,9 @@ export function academyToday(now = new Date()) {
 }
 
 /** Links between student list pages; `after` is the API's keyset cursor. */
-export function studentListHref(options: { after?: string | null; status?: string }) {
+export function studentListHref(options: { after?: string | null; status?: string; q?: string | null }) {
   const params = new URLSearchParams();
+  if (options.q) params.set("q", options.q);
   if (options.status && options.status !== "active") params.set("status", options.status);
   if (options.after) params.set("after", options.after);
   const query = params.toString();

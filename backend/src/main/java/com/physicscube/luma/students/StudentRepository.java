@@ -37,4 +37,19 @@ interface StudentRepository extends JpaRepository<Student, UUID> {
             """)
     List<Student> page(@Param("academyId") UUID academyId, @Param("after") String after,
                        @Param("active") Boolean active, Limit limit);
+
+    /**
+     * As {@link #page}, keeping students whose number or name contains {@code pattern} (a
+     * lower-case LIKE pattern with \\ escaping) or whose sign-in is {@code accountId}.
+     */
+    @Query("""
+            select s from Student s
+            where s.academyId = :academyId and s.studentNumber > :after
+              and (:active is null or s.active = :active)
+              and (lower(s.studentNumber) like :pattern escape '\\' or lower(s.fullName) like :pattern escape '\\'
+                   or s.accountId = :accountId)
+            order by s.studentNumber
+            """)
+    List<Student> search(@Param("academyId") UUID academyId, @Param("after") String after, @Param("active") Boolean active,
+                         @Param("pattern") String pattern, @Param("accountId") UUID accountId, Limit limit);
 }

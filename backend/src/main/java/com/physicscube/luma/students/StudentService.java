@@ -38,15 +38,37 @@ public class StudentService {
         this.accounts = accounts;
     }
 
-    /** @param active {@code null} for all; @param after last student number of the previous page, or {@code null} */
     @Transactional(readOnly = true)
     public StudentPage list(CurrentAccount caller, Boolean active, String after, int limit) {
+        return list(caller, active, after, limit, null);
+    }
+
+    /**
+     * @param active {@code null} for all; @param after last student number of the previous page, or {@code null}
+     * @param query {@code null} for everyone; otherwise part of a student number or name (any letter case),
+     *              or a whole email address
+     */
+    @Transactional(readOnly = true)
+    public StudentPage list(CurrentAccount caller, Boolean active, String after, int limit, String query) {
         caller.requireAcademyManager();
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new InvalidRequestException("limit must be between 1 and " + MAX_PAGE_SIZE);
         }
-        List<Student> found = students.page(caller.academyId(), after == null ? "" : Codes.normalize(after), active,
-                Limit.of(limit + 1));
+        String start = after == null ? "" : Codes.normalize(after);
+        String term = query == null ? "" : query.strip();
+        if (term.length() > 100) {
+            throw new InvalidRequestException("q must be at most 100 characters");
+        }
+        List<Student> found;
+        if (term.isEmpty()) {
+            found = students.page(caller.academyId(), start, active, Limit.of(limit + 1));
+        } else {
+            String lower = term.toLowerCase(java.util.Locale.ROOT);
+            String pattern = "%" + lower.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+            // An email matches only as a whole address, so a search cannot be used to guess addresses letter by letter.
+            UUID accountId = lower.contains("@") ? accounts.findByEmailIfValid(lower).map(AccountSummary::id).orElse(null) : null;
+            found = students.search(caller.academyId(), start, active, pattern, accountId, Limit.of(limit + 1));
+        }
         boolean more = found.size() > limit;
         List<Student> page = more ? found.subList(0, limit) : found;
         return new StudentPage(views(page), more ? page.get(page.size() - 1).getStudentNumber() : null);

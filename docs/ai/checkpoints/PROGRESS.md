@@ -1418,7 +1418,8 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint SES-2 — 2026-11-12 — Weekly class series
 
 - **Branch:** `feature/class-series`. **PR / merge SHA:** see the merged pull request titled
-  "feat(sessions): weekly class series with preview and overlap checks".
+  "feat(sessions): weekly class series with preview and overlap checks" (PR #49, merge commit
+  `83a5f5c`; all CI checks green).
 - **Implemented:** `POST /api/v1/class-sessions/series` (title, first and last date, weekdays,
   local start and end time, zone, batches, webinar ID, dates to skip, `dryRun`): 1–100 classes
   within a year, each an ordinary class session sharing a `series_id` (V17). Local times follow
@@ -1435,3 +1436,16 @@ build runs the Next.js default bundler and repeats the smoke test.
   has two batch lists. Real-stack test creates a two-class series on the real API.
 - **Not covered:** editing a whole series at once (each class is edited alone); changes to a
   class's time or webinar ID still do not revisit existing Zoom links.
+
+## Checkpoint STU-4 — 2026-11-12 — Student search
+
+- **Branch:** `feature/student-search`. **PR / merge SHA:** see the merged pull request titled
+  "feat(students): search the directory by name, number or email".
+- **Implemented:** `GET /api/v1/students?q=` — part of a student number or full name, any
+  letter case (`%` and `_` matched literally), or a whole email address (never part of one, so
+  addresses cannot be guessed letter by letter); combines with the active filter and keyset
+  paging; at most 100 characters. Students page: "Find a student" box kept across the status
+  filter and pages, with Clear.
+- **Tests:** backend search test (case, partial number, literal `%`/`_`, whole email only, other
+  academy excluded, paging, active filter, 400, 403); Playwright `student-search.spec.ts` (desktop
+  and mobile); real-stack search by name fragment and by email on PostgreSQL.

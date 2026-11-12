@@ -18,9 +18,10 @@ const filters = [
   { key: "all", label: "All", query: "" },
 ] as const;
 
-export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ after?: string; status?: string }> }) {
+export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ after?: string; status?: string; q?: string }> }) {
   const identity = await requirePortal("staff");
-  const { after, status } = await searchParams;
+  const { after, status, q } = await searchParams;
+  const search = typeof q === "string" ? q.trim().slice(0, 100) : "";
   const filter = filters.find(f => f.key === status) ?? filters[0];
   const cursor = typeof after === "string" && /^[A-Za-z0-9._-]{1,60}$/.test(after) ? after : null;
   const shell = { active: "students" as const, crumb: "Students", title: "Students",
@@ -33,18 +34,26 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
     </StaffShell>;
   }
 
-  const result = await staffApi<Page>(`/api/v1/students?limit=50${filter.query}${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}`);
+  const result = await staffApi<Page>(`/api/v1/students?limit=50${filter.query}${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}${search ? `&q=${encodeURIComponent(search)}` : ""}`);
   return <StaffShell {...shell}>
     <div className="staff-grid">
       <section className="panel" aria-labelledby="students-title">
         <h2 id="students-title" className="panel-title">STUDENT DIRECTORY</h2>
+        <form className="filter-form" method="get" action="/staff/students" role="search">
+          {filter.key !== "active" && <input type="hidden" name="status" value={filter.key} />}
+          <label htmlFor="student-search">Find a student</label>
+          <input id="student-search" name="q" type="search" maxLength={100} defaultValue={search} placeholder="Name, student number or whole email" />
+          <button className="action secondary" type="submit">Search</button>
+          {search && <Link className="text-link" href={studentListHref({ status: filter.key })}>Clear</Link>}
+        </form>
         <nav className="filter-row" aria-label="Filter students">
-          {filters.map(f => <Link key={f.key} href={studentListHref({ status: f.key })}
+          {filters.map(f => <Link key={f.key} href={studentListHref({ status: f.key, q: search })}
             className={`chip ${f.key === filter.key ? "cyan" : ""}`} aria-current={f.key === filter.key ? "true" : undefined}>{f.label}</Link>)}
         </nav>
         {!result.ok ? <p className="session-error" role="alert">We couldn’t load students right now. Please reload the page shortly.</p> : <>
-          <p className="panel-sub">{result.data.items.length === 0 ? (cursor ? "No more students." : "No students here yet.")
-            : `Showing ${result.data.items.length}${cursor ? ` after ${cursor}` : ""}, by student number.`}</p>
+          <p className="panel-sub">{result.data.items.length === 0
+            ? (search ? `No students match “${search}”.` : cursor ? "No more students." : "No students here yet.")
+            : `Showing ${result.data.items.length}${search ? ` matching “${search}”` : ""}${cursor ? ` after ${cursor}` : ""}, by student number.`}</p>
           <ul className="dir-list">
             {result.data.items.map(student => <li key={student.id} className="dir-row dir-course">
               <div><Link className="text-link" href={`/staff/students/${student.id}`}><strong>{student.studentNumber}</strong> <span>{student.fullName}</span></Link></div>
@@ -55,8 +64,8 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
             </li>)}
           </ul>
           <div className="nav-links">
-            {cursor && <Link className="action secondary" href={studentListHref({ status: filter.key })}>← First page</Link>}
-            {result.data.nextAfter && <Link className="action secondary" href={studentListHref({ status: filter.key, after: result.data.nextAfter })}>Next page →</Link>}
+            {cursor && <Link className="action secondary" href={studentListHref({ status: filter.key, q: search })}>← First page</Link>}
+            {result.data.nextAfter && <Link className="action secondary" href={studentListHref({ status: filter.key, after: result.data.nextAfter, q: search })}>Next page →</Link>}
           </div>
         </>}
       </section>
