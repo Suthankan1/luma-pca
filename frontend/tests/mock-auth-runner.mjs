@@ -19,7 +19,7 @@ const backend = createServer(async (req, res) => {
     res.end(value ? JSON.stringify(value) : "");
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -342,6 +342,8 @@ function importStudents(body, send) {
     students.push(created);
     if (batch) enrollments.push({ id: uuid(), batchId: batch.id, studentId: created.id, enrolledOn: body.enrolledOn, withdrawnOn: null, version: 0 });
   }
+  audit("STUDENTS_IMPORTED", batch ? "BATCH" : "ACADEMY", batch ? batch.id : null, batch ? batch.code : null,
+    { students: String(rows.length), enrolled: String(batch ? rows.length : 0), ...(batch ? { enrolledOn: body.enrolledOn } : {}) });
   return send(200, { imported: true, rows: rows.length, enrolled: batch ? rows.length : 0, problems: [] });
 }
 
@@ -415,10 +417,34 @@ function classSeries(body, send, seriesId, action) {
   return send(200, { created: true, seriesId: seriesIdNew, occurrences: planned, conflicts: [] });
 }
 
+// The activity log: appended by the routes above, read newest first with the API's filters and cursor.
+const auditEvents = [];
+function audit(action, targetType, targetId, targetLabel, details) {
+  auditEvents.push({ id: uuid(), seq: auditEvents.length + 1, occurredAt: new Date().toISOString(), action,
+    actorAccountId: SELF_ID, actorEmail: "admin-enrolled@example.invalid", targetType, targetId, targetLabel, details });
+}
+const auditCategories = { staff: /^(STAFF_|OWNER_)/, "sign-in": /^(INVITATIONS?_|PASSWORD_RESET_)/, students: /^STUDENTS_/, zoom: /^ZOOM_/ };
+function auditApi(query, send) {
+  const params = new URLSearchParams(query);
+  const category = params.get("category");
+  if (category && !auditCategories[category]) return send(400, { detail: "category must be one of sign-in, staff, students, zoom" });
+  const limit = Number(params.get("limit") ?? 50);
+  const before = Number((params.get("before") ?? "").split("_")[0] || Infinity);
+  const matching = auditEvents.filter(e => (!category || auditCategories[category].test(e.action))
+    && (!params.get("targetId") || e.targetId === params.get("targetId")) && e.seq < before).reverse();
+  const page = matching.slice(0, limit);
+  const last = page[page.length - 1];
+  return send(200, { items: page.map(({ seq, ...e }) => e), nextBefore: matching.length > limit ? `${last.seq}_${last.id}` : null });
+}
+
 function academicApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const [path, query = ""] = req.url.split("?");
   const [, , , collection, id, sub] = path.split("/");
+  if (collection === "audit-events" && req.method === "GET") {
+    if (!roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN")) return send(403, { detail: "Forbidden" });
+    return auditApi(query, send);
+  }
   const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
   // Assigned staff may list batches; the mock has no assignments, so they see none.
   if (!manager && (collection === "batches" || collection === "class-sessions") && !id && req.method === "GET"
@@ -475,6 +501,7 @@ function academicApi(req, body, send) {
       if (staff.some(s => s.email === email) || students.some(s => s.email === email)) return send(409, { detail: "An account with this email already exists" });
       const created = { id: uuid(), email, roles: [...body.roles].sort(), status: "PENDING_ACTIVATION", mfaEnrolled: false, version: 0 };
       staff.push(created);
+      audit("STAFF_ACCOUNT_CREATED", "ACCOUNT", created.id, created.email, { roles: created.roles });
       return send(201, created);
     }
     const person = staff.find(s => s.id === id);
@@ -489,7 +516,10 @@ function academicApi(req, body, send) {
       return send(200, person);
     }
     if (req.method === "POST" && sub === "disable") {
-      if (person.status !== "DISABLED") person.passwordSet = person.status === "ACTIVE" || person.passwordSet === true;
+      if (person.status !== "DISABLED") {
+        person.passwordSet = person.status === "ACTIVE" || person.passwordSet === true;
+        audit("STAFF_ACCOUNT_DISABLED", "ACCOUNT", person.id, person.email, {});
+      }
       Object.assign(person, { status: "DISABLED" });
       return send(200, person);
     }
@@ -497,6 +527,7 @@ function academicApi(req, body, send) {
       if (person.status === "DISABLED") {
         const fresh = body?.requireNewPassword === true || !person.passwordSet;
         Object.assign(person, { status: fresh ? "PENDING_ACTIVATION" : "ACTIVE", passwordSet: !fresh, version: person.version + 1 });
+        audit("STAFF_ACCOUNT_ENABLED", "ACCOUNT", person.id, person.email, { newPasswordRequired: String(fresh), statusNow: person.status });
       }
       return send(200, person);
     }

@@ -944,6 +944,48 @@ paths:
                   failed: {type: integer}
                   cancelled: {type: integer}
         '403': {description: Caller is not an academy owner or administrator}
+  /api/v1/audit-events:
+    get:
+      summary: The academy's activity log, newest first (implemented; owner/admin, read-only)
+      description: >-
+        Audited actions with the acting account's email and a readable target label (an
+        account's email, a batch code or a class title) where those still exist. Details never
+        hold passwords, tokens or student personal data. The log is append-only in the database.
+      operationId: listAuditEvents
+      tags: [Audit]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: category, required: false, schema: {type: string, enum: [staff, sign-in, students, zoom]}}
+        - {in: query, name: targetId, required: false, schema: {type: string, format: uuid}, description: One record's history}
+        - {in: query, name: before, required: false, schema: {type: string}, description: nextBefore from the previous page}
+        - {in: query, name: limit, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200':
+          description: One page of events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  nextBefore: {type: string, nullable: true}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, occurredAt, action, targetType, details]
+                      properties:
+                        id: {type: string, format: uuid}
+                        occurredAt: {type: string, format: date-time}
+                        action: {type: string, example: STAFF_ACCOUNT_DISABLED}
+                        actorAccountId: {type: string, format: uuid, nullable: true}
+                        actorEmail: {type: string, nullable: true}
+                        targetType: {type: string}
+                        targetId: {type: string, format: uuid, nullable: true}
+                        targetLabel: {type: string, nullable: true}
+                        details: {type: object, additionalProperties: true}
+        '400': {description: Unknown category, bad cursor or limit}
+        '403': {description: Caller is not an academy owner or administrator}
   /api/v1/me/enrollments:
     get:
       summary: The signed-in student's own enrollments (implemented; STUDENT role)
