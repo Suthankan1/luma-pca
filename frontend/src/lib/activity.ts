@@ -1,3 +1,5 @@
+import { formatClassTime, formatDate, formatInstant } from "./staff-forms.ts";
+
 /**
  * Plain-language lines for the activity log. Details are what the API recorded (never
  * passwords, tokens or student personal data); unknown actions fall back to their code.
@@ -10,6 +12,7 @@ export const ACTIVITY_CATEGORIES = [
   { key: "staff", label: "Staff" },
   { key: "sign-in", label: "Invitations & sign-in" },
   { key: "students", label: "Students" },
+  { key: "classes", label: "Classes" },
   { key: "zoom", label: "Zoom" },
 ] as const;
 
@@ -23,6 +26,13 @@ const count = (value: unknown, one: string, many = `${one}s`) => {
   const n = Number(value ?? 0);
   return `${n} ${n === 1 ? one : many}`;
 };
+
+const classFields: Record<string, string> = { title: "title", webinar: "Zoom webinar", batches: "batches" };
+const dayNames: Record<string, string> = { MONDAY: "Monday", TUESDAY: "Tuesday", WEDNESDAY: "Wednesday", THURSDAY: "Thursday",
+  FRIDAY: "Friday", SATURDAY: "Saturday", SUNDAY: "Sunday" };
+const zoneOf = (d: Record<string, unknown>) => typeof d.timeZone === "string" ? d.timeZone : "Asia/Colombo";
+/** The class's current title, or "a class" once it is gone. */
+const quoted = (event: ActivityEvent) => event.targetLabel ? `“${event.targetLabel}”` : "a class";
 
 /** Who acted: their email, "the system" for automatic actions, or "a removed account". */
 export function actorName(event: ActivityEvent) {
@@ -48,6 +58,23 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
     case "PASSWORD_RESET_COMPLETED": return { summary: `Password reset completed for ${target}` };
     case "STUDENTS_IMPORTED": return { summary: `Imported ${count(d.students, "student")}`,
       detail: event.targetType === "BATCH" ? `Enrolled ${d.enrolled ?? 0} in ${target}${d.enrolledOn ? ` from ${String(d.enrolledOn)}` : ""}` : undefined };
+    case "CLASS_SCHEDULED": return { summary: `Scheduled ${quoted(event)}`,
+      detail: typeof d.startsAt === "string" && typeof d.endsAt === "string" ? formatClassTime(d.startsAt, d.endsAt, zoneOf(d)) : undefined };
+    case "CLASS_UPDATED": {
+      const changed = Array.isArray(d.changed) ? d.changed.map(String) : [];
+      const moved = changed.includes("time") && typeof d.startsAtBefore === "string" && typeof d.startsAt === "string" && typeof d.endsAt === "string"
+        ? `moved from ${formatInstant(d.startsAtBefore, zoneOf(d))} to ${formatClassTime(d.startsAt, d.endsAt, zoneOf(d))}` : "";
+      const rest = changed.filter(field => field !== "time").map(field => classFields[field] ?? field);
+      return { summary: `Changed ${quoted(event)}`, detail: [moved, rest.length ? `changed ${rest.join(", ")}` : ""].filter(Boolean).join("; ") || undefined };
+    }
+    case "CLASS_CANCELLED": return { summary: `Cancelled ${quoted(event)}` };
+    case "CLASS_RESTORED": return { summary: `Restored ${quoted(event)}` };
+    case "CLASS_SERIES_CREATED": return { summary: `Scheduled a weekly series of ${count(d.classes, "class", "classes")}`,
+      detail: [Array.isArray(d.weekdays) ? `Every ${d.weekdays.map(w => dayNames[String(w)] ?? String(w)).join(" and ")}` : "",
+        typeof d.firstDate === "string" && typeof d.lastDate === "string" ? `${formatDate(d.firstDate)} – ${formatDate(d.lastDate)}` : ""]
+        .filter(Boolean).join(", ") || undefined };
+    case "CLASS_SERIES_CANCELLED": return { summary: `Cancelled ${count(d.cancelled, "class", "classes")} of a weekly series`,
+      detail: typeof d.fromDate === "string" ? `From ${formatDate(d.fromDate)}` : undefined };
     case "ZOOM_OCCURRENCE_LINKED": return { summary: `Linked a Zoom occurrence to ${event.targetLabel ?? "a class"}`,
       detail: typeof d.reason === "string" ? `Reason: ${d.reason}` : undefined };
     case "ZOOM_OCCURRENCE_MARKED_NOT_CLASS": return { summary: "Marked a Zoom occurrence as not a class",

@@ -42,13 +42,20 @@ public class ClassSessionService {
     private final BatchService batches;
     private final EnrollmentService enrollments;
     private final org.springframework.context.ApplicationEventPublisher events;
+    private final com.physicscube.luma.audit.AuditLog audit;
 
     ClassSessionService(ClassSessionRepository sessions, BatchService batches, EnrollmentService enrollments,
-                        org.springframework.context.ApplicationEventPublisher events) {
+                        org.springframework.context.ApplicationEventPublisher events, com.physicscube.luma.audit.AuditLog audit) {
         this.sessions = sessions;
         this.batches = batches;
         this.enrollments = enrollments;
         this.events = events;
+        this.audit = audit;
+    }
+
+    /** Timetable changes are audited: attendance is judged against the timetable. Classes hold no personal data. */
+    private void audited(CurrentAccount caller, String action, String targetType, UUID targetId, Map<String, ?> details) {
+        audit.record(caller.academyId(), caller.accountId(), action, targetType, targetId, details);
     }
 
     private static ClassSessionChanged.ZoomSlot slot(ClassSession session) {
@@ -138,6 +145,9 @@ public class ClassSessionService {
         ClassSession saved = sessions.saveAndFlush(
                 new ClassSession(caller.academyId(), title.strip(), startsAt, endsAt, zone, wanted, webinarId(zoomWebinarId)));
         changed(caller, saved, null);
+        audited(caller, "CLASS_SCHEDULED", "CLASS_SESSION", saved.getId(), Map.of("startsAt", saved.getStartsAt().toString(),
+                "endsAt", saved.getEndsAt().toString(), "timeZone", saved.getTimeZone(), "batches", String.valueOf(saved.batchIds().size()),
+                "webinar", saved.getZoomWebinarId() == null ? "none" : "set"));
         return views(caller, List.of(saved), new BatchScope(true, Set.of())).get(0);
     }
 
@@ -217,6 +227,10 @@ public class ClassSessionService {
                 .map(o -> new ClassSession(caller.academyId(), title.strip(), o.startsAt(), o.endsAt(), zone, wanted, webinar, seriesId))
                 .toList());
         saved.forEach(c -> changed(caller, c, null));
+        audited(caller, "CLASS_SERIES_CREATED", "CLASS_SERIES", seriesId, Map.of("classes", String.valueOf(saved.size()),
+                "firstDate", saved.get(0).localDate().toString(), "lastDate", saved.get(saved.size() - 1).localDate().toString(),
+                "weekdays", days.stream().sorted().map(Enum::name).toList(), "timeZone", zone.getId(),
+                "batches", String.valueOf(wanted.size())));
         return new SeriesResult(true, seriesId, saved.stream()
                 .map(c -> new SeriesResult.Occurrence(c.localDate(), c.getStartsAt(), c.getEndsAt(), c.getId())).toList(), List.of());
     }
@@ -233,6 +247,10 @@ public class ClassSessionService {
                 .filter(c -> "SCHEDULED".equals(c.getStatus()) && !c.localDate().isBefore(fromDate)).toList();
         cancelled.forEach(ClassSession::cancel);
         sessions.saveAllAndFlush(cancelled).forEach(c -> changed(caller, c, slot(c)));
+        if (!cancelled.isEmpty()) {
+            audited(caller, "CLASS_SERIES_CANCELLED", "CLASS_SERIES", seriesId, Map.of("fromDate", fromDate.toString(),
+                    "cancelled", String.valueOf(cancelled.size())));
+        }
         return cancelled.size();
     }
 
@@ -254,9 +272,46 @@ public class ClassSessionService {
         }
         Set<UUID> wanted = checkBatches(caller, batchIds, session.batchIds());
         ClassSessionChanged.ZoomSlot before = slot(session);
+        String oldTitle = session.getTitle();
+        Instant oldStart = session.getStartsAt();
+        Instant oldEnd = session.getEndsAt();
+        String oldZone = session.getTimeZone();
+        String oldStatus = session.getStatus();
+        String oldWebinar = session.getZoomWebinarId();
+        Set<UUID> oldBatches = Set.copyOf(session.batchIds());
         session.update(title.strip(), startsAt, endsAt, zone, wanted, status, webinarId(zoomWebinarId));
         ClassSession saved = sessions.saveAndFlush(session);
         changed(caller, saved, before);
+        List<String> fields = new java.util.ArrayList<>();
+        if (!oldTitle.equals(saved.getTitle())) {
+            fields.add("title");
+        }
+        if (!oldStart.equals(saved.getStartsAt()) || !oldEnd.equals(saved.getEndsAt()) || !oldZone.equals(saved.getTimeZone())) {
+            fields.add("time");
+        }
+        if (!java.util.Objects.equals(oldWebinar, saved.getZoomWebinarId())) {
+            fields.add("webinar");
+        }
+        if (!oldBatches.equals(saved.batchIds())) {
+            fields.add("batches");
+        }
+        String action = oldStatus.equals(saved.getStatus()) ? (fields.isEmpty() ? null : "CLASS_UPDATED")
+                : "CANCELLED".equals(saved.getStatus()) ? "CLASS_CANCELLED" : "CLASS_RESTORED";
+        if (action != null) {
+            Map<String, Object> details = new java.util.LinkedHashMap<>();
+            details.put("changed", fields);
+            if (fields.contains("time")) {
+                details.put("startsAtBefore", oldStart.toString());
+                details.put("startsAt", saved.getStartsAt().toString());
+                details.put("endsAt", saved.getEndsAt().toString());
+                details.put("timeZone", saved.getTimeZone());
+            }
+            if (fields.contains("batches")) {
+                details.put("batchesAdded", String.valueOf(saved.batchIds().stream().filter(b -> !oldBatches.contains(b)).count()));
+                details.put("batchesRemoved", String.valueOf(oldBatches.stream().filter(b -> !saved.batchIds().contains(b)).count()));
+            }
+            audited(caller, action, "CLASS_SESSION", saved.getId(), details);
+        }
         return views(caller, List.of(saved), new BatchScope(true, Set.of())).get(0);
     }
 

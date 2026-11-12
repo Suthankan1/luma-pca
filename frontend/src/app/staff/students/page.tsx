@@ -5,10 +5,11 @@ import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { accountStatusLabels, isAcademyManager, studentListHref } from "@/lib/staff-forms";
+import { accountStatusLabels, formatInstant, isAcademyManager, studentListHref } from "@/lib/staff-forms";
 
 type Student = { id: string; studentNumber: string; fullName: string; accountStatus: string | null; active: boolean };
 type Page = { items: Student[]; nextAfter: string | null };
+type FailedInvitation = { studentId: string; studentNumber: string; fullName: string; email: string; reason: string; failedAt: string; attempts: number };
 
 export const metadata = { title: "Students · LUMA" };
 
@@ -34,6 +35,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
     </StaffShell>;
   }
 
+  const failures = await staffApi<FailedInvitation[]>("/api/v1/student-invitations/failures");
   const result = await staffApi<Page>(`/api/v1/students?limit=50${filter.query}${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}${search ? `&q=${encodeURIComponent(search)}` : ""}`);
   return <StaffShell {...shell}>
     <div className="staff-grid">
@@ -80,6 +82,20 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
         <h2 id="invite-all-title" className="panel-title">INVITE BY EMAIL</h2>
         <BulkInviteForm batchId={null} scope="every active student" />
       </section>
+      {failures.ok && failures.data.length > 0 && <section className="panel panel-gap" aria-labelledby="failed-invites-title">
+        <h2 id="failed-invites-title" className="panel-title">EMAILS THAT FAILED</h2>
+        <p className="panel-sub">These invitation emails could not be delivered after several tries. Check the address on the student’s
+          record, then email again from here, or create a link on their record and send it another way.</p>
+        <ul className="dir-list">
+          {failures.data.map(f => <li key={f.studentId} className="dir-row dir-course">
+            <div>
+              <Link className="text-link" href={`/staff/students/${f.studentId}`}><strong>{f.studentNumber}</strong> <span>{f.fullName}</span></Link>
+              <div className="dir-dates muted">{f.email} · {f.attempts} tries, last {formatInstant(f.failedAt)}</div>
+            </div>
+            <span className="status off">{/Mail|Smtp|Socket|Connect/i.test(f.reason) ? "Mail server refused or unreachable" : "Sending failed"}</span>
+          </li>)}
+        </ul>
+      </section>}
       </div>
     </div>
   </StaffShell>;

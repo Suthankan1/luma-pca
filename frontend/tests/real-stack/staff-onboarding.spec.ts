@@ -151,10 +151,10 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-003" })).toContainText("Invitation pending");
   await page.getByRole("search").getByLabel("Find a student").fill("IMPORT,");
   await page.getByRole("search").getByRole("button", { name: "Search" }).click();
-  await expect(page.locator(".dir-list .dir-course")).toHaveText([/PCA-REAL-002\s*Import, One/]);
+  await expect(page.getByRole("region", { name: "STUDENT DIRECTORY" }).locator(".dir-list .dir-course")).toHaveText([/PCA-REAL-002\s*Import, One/]);
   await page.getByRole("search").getByLabel("Find a student").fill("real.student@example.invalid");
   await page.getByRole("search").getByRole("button", { name: "Search" }).click();
-  await expect(page.locator(".dir-list .dir-course")).toHaveText([/PCA-REAL-001/]);
+  await expect(page.getByRole("region", { name: "STUDENT DIRECTORY" }).locator(".dir-list .dir-course")).toHaveText([/PCA-REAL-001/]);
 
   // 6c. Invitation emails for the batch's students, sent by the background sender over SMTP.
   await page.goto("/staff/courses");

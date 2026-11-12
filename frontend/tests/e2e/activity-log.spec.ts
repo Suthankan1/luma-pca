@@ -54,6 +54,33 @@ test.describe("Activity log", () => {
       .toHaveAttribute("aria-current", "page");
   });
 
+  test("Scheduling a class appears under Classes, in the class's own time", async ({ page }) => {
+    await signInAsAdmin(page);
+    const P = p.toUpperCase();
+    await page.goto("/staff/courses");
+    await page.locator("#course-code").fill(`${p}-tt`);
+    await page.locator("#course-title").fill("Timetable course");
+    await page.getByRole("button", { name: "Create course" }).click();
+    await page.locator("#batch-course").selectOption({ label: `${P}-TT · Timetable course` });
+    await page.locator("#batch-code").fill(`${p}-sat`);
+    await page.locator("#batch-name").fill("Saturday");
+    await page.locator("#batch-starts").fill("2027-01-10");
+    await page.getByRole("button", { name: "Create batch" }).click();
+    await page.goto("/staff/sessions");
+    await page.locator("#schedule-title").fill(`Audited ${p}`);
+    await page.locator("#schedule-date").fill("2027-04-03");
+    await page.locator("#schedule-start").fill("09:00");
+    await page.locator("#schedule-end").fill("11:00");
+    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${P}-TT · ${P}-SAT · Saturday`, { exact: true }).check();
+    await page.getByRole("button", { name: "Schedule class" }).click();
+    await expect(page.locator("#schedule-feedback")).toHaveText(`Audited ${p} scheduled.`);
+
+    await page.goto("/staff/activity?category=classes");
+    const entry = page.locator(".activity-list > li").filter({ hasText: `Scheduled “Audited ${p}”` });
+    await expect(entry).toContainText("Sat 3 Apr 2027 · 09:00–11:00");
+    await expect(entry).toContainText("by admin-enrolled@example.invalid");
+  });
+
   test("Instructors are told the log is for owners and administrators", async ({ page }) => {
     await page.goto("/sign-in");
     await page.fill("#email", "instructor@example.invalid");

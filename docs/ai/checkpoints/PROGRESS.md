@@ -1534,7 +1534,8 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint OPS-1 — 2026-11-13 — Backups proven restorable
 
 - **Branch:** `feature/restore-drill`. **PR / merge SHA:** see the merged pull request titled
-  "feat(ops): backup script, restore drill and a restore test in CI".
+  "feat(ops): backup script, restore drill and a restore test in CI" (PR #56, merge commit
+  `7c7c257`; all CI checks green; CI backend ran all 328 tests).
 - **Implemented:** `scripts/db-backup.sh` (pg_dump custom format to gitignored `backups/`, private
   permissions, personal-data warning); `scripts/db-restore-drill.sh` (fresh dump → throwaway PostgreSQL 17
   → identical Flyway history, matching table counts, audit log still append-only; everything deleted
@@ -1546,3 +1547,24 @@ build runs the Next.js default bundler and repeats the smoke test.
   versions); fixed to the last applied migration.
 - **Still open:** RPO/RTO/retention (OPEN-QUESTIONS P1) and hosting budget (P0) decide the production
   backup design; no cloud resources were created.
+
+## Checkpoint AUD-2 — 2026-11-13 — Timetable changes audited; failed invitations listed
+
+- **Branch:** `feature/timetable-audit`. **PR / merge SHA:** see the merged pull request titled
+  "feat(audit): record timetable changes and list failed invitation emails".
+- **Timetable audit:** attendance is judged against the timetable, so every change is now in the
+  activity log: `CLASS_SCHEDULED` (time, zone, batch count, webinar set or not), `CLASS_UPDATED` (which
+  fields changed; old and new time when it moved; batches added/removed), `CLASS_CANCELLED`,
+  `CLASS_RESTORED`, one `CLASS_SERIES_CREATED` per series (classes, weekdays, first and last date) and
+  one `CLASS_SERIES_CANCELLED` (from date, how many). A save that changes nothing is not recorded.
+  The activity page gains a "Classes" filter and describes each in the class's own time zone.
+- **Failed invitations:** `GET /api/v1/student-invitations/failures` lists students whose latest
+  invitation email failed (last 14 days) and who have not activated; they leave the list when emailed
+  again or activated. The students page shows an "Emails that failed" panel only when there are any.
+- **Tests:** backend `TimetableAuditIntegrationTest` (2 tests) and failure-list checks in the
+  invitation test; one Zoom test now counts only Zoom audit events. Frontend: description unit tests;
+  Playwright for a bounced invitation and a class in the activity log. Four existing browser tests
+  now look inside the student directory, since the students page can show a second list. Full local
+  runs: backend 330 tests, 48 unit tests, 80 Playwright tests passed.
+- **Tooling:** `src/lib/activity.ts` imports `./staff-forms.ts` with its extension so Node's test
+  runner can load it; `allowImportingTsExtensions` is on (the app never emits TypeScript).

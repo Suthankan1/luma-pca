@@ -36,3 +36,20 @@ test("filter links", () => {
   assert.equal(activityHref({ category: "staff", before: "123_abc" }), "/staff/activity?category=staff&before=123_abc");
   assert.equal(activityHref({ target: "t1" }), "/staff/activity?target=t1");
 });
+
+test("timetable changes, in the class's own time zone", () => {
+  const cls = (action, details) => event(action, details, { targetType: "CLASS_SESSION", targetLabel: "Waves" });
+  assert.deepEqual(describeActivity(cls("CLASS_SCHEDULED", { startsAt: "2027-03-01T12:30:00Z", endsAt: "2027-03-01T14:30:00Z",
+    timeZone: "Asia/Colombo" })), { summary: "Scheduled “Waves”", detail: "Mon 1 Mar 2027 · 18:00–20:00" });
+  assert.deepEqual(describeActivity(cls("CLASS_UPDATED", { changed: ["batches", "time", "title"], startsAtBefore: "2027-03-01T12:30:00Z",
+    startsAt: "2027-03-02T12:30:00Z", endsAt: "2027-03-02T14:30:00Z", timeZone: "Asia/Colombo" })),
+    { summary: "Changed “Waves”", detail: "moved from 1 Mar 2027 18:00 to Tue 2 Mar 2027 · 18:00–20:00; changed batches, title" });
+  assert.deepEqual(describeActivity(cls("CLASS_UPDATED", { changed: ["webinar"] })), { summary: "Changed “Waves”", detail: "changed Zoom webinar" });
+  assert.equal(describeActivity(cls("CLASS_CANCELLED", { changed: [] })).summary, "Cancelled “Waves”");
+  assert.equal(describeActivity({ ...cls("CLASS_RESTORED", {}), targetLabel: null }).summary, "Restored a class");
+  assert.deepEqual(describeActivity(event("CLASS_SERIES_CREATED", { classes: "9", weekdays: ["MONDAY", "THURSDAY"], firstDate: "2027-03-01",
+    lastDate: "2027-03-29" }, { targetType: "CLASS_SERIES", targetLabel: null })),
+    { summary: "Scheduled a weekly series of 9 classes", detail: "Every Monday and Thursday, 1 Mar 2027 – 29 Mar 2027" });
+  assert.deepEqual(describeActivity(event("CLASS_SERIES_CANCELLED", { fromDate: "2027-03-22", cancelled: "1" },
+    { targetType: "CLASS_SERIES", targetLabel: null })), { summary: "Cancelled 1 class of a weekly series", detail: "From 22 Mar 2027" });
+});

@@ -924,6 +924,30 @@ paths:
         '403': {description: Caller is not an academy owner or administrator}
         '404': {description: The batch is not in the caller's academy}
         '503': {description: Email is not set up}
+  /api/v1/student-invitations/failures:
+    get:
+      summary: Students whose latest invitation email failed in the last 14 days and who still have not activated (implemented; owner/admin)
+      operationId: studentInvitationFailures
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Newest first, at most 200; a student leaves the list once emailed again or activated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    studentId: {type: string, format: uuid}
+                    studentNumber: {type: string}
+                    fullName: {type: string}
+                    email: {type: string}
+                    reason: {type: string, description: The kind of failure (exception class), never the mail server's message}
+                    failedAt: {type: string, format: date-time}
+                    attempts: {type: integer}
+        '403': {description: Caller is not an academy owner or administrator}
   /api/v1/student-invitations/progress:
     get:
       summary: Invitation emails of the academy waiting now, and sent, failed or cancelled in the last 14 days (implemented; owner/admin)
@@ -955,7 +979,7 @@ paths:
       tags: [Audit]
       security: [{bearerAuth: []}]
       parameters:
-        - {in: query, name: category, required: false, schema: {type: string, enum: [staff, sign-in, students, zoom]}}
+        - {in: query, name: category, required: false, schema: {type: string, enum: [staff, sign-in, students, classes, zoom]}}
         - {in: query, name: targetId, required: false, schema: {type: string, format: uuid}, description: One record's history}
         - {in: query, name: before, required: false, schema: {type: string}, description: nextBefore from the previous page}
         - {in: query, name: limit, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}

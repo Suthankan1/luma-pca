@@ -174,9 +174,19 @@ class StudentInvitationHttpIntegrationTest extends StaffApiIntegrationTest {
         assertTrue(drainMail().isEmpty());
         assertEquals("FAILED", jdbc.queryForObject("SELECT status FROM invitation_emails", String.class));
         assertEquals(1, ((Number) progress().get("failed")).intValue());
+        List<Object> failed = HttpApi.parseList(api.get("/api/v1/student-invitations/failures", admin));
+        assertEquals(1, failed.size(), "staff see which student's email failed");
+        Map<?, ?> failure = (Map<?, ?>) failed.get(0);
+        assertEquals("PCA-2", failure.get("studentNumber"));
+        assertEquals("pca-2@example.invalid", failure.get("email"));
+        assertEquals("IllegalStateException", failure.get("reason"));
+        assertEquals(5, ((Number) failure.get("attempts")).intValue());
+        assertEquals(403, api.get("/api/v1/student-invitations/failures", tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
         assertEquals(counts(2, 1, 0, 1), invite("{}"), "a failed email does not count as invited");
+        assertEquals(List.of(), HttpApi.parseList(api.get("/api/v1/student-invitations/failures", admin)), "queued again: no longer listed");
         sender.runOnce();
         assertEquals(List.of("pca-2@example.invalid"), drainMail().stream().map(CapturedMail.Mail::to).toList());
+        assertEquals(List.of(), HttpApi.parseList(api.get("/api/v1/student-invitations/failures", admin)));
     }
 
     @Test

@@ -205,7 +205,7 @@ class OccurrenceLinkingIntegrationTest extends StaffApiIntegrationTest {
         assertNull(link("Occ1==").get("session"));
 
         List<Map<String, Object>> audit = jdbc.queryForList("SELECT action, target_id::text AS target, details::text AS details "
-                + "FROM audit_events ORDER BY occurred_at");
+                + "FROM audit_events WHERE action LIKE 'ZOOM\\_%' ORDER BY occurred_at");
         assertEquals(List.of("ZOOM_OCCURRENCE_LINKED", "ZOOM_OCCURRENCE_LINKED", "ZOOM_OCCURRENCE_MARKED_NOT_CLASS"),
                 audit.stream().map(a -> a.get("action")).toList());
         assertEquals(first, audit.get(1).get("details").toString().replaceAll(".*\"previousSessionId\": \"([^\"]+)\".*", "$1"));
