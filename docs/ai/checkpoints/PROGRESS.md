@@ -1171,3 +1171,21 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Still open:** the 182 timeouts of the 1,500-student laptop run are not settled by a
   300-student run (the laptop had none at 150 either); needs a 1,500-student Linux run.
   Still no capacity claim.
+
+## Checkpoint PERF-1b — 2026-11-12 — Linux runner, 1,500 students
+
+- **PERF-1a evidence:** PR #34, merge commit `9b5164e`.
+- Ran the manual load workflow at the owner's request with 1,500 students (run
+  43195499238). **The run failed its latency targets** on one 4-vCPU runner hosting k6, the
+  API, Next.js and PostgreSQL: sign-in p95 6.93 s (target 2 s), portal p95 6.56 s (target
+  0.5 s), staff class page p95 3.79 s, with 2 HTTP 500s and one "couldn't load" class page.
+  Webhooks met their target (ack p99 132 ms, 3,600 processed once, no backlog). Peak CPU:
+  API 168%, web 56%, database 63%. The limiting tier was not isolated.
+- **Closed:** the laptop's 182 connection timeouts did not occur on Linux (0 of 6,000
+  student requests failed): local harness, not LUMA.
+- **Script fixes:** the staff script now clears cookies before signing in again (it cascaded
+  into 227 failed sign-ins after the first page errors; reasoned fix, not yet exercised at
+  1,500); the local runner prints a masked summary of web-log errors (the two 500s came from
+  the web tier, whose log was not captured).
+- **Next:** load generator on a separate machine, per-tier timings, a larger Hikari pool,
+  then the production-like gate run (needs cloud authorisation). Still no capacity claim.

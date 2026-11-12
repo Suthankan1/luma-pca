@@ -164,6 +164,10 @@ awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^cpu=/) { split($i, a, "="); v = a[2]
 tail -1 "$S/resources.log"
 echo "--- backend log: $(grep -c ' ERROR ' "$S/backend.log") ERROR, $(grep -c ' WARN ' "$S/backend.log") WARN lines"
 grep -E " ERROR " "$S/backend.log" | cut -c1-200 | sort | uniq -c | sort -rn | head -5
+# Next.js logs server errors without a level; show the distinct messages, credentials masked.
+echo "--- web log: $(grep -ciE "error|exception|timeout" "$S/frontend.log") error-like lines"
+grep -iE "error|exception|timeout" "$S/frontend.log" | sed -E -e "s/$PASSWORD/<password>/g" -e 's/eyJ[A-Za-z0-9_.-]{20,}/<jwt>/g' \
+  | cut -c1-200 | sort | uniq -c | sort -rn | head -8
 echo "--- started $PERIOD_START; local baseline only, not capacity evidence"
 # Debugging: keep the stack up (web $ORIGIN, API port $API) for KEEP_UP_S seconds.
 [ -n "${KEEP_UP_S:-}" ] && { echo "keeping the stack up for $KEEP_UP_S s"; sleep "$KEEP_UP_S"; }
