@@ -167,6 +167,15 @@ public class StudentService {
                 .collect(Collectors.toMap(StudentView::id, Function.identity()));
     }
 
+    /** For other modules: sign-in account ids of the academy's active students, or of those among {@code studentIds}. No role check. */
+    @Transactional(readOnly = true)
+    public List<UUID> activeAccountIds(UUID academyId, Collection<UUID> studentIds) {
+        if (studentIds == null) {
+            return students.activeAccountIds(academyId);
+        }
+        return studentIds.isEmpty() ? List.of() : students.activeAccountIds(academyId, studentIds);
+    }
+
     private Student load(UUID academyId, UUID studentId) {
         return students.findByIdAndAcademyId(studentId, academyId).orElseThrow(() -> new ResourceNotFoundException("Student"));
     }

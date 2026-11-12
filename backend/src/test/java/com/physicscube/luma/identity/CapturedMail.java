@@ -19,12 +19,18 @@ public class CapturedMail {
 
     public static final BlockingQueue<Mail> SENT = new LinkedBlockingQueue<>();
 
+    /** The next this-many invitation sends throw, as an unreachable mail server would. */
+    public static final java.util.concurrent.atomic.AtomicInteger FAIL_NEXT = new java.util.concurrent.atomic.AtomicInteger();
+
     @Bean
     @Primary
     AccountMailer capturingMailer() {
         return new AccountMailer() {
             @Override
             public void invitation(String to, String link, Instant expiresAt) {
+                if (FAIL_NEXT.getAndUpdate(n -> Math.max(n - 1, 0)) > 0) {
+                    throw new IllegalStateException("simulated mail server failure");
+                }
                 SENT.add(new Mail("invitation", to, link, expiresAt));
             }
 

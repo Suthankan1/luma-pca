@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
 import { AddStudentForm } from "@/components/staff/StudentForms";
+import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
@@ -59,12 +60,18 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
           </div>
         </>}
       </section>
+      <div>
       <section className="panel" aria-labelledby="add-student-title">
         <h2 id="add-student-title" className="panel-title">ADD</h2>
         <p className="panel-sub">Adding a student also creates their sign-in, waiting for an invitation. Student numbers are stored in capitals and cannot be changed later.</p>
         <AddStudentForm />
         <p><Link className="text-link" href="/staff/students/import">Import many students from a CSV file →</Link></p>
       </section>
+      <section className="panel panel-gap" aria-labelledby="invite-all-title">
+        <h2 id="invite-all-title" className="panel-title">INVITE BY EMAIL</h2>
+        <BulkInviteForm batchId={null} scope="every active student" />
+      </section>
+      </div>
     </div>
   </StaffShell>;
 }

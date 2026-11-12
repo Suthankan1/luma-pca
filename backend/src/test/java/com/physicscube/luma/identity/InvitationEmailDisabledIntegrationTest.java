@@ -25,5 +25,9 @@ class InvitationEmailDisabledIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE action = 'INVITATION_ISSUED'", Integer.class));
 
         assertEquals(201, api.post("/api/v1/accounts/" + id + "/invitations", "", admin).statusCode());
+
+        HttpResponse<String> bulk = api.post("/api/v1/student-invitations", "{\"dryRun\":true}", admin);
+        assertEquals(503, bulk.statusCode(), "bulk invitations need email");
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM invitation_emails", Integer.class));
     }
 }

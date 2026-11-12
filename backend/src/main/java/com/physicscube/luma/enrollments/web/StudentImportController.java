@@ -22,12 +22,12 @@ class StudentImportController {
         this.imports = imports;
     }
 
-    record ImportRequest(@NotNull List<Row> rows, UUID batchId, LocalDate enrolledOn, boolean dryRun) {
+    record ImportRequest(@NotNull List<Row> rows, UUID batchId, LocalDate enrolledOn, Boolean dryRun) {
     }
 
     @PostMapping("/api/v1/students/import")
     Result importStudents(JwtAuthenticationToken authentication, @RequestBody ImportRequest request) {
         return imports.importStudents(CurrentAccount.from(authentication), request.rows(), request.batchId(),
-                request.enrolledOn(), request.dryRun());
+                request.enrolledOn(), Boolean.TRUE.equals(request.dryRun()));
     }
 }

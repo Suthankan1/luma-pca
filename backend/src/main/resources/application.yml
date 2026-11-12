@@ -68,6 +68,14 @@ luma:
     from: ${LUMA_MAIL_FROM:}
     # Where people open emailed links: the Next.js origin, https except for localhost.
     web-origin: ${LUMA_MAIL_WEB_ORIGIN:}
+    # Bulk invitation emails are queued in the database and sent in the background: up to
+    # batch-size every poll-interval (default 20 every 5 s, at most 240 a minute). Lower them
+    # to stay inside the mail provider's sending limit. Failed sends retry with back-off.
+    bulk:
+      enabled: ${LUMA_MAIL_BULK_ENABLED:true}
+      poll-interval: ${LUMA_MAIL_BULK_POLL_INTERVAL:PT5S}
+      batch-size: ${LUMA_MAIL_BULK_BATCH_SIZE:20}
+      max-attempts: ${LUMA_MAIL_BULK_MAX_ATTEMPTS:5}
   password-reset:
     ttl: ${LUMA_PASSWORD_RESET_TTL:PT30M}
     max-requests-per-hour: ${LUMA_PASSWORD_RESET_MAX_REQUESTS_PER_HOUR:3}

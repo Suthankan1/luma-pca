@@ -1385,3 +1385,31 @@ build runs the Next.js default bundler and repeats the smoke test.
   test imports two students into the batch after a refused clash.
 - **Privacy:** the tool exists, but real student data still waits for the privacy questions
   in `docs/product/OPEN-QUESTIONS.md` to be signed off.
+
+## Checkpoint STU-3 — 2026-11-12 — Bulk invitation emails
+
+- **Branch:** `feature/bulk-invitations`. **PR / merge SHA:** see the merged pull request titled
+  "feat(students): bulk invitation emails with a durable send queue".
+- **Why a queue:** single invitations are emailed through an in-memory queue of 100 that drops
+  messages when full and loses them on restart. Fine for one at a time; 500 at once would
+  silently lose most. Bulk invitations therefore use a database queue (V16 `invitation_emails`).
+- **Implemented:** `POST /api/v1/student-invitations` (`batchId` optional, `resend`, `dryRun`)
+  and `GET /api/v1/student-invitations/progress`. A background worker (`luma.mail.bulk.*`; default
+  20 emails every 5 s) claims each queued email with `FOR UPDATE SKIP LOCKED`, issues a new link in
+  that transaction (the token is never stored), sends after commit, then marks it sent or
+  retries with back-off (1, 2, 4, 8 min; failed after 5 attempts). At least once: a worker that
+  dies after sending leaves the email due when its 10-minute lease ends, and the next link
+  replaces the first. Accounts activated meanwhile are cancelled, not emailed. Only pure student
+  accounts of the caller's academy that are pending activation are reached. Audit:
+  `INVITATIONS_QUEUED` (counts) and `INVITATION_ISSUED` per link (no addresses or links).
+  Batch page and students page get an "Invite by email" panel: check who will be emailed, then
+  send; progress refreshes while emails wait.
+- **Also fixed:** request bodies with an omitted boolean (`dryRun`) were refused with 400 by
+  Jackson's primitive handling; the student import endpoint had the same latent issue.
+- **Tests:** backend `StudentInvitationHttpIntegrationTest` (6 tests: batch selection with
+  withdrawn, inactive, other-batch and activated students; dry run; no double queueing; emailed
+  links activate; resend semantics; staff never reached; retry then give up then re-queue;
+  cancellation on activation; three concurrent senders email 30 students exactly once;
+  refusals) plus 503 when email is off. Playwright `bulk-invitations.spec.ts` (desktop and
+  mobile). Real-stack: the worker emails two imported students through Mailpit and the link
+  activates one of them.
