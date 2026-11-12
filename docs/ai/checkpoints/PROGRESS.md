@@ -1285,3 +1285,26 @@ build runs the Next.js default bundler and repeats the smoke test.
   Credentials pages. Created on the same day: test webinar "LUMA test - do not join"
   (838 3442 8148, 13 Nov 2026 11:00 Colombo, registration and sign-in required), app
   "LUMA Attendance Test" activated with four read-only scopes.
+
+## Checkpoint 003A-2 — 2026-11-12 — Real Zoom validation passed; event subscription live
+
+- **Incident 003A-1 resolved:** the webhook Secret Token was regenerated in Zoom (owner's
+  request, by the assistant without viewing the new value: Regenerate, Copy, clipboard piped
+  into `.env.zoom-test` with only its length and fingerprint checked, clipboard cleared). The
+  exposed token no longer works.
+- **First real Zoom contact:** with `scripts/zoom-test-tunnel.sh` running, Zoom's
+  "Validate" on the event subscription endpoint returned **Validated**: LUMA answered Zoom's
+  signed `endpoint.url_validation` with the HMAC of the new token. This is the first time a
+  real Zoom signature, not a fixture, was verified.
+- **Event subscription saved** on app "LUMA Attendance Test": name "LUMA test webinar events",
+  method Webhook, the tunnel URL, events Start Webinar, End Webinar, Participant/Host joined
+  webinar, Participant/Host left webinar; receiver "All users in the account". Allow-list:
+  test webinar 838 3442 8148 (13 Nov 2026 11:00 Colombo). Every other webinar's events are
+  acknowledged and dropped unread.
+- **Lessons for agents:** on the Zoom Features page, element searches and page-text reads can
+  return the Secret Token; scroll actions return automatic screenshots; the Chrome extension
+  redacts result keys containing "token". Use cropped zooms below the token row, scrolling
+  by script.
+- **Open:** the tunnel URL changes on each start, so the subscription's URL must be updated
+  and re-validated after any restart; keep the tunnel running through the test or restart it
+  before 11:00 on 13 Nov. After the test, stop the tunnel and switch the subscription off.
