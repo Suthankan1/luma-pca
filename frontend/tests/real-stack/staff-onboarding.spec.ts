@@ -10,6 +10,23 @@ import { test, expect } from "@playwright/test";
 const adminEmail = "smoke.admin@example.invalid";
 const adminInvite = process.env.LUMA_REAL_ADMIN_INVITE!;
 const passphrase = process.env.LUMA_REAL_PASSPHRASE!;
+const mailpit = process.env.LUMA_REAL_MAILPIT_URL!;
+
+type MailpitList = { messages: { ID: string; Subject: string; To: { Address: string }[] }[] };
+
+/** The newest email to an address caught by Mailpit, waiting up to 10 s for it to arrive. */
+async function newestEmailTo(address: string) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const list = await (await fetch(`${mailpit}/api/v1/messages`)).json() as MailpitList;
+    const found = list.messages.find(m => m.To.some(to => to.Address === address));
+    if (found) {
+      const message = await (await fetch(`${mailpit}/api/v1/message/${found.ID}`)).json() as { Text: string; From: { Address: string } };
+      return { subject: found.Subject, from: message.From.Address, text: message.Text };
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  throw new Error(`No email to ${address} arrived`);
+}
 
 /** RFC 6238 code (SHA-1, 6 digits, 30 s) for a Base32 secret, as an authenticator app computes it. */
 function totp(base32: string, at = Date.now()) {
@@ -217,4 +234,47 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(instructor.getByText("You are not assigned to any batch yet.")).toBeVisible();
   expect((await instructor.goto(classUrl))?.status()).toBe(404);
   await instructorContext.close();
+
+  // 10. The student forgets their password: the link arrives by real SMTP and works once.
+  const newPassphrase = `${passphrase} again`;
+  const resetContext = await browser.newContext();
+  const forgetful = await resetContext.newPage();
+  await forgetful.goto("/sign-in");
+  await forgetful.getByRole("link", { name: "Forgot your password?" }).click();
+  // Both pages have an #email field: wait for the new page before typing.
+  await expect(forgetful.getByRole("heading", { name: "Forgot your password" })).toBeVisible();
+  await forgetful.fill("#email", "real.student@example.invalid");
+  await forgetful.getByRole("button", { name: "Email me a reset link" }).click();
+  await expect(forgetful).toHaveURL(/\/forgot-password\?sent=1$/);
+  const email = await newestEmailTo("real.student@example.invalid");
+  expect(email.subject).toBe("Reset your LUMA password");
+  expect(email.from).toBe("no-reply@example.invalid");
+  const link = /http:\/\/127\.0\.0\.1:\d+\/reset-password#token=[A-Za-z0-9_-]{43}/.exec(email.text)?.[0];
+  expect(link, email.text).toBeTruthy();
+  await forgetful.goto(link!);
+  await forgetful.fill("#password", newPassphrase);
+  await forgetful.fill("#confirm", newPassphrase);
+  await forgetful.getByRole("button", { name: "Change password" }).click();
+  await expect(forgetful).toHaveURL(/\/sign-in\?reset=1$/);
+  await forgetful.fill("#email", "real.student@example.invalid");
+  await forgetful.fill("#password", passphrase);
+  await forgetful.getByRole("button", { name: "Sign in" }).click();
+  await expect(forgetful).toHaveURL(/\/sign-in\?error=invalid/);
+  await forgetful.fill("#email", "real.student@example.invalid");
+  await forgetful.fill("#password", newPassphrase);
+  await forgetful.getByRole("button", { name: "Sign in" }).click();
+  await expect(forgetful).toHaveURL(/\/student$/);
+  // The link was single use.
+  await forgetful.goto(link!);
+  await forgetful.fill("#password", `${newPassphrase} once more`);
+  await forgetful.fill("#confirm", `${newPassphrase} once more`);
+  await forgetful.getByRole("button", { name: "Change password" }).click();
+  await expect(forgetful).toHaveURL(/\/reset-password\?error=invalid$/);
+  await resetContext.close();
+
+  // An unknown address gets the same answer and no email.
+  await page.goto("/forgot-password");
+  await page.fill("#email", "nobody.here@example.invalid");
+  await page.getByRole("button", { name: "Email me a reset link" }).click();
+  await expect(page).toHaveURL(/\/forgot-password\?sent=1$/);
 });

@@ -978,3 +978,41 @@ build runs the Next.js default bundler and repeats the smoke test.
   academy's decision.
 - **Next planned feature:** 001J part 2, the `/forgot-password` and
   `/reset-password` pages and a real SMTP run.
+
+## Checkpoint 001J part 2 — 2026-11-12 — Password reset pages and real SMTP run
+
+- **Part 1 evidence:** merged as PR #28, merge commit `4a769b7`; Linux backend CI
+  264 tests, 0 failures; real-stack job green.
+- **Feature ID / name:** 001J part 2. With it, 001J is complete.
+- **Branch:** `feature/001j-reset-pages`. **PR / merge SHA:** see the merged pull
+  request titled "feat(web): forgot and reset password pages".
+- **Implemented behavior:** "Forgot your password?" on the sign-in form opens
+  `/forgot-password`, which posts to the BFF action `reset-request` (origin
+  checked like sign-in) and always shows the same "if an active account uses
+  that address" message; the address is never put in a URL. When email is not
+  configured it explains that an administrator can help. `/reset-password`
+  reads the code from the link's `#token=` fragment and removes it from the
+  address bar (pasting the code or whole link also works); `reset-confirm`
+  checks the code shape, matching passwords and length first, keeps the code in
+  the fragment after a mistake, and on success redirects to `/sign-in?reset=1`
+  ("signed out everywhere"). A used or expired link offers a new one.
+- **Real-stack test:** the script now runs Mailpit (`axllent/mailpit:v1.27.0`)
+  as the SMTP server with reset enabled. The student asks for a link; the test
+  reads the email from Mailpit (subject, sender, link to the web origin), sets a
+  new password through the link, confirms the old password fails and the new
+  one signs in, and that the link is single use; an unknown address gets the
+  same page and no email. Database: one reset, used; audit has
+  PASSWORD_RESET_REQUESTED and PASSWORD_RESET_COMPLETED; exactly one email
+  caught; logs checked for passphrases, invitations, JWTs, reset links and the
+  student's address: none. Passed three times locally after the fix below.
+- **Tests executed (macOS):** frontend lint, type-check, 34 unit, build, HTTP
+  smoke; Playwright 56 tests (6 new: 3 scenarios × desktop and mobile) run twice.
+- **Test-only fix before commit:** the real-stack step typed into `#email`
+  before the forgot-password page had replaced the sign-in page (both have that
+  id), so the form was empty and the browser blocked it; it now waits for the
+  heading. The first runs failed this way; none after.
+- **Known issues / not done:** no email provider chosen or provisioned (the
+  academy decides; any SMTP service works); invitations are still copied by the
+  administrator rather than emailed; rate limiting is per account only.
+- **Next planned feature:** emailing invitation links, or 003A when the
+  academy's Zoom test webinar is available.

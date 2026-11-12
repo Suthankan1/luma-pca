@@ -15,6 +15,7 @@ import {
   isSameOrigin,
   openMfa,
   portalPath,
+  resetPath,
   sealAccess,
   sealMfa,
   sealRecovery,
@@ -27,7 +28,7 @@ const noStore = { "Cache-Control": "no-store" };
 
 export async function POST(request: NextRequest, context: { params: Promise<{ action: string }> }) {
   const { action } = await context.params;
-  const allowedActions = ["login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery", "activate"];
+  const allowedActions = ["login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery", "activate", "reset-request", "reset-confirm"];
   if (!allowedActions.includes(action)) {
     return new NextResponse(null, { status: 404, headers: noStore });
   }
@@ -162,6 +163,31 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       return go(activationPath("unavailable", token));
     }
 
+    if (action === "reset-request") {
+      // The address is never put in a URL; every outcome for a well-formed address looks the same.
+      const address = form.get("email")?.trim();
+      if (!address || address.length > 254) return go("/forgot-password?error=email");
+      const requested = await authRequest("password-reset/request", { body: { email: address } });
+      if (requested.status === 202) return go("/forgot-password?sent=1");
+      if (requested.status === 503) return go("/forgot-password?error=disabled");
+      if (requested.status === 429) return go("/forgot-password?error=limited");
+      return go("/forgot-password?error=unavailable");
+    }
+
+    if (action === "reset-confirm") {
+      // Like activation, independent of any session here; the backend signs the account out everywhere.
+      const token = extractActivationToken(form.get("token"));
+      const newPassword = form.get("password") ?? "";
+      const problem = activationProblem(token, newPassword, form.get("confirm") ?? "");
+      if (problem) return go(resetPath(problem, problem === "token" ? null : token));
+      const reset = await authRequest("password-reset/confirm", { body: { token, password: newPassword } });
+      if (reset.status === 204) return go("/sign-in?reset=1");
+      if (reset.status === 400) return go(resetPath("invalid"));
+      if (reset.status === 422) return go(resetPath("weak", token));
+      if (reset.status === 429) return go(resetPath("limited", token));
+      return go(resetPath("unavailable", token));
+    }
+
     const email = form.get("email")?.trim();
     const password = form.get("password");
     if (action === "login" && (!email || email.length > 254 || !password || password.length > 256)) {
@@ -234,6 +260,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     return response;
   } catch {
     if (action === "activate") return go(activationPath("unavailable"));
+    if (action === "reset-request") return go("/forgot-password?error=unavailable");
+    if (action === "reset-confirm") return go(resetPath("unavailable"));
     return go(action === "logout" ? "/sign-in?error=sign-out" : "/sign-in?error=unavailable");
   }
 }

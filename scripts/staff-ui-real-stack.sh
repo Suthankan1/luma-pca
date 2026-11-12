@@ -3,7 +3,8 @@
 # Spring backend jar + a production build of Next.js, driven by Playwright
 # (frontend/tests/real-stack). Only an academy and a pending administrator with a
 # known invitation are seeded, plus Zoom occurrences and a failed receipt (no personal
-# data) for the review screen; everything else happens through the browser.
+# data) for the review screen; everything else happens through the browser. Password
+# reset emails go over SMTP to a Mailpit container (uses ports 11025 and 18025 too).
 #
 # Needs: Docker running, JDK 21 as `java` (or JAVA_HOME), Node 22+, a built backend
 # (`mvn -f backend/pom.xml package`), `npm --prefix frontend ci` and
@@ -14,18 +15,22 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 S="$(mktemp -d)"
 JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"
-PG=luma-staff-ui-pg; API=18081; WEB=3200; ORIGIN=http://127.0.0.1:$WEB
+PG=luma-staff-ui-pg; MAIL=luma-staff-ui-mail; API=18081; WEB=3200; ORIGIN=http://127.0.0.1:$WEB
+# Mailpit catches every email over real SMTP and shows it through its HTTP API.
+MAILPIT_IMAGE=axllent/mailpit:v1.27.0; SMTP=11025; MAILPIT=18025
 DBPASS=$(openssl rand -hex 12)
 PHRASE="$(openssl rand -hex 4) river under bridge"
 INVITE=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')
-cleanup() { [ -n "${BPID:-}" ] && kill $BPID 2>/dev/null; [ -n "${FPID:-}" ] && kill $FPID 2>/dev/null; docker rm -f $PG >/dev/null 2>&1; rm -rf "$S"; }
+cleanup() { [ -n "${BPID:-}" ] && kill $BPID 2>/dev/null; [ -n "${FPID:-}" ] && kill $FPID 2>/dev/null; docker rm -f $PG $MAIL >/dev/null 2>&1; rm -rf "$S"; }
 trap cleanup EXIT
 
-docker rm -f $PG >/dev/null 2>&1
+docker rm -f $PG $MAIL >/dev/null 2>&1
+docker run -d --rm --name $MAIL -p 127.0.0.1:$SMTP:1025 -p 127.0.0.1:$MAILPIT:8025 $MAILPIT_IMAGE >/dev/null
 docker run -d --rm --name $PG -e POSTGRES_USER=luma -e POSTGRES_PASSWORD=$DBPASS -e POSTGRES_DB=luma -p 127.0.0.1:55433:5432 postgres:17-alpine >/dev/null
 for i in $(seq 1 60); do docker exec $PG pg_isready -U luma -d luma >/dev/null 2>&1 && break; sleep 1; done; sleep 2
 DB_URL=jdbc:postgresql://localhost:55433/luma DB_USERNAME=luma DB_PASSWORD=$DBPASS SERVER_PORT=$API LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true \
-  LUMA_ZOOM_PROCESSING_ENABLED=false "$JAVA" -jar "$ROOT/backend/target/luma-backend-0.1.0-SNAPSHOT.jar" > "$S/backend.log" 2>&1 & BPID=$!
+  LUMA_ZOOM_PROCESSING_ENABLED=false LUMA_PASSWORD_RESET_ENABLED=true LUMA_PASSWORD_RESET_FROM=no-reply@example.invalid \
+  LUMA_PASSWORD_RESET_WEB_ORIGIN=$ORIGIN SPRING_MAIL_HOST=127.0.0.1 SPRING_MAIL_PORT=$SMTP "$JAVA" -jar "$ROOT/backend/target/luma-backend-0.1.0-SNAPSHOT.jar" > "$S/backend.log" 2>&1 & BPID=$!
 for i in $(seq 1 90); do curl -sf localhost:$API/actuator/health/readiness >/dev/null && break; sleep 1; done
 curl -sf localhost:$API/actuator/health/readiness >/dev/null || { echo "backend did not start"; tail -20 "$S/backend.log"; exit 1; }
 
@@ -53,7 +58,8 @@ LUMA_WEB_ORIGIN=$ORIGIN LUMA_SESSION_KEY=$(openssl rand -base64 32 | tr '+/' '-_
   node node_modules/next/dist/bin/next start -H 127.0.0.1 -p $WEB > "$S/frontend.log" 2>&1 & FPID=$!
 for i in $(seq 1 60); do curl -sf -o /dev/null $ORIGIN/sign-in && break; sleep 1; done
 
-LUMA_REAL_STACK_URL=$ORIGIN LUMA_REAL_ADMIN_INVITE=$INVITE LUMA_REAL_PASSPHRASE=$PHRASE \
+for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:$MAILPIT/api/v1/messages && break; sleep 1; done
+LUMA_REAL_STACK_URL=$ORIGIN LUMA_REAL_MAILPIT_URL=http://127.0.0.1:$MAILPIT LUMA_REAL_ADMIN_INVITE=$INVITE LUMA_REAL_PASSPHRASE=$PHRASE \
   npx playwright test -c playwright.real-stack.config.ts
 status=$?
 
@@ -65,8 +71,11 @@ docker exec $PG psql -At -U luma -d luma -c "SELECT 'courses=' || count(*) FROM 
   -c "SELECT 'class sessions=' || string_agg(starts_at::text || ' to ' || ends_at::text || ' webinar ' || zoom_webinar_id, ';') FROM class_sessions" \
   -c "SELECT 'occurrence links=' || string_agg(occurrence_uuid || ':' || link_source || ':' || coalesce(class_session_id::text, 'not a class'), ',') FROM zoom_occurrence_links" \
   -c "SELECT 'receipts=' || string_agg(processing_status || ':' || attempts, ',' ORDER BY id) FROM zoom_webhook_receipts" \
+  -c "SELECT 'password resets=' || count(*) || ' used=' || count(consumed_at) FROM password_resets" \
   -c "SELECT 'audit: ' || string_agg(action, ',' ORDER BY occurred_at) FROM audit_events"
-leaks=$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE" "$S/backend.log" "$S/frontend.log" | awk -F: '{s+=$2} END {print s}')
+echo "emails caught: $(curl -sf http://127.0.0.1:$MAILPIT/api/v1/messages | grep -o '"total":[0-9]*')"
+# Reset links and recipient addresses must never reach the logs either.
+leaks=$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE|reset-password#token|real\.student@" "$S/backend.log" "$S/frontend.log" | awk -F: '{s+=$2} END {print s}')
 echo "secrets in logs: $leaks"
 [ "$leaks" = 0 ] || status=1
 if [ "$status" != 0 ]; then
