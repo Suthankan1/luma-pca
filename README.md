@@ -56,6 +56,7 @@ The backend exposes `POST /api/v1/auth/login`, `refresh`, `logout`, `logout-all`
 
 ```bash
 mvn -f backend/pom.xml test
+scripts/backend-test-docker.sh test     # the same tests in a throwaway Maven container (JDK 21 inside; host Java and settings untouched)
 npm --prefix frontend run lint
 npm --prefix frontend run build
 python3 scripts/verify_structure.py

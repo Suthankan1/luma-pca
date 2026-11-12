@@ -68,6 +68,38 @@ public class ClassSessionService {
         return views(caller, found, scope);
     }
 
+    /**
+     * The calling student's classes starting in [from, to): those of a batch they are enrolled
+     * in on the class's own date (the same rule as {@link #expectedStudents}). Cancelled
+     * classes are included so the student sees the change.
+     */
+    @Transactional(readOnly = true)
+    public List<StudentClassView> mine(CurrentAccount caller, Instant from, Instant to) {
+        caller.requireRole("STUDENT");
+        if (!to.isAfter(from) || Duration.between(from, to).compareTo(MAX_WINDOW) > 0) {
+            throw new InvalidRequestException("to must be after from and at most " + MAX_WINDOW.toDays() + " days later");
+        }
+        List<com.physicscube.luma.enrollments.EnrollmentView> enrolled = enrollments.mine(caller);
+        Set<UUID> batchIds = enrolled.stream().map(com.physicscube.luma.enrollments.EnrollmentView::batchId).collect(Collectors.toSet());
+        if (batchIds.isEmpty()) {
+            return List.of();
+        }
+        return sessions.inWindowForBatches(caller.academyId(), from, to, batchIds).stream()
+                .map(session -> {
+                    java.time.LocalDate day = session.localDate();
+                    List<StudentClassView.Batch> mine = enrolled.stream()
+                            .filter(e -> session.batchIds().contains(e.batchId()) && !e.enrolledOn().isAfter(day)
+                                    && (e.withdrawnOn() == null || e.withdrawnOn().isAfter(day)))
+                            .map(e -> new StudentClassView.Batch(e.batchId(), e.batchCode(), e.batchName()))
+                            .distinct().sorted(Comparator.comparing(StudentClassView.Batch::code)).toList();
+                    return mine.isEmpty() ? null : new StudentClassView(session.getId(), session.getTitle(), session.getStartsAt(),
+                            session.getEndsAt(), session.getTimeZone(), day, session.getStatus(), mine);
+                })
+                .filter(java.util.Objects::nonNull)
+                .sorted(Comparator.comparing(StudentClassView::startsAt).thenComparing(StudentClassView::id))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public SessionView get(CurrentAccount caller, UUID sessionId) {
         BatchScope scope = batches.scope(caller);

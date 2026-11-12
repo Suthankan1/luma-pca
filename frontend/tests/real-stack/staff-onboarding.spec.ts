@@ -173,6 +173,20 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students follow the new date and batches.");
   await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
 
+  // 7b'. The student sees the class and their batch in the student portal.
+  const studentAgain = await browser.newContext();
+  const portal = await studentAgain.newPage();
+  await portal.goto("/sign-in?portal=student");
+  await portal.fill("#email", "real.student@example.invalid");
+  await portal.fill("#password", passphrase);
+  await portal.getByRole("button", { name: "Sign in" }).click();
+  await expect(portal).toHaveURL(/\/student$/);
+  await portal.goto("/student?from=2027-01-11");
+  await expect(portal.getByRole("region", { name: "MY CLASSES" }).getByRole("listitem", { name: "Real stack class" }))
+    .toContainText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
+  await expect(portal.getByRole("region", { name: "MY BATCHES" })).toContainText("from 12 Jan 2027");
+  await studentAgain.close();
+
   // 7c. Zoom review against the seeded occurrences: automatic linking finds the class by
   // webinar ID and time; the other occurrence is decided by hand, then the decision changed.
   await page.goto("/staff/zoom");

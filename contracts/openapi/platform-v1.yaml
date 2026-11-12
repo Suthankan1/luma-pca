@@ -813,6 +813,27 @@ paths:
               schema: {type: array, items: {$ref: '#/components/schemas/Enrollment'}}
         '403': {description: Caller is not a student}
         '404': {description: The account has no student record}
+  /api/v1/me/class-sessions:
+    get:
+      summary: The signed-in student's own classes starting in a window, by start time (implemented; STUDENT role)
+      description: >-
+        A class is listed when the student is enrolled, on the class's local date, in at least one
+        of its batches; only those batches are listed. Cancelled classes are included. The Zoom
+        webinar ID is not exposed to students.
+      operationId: listMyClassSessions
+      tags: [Sessions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: from, required: true, schema: {type: string, format: date-time}, description: Inclusive}
+        - {in: query, name: to, required: true, schema: {type: string, format: date-time}, description: 'Exclusive; at most 92 days after from'}
+      responses:
+        '200':
+          description: Own classes only (empty when not enrolled)
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/StudentClass'}}
+        '400': {description: Window invalid or longer than 92 days}
+        '403': {description: Caller is not a student}
   /api/v1/class-sessions:
     get:
       summary: Sessions starting in a window, by start time (implemented; owner/admin see all, assigned staff only sessions with their batches)
@@ -1194,6 +1215,27 @@ components:
         email: {type: [string, 'null']}
         role: {type: string, enum: [INSTRUCTOR, ATTENDANCE_OFFICER]}
         createdAt: {type: string, format: date-time}
+    StudentClass:
+      type: object
+      required: [id, title, startsAt, endsAt, timeZone, localDate, status, batches]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        startsAt: {type: string, format: date-time}
+        endsAt: {type: string, format: date-time}
+        timeZone: {type: string, example: Asia/Colombo}
+        localDate: {type: string, format: date}
+        status: {type: string, enum: [SCHEDULED, CANCELLED]}
+        batches:
+          type: array
+          description: Only the student's own batches enrolled on localDate
+          items:
+            type: object
+            required: [batchId, code, name]
+            properties:
+              batchId: {type: string, format: uuid}
+              code: {type: string}
+              name: {type: string}
     ClassSession:
       type: object
       required: [id, title, startsAt, endsAt, timeZone, localDate, status, batches, version, createdAt, updatedAt]

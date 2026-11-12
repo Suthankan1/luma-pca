@@ -54,7 +54,7 @@ public class SecurityConfig {
                             "/api/v1/zoom/occurrences", "/api/v1/zoom/occurrences/**", "/api/v1/zoom/occurrence-links")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
                     // A student's own data; services resolve "own" from the token, never from input.
-                    .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments").hasRole("STUDENT")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments", "/api/v1/me/class-sessions").hasRole("STUDENT")
                     .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
