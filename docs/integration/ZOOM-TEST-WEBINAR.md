@@ -54,11 +54,21 @@ attendance. Fixture tests cannot show that.
    `webinar.participant_joined`, `webinar.participant_left`). Add the scopes Zoom says these
    events need, nothing more. Click **Validate**: Zoom sends a signed `endpoint.url_validation`
    and LUMA answers it. Save, then **activate** the app.
-5. **Run the test webinar** with a few test participants: join, leave, rejoin, join from a
+5. **Check the API side** (optional, read-only):
+
+   ```bash
+   scripts/zoom-api-check.sh
+   ```
+
+   It obtains a token with the app's credentials and reads the test webinar: granted scopes,
+   webinar facts, registrant counts and, once it has run, join sessions per person (counts only;
+   no names or emails). Webinars outside the allow-list are refused before any call.
+
+6. **Run the test webinar** with a few test participants: join, leave, rejoin, join from a
    phone, join late, leave early.
-6. **Review**: `scripts/zoom-test-tunnel.sh summary`, and the Zoom review page at
+7. **Review**: `scripts/zoom-test-tunnel.sh summary`, `scripts/zoom-api-check.sh`, and the Zoom review page at
    `http://127.0.0.1:3400/staff/zoom` (link the occurrence to a class there if needed).
-7. **Stop** the script (Ctrl+C) and **deactivate the event subscription** in Zoom until the
+8. **Stop** the script (Ctrl+C) and **deactivate the event subscription** in Zoom until the
    next test, because the URL changes on every start.
 
 ## Verified before the first real test
