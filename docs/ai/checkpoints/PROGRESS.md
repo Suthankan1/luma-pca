@@ -1159,3 +1159,15 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Next:** run the manual workflow on a Linux runner to settle the connection timeouts
   (uses GitHub Actions minutes), then the production-like gate run once cloud resources
   are authorised.
+
+## Checkpoint PERF-1a — 2026-11-12 — Linux runner baseline, 300 students
+
+- **PERF-1 evidence:** merged as PR #33, merge commit `180edb3`.
+- Ran the manual "Load test (local baseline)" workflow at the owner's request with 300
+  students (run 43194535303, success): 0 failures in all scenarios, no connection timeouts,
+  sign-in p95 265 ms, portal p95 64 ms, webhook ack p99 148 ms, 720 receipts processed
+  once with no backlog, staff class page p95 463 ms, API peak about 1.5 cores, no ERROR
+  lines. Recorded in LOAD-TEST-PLAN.md §9.
+- **Still open:** the 182 timeouts of the 1,500-student laptop run are not settled by a
+  300-student run (the laptop had none at 150 either); needs a 1,500-student Linux run.
+  Still no capacity claim.
