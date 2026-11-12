@@ -1389,7 +1389,8 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint STU-3 — 2026-11-12 — Bulk invitation emails
 
 - **Branch:** `feature/bulk-invitations`. **PR / merge SHA:** see the merged pull request titled
-  "feat(students): bulk invitation emails with a durable send queue".
+  "feat(students): bulk invitation emails with a durable send queue" (PR #47, merge commit
+  `e4fa841`; all CI checks green; real-stack "1 passed", "secrets in logs: 0").
 - **Why a queue:** single invitations are emailed through an in-memory queue of 100 that drops
   messages when full and loses them on restart. Fine for one at a time; 500 at once would
   silently lose most. Bulk invitations therefore use a database queue (V16 `invitation_emails`).
