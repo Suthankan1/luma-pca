@@ -82,16 +82,16 @@ class ZoomWebhookSignatureTest {
 
     @Test
     void configurationRequiresAnAcademyAndAStrongEnoughSecretAndNeverPrintsIt() {
-        ZoomWebhookProperties off = new ZoomWebhookProperties(null, null, SKEW, 65536);
+        ZoomWebhookProperties off = new ZoomWebhookProperties(null, null, SKEW, 65536, java.util.List.of());
         assertFalse(off.enabled());
-        ZoomWebhookProperties on = new ZoomWebhookProperties(FIXTURE_KEY, UUID.randomUUID(), SKEW, 65536);
+        ZoomWebhookProperties on = new ZoomWebhookProperties(FIXTURE_KEY, UUID.randomUUID(), SKEW, 65536, java.util.List.of());
         assertTrue(on.enabled());
         assertFalse(on.toString().contains(FIXTURE_KEY));
-        assertThrows(IllegalArgumentException.class, () -> new ZoomWebhookProperties(FIXTURE_KEY, null, SKEW, 65536));
-        assertThrows(IllegalArgumentException.class, () -> new ZoomWebhookProperties("short", UUID.randomUUID(), SKEW, 65536));
-        assertThrows(IllegalArgumentException.class, () -> new ZoomWebhookProperties(FIXTURE_KEY, UUID.randomUUID(), Duration.ZERO, 65536));
+        assertThrows(IllegalArgumentException.class, () -> new ZoomWebhookProperties(FIXTURE_KEY, null, SKEW, 65536, java.util.List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new ZoomWebhookProperties("short", UUID.randomUUID(), SKEW, 65536, java.util.List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new ZoomWebhookProperties(FIXTURE_KEY, UUID.randomUUID(), Duration.ZERO, 65536, java.util.List.of()));
         assertThrows(IllegalArgumentException.class,
-                () -> new ZoomWebhookProperties(FIXTURE_KEY, UUID.randomUUID(), Duration.ofHours(1), 65536));
-        assertThrows(IllegalArgumentException.class, () -> new ZoomWebhookProperties(FIXTURE_KEY, UUID.randomUUID(), SKEW, 10));
+                () -> new ZoomWebhookProperties(FIXTURE_KEY, UUID.randomUUID(), Duration.ofHours(1), 65536, java.util.List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new ZoomWebhookProperties(FIXTURE_KEY, UUID.randomUUID(), SKEW, 10, java.util.List.of()));
     }
 }

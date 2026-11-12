@@ -53,6 +53,20 @@ public class ZoomWebhookIngress {
         return properties.maxBodyBytes();
     }
 
+    /** payload.object.id, which Zoom documents as a string; a number is accepted too. */
+    private static String webinarId(Map<String, Object> json) {
+        if (json.get("payload") instanceof Map<?, ?> payload && payload.get("object") instanceof Map<?, ?> object) {
+            Object id = object.get("id");
+            if (id instanceof String text) {
+                return text;
+            }
+            if (id instanceof Number number) {
+                return Long.toString(number.longValue());
+            }
+        }
+        return "";
+    }
+
     public Outcome receive(String timestampHeader, String signatureHeader, byte[] body) {
         ZoomWebhookSignature.Result verified = signature.verify(timestampHeader, signatureHeader, body, Instant.now(),
                 properties.maxClockSkew());
@@ -81,6 +95,12 @@ public class ZoomWebhookIngress {
         }
         if (!STORED_EVENTS.contains(event)) {
             log.info("Acknowledged Zoom webhook of unused type {}", event.replaceAll("[^A-Za-z0-9._]", "?"));
+            return new Outcome(200, null);
+        }
+        if (!properties.webinarAllowList().isEmpty() && !properties.webinarAllowList().contains(webinarId(json))) {
+            // Not stored and the payload is not inspected further: it may describe people
+            // attending a class this deployment is not allowed to collect.
+            log.info("Acknowledged Zoom webhook {} for a webinar outside the allow-list; not stored", event);
             return new Outcome(200, null);
         }
         if (!(json.get("event_ts") instanceof Number eventTs) || eventTs.longValue() <= 0) {

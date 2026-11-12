@@ -1222,3 +1222,26 @@ build runs the Next.js default bundler and repeats the smoke test.
   in LOAD-TEST-PLAN.md.
 - **Still not the capacity gate** (needs a production-like environment with a separate load
   generator, the 60-minute soak, and the live-attendance scenarios once built). No capacity claim.
+
+## Checkpoint 003A-prep — 2026-11-12 — Zoom test tunnel and webinar allow-list
+
+- **Context:** the owner chose a temporary tunnel to this Mac for the first real Zoom test,
+  and kept the 1,500-student target. A read-only look at the Zoom account (owner's Chrome)
+  found Zoom Webinars for 500 attendees, registration with sign-in on webinars, one existing
+  Server-to-Server OAuth app ("BulkRegister", not reused), and recurring live classes on most
+  days. Nothing was changed in Zoom.
+- **Implemented:** `LUMA_ZOOM_WEBHOOK_WEBINAR_ALLOW_LIST` — when set, only events for those
+  webinar IDs are stored; others are acknowledged and dropped unread (not stored, not
+  logged), because a Zoom event subscription covers the whole account and real classes must
+  not be collected before the privacy sign-off. `scripts/zoom-test-tunnel.sh`: PostgreSQL
+  (kept volume), backend and web app on 127.0.0.1 only, nginx passing only
+  `POST /api/v1/zoom/webhooks`, Cloudflare quick tunnel over HTTP/2; refuses to start without
+  the allow-list; secrets read from gitignored `.env.zoom-test`. Runbook:
+  `docs/integration/ZOOM-TEST-WEBINAR.md`.
+- **Tests:** 2 new integration tests (allow-list stores only listed webinars; dropped
+  payloads and their IDs not logged; ID validation); all webhook tests pass. End-to-end over
+  the live tunnel with a throwaway token: other paths 404, validation signed correctly,
+  allowed event stored and processed, other webinar not stored, unsigned 401. First attempt
+  failed because cloudflared's default QUIC never registered; HTTP/2 fixed it.
+- **Next:** create the dedicated Zoom app with the owner (Chrome), owner adds the secret token,
+  validate the URL, run a test webinar with test participants only.
