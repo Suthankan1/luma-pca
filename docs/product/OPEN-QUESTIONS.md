@@ -2,7 +2,7 @@
 
 | Priority | Question | Why it matters |
 | --- | --- | --- |
-| P0 | How many active students, courses, batches and concurrent webinars? | Capacity/cost estimates and rate limits |
+| P0 | How many active students, courses, batches and concurrent webinars? | Capacity/cost estimates and rate limits. **Partly answered 2026-11-12:** one webinar at a time, at most 500 students; capacity target 600 concurrent users. Totals of students, courses and batches still open |
 | P0 | Which Zoom account license, Webinar add-on, report scopes, and registration policies exist? | Technical feasibility and identity mapping |
 | P0 | Will academy mandate individual webinar registration linked to student ID/email? | Reliable matching without display names |
 | P0 | Can staff approve a written attendance threshold and exception policy? | Fair decisions; late join/rejoin handling |

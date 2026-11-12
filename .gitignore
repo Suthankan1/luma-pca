@@ -4,6 +4,7 @@
 !.env.example
 !.env.local.example
 !.env.test.example
+!.env.zoom-test.example
 *.pem
 *.key
 *.p12

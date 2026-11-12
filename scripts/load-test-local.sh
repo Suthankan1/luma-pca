@@ -21,11 +21,13 @@ K6_IMAGE=grafana/k6:1.4.2
 PG=luma-load-pg; API=18082; WEB=3300; ORIGIN=http://127.0.0.1:$WEB
 STUDENTS=${STUDENTS:-150}
 SCENARIOS=${SCENARIOS:-"sign-in webhooks staff"}
-# Time windows scale with the class size unless set: the plan's 1,500 students use 600/180/120/120 s.
-WINDOW_S=${WINDOW_S:-$(( STUDENTS * 600 / 1500 > 30 ? STUDENTS * 600 / 1500 : 30 ))}
-JOIN_S=${JOIN_S:-$(( STUDENTS * 180 / 1500 > 20 ? STUDENTS * 180 / 1500 : 20 ))}
-CLASS_S=${CLASS_S:-$(( STUDENTS * 120 / 1500 > 20 ? STUDENTS * 120 / 1500 : 20 ))}
-LEAVE_S=${LEAVE_S:-$(( STUDENTS * 120 / 1500 > 20 ? STUDENTS * 120 / 1500 : 20 ))}
+# Time windows scale with the class size unless set: the plan's 600 students use 600/180/120/120 s
+# (larger classes keep the plan's windows, so their rates rise).
+scale() { local v=$(( STUDENTS * $1 / 600 )); [ $v -gt $1 ] && v=$1; [ $v -lt $2 ] && v=$2; echo $v; }
+WINDOW_S=${WINDOW_S:-$(scale 600 30)}
+JOIN_S=${JOIN_S:-$(scale 180 20)}
+CLASS_S=${CLASS_S:-$(scale 120 20)}
+LEAVE_S=${LEAVE_S:-$(scale 120 20)}
 STAFF=${STAFF:-20}
 DBPASS=$(openssl rand -hex 12)
 PASSWORD="${LOAD_PASSWORD:-$(openssl rand -hex 4) lantern over harbour}"

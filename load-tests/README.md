@@ -12,8 +12,8 @@ Run all three locally with synthetic data:
 
 ```bash
 STUDENTS=150 scripts/load-test-local.sh                       # quick check, about 2 minutes
-STUDENTS=1500 scripts/load-test-local.sh                      # full class, about 17 minutes
-STUDENTS=1500 PER_ADDRESS=50 SCENARIOS=sign-in scripts/load-test-local.sh   # carrier-NAT variant
+STUDENTS=600 scripts/load-test-local.sh                       # the target class (600), about 17 minutes
+STUDENTS=600 PER_ADDRESS=50 SCENARIOS=sign-in scripts/load-test-local.sh    # carrier-NAT variant
 ```
 
 **Local results are a baseline, never capacity evidence**: everything shares one machine.
