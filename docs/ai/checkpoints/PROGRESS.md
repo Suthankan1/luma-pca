@@ -1268,3 +1268,20 @@ build runs the Next.js default bundler and repeats the smoke test.
   file is not gitignored). The assistant does not handle the live values; the owner pastes them.
 - **Next:** owner stores the secrets; then activate the app and add the event subscription
   (tunnel URL, the four webinar events), with a test webinar on the allow-list.
+
+## Incident 003A-1 — 2026-11-12 — Zoom webhook Secret Token exposed in an assistant transcript
+
+- **What happened:** while preparing the event subscription, an element search on the Zoom
+  app's Features page returned the Secret Token, because Zoom includes it in the token
+  field's accessible label. The value entered the assistant's transcript. Earlier the same
+  day, stopping the tunnel tab returned its last lines, including the local test owner's
+  activation link (only usable on 127.0.0.1 on this Mac; superseded on the next start).
+- **Impact:** the token lets someone forge webhook events that LUMA's test endpoint would
+  accept; it grants no access to the Zoom account. The client secret was not exposed. No event
+  subscription existed yet and the tunnel was stopped at once.
+- **Response:** owner to regenerate the Secret Token in Zoom and store the new one with
+  `scripts/zoom-test-setup.sh`; the tunnel script now writes the owner link to a gitignored
+  file instead of the screen; the runbook forbids automated reads of the Features and App
+  Credentials pages. Created on the same day: test webinar "LUMA test - do not join"
+  (838 3442 8148, 13 Nov 2026 11:00 Colombo, registration and sign-in required), app
+  "LUMA Attendance Test" activated with four read-only scopes.

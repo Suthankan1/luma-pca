@@ -72,10 +72,13 @@ export DB_URL=jdbc:postgresql://localhost:55435/luma DB_USERNAME=luma DB_PASSWOR
 # review receipts and occurrences on the Zoom review page.
 LUMA_BACKEND_JAR="$JAR" LUMA_BOOTSTRAP_WEB_ORIGIN=$ORIGIN "$ROOT/scripts/bootstrap-owner.sh" "Zoom Test Academy" \
   zoom.test.owner@example.invalid > "$S/bootstrap.out" 2>&1
-grep -q "already has an active owner" "$S/bootstrap.out" || {
-  grep -E "^(LUMA owner bootstrap|Send this link|http)" "$S/bootstrap.out" | sed 's/^/  /'
-  echo "  (Open that link in your browser to choose the test owner's password; it is shown only here.)"
-}
+# The activation link is a credential: written to a private gitignored file, never to the screen.
+OWNER_LINK="${SETTINGS}-owner-link"
+if grep -q "already has an active owner" "$S/bootstrap.out"; then rm -f "$OWNER_LINK"
+else
+  (umask 077; grep -oE "^http://[^ ]+/activate#token=[A-Za-z0-9_-]+" "$S/bootstrap.out" > "$OWNER_LINK")
+  echo "  Test owner not activated yet: open the link saved in $(basename "$OWNER_LINK") to choose their password."
+fi
 ACADEMY=$(psql_q -c "SELECT id FROM academies WHERE name = 'Zoom Test Academy'")
 [ -n "$ACADEMY" ] || { echo "No test academy; owner bootstrap output:"; grep "LUMA owner bootstrap" "$S/bootstrap.out"; exit 1; }
 
