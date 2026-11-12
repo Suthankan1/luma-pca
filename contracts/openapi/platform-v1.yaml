@@ -831,7 +831,7 @@ paths:
                       email: {type: string}
                 batchId: {type: string, format: uuid, description: 'Optional; requires enrolledOn'}
                 enrolledOn: {type: string, format: date, description: 'Required with batchId'}
-                dryRun: {type: boolean, default: false}
+                dryRun: {type: boolean, default: false, description: 'Optional since STU-3; omitted means false'}
       responses:
         '200':
           description: The check or import result
@@ -857,6 +857,66 @@ paths:
         '403': {description: Caller is not an academy owner or administrator}
         '404': {description: The batch is not in the caller's academy}
         '409': {description: The batch is inactive, or a number or email was taken by a concurrent change}
+  /api/v1/student-invitations:
+    post:
+      summary: Queue activation invitation emails for many students (implemented; owner/admin)
+      description: >-
+        Covers the active students currently enrolled in batchId (not withdrawn as of today in
+        Asia/Colombo), or every active student of the academy when batchId is absent. Only
+        student accounts still pending activation are counted. Unless resend is true, accounts
+        holding a usable invitation are skipped (except when their last queued email failed).
+        Emails are sent in the background, at least once, each with a newly issued link that
+        replaces any earlier one; an account activated meanwhile is not emailed. dryRun counts
+        without queueing. 503 when email is not set up.
+      operationId: queueStudentInvitations
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                batchId: {type: string, format: uuid}
+                resend: {type: boolean, default: false}
+                dryRun: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pending, queued, alreadyQueued, alreadyInvited]
+                properties:
+                  pending: {type: integer, description: Covered student accounts still pending activation}
+                  queued: {type: integer, description: 'Queued now (dry run: would be queued)'}
+                  alreadyQueued: {type: integer}
+                  alreadyInvited: {type: integer, description: Skipped because they hold a usable link (resend false)}
+        '403': {description: Caller is not an academy owner or administrator}
+        '404': {description: The batch is not in the caller's academy}
+        '503': {description: Email is not set up}
+  /api/v1/student-invitations/progress:
+    get:
+      summary: Invitation emails of the academy waiting now, and sent, failed or cancelled in the last 14 days (implemented; owner/admin)
+      operationId: studentInvitationProgress
+      tags: [Students]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [waiting, sent, failed, cancelled]
+                properties:
+                  waiting: {type: integer}
+                  sent: {type: integer}
+                  failed: {type: integer}
+                  cancelled: {type: integer}
+        '403': {description: Caller is not an academy owner or administrator}
   /api/v1/me/enrollments:
     get:
       summary: The signed-in student's own enrollments (implemented; STUDENT role)

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
 import { AssignForm, UnassignButton } from "@/components/staff/TeamForms";
@@ -50,6 +51,10 @@ export default async function RosterPage({ params }: { params: Promise<{ batchId
         {roster.data.length === 0 && <li className="dir-empty muted">No students enrolled yet.</li>}
       </ul>
     </section>
+    {manager && <section className="panel panel-gap" aria-labelledby="batch-invite-title">
+      <h2 id="batch-invite-title" className="panel-title">INVITE BY EMAIL</h2>
+      <BulkInviteForm batchId={batchId} scope="this batch’s current students" />
+    </section>}
     {assignments && <section className="panel panel-gap" aria-labelledby="assigned-title">
       <h2 id="assigned-title" className="panel-title">ASSIGNED STAFF</h2>
       {!assignments.ok ? <p className="session-error" role="alert">We couldn’t load assignments right now.</p> : <>

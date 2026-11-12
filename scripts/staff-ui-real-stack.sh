@@ -29,7 +29,7 @@ docker run -d --rm --name $PG -e POSTGRES_USER=luma -e POSTGRES_PASSWORD=$DBPASS
 for i in $(seq 1 60); do docker exec $PG pg_isready -U luma -d luma >/dev/null 2>&1 && break; sleep 1; done; sleep 2
 DB_URL=jdbc:postgresql://localhost:55433/luma DB_USERNAME=luma DB_PASSWORD=$DBPASS SERVER_PORT=$API LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true \
   LUMA_ZOOM_PROCESSING_ENABLED=false LUMA_MAIL_ENABLED=true LUMA_MAIL_FROM=no-reply@example.invalid \
-  LUMA_MAIL_WEB_ORIGIN=$ORIGIN LUMA_RATE_LIMIT_RESET_REQUEST_LIMIT=3 SPRING_MAIL_HOST=127.0.0.1 SPRING_MAIL_PORT=$SMTP "$JAVA" -jar "$ROOT/backend/target/luma-backend-0.1.0-SNAPSHOT.jar" > "$S/backend.log" 2>&1 & BPID=$!
+  LUMA_MAIL_WEB_ORIGIN=$ORIGIN LUMA_RATE_LIMIT_RESET_REQUEST_LIMIT=3 LUMA_MAIL_BULK_POLL_INTERVAL=PT1S SPRING_MAIL_HOST=127.0.0.1 SPRING_MAIL_PORT=$SMTP "$JAVA" -jar "$ROOT/backend/target/luma-backend-0.1.0-SNAPSHOT.jar" > "$S/backend.log" 2>&1 & BPID=$!
 for i in $(seq 1 90); do curl -sf localhost:$API/actuator/health/readiness >/dev/null && break; sleep 1; done
 curl -sf localhost:$API/actuator/health/readiness >/dev/null || { echo "backend did not start"; tail -20 "$S/backend.log"; exit 1; }
 
@@ -87,7 +87,7 @@ docker exec $PG psql -At -U luma -d luma -c "SELECT 'courses=' || count(*) FROM 
   -c "SELECT 'audit: ' || string_agg(action, ',' ORDER BY occurred_at) FROM audit_events"
 echo "emails caught: $(curl -sf http://127.0.0.1:$MAILPIT/api/v1/messages | grep -o '"total":[0-9]*')"
 # Reset links and recipient addresses must never reach the logs either.
-leaks=$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE|reset-password#token|activate#token|real\.student@|real\.instructor@" "$S/backend.log" "$S/frontend.log" | awk -F: '{s+=$2} END {print s}')
+leaks=$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE|reset-password#token|activate#token|real\.student@|real\.instructor@|real\.import" "$S/backend.log" "$S/frontend.log" | awk -F: '{s+=$2} END {print s}')
 echo "secrets in logs: $leaks"
 [ "$leaks" = 0 ] || status=1
 if [ "$status" != 0 ]; then

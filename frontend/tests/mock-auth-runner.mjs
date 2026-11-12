@@ -19,7 +19,7 @@ const backend = createServer(async (req, res) => {
     res.end(value ? JSON.stringify(value) : "");
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -324,6 +324,36 @@ function importStudents(body, send) {
   return send(200, { imported: true, rows: rows.length, enrolled: batch ? rows.length : 0, problems: [] });
 }
 
+// Bulk invitation emails: queued here, "sent" when progress is next read (as the background sender would).
+const invitedAccounts = new Set();
+const queuedInvites = new Set();
+let sentInvites = 0;
+function studentInvitations(req, body, send, sub) {
+  if (req.method === "GET" && sub === "progress") {
+    const now = { waiting: queuedInvites.size, sent: sentInvites, failed: 0, cancelled: 0 };
+    for (const account of queuedInvites) invitedAccounts.add(account);
+    sentInvites += queuedInvites.size;
+    queuedInvites.clear();
+    return send(200, now);
+  }
+  if (req.method !== "POST" || sub) return send(404);
+  if (body.batchId && !batches.some(b => b.id === body.batchId)) return send(404, { detail: "Not found" });
+  const chosen = body.batchId
+    ? enrollments.filter(e => e.batchId === body.batchId && !e.withdrawnOn).map(e => students.find(s => s.id === e.studentId))
+    : students;
+  const pending = chosen.filter(s => s.active && s.accountStatus === "PENDING_ACTIVATION");
+  const counts = { pending: pending.length, queued: 0, alreadyQueued: 0, alreadyInvited: 0 };
+  for (const student of pending) {
+    if (queuedInvites.has(student.accountId)) counts.alreadyQueued++;
+    else if (!body.resend && invitedAccounts.has(student.accountId)) counts.alreadyInvited++;
+    else {
+      counts.queued++;
+      if (!body.dryRun) queuedInvites.add(student.accountId);
+    }
+  }
+  return send(200, counts);
+}
+
 function academicApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const [path, query = ""] = req.url.split("?");
@@ -335,6 +365,8 @@ function academicApi(req, body, send) {
   if (!manager) return send(403, { detail: "Forbidden" });
   const stale = () => send(409, { detail: "The record was changed by someone else; reload and retry" });
   const notFound = () => send(404, { detail: "Not found" });
+
+  if (collection === "student-invitations") return studentInvitations(req, body, send, id);
 
   if (collection === "students") {
     if (req.method === "GET" && !id) {

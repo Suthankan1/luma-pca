@@ -22,6 +22,12 @@ interface StudentRepository extends JpaRepository<Student, UUID> {
 
     List<Student> findByAcademyIdAndIdIn(UUID academyId, Collection<UUID> ids);
 
+    @Query("select s.accountId from Student s where s.academyId = :academyId and s.active = true")
+    List<UUID> activeAccountIds(@Param("academyId") UUID academyId);
+
+    @Query("select s.accountId from Student s where s.academyId = :academyId and s.active = true and s.id in :ids")
+    List<UUID> activeAccountIds(@Param("academyId") UUID academyId, @Param("ids") Collection<UUID> ids);
+
     /** Keyset page ordered by student number; {@code after} is "" for the first page. */
     @Query("""
             select s from Student s

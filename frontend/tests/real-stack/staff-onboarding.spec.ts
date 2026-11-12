@@ -150,6 +150,29 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-002" })).toContainText("Import, One");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-003" })).toContainText("Invitation pending");
 
+  // 6c. Invitation emails for the batch's students, sent by the background sender over SMTP.
+  await page.goto("/staff/courses");
+  await page.getByRole("link", { name: /MON/ }).first().click();
+  const invitePanel = page.getByRole("region", { name: "INVITE BY EMAIL" });
+  await invitePanel.getByRole("button", { name: "Check who will be emailed" }).click();
+  await expect(invitePanel.locator("#bulk-invite-feedback")).toHaveText("2 students will be emailed. Nothing has been sent yet.");
+  await invitePanel.getByRole("button", { name: "Email 2 invitations" }).click();
+  await expect(invitePanel.locator("#bulk-invite-feedback")).toHaveText("2 invitations queued. They are sent in the background.");
+  const bulkEmail = await newestEmailTo("real.import1@example.invalid");
+  expect(bulkEmail.subject).toBe("Your Physics Cube Academy LUMA account");
+  const bulkLink = /http:\/\/127\.0\.0\.1:\d+\/activate#token=[A-Za-z0-9_-]{43}/.exec(bulkEmail.text)?.[0];
+  expect(bulkLink, bulkEmail.text).toBeTruthy();
+  await newestEmailTo("real.import2@example.invalid");
+  await expect(invitePanel.locator("#bulk-invite-progress")).toContainText("0 waiting · 2 sent · 0 failed", { timeout: 15000 });
+  const importedContext = await browser.newContext();
+  const imported = await importedContext.newPage();
+  await imported.goto(bulkLink!);
+  await imported.fill("#password", passphrase);
+  await imported.fill("#confirm", passphrase);
+  await imported.getByRole("button", { name: "Activate account" }).click();
+  await expect(imported).toHaveURL(/\/sign-in\?activated=1$/);
+  await importedContext.close();
+
   // 7. The owner adds an instructor, invites them and assigns them to the batch.
   await page.goto("/staff/team");
   await page.locator("#staff-email").fill("real.instructor@example.invalid");

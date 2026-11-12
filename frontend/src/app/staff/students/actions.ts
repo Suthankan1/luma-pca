@@ -95,3 +95,28 @@ export async function importStudents(input: { rows: unknown; batchId: unknown; e
   }
   return { ok: true, ...result.data };
 }
+
+export type InviteCounts = { pending: number; queued: number; alreadyQueued: number; alreadyInvited: number };
+export type InviteProgress = { waiting: number; sent: number; failed: number; cancelled: number };
+
+/** Checks (dryRun) or queues invitation emails for a batch's current students, or every active student when batchId is null. */
+export async function bulkInvite(input: { batchId: unknown; resend: unknown; dryRun: unknown }):
+    Promise<{ ok: true; counts: InviteCounts } | { ok: false; message: string }> {
+  await requireSameOriginAction();
+  const batchId = input?.batchId == null ? null : (typeof input.batchId === "string" ? uuidOrNull(input.batchId) : null);
+  if ((input?.batchId != null && !batchId) || typeof input?.resend !== "boolean" || typeof input?.dryRun !== "boolean") {
+    return { ok: false, message: "That request was not valid. Reload the page." };
+  }
+  const result = await staffApi<InviteCounts>("/api/v1/student-invitations",
+    { method: "POST", body: { batchId, resend: input.resend, dryRun: input.dryRun } }, 15000);
+  if (!result.ok) {
+    return { ok: false, message: result.status === 503 ? (result.detail ?? "Email is not set up yet.") : problemMessage(result.status, result.detail) };
+  }
+  return { ok: true, counts: result.data };
+}
+
+export async function inviteProgress(): Promise<InviteProgress | null> {
+  await requireSameOriginAction();
+  const result = await staffApi<InviteProgress>("/api/v1/student-invitations/progress");
+  return result.ok ? result.data : null;
+}
