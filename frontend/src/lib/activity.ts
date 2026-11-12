@@ -73,6 +73,14 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
       detail: [Array.isArray(d.weekdays) ? `Every ${d.weekdays.map(w => dayNames[String(w)] ?? String(w)).join(" and ")}` : "",
         typeof d.firstDate === "string" && typeof d.lastDate === "string" ? `${formatDate(d.firstDate)} – ${formatDate(d.lastDate)}` : ""]
         .filter(Boolean).join(", ") || undefined };
+    case "CLASS_SERIES_UPDATED": {
+      const changed = Array.isArray(d.changed) ? d.changed.map(String) : [];
+      const parts = [changed.includes("time") && typeof d.startTime === "string" && typeof d.endTime === "string" ? `time ${d.startTime}–${d.endTime}` : "",
+        changed.includes("title") ? "title" : "", changed.includes("webinar") ? "Zoom webinar" : ""].filter(Boolean);
+      return { summary: `Changed ${count(d.classes, "class", "classes")} of a weekly series`,
+        detail: [typeof d.fromDate === "string" ? `From ${formatDate(d.fromDate)}` : "", parts.length ? `changed ${parts.join(", ")}` : ""]
+          .filter(Boolean).join("; ") || undefined };
+    }
     case "CLASS_SERIES_CANCELLED": return { summary: `Cancelled ${count(d.cancelled, "class", "classes")} of a weekly series`,
       detail: typeof d.fromDate === "string" ? `From ${formatDate(d.fromDate)}` : undefined };
     case "ZOOM_OCCURRENCE_LINKED": return { summary: `Linked a Zoom occurrence to ${event.targetLabel ?? "a class"}`,

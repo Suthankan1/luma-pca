@@ -84,6 +84,25 @@ test.describe("Weekly class series", () => {
     await expect(rows).toHaveCount(2);
     await expect(rows.first()).toContainText("Mon 1 Feb 2027 · 18:00–19:45");
 
+    // From the class on 11 February, move it and the rest of the series half an hour earlier.
+    await page.goto("/staff/sessions?from=2027-02-01");
+    await page.locator(".dir-course").filter({ hasText: `Theory ${p}` }).filter({ hasText: "11 Feb 2027" }).getByRole("link").click();
+    await expect(page.locator("#series-edit-from")).toHaveValue("2027-02-11");
+    await page.locator("#series-edit-start").fill("17:30");
+    await page.locator("#series-edit-end").fill("19:30");
+    await page.getByRole("button", { name: "Preview changes" }).click();
+    await expect(page.locator("#series-edit-feedback")).toHaveText("5 classes will change. Nothing has been changed yet.");
+    await expect(page.getByRole("list", { name: "Classes after the change" }).getByRole("listitem").first()).toHaveText("Thu 11 Feb 2027 · 17:30–19:30");
+    await page.getByRole("button", { name: "Change 5 classes" }).click();
+    await expect(page.locator("#series-edit-feedback")).toHaveText("Changed 5 classes from 11 Feb 2027. Zoom links follow the new time and webinar.");
+    await expect(page.locator(".sub").first()).toHaveText("Thu 11 Feb 2027 · 17:30–19:30 (Asia/Colombo)");
+    await page.goto("/staff/sessions?from=2027-02-01");
+    await expect(page.locator(".dir-course").filter({ hasText: `Theory ${p}` }).filter({ hasText: "1 Feb 2027" }).first())
+      .toContainText("Mon 1 Feb 2027 · 18:00–19:45", { timeout: 2000 });
+    await page.goto(`/staff/activity?category=classes`);
+    await expect(page.locator(".activity-list > li").filter({ hasText: "Changed 5 classes of a weekly series" }).first())
+      .toContainText("From 11 Feb 2027; changed time 17:30–19:30");
+
     // From the class on 15 February, cancel it and the rest of the series.
     await page.goto("/staff/sessions?from=2027-02-15");
     await page.locator(".dir-course").filter({ hasText: `Theory ${p}` }).filter({ hasText: "15 Feb 2027" }).getByRole("link").click();

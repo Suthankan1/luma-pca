@@ -201,4 +201,108 @@ class ClassSeriesHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(409, post(series(), admin).statusCode(), "inactive batch");
         assertEquals(0, classes());
     }
+
+    private HttpResponse<String> edit(String seriesId, Map<String, Object> changes, String token) {
+        return api.post("/api/v1/class-sessions/series/" + seriesId + "/changes", json(changes), token);
+    }
+
+    private static Map<String, Object> changes(Object... pairs) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            body.put((String) pairs[i], pairs[i + 1]);
+        }
+        return body;
+    }
+
+    private List<Map<String, Object>> rows(String seriesId) {
+        return jdbc.queryForList("SELECT to_char(starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI') AS starts, title, status, "
+                + "coalesce(zoom_webinar_id, '-') AS webinar FROM class_sessions WHERE series_id = ?::uuid ORDER BY starts_at", seriesId);
+    }
+
+    @Test
+    void theRestOfASeriesIsRetimedAndRenamedFromADateAfterAPreview() {
+        Map<String, Object> created = ok(series());
+        String seriesId = (String) created.get("seriesId");
+        String cancelled = (String) list(created, "occurrences").get(4).get("id");  // 20 January
+        Map<String, Object> current = HttpApi.parse(api.get("/api/v1/class-sessions/" + cancelled, admin));
+        assertEquals(200, api.put("/api/v1/class-sessions/" + cancelled, "{\"title\":\"Waves\",\"startsAt\":\"" + current.get("startsAt")
+                + "\",\"endsAt\":\"" + current.get("endsAt") + "\",\"timeZone\":\"Asia/Colombo\",\"batchIds\":[\"" + batchA + "\",\"" + batchB
+                + "\"],\"zoomWebinarId\":\"81234567890\",\"status\":\"CANCELLED\",\"version\":" + ((Number) current.get("version")).longValue() + "}",
+                admin).statusCode());
+        List<Map<String, Object>> before = rows(seriesId);
+
+        HttpResponse<String> preview = edit(seriesId, changes("fromDate", "2027-01-18", "title", "Waves (new time)", "startTime", "17:30",
+                "endTime", "19:30", "dryRun", true), admin);
+        assertEquals(200, preview.statusCode(), preview.body());
+        Map<String, Object> planned = HttpApi.parse(preview);
+        assertEquals(false, planned.get("applied"));
+        assertEquals(List.of("2027-01-18", "2027-01-25", "2027-01-27"), list(planned, "occurrences").stream().map(o -> o.get("localDate")).toList(),
+                "scheduled classes from the date; the cancelled 20th is left alone");
+        assertEquals("2027-01-18T12:00:00Z", list(planned, "occurrences").get(0).get("startsAt"), "17:30 Colombo");
+        assertEquals(before, rows(seriesId), "a preview changes nothing");
+
+        Map<String, Object> applied = HttpApi.parse(edit(seriesId, changes("fromDate", "2027-01-18", "title", "Waves (new time)",
+                "startTime", "17:30", "endTime", "19:30"), admin));
+        assertEquals(true, applied.get("applied"));
+        List<Map<String, Object>> after = rows(seriesId);
+        assertEquals(before.subList(0, 3), after.subList(0, 3), "the 4th, 6th and 11th, before the date, are untouched");
+        assertEquals(Map.of("starts", "2027-01-18T12:00", "title", "Waves (new time)", "status", "SCHEDULED", "webinar", "81234567890"), after.get(3));
+        assertEquals(Map.of("starts", "2027-01-20T12:30", "title", "Waves", "status", "CANCELLED", "webinar", "81234567890"), after.get(4));
+        assertEquals(Map.of("starts", "2027-01-25T12:00", "title", "Waves (new time)", "status", "SCHEDULED", "webinar", "81234567890"), after.get(5));
+        assertEquals("2027-01-27T12:00", after.get(6).get("starts"));
+
+        Map<String, Object> audit = jdbc.queryForMap("SELECT target_id::text AS target, details::text AS details FROM audit_events "
+                + "WHERE action = 'CLASS_SERIES_UPDATED'");
+        assertEquals(seriesId, audit.get("target"));
+        assertEquals("{\"changed\": [\"time\", \"title\"], \"classes\": \"3\", \"endTime\": \"19:30\", \"fromDate\": \"2027-01-18\", "
+                + "\"startTime\": \"17:30\"}", audit.get("details"));
+    }
+
+    @Test
+    void aRetimeThatWouldOverlapAnotherClassChangesNothing() {
+        String seriesId = (String) ok(series()).get("seriesId");
+        HttpResponse<String> clash = api.post("/api/v1/class-sessions", "{\"title\":\"Revision\",\"startsAt\":\"2027-01-25T11:30:00Z\","
+                + "\"endsAt\":\"2027-01-25T12:15:00Z\",\"timeZone\":\"Asia/Colombo\",\"batchIds\":[\"" + batchB + "\"]}", admin);
+        assertEquals(201, clash.statusCode(), clash.body());
+        api.post("/api/v1/class-sessions", "{\"title\":\"Chemistry\",\"startsAt\":\"2027-01-27T12:00:00Z\",\"endsAt\":\"2027-01-27T13:00:00Z\","
+                + "\"timeZone\":\"Asia/Colombo\",\"batchIds\":[\"" + batchC + "\"]}", admin);
+        List<Map<String, Object>> before = rows(seriesId);
+
+        Map<String, Object> refused = HttpApi.parse(edit(seriesId, changes("fromDate", "2027-01-18", "startTime", "17:30", "endTime", "19:30"), admin));
+
+        assertEquals(false, refused.get("applied"));
+        assertEquals(List.of("2027-01-25"), list(refused, "conflicts").stream().map(c -> c.get("localDate")).toList(),
+                "only the class sharing a batch clashes");
+        assertEquals("Revision", list(refused, "conflicts").get(0).get("title"));
+        assertEquals(before, rows(seriesId));
+        assertEquals(false, HttpApi.parse(edit(seriesId, changes("fromDate", "2027-01-18", "startTime", "17:30", "endTime", "19:30",
+                "title", "Moved"), admin)).get("applied"), "still refused while the clash remains, title included");
+        assertEquals(before, rows(seriesId));
+    }
+
+    @Test
+    void theWebinarIsChangedOrClearedForTheRestOfASeries() {
+        String seriesId = (String) ok(series()).get("seriesId");
+        assertEquals(true, HttpApi.parse(edit(seriesId, changes("fromDate", "2027-01-20", "zoomWebinarId", "899 9999 9999"), admin)).get("applied"));
+        assertEquals(List.of("81234567890", "81234567890", "81234567890", "81234567890", "89999999999", "89999999999", "89999999999"),
+                rows(seriesId).stream().map(r -> r.get("webinar")).toList());
+        assertEquals(true, HttpApi.parse(edit(seriesId, changes("fromDate", "2027-01-25", "clearWebinar", true), admin)).get("applied"));
+        assertEquals(List.of("89999999999", "-", "-"), rows(seriesId).subList(4, 7).stream().map(r -> r.get("webinar")).toList());
+    }
+
+    @Test
+    void invalidSeriesChangesAreRefused() {
+        String seriesId = (String) ok(series()).get("seriesId");
+        assertEquals(400, edit(seriesId, changes("fromDate", "2027-01-18"), admin).statusCode(), "nothing to change");
+        assertEquals(400, edit(seriesId, changes("fromDate", "2027-01-18", "startTime", "17:30"), admin).statusCode());
+        assertEquals(400, edit(seriesId, changes("fromDate", "2027-01-18", "startTime", "19:30", "endTime", "17:30"), admin).statusCode());
+        assertEquals(400, edit(seriesId, changes("fromDate", "2027-01-18", "zoomWebinarId", "812 3456 7890", "clearWebinar", true), admin)
+                .statusCode());
+        assertEquals(400, edit(seriesId, changes("fromDate", "2027-02-01", "title", "Late"), admin).statusCode(), "no classes from then");
+        assertEquals(400, edit(seriesId, changes("title", "No date"), admin).statusCode());
+        assertEquals(404, edit(UUID.randomUUID().toString(), changes("fromDate", "2027-01-18", "title", "x"), admin).statusCode());
+        assertEquals(403, edit(seriesId, changes("fromDate", "2027-01-18", "title", "x"), tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+        assertEquals(404, edit(seriesId, changes("fromDate", "2027-01-18", "title", "x"), tokenFor(academy("Other"), Role.ACADEMY_ADMIN))
+                .statusCode());
+    }
 }

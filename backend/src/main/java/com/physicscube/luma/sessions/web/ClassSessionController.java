@@ -58,6 +58,19 @@ class ClassSessionController {
     record CancelledCount(int cancelled) {
     }
 
+    record EditSeriesRequest(@NotNull java.time.LocalDate fromDate, @Size(max = 200) String title, java.time.LocalTime startTime,
+                             java.time.LocalTime endTime, @Size(max = 40) String zoomWebinarId, Boolean clearWebinar, Boolean dryRun) {
+    }
+
+    /** Changes the rest of a series from a date; 200 with applied=false for a preview or when classes would overlap. */
+    @PostMapping("/series/{seriesId}/changes")
+    com.physicscube.luma.sessions.SeriesEditResult editSeries(JwtAuthenticationToken authentication, @PathVariable UUID seriesId,
+                                                              @Valid @RequestBody EditSeriesRequest request) {
+        return sessions.editSeriesFrom(CurrentAccount.from(authentication), seriesId, request.fromDate(), request.title(),
+                request.startTime(), request.endTime(), request.zoomWebinarId(), Boolean.TRUE.equals(request.clearWebinar()),
+                Boolean.TRUE.equals(request.dryRun()));
+    }
+
     /** A weekly series; 200 with created=false for a preview or when classes would overlap. */
     @PostMapping("/series")
     com.physicscube.luma.sessions.SeriesResult createSeries(JwtAuthenticationToken authentication,

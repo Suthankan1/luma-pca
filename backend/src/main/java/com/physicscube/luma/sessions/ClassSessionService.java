@@ -235,6 +235,109 @@ public class ClassSessionService {
                 .map(c -> new SeriesResult.Occurrence(c.localDate(), c.getStartsAt(), c.getEndsAt(), c.getId())).toList(), List.of());
     }
 
+    /**
+     * Changes the series' scheduled classes on or after {@code fromDate}: any of the title, the
+     * local start and end time (kept in each class's own zone), and the webinar ID ({@code
+     * clearWebinar} removes it). A class that would then overlap a scheduled class of the same
+     * batches outside the change is reported and nothing changes; {@code dryRun} only previews.
+     * Each class stays its own record (Zoom links are re-checked per class); one audit record
+     * describes the change.
+     */
+    @Transactional
+    public SeriesEditResult editSeriesFrom(CurrentAccount caller, UUID seriesId, java.time.LocalDate fromDate, String title,
+                                           java.time.LocalTime startTime, java.time.LocalTime endTime, String zoomWebinarId,
+                                           boolean clearWebinar, boolean dryRun) {
+        caller.requireAcademyManager();
+        String newTitle = title == null || title.isBlank() ? null : title.strip();
+        if (newTitle != null && newTitle.length() > 200) {
+            throw new InvalidRequestException("title must be at most 200 characters");
+        }
+        if ((startTime == null) != (endTime == null)) {
+            throw new InvalidRequestException("startTime and endTime go together");
+        }
+        if (startTime != null && !endTime.isAfter(startTime)) {
+            throw new InvalidRequestException("endTime must be after startTime on the same day");
+        }
+        if (clearWebinar && zoomWebinarId != null && !zoomWebinarId.isBlank()) {
+            throw new InvalidRequestException("Give a webinar ID or clear it, not both");
+        }
+        String newWebinar = clearWebinar ? null : webinarId(zoomWebinarId);
+        boolean changeWebinar = clearWebinar || newWebinar != null;
+        if (newTitle == null && startTime == null && !changeWebinar) {
+            throw new InvalidRequestException("Change at least one of title, time or webinar");
+        }
+        List<ClassSession> series = sessions.findByAcademyIdAndSeriesIdOrderByStartsAt(caller.academyId(), seriesId);
+        if (series.isEmpty()) {
+            throw new ResourceNotFoundException("Class series");
+        }
+        List<ClassSession> affected = series.stream()
+                .filter(c -> "SCHEDULED".equals(c.getStatus()) && !c.localDate().isBefore(fromDate)).toList();
+        if (affected.isEmpty()) {
+            throw new InvalidRequestException("This series has no scheduled classes on or after that date");
+        }
+
+        Map<UUID, Instant[]> times = new java.util.LinkedHashMap<>();
+        for (ClassSession c : affected) {
+            ZoneId zone = ZoneId.of(c.getTimeZone());
+            Instant start = startTime == null ? c.getStartsAt() : java.time.ZonedDateTime.of(c.localDate(), startTime, zone).toInstant();
+            Instant end = startTime == null ? c.getEndsAt() : java.time.ZonedDateTime.of(c.localDate(), endTime, zone).toInstant();
+            checkTimes(start, end);
+            times.put(c.getId(), new Instant[] {start, end});
+        }
+        List<SeriesResult.Conflict> conflicts = new java.util.ArrayList<>();
+        if (startTime != null) {
+            Set<UUID> moving = times.keySet();
+            Set<UUID> batchIds = affected.stream().flatMap(c -> c.batchIds().stream()).collect(Collectors.toSet());
+            Instant from = times.values().stream().map(t -> t[0]).min(Instant::compareTo).orElseThrow().minus(MAX_LENGTH);
+            Instant to = times.values().stream().map(t -> t[1]).max(Instant::compareTo).orElseThrow();
+            List<ClassSession> nearby = sessions.inWindowForBatches(caller.academyId(), from, to, batchIds).stream()
+                    .filter(other -> "SCHEDULED".equals(other.getStatus()) && !moving.contains(other.getId())).toList();
+            for (ClassSession c : affected) {
+                Instant[] t = times.get(c.getId());
+                for (ClassSession other : nearby) {
+                    if (other.batchIds().stream().anyMatch(c.batchIds()::contains)
+                            && other.getStartsAt().isBefore(t[1]) && other.getEndsAt().isAfter(t[0])) {
+                        conflicts.add(new SeriesResult.Conflict(c.localDate(), other.getId(), other.getTitle(), other.getStartsAt(),
+                                other.getEndsAt()));
+                    }
+                }
+            }
+        }
+        List<SeriesResult.Occurrence> planned = affected.stream().map(c -> new SeriesResult.Occurrence(c.localDate(),
+                times.get(c.getId())[0], times.get(c.getId())[1], c.getId())).toList();
+        if (dryRun || !conflicts.isEmpty()) {
+            return new SeriesEditResult(false, planned, conflicts);
+        }
+        Map<UUID, ClassSessionChanged.ZoomSlot> before = new java.util.HashMap<>();
+        for (ClassSession c : affected) {
+            before.put(c.getId(), slot(c));
+            Instant[] t = times.get(c.getId());
+            c.update(newTitle == null ? c.getTitle() : newTitle, t[0], t[1], ZoneId.of(c.getTimeZone()), c.batchIds(), "SCHEDULED",
+                    changeWebinar ? newWebinar : c.getZoomWebinarId());
+        }
+        sessions.saveAllAndFlush(affected).forEach(c -> changed(caller, c, before.get(c.getId())));
+        List<String> fields = new java.util.ArrayList<>();
+        if (newTitle != null) {
+            fields.add("title");
+        }
+        if (startTime != null) {
+            fields.add("time");
+        }
+        if (changeWebinar) {
+            fields.add("webinar");
+        }
+        Map<String, Object> details = new java.util.LinkedHashMap<>();
+        details.put("fromDate", fromDate.toString());
+        details.put("classes", String.valueOf(affected.size()));
+        details.put("changed", fields);
+        if (startTime != null) {
+            details.put("startTime", startTime.toString());
+            details.put("endTime", endTime.toString());
+        }
+        audited(caller, "CLASS_SERIES_UPDATED", "CLASS_SERIES", seriesId, details);
+        return new SeriesEditResult(true, planned, List.of());
+    }
+
     /** Cancels the series' scheduled classes on or after {@code fromDate} (their own local dates); returns how many. */
     @Transactional
     public int cancelSeriesFrom(CurrentAccount caller, UUID seriesId, java.time.LocalDate fromDate) {

@@ -1110,6 +1110,50 @@ paths:
         '403': {description: Caller is not an academy owner or administrator}
         '404': {description: A batch is not in the caller's academy}
         '409': {description: A batch is inactive}
+  /api/v1/class-sessions/series/{seriesId}/changes:
+    post:
+      summary: Change the title, time or webinar of a series' scheduled classes from a date, or preview it (implemented; owner/admin)
+      description: >-
+        Applies to the series' SCHEDULED classes whose local date is on or after fromDate. Omitted fields
+        are kept; startTime and endTime go together and are applied in each class's own zone;
+        clearWebinar removes the webinar ID. If a class would then overlap a scheduled class of the same
+        batches outside the change, the conflicts are returned and nothing changes. Zoom links are
+        re-checked per class; one CLASS_SERIES_UPDATED audit event is recorded.
+      operationId: editClassSeries
+      tags: [Sessions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: seriesId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fromDate]
+              properties:
+                fromDate: {type: string, format: date}
+                title: {type: string, maxLength: 200}
+                startTime: {type: string, example: '17:30'}
+                endTime: {type: string, example: '19:30'}
+                zoomWebinarId: {type: string}
+                clearWebinar: {type: boolean, default: false}
+                dryRun: {type: boolean, default: false}
+      responses:
+        '200':
+          description: The classes as they would be (or now are), and any overlaps
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [applied, occurrences, conflicts]
+                properties:
+                  applied: {type: boolean}
+                  occurrences: {type: array, items: {type: object}}
+                  conflicts: {type: array, items: {type: object}}
+        '400': {description: Nothing to change, invalid times or webinar, or no scheduled classes from that date}
+        '403': {description: Caller is not an academy owner or administrator}
+        '404': {description: No such series in the caller's academy}
   /api/v1/class-sessions/series/{seriesId}/cancellations:
     post:
       summary: Cancel the series' scheduled classes on or after a date (implemented; owner/admin)

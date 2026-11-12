@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { cancelSeries, scheduleSeries, scheduleSession, updateSession } from "@/app/staff/sessions/actions";
+import { cancelSeries, editSeries, scheduleSeries, scheduleSession, updateSession } from "@/app/staff/sessions/actions";
 import { WEEKDAYS, type FormState } from "@/lib/staff-forms";
 
 export type BatchOption = { id: string; label: string };
@@ -174,5 +174,45 @@ export function CancelSeriesForm({ sessionId, seriesId, fromDate }: { sessionId:
     <p className="panel-sub">Every scheduled class of this weekly series on or after this date is cancelled. Each can be restored on its own page.</p>
     <button className="action danger" type="submit" disabled={pending}>{pending ? "Saving…" : "Cancel these classes"}</button>
     <Feedback state={state} id="series-cancel-feedback" />
+  </form>;
+}
+
+/** Changes the title, time or webinar of this and later scheduled classes of the class's series, after a preview. */
+export function EditSeriesForm({ sessionId, seriesId, fromDate, timeZone }: { sessionId: string; seriesId: string; fromDate: string; timeZone: string }) {
+  const [state, action, pending] = useActionState(editSeries, null);
+  const v = state?.ok && !state.preview ? undefined : state?.values;
+  return <form key={JSON.stringify(state)} action={action} className="session-form staff-form" aria-describedby="series-edit-feedback">
+    <h3 className="form-title">Change the rest of the series</h3>
+    <input type="hidden" name="seriesId" value={seriesId} />
+    <input type="hidden" name="sessionId" value={sessionId} />
+    <input type="hidden" name="timeZone" value={timeZone} />
+    <label htmlFor="series-edit-from">Change scheduled classes from</label>
+    <input id="series-edit-from" name="fromDate" type="date" required defaultValue={v?.fromDate ?? fromDate} />
+    <p className="panel-sub">Leave a field empty to keep it. Times are in {timeZone}; each class keeps its own date and batches.</p>
+    <label htmlFor="series-edit-title">New title</label>
+    <input id="series-edit-title" name="title" maxLength={200} defaultValue={v?.title} />
+    <div className="form-pair">
+      <div><label htmlFor="series-edit-start">New start</label>
+        <input id="series-edit-start" name="startTime" type="time" defaultValue={v?.startTime} /></div>
+      <div><label htmlFor="series-edit-end">New end</label>
+        <input id="series-edit-end" name="endTime" type="time" defaultValue={v?.endTime} /></div>
+    </div>
+    <label htmlFor="series-edit-webinar">New Zoom webinar ID</label>
+    <input id="series-edit-webinar" name="zoomWebinarId" inputMode="numeric" maxLength={40} autoComplete="off" defaultValue={v?.zoomWebinarId} />
+    <label className="check-row"><input type="checkbox" name="clearWebinar" value="yes" defaultChecked={v?.clearWebinar === "yes"} /> Remove the webinar ID</label>
+    {state?.preview && <input type="hidden" name="previewKey" value={state.preview.key} />}
+    <div className="button-row">
+      <button className={`action ${state?.preview ? "secondary" : ""}`} type="submit" name="intent" value="preview" disabled={pending}>
+        {pending ? "Working…" : "Preview changes"}</button>
+      {state?.preview && <button className="action" type="submit" name="intent" value="apply" disabled={pending}>
+        Change {state.preview.classes.length} class{state.preview.classes.length === 1 ? "" : "es"}</button>}
+    </div>
+    {state && <p id="series-edit-feedback" className={state.ok ? "form-ok" : "session-error"} role={state.ok ? "status" : "alert"}>{state.message}</p>}
+    {state?.preview && <ol className="series-preview" aria-label="Classes after the change">
+      {state.preview.classes.map(label => <li key={label}>{label}</li>)}
+    </ol>}
+    {state?.conflicts && <ul className="series-preview" aria-label="Overlapping classes">
+      {state.conflicts.map(c => <li key={c.label}><Link className="text-link" href={c.link}>{c.label}</Link></li>)}
+    </ul>}
   </form>;
 }
