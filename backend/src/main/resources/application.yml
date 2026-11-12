@@ -89,3 +89,5 @@ luma:
       # Polls stored webhook receipts in this process; safe with several instances.
       enabled: ${LUMA_ZOOM_PROCESSING_ENABLED:true}
       poll-interval: ${LUMA_ZOOM_PROCESSING_POLL_INTERVAL:PT5S}
+      # Receipts handled per poll (1 to 500); with the interval this sets the drain rate per instance.
+      batch-size: ${LUMA_ZOOM_PROCESSING_BATCH_SIZE:50}
