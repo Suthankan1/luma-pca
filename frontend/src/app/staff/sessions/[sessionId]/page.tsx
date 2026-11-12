@@ -6,7 +6,8 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  batchOptions, formatClassTime, formatDate, formatWebinarId, instantParts, isAcademyManager, uuidOrNull, type ClassSession, type CourseRef,
+  batchOptions, formatClassTime, formatDate, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
+  type ClassSession, type CourseRef, type Occurrence,
 } from "@/lib/staff-forms";
 
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -20,11 +21,12 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   const sessionId = uuidOrNull((await params).sessionId);
   if (!sessionId) notFound();
   const manager = isAcademyManager(identity.roles);
-  const [session, expected, batches, courses] = await Promise.all([
+  const [session, expected, batches, courses, zoom] = await Promise.all([
     staffApi<ClassSession>(`/api/v1/class-sessions/${sessionId}`),
     staffApi<ExpectedStudent[]>(`/api/v1/class-sessions/${sessionId}/students`),
     manager ? staffApi<Batch[]>("/api/v1/batches") : Promise.resolve(null),
     manager ? staffApi<CourseRef[]>("/api/v1/courses") : Promise.resolve(null),
+    manager ? staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?decided=true&sessionId=${sessionId}&limit=50`) : Promise.resolve(null),
   ]);
   if (!session.ok && (session.status === 404 || session.status === 403)) notFound();
   const shell = { active: "sessions" as const, crumb: "Timetable", hasStudentPortal: hasPortal(identity, "student") };
@@ -66,6 +68,17 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
           <Link className="text-link" href={`/staff/batches/${b.batchId}`}>Roster →</Link>
         </li>)}</ul>
         <p className="panel-sub">Zoom webinar: {s.zoomWebinarId ? formatWebinarId(s.zoomWebinarId) : "not set"}</p>
+        {zoom && <div aria-labelledby="zoom-links-title" role="region">
+          <h3 id="zoom-links-title" className="form-title">Zoom occurrences linked</h3>
+          {!zoom.ok ? <p className="session-error" role="alert">We couldn’t load the Zoom links right now.</p>
+            : zoom.data.length === 0 ? <p className="panel-sub">None yet. Links are made when Zoom reports this webinar running around the class time,
+              and checked again whenever the class is changed.</p>
+            : <ul className="dir-list">{zoom.data.map(o => <li key={o.occurrenceUuid} className="dir-row">
+              <span>Started {formatInstant(o.firstEventAt)} · {o.eventCount} event{o.eventCount === 1 ? "" : "s"}</span>
+              <span className="status on">{occurrenceState(o)}</span>
+            </li>)}</ul>}
+          <p className="panel-sub"><Link className="text-link" href="/staff/zoom">Review Zoom occurrences →</Link></p>
+        </div>}
       </section>
       {manager && <section className="panel" aria-labelledby="manage-title">
         <h2 id="manage-title" className="panel-title">MANAGE</h2>

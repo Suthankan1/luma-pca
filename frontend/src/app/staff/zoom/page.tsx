@@ -65,7 +65,8 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
     <section className="panel" aria-labelledby="occurrences-title">
       <h2 id="occurrences-title" className="panel-title">WEBINAR OCCURRENCES</h2>
       <p className="panel-sub">Each time a webinar runs, Zoom reports a new occurrence. It is linked automatically when exactly one scheduled class
-        on that webinar ID covers its start (±60 minutes); otherwise decide here. Your decisions are never overridden automatically.</p>
+        on that webinar ID covers its start (±60 minutes); otherwise decide here. Automatic links are checked again whenever a class is
+        scheduled, moved, given another webinar ID or cancelled. Your decisions are never overridden automatically.</p>
       <nav className="filter-row" aria-label="Filter occurrences">
         {views.map(v => <Link key={v.key} href={v.key === "all" ? "/staff/zoom" : `/staff/zoom?view=${v.key}`}
           className={`chip ${v.key === view.key ? "cyan" : ""}`} aria-current={v.key === view.key ? "true" : undefined}>{v.label}</Link>)}

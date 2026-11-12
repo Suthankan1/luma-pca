@@ -218,10 +218,14 @@ test("an administrator onboards a student end to end on the real stack", async (
   const classUrl = page.url();
   await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:00 (Asia/Colombo)");
   await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
+  // The seeded Zoom occurrence on this webinar at 18:20 was linked as soon as the class was scheduled.
+  const zoomLinks = page.getByRole("region", { name: "Zoom occurrences linked" });
+  await expect(zoomLinks.getByRole("listitem").locator(".status")).toHaveText(["Linked automatically"]);
   await page.locator("#edit-end").fill("20:30");
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students follow the new date and batches.");
+  await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students and automatic Zoom links follow the new date, time and webinar.");
   await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
+  await expect(zoomLinks.getByRole("listitem").locator(".status")).toHaveText(["Linked automatically"], { timeout: 1000 });
 
   // 7b'. The student sees the class and their batch in the student portal.
   const studentAgain = await browser.newContext();
@@ -254,14 +258,16 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.goto("/staff/sessions?from=2027-03-01");
   await expect(page.locator(".dir-course").filter({ hasText: "Real series" }).first()).toContainText("Mon 1 Mar 2027 · 18:00–20:00");
 
-  // 7c. Zoom review against the seeded occurrences: automatic linking finds the class by
-  // webinar ID and time; the other occurrence is decided by hand, then the decision changed.
+  // 7c. Zoom review against the seeded occurrences: scheduling the class already linked the one
+  // on its webinar and time (re-running the matcher finds nothing more); the other occurrence is
+  // decided by hand, then the decision changed.
   await page.goto("/staff/zoom");
   const auto = page.getByRole("listitem", { name: "Webinar 812 3456 7890 at 13 Jan 2027 18:20" });
   const manual = page.getByRole("listitem", { name: "Webinar 555 0001 1101 at 13 Jan 2027 09:30" });
-  await expect(auto.locator(".status")).toHaveText("Needs review");
+  await expect(auto.locator(".status")).toHaveText("Linked automatically");
+  await expect(manual.locator(".status")).toHaveText("Needs review");
   await page.getByRole("button", { name: "Run automatic linking" }).click();
-  await expect(page.locator(".autolink-feedback")).toHaveText("Linked 1 occurrence; 1 still needs review.");
+  await expect(page.locator(".autolink-feedback")).toHaveText("Linked 0 occurrences; 1 still needs review.");
   await expect(auto.locator(".status")).toHaveText("Linked automatically");
   await expect(auto.getByRole("link", { name: /^Real stack class, Wed 13 Jan 2027/ })).toBeVisible();
   await manual.getByLabel("Class").selectOption({ label: "Wed 13 Jan 2027 · 18:00–20:30 · Real stack class" });

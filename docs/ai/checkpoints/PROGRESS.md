@@ -1440,7 +1440,8 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint STU-4 — 2026-11-12 — Student search
 
 - **Branch:** `feature/student-search`. **PR / merge SHA:** see the merged pull request titled
-  "feat(students): search the directory by name, number or email".
+  "feat(students): search the directory by name, number or email" (PR #50, merge commit
+  `9244a08`; all CI checks green).
 - **Implemented:** `GET /api/v1/students?q=` — part of a student number or full name, any
   letter case (`%` and `_` matched literally), or a whole email address (never part of one, so
   addresses cannot be guessed letter by letter); combines with the active filter and keyset
@@ -1449,3 +1450,31 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Tests:** backend search test (case, partial number, literal `%`/`_`, whole email only, other
   academy excluded, paging, active filter, 400, 403); Playwright `student-search.spec.ts` (desktop
   and mobile); real-stack search by name fragment and by email on PostgreSQL.
+
+## Checkpoint ZM-5 — 2026-11-12 — Zoom links follow the timetable
+
+- **Branch:** `feature/zoom-link-revision`. **PR / merge SHA:** see the merged pull request titled
+  "feat(zoom): re-check automatic Zoom links when a class changes".
+- **Problem:** an automatic occurrence-to-class link was made once and never revisited, so moving a
+  class, changing its webinar ID or cancelling it left Zoom events (and later attendance) on the
+  wrong class; and occurrences that arrived before a class existed waited for "Run automatic linking".
+- **Implemented:** the class module publishes `ClassSessionChanged` (with the class's webinar and
+  time before and after) inside the transaction of every create, edit, series create and series
+  cancellation. The Zoom module's `ClassLinkReviser` handles it in the same transaction. It
+  considers the class's automatic links and every occurrence on its webinar whose first event lies
+  within 60 minutes of its old or new time. An automatic link is kept only while the matcher would
+  still make it (exactly one scheduled class fits, and it is the linked one); otherwise it is removed
+  and matched again, moving to the one class that now fits or back to review. Undecided occurrences
+  are matched again. Manual decisions are never changed. Changes are audited as `ZOOM_LINKS_REVISED`
+  (counts only). V18 indexes occurrence events by webinar. The class page lists the Zoom occurrences
+  linked to it; the save message and the Zoom page explain the re-check.
+- **Behaviour change:** a class scheduled after its Zoom events arrived links them immediately;
+  "Run automatic linking" remains for anything left undecided. The real-stack and backend tests that
+  expected the old timing were updated.
+- **Tests:** backend `ClassLinkRevisionIntegrationTest` (5 tests: move away and back, webinar
+  change, cancel and restore, a clashing new class then cancelling one, manual decisions untouched,
+  series picking up earlier events and releasing them on cancel-the-rest); Playwright Zoom spec moves
+  a class and sees its occurrence return to review; real-stack sees the link appear when the class
+  is scheduled.
+- **Not covered:** a manual link to a class that is later cancelled stays (an administrator's
+  decision); the review page lists it as linked by an administrator.
