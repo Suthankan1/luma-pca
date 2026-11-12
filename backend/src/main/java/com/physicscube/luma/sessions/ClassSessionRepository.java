@@ -36,4 +36,6 @@ interface ClassSessionRepository extends JpaRepository<ClassSession, UUID> {
             """)
     List<ClassSession> inWindowForBatches(@Param("academyId") UUID academyId, @Param("from") Instant from,
                                           @Param("to") Instant to, @Param("batchIds") Collection<UUID> batchIds);
+
+    List<ClassSession> findByAcademyIdAndSeriesIdOrderByStartsAt(UUID academyId, UUID seriesId);
 }

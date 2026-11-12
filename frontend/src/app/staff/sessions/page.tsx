@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
-import { ScheduleForm } from "@/components/staff/SessionForms";
+import { ScheduleForm, SeriesForm } from "@/components/staff/SessionForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
@@ -81,6 +81,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
       {manager && <section className="panel" aria-labelledby="new-class-title">
         <h2 id="new-class-title" className="panel-title">NEW CLASS</h2>
         <ScheduleForm batches={scheduleOptions} />
+        <SeriesForm batches={scheduleOptions} />
       </section>}
     </div>
   </StaffShell>;

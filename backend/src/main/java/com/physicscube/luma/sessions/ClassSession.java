@@ -51,6 +51,9 @@ class ClassSession {
     @Column(name = "zoom_webinar_id", length = 20)
     private String zoomWebinarId;
 
+    @Column(name = "series_id", updatable = false)
+    private UUID seriesId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -73,6 +76,21 @@ class ClassSession {
         this.academyId = academyId;
         this.status = "SCHEDULED";
         update(title, startsAt, endsAt, zone, batchIds, "SCHEDULED", zoomWebinarId);
+    }
+
+    /** One class of a weekly series created together. */
+    ClassSession(UUID academyId, String title, Instant startsAt, Instant endsAt, ZoneId zone, Set<UUID> batchIds,
+                 String zoomWebinarId, UUID seriesId) {
+        this(academyId, title, startsAt, endsAt, zone, batchIds, zoomWebinarId);
+        this.seriesId = seriesId;
+    }
+
+    UUID getSeriesId() {
+        return seriesId;
+    }
+
+    void cancel() {
+        this.status = "CANCELLED";
     }
 
     void update(String title, Instant startsAt, Instant endsAt, ZoneId zone, Set<UUID> batchIds, String status,

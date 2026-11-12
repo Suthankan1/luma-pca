@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { scheduleSession, updateSession } from "@/app/staff/sessions/actions";
-import type { FormState } from "@/lib/staff-forms";
+import { cancelSeries, scheduleSeries, scheduleSession, updateSession } from "@/app/staff/sessions/actions";
+import { WEEKDAYS, type FormState } from "@/lib/staff-forms";
 
 export type BatchOption = { id: string; label: string };
 export type SessionDefaults = { title: string; date: string; startTime: string; endTime: string; zoomWebinarId: string; batchIds: string[] };
@@ -94,5 +94,85 @@ export function StatusForm({ session, defaults }: { session: Existing; defaults:
     <button className={`action ${cancelling ? "danger" : ""}`} type="submit" disabled={pending}>
       {pending ? "Saving…" : cancelling ? "Cancel class" : "Restore class"}</button>
     <Feedback state={state} id="status-feedback" />
+  </form>;
+}
+
+const dayNames: Record<string, string> = { MONDAY: "Mon", TUESDAY: "Tue", WEDNESDAY: "Wed", THURSDAY: "Thu", FRIDAY: "Fri", SATURDAY: "Sat", SUNDAY: "Sun" };
+
+/**
+ * A weekly series: "Preview classes" lists every class without creating anything; "Create"
+ * appears after a clean preview and is refused if the details changed since.
+ */
+export function SeriesForm({ batches }: { batches: BatchOption[] }) {
+  const [state, action, pending] = useActionState(scheduleSeries, null);
+  const created = state?.ok && !state.preview && state.values?.link;
+  const v = created ? undefined : state?.values;
+  const chosenBatches = v?.batchIds ? v.batchIds.split(",") : [];
+  const chosenDays = v?.weekdays ? v.weekdays.split(",") : [];
+  return <form key={JSON.stringify(state)} action={action} className="session-form staff-form" aria-describedby="series-feedback">
+    <h3 className="form-title">Schedule a weekly series</h3>
+    <label htmlFor="series-title">Title</label>
+    <input id="series-title" name="title" maxLength={200} required defaultValue={v?.title} placeholder="Physics theory" />
+    <div className="form-pair">
+      <div><label htmlFor="series-first">First date</label>
+        <input id="series-first" name="firstDate" type="date" required defaultValue={v?.firstDate} /></div>
+      <div><label htmlFor="series-last">Last date</label>
+        <input id="series-last" name="lastDate" type="date" required defaultValue={v?.lastDate} /></div>
+    </div>
+    <fieldset className="role-choices weekday-choices">
+      <legend>Every</legend>
+      {WEEKDAYS.map(day => <label key={day} className="check-row">
+        <input type="checkbox" name="weekdays" value={day} defaultChecked={chosenDays.includes(day)} /> {dayNames[day]}
+      </label>)}
+    </fieldset>
+    <div className="form-pair">
+      <div><label htmlFor="series-start">Starts</label>
+        <input id="series-start" name="startTime" type="time" required defaultValue={v?.startTime} /></div>
+      <div><label htmlFor="series-end">Ends</label>
+        <input id="series-end" name="endTime" type="time" required defaultValue={v?.endTime} /></div>
+    </div>
+    <p className="panel-sub">Sri Lanka time (Asia/Colombo). Up to 100 classes within a year.</p>
+    <label htmlFor="series-skip">Dates to skip <span className="muted">(optional, such as holidays)</span></label>
+    <textarea id="series-skip" name="skipDates" rows={2} maxLength={2000} defaultValue={v?.skipDates} placeholder="2027-01-14, 2027-02-04" />
+    <fieldset className="role-choices">
+      <legend>Batches taking these classes</legend>
+      {batches.length === 0 && <p className="muted">There are no active batches. Create one under Courses &amp; batches first.</p>}
+      {batches.map(batch => <label key={batch.id} className="check-row">
+        <input type="checkbox" name="batchIds" value={batch.id} defaultChecked={chosenBatches.includes(batch.id)} /> {batch.label}
+      </label>)}
+    </fieldset>
+    <label htmlFor="series-webinar">Zoom webinar ID <span className="muted">(optional; a recurring webinar keeps one ID)</span></label>
+    <input id="series-webinar" name="zoomWebinarId" inputMode="numeric" maxLength={40} autoComplete="off" defaultValue={v?.zoomWebinarId}
+      placeholder="812 3456 7890" />
+    {state?.preview && <input type="hidden" name="previewKey" value={state.preview.key} />}
+    <div className="button-row">
+      <button className={`action ${state?.preview ? "secondary" : ""}`} type="submit" name="intent" value="preview" disabled={pending}>
+        {pending ? "Working…" : "Preview classes"}</button>
+      {state?.preview && <button className="action" type="submit" name="intent" value="create" disabled={pending}>
+        Create {state.preview.classes.length} class{state.preview.classes.length === 1 ? "" : "es"}</button>}
+    </div>
+    {state && <p id="series-feedback" className={state.ok ? "form-ok" : "session-error"} role={state.ok ? "status" : "alert"}>{state.message}</p>}
+    {state?.preview && <ol className="series-preview" aria-label="Classes in the series">
+      {state.preview.classes.map(label => <li key={label}>{label}</li>)}
+    </ol>}
+    {state?.conflicts && <ul className="series-preview" aria-label="Overlapping classes">
+      {state.conflicts.map(c => <li key={c.label}><Link className="text-link" href={c.link}>{c.label}</Link></li>)}
+    </ul>}
+    {created && <p><Link className="text-link" href={state.values!.link}>Show the classes →</Link></p>}
+  </form>;
+}
+
+/** Cancels this and later scheduled classes of the class's series (each stays on record as cancelled). */
+export function CancelSeriesForm({ sessionId, seriesId, fromDate }: { sessionId: string; seriesId: string; fromDate: string }) {
+  const [state, action, pending] = useActionState(cancelSeries, null);
+  return <form action={action} className="session-form staff-form danger-zone" aria-describedby="series-cancel-feedback">
+    <h3 className="form-title">Cancel the rest of the series</h3>
+    <input type="hidden" name="seriesId" value={seriesId} />
+    <input type="hidden" name="sessionId" value={sessionId} />
+    <label htmlFor="series-cancel-from">Cancel scheduled classes from</label>
+    <input id="series-cancel-from" name="fromDate" type="date" required defaultValue={fromDate} />
+    <p className="panel-sub">Every scheduled class of this weekly series on or after this date is cancelled. Each can be restored on its own page.</p>
+    <button className="action danger" type="submit" disabled={pending}>{pending ? "Saving…" : "Cancel these classes"}</button>
+    <Feedback state={state} id="series-cancel-feedback" />
   </form>;
 }

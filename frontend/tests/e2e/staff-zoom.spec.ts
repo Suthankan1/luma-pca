@@ -40,7 +40,7 @@ test.describe("Zoom review", () => {
     await page.locator("#schedule-date").fill(`2027-03-0${n}`);
     await page.locator("#schedule-start").fill("18:00");
     await page.locator("#schedule-end").fill("20:00");
-    await page.getByLabel(`${C} · A · Batch A`, { exact: true }).check();
+    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
     await page.locator("#schedule-webinar").fill(`987 6543 210${n}`);
     await page.getByRole("button", { name: "Schedule class" }).click();
     await expect(page.locator("#schedule-feedback")).toHaveText(`Zoom class ${p} scheduled.`);

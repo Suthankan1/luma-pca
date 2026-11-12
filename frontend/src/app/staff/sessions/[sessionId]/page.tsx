@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
-import { EditSessionForm, StatusForm, type SessionDefaults } from "@/components/staff/SessionForms";
+import { CancelSeriesForm, EditSessionForm, StatusForm, type SessionDefaults } from "@/components/staff/SessionForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
@@ -71,6 +71,7 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
         <h2 id="manage-title" className="panel-title">MANAGE</h2>
         <EditSessionForm session={s} batches={options} defaults={defaults} />
         <StatusForm session={s} defaults={defaults} />
+        {s.seriesId && <CancelSeriesForm sessionId={s.id} seriesId={s.seriesId} fromDate={s.localDate} />}
       </section>}
     </div>
   </StaffShell>;

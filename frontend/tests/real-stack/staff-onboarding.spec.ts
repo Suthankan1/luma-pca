@@ -203,7 +203,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.locator("#schedule-date").fill("2027-01-13");
   await page.locator("#schedule-start").fill("18:00");
   await page.locator("#schedule-end").fill("20:00");
-  await page.getByLabel("REAL-PHY · MON · Monday evening", { exact: true }).check();
+  await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel("REAL-PHY · MON · Monday evening", { exact: true }).check();
   await page.locator("#schedule-webinar").fill("812 3456 7890");
   await page.getByRole("button", { name: "Schedule class" }).click();
   await expect(page.locator("#schedule-feedback")).toHaveText("Real stack class scheduled.");
@@ -230,6 +230,23 @@ test("an administrator onboards a student end to end on the real stack", async (
     .toContainText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
   await expect(portal.getByRole("region", { name: "MY BATCHES" })).toContainText("from 12 Jan 2027");
   await studentAgain.close();
+
+  // 7b''. A weekly series on the real API: Mondays in early March, entered in Sri Lanka time.
+  await page.goto("/staff/sessions");
+  const seriesForm = page.locator("form", { has: page.locator("#series-title") });
+  await page.locator("#series-title").fill("Real series");
+  await page.locator("#series-first").fill("2027-03-01");
+  await page.locator("#series-last").fill("2027-03-14");
+  await seriesForm.getByLabel("Mon", { exact: true }).check();
+  await page.locator("#series-start").fill("18:00");
+  await page.locator("#series-end").fill("20:00");
+  await seriesForm.getByLabel("REAL-PHY · MON · Monday evening", { exact: true }).check();
+  await page.getByRole("button", { name: "Preview classes" }).click();
+  await expect(page.locator("#series-feedback")).toHaveText("2 classes, 1 Mar 2027 – 8 Mar 2027. Nothing has been created yet.");
+  await page.getByRole("button", { name: "Create 2 classes" }).click();
+  await expect(page.locator("#series-feedback")).toHaveText("Created 2 classes, 1 Mar 2027 – 8 Mar 2027.");
+  await page.goto("/staff/sessions?from=2027-03-01");
+  await expect(page.locator(".dir-course").filter({ hasText: "Real series" }).first()).toContainText("Mon 1 Mar 2027 · 18:00–20:00");
 
   // 7c. Zoom review against the seeded occurrences: automatic linking finds the class by
   // webinar ID and time; the other occurrence is decided by hand, then the decision changed.

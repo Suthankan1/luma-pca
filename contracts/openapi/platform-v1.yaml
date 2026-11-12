@@ -952,6 +952,96 @@ paths:
               schema: {type: array, items: {$ref: '#/components/schemas/StudentClass'}}
         '400': {description: Window invalid or longer than 92 days}
         '403': {description: Caller is not a student}
+  /api/v1/class-sessions/series:
+    post:
+      summary: Create a weekly series of classes, or preview it (implemented; owner/admin)
+      description: >-
+        One class on each chosen weekday from firstDate to lastDate (inclusive, at most 366 days
+        apart), at startTime–endTime local time in timeZone (default Asia/Colombo; times follow
+        daylight-saving changes), leaving out skipDates; 1 to 100 classes. Every class is an
+        ordinary class session sharing seriesId. A class that would overlap a scheduled class of
+        any of the same batches is returned in conflicts and nothing is created. dryRun previews.
+      operationId: createClassSeries
+      tags: [Sessions]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, firstDate, lastDate, weekdays, startTime, endTime, batchIds]
+              properties:
+                title: {type: string, maxLength: 200}
+                firstDate: {type: string, format: date}
+                lastDate: {type: string, format: date}
+                weekdays: {type: array, minItems: 1, maxItems: 7, items: {type: string, enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]}}
+                startTime: {type: string, example: '18:00'}
+                endTime: {type: string, example: '20:00', description: Same day, after startTime}
+                timeZone: {type: string, example: Asia/Colombo}
+                batchIds: {type: array, minItems: 1, maxItems: 20, items: {type: string, format: uuid}}
+                zoomWebinarId: {type: string}
+                skipDates: {type: array, maxItems: 100, items: {type: string, format: date}}
+                dryRun: {type: boolean, default: false}
+      responses:
+        '200':
+          description: The planned or created classes, and any overlaps
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [created, occurrences, conflicts]
+                properties:
+                  created: {type: boolean}
+                  seriesId: {type: string, format: uuid, nullable: true}
+                  occurrences:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        localDate: {type: string, format: date}
+                        startsAt: {type: string, format: date-time}
+                        endsAt: {type: string, format: date-time}
+                        id: {type: string, format: uuid, nullable: true}
+                  conflicts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        localDate: {type: string, format: date}
+                        sessionId: {type: string, format: uuid}
+                        title: {type: string}
+                        startsAt: {type: string, format: date-time}
+                        endsAt: {type: string, format: date-time}
+        '400': {description: Invalid dates, times, weekdays, webinar ID, or not 1–100 classes}
+        '403': {description: Caller is not an academy owner or administrator}
+        '404': {description: A batch is not in the caller's academy}
+        '409': {description: A batch is inactive}
+  /api/v1/class-sessions/series/{seriesId}/cancellations:
+    post:
+      summary: Cancel the series' scheduled classes on or after a date (implemented; owner/admin)
+      operationId: cancelClassSeries
+      tags: [Sessions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: seriesId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fromDate]
+              properties:
+                fromDate: {type: string, format: date, description: Compared with each class's local date}
+      responses:
+        '200':
+          description: How many classes were cancelled
+          content:
+            application/json:
+              schema: {type: object, required: [cancelled], properties: {cancelled: {type: integer}}}
+        '403': {description: Caller is not an academy owner or administrator}
+        '404': {description: No such series in the caller's academy}
   /api/v1/class-sessions:
     get:
       summary: Sessions starting in a window, by start time (implemented; owner/admin see all, assigned staff only sessions with their batches)
@@ -1358,6 +1448,7 @@ components:
       type: object
       required: [id, title, startsAt, endsAt, timeZone, localDate, status, batches, version, createdAt, updatedAt]
       properties:
+        seriesId: {type: string, format: uuid, nullable: true, description: Set on classes created together as a weekly series}
         id: {type: string, format: uuid}
         title: {type: string}
         startsAt: {type: string, format: date-time}
