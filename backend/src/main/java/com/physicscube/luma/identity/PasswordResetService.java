@@ -5,6 +5,7 @@ import com.physicscube.luma.identity.domain.Account;
 import com.physicscube.luma.identity.domain.AccountStatus;
 import com.physicscube.luma.identity.domain.EmailAddress;
 import com.physicscube.luma.identity.domain.PasswordReset;
+import com.physicscube.luma.shared.api.ServiceUnavailableException;
 import com.physicscube.luma.shared.time.DbTime;
 import java.time.Duration;
 import java.time.Instant;
@@ -15,8 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Self-service password reset. A request never reveals whether the address belongs to
@@ -35,31 +34,33 @@ public class PasswordResetService {
     private final RefreshSessions sessions;
     private final AuditLog audit;
     private final PasswordResetProperties properties;
-    private final PasswordResetMailer mailer;
-    private final PasswordResetDelivery delivery;
+    private final MailProperties mail;
+    private final AccountMailer mailer;
+    private final MailDelivery delivery;
 
     PasswordResetService(AccountRepository accounts, PasswordResetRepository resets, AccountService accountService,
                          RefreshSessions sessions, AuditLog audit, PasswordResetProperties properties,
-                         PasswordResetMailer mailer, PasswordResetDelivery delivery) {
+                         MailProperties mail, AccountMailer mailer, MailDelivery delivery) {
         this.accounts = accounts;
         this.resets = resets;
         this.accountService = accountService;
         this.sessions = sessions;
         this.audit = audit;
         this.properties = properties;
+        this.mail = mail;
         this.mailer = mailer;
         this.delivery = delivery;
     }
 
     public boolean available() {
-        return properties.enabled();
+        return mail.enabled();
     }
 
     /** Emails a reset link if the address belongs to an active account and its hourly limit allows. */
     @Transactional
     public void request(String rawEmail) {
         if (!available()) {
-            throw new PasswordResetUnavailableException();
+            throw new ServiceUnavailableException("Password reset by email is not available. Ask an academy administrator for help.");
         }
         String email;
         try {
@@ -81,23 +82,9 @@ public class PasswordResetService {
         String token = OpaqueToken.generate();
         PasswordReset reset = resets.saveAndFlush(PasswordReset.issue(account.getId(), OpaqueToken.digest(token), now, properties.ttl()));
         audit.record(account.getAcademyId(), account.getId(), "PASSWORD_RESET_REQUESTED", "ACCOUNT", account.getId(), Map.of());
-        String link = properties.webOrigin() + "/reset-password#token=" + token;
+        String link = mail.webOrigin() + "/reset-password#token=" + token;
         String to = account.getEmail();
-        UUID accountId = account.getId();
-        Instant expiresAt = reset.getExpiresAt();
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                delivery.submit(() -> {
-                    try {
-                        mailer.send(to, link, expiresAt);
-                    } catch (RuntimeException e) {
-                        // Neither the address nor the link is logged.
-                        log.warn("Password reset email for account {} failed: {}", accountId, e.getClass().getSimpleName());
-                    }
-                });
-            }
-        });
+        delivery.afterCommit(account.getId(), "Password reset", () -> mailer.passwordReset(to, link, reset.getExpiresAt()));
     }
 
     /** Sets the new password. A rejected password rolls the claim back, so the link can be retried. */

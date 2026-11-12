@@ -70,7 +70,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
       <section className="panel" aria-labelledby="manage-title">
         <h2 id="manage-title" className="panel-title">MANAGE</h2>
         {s.accountStatus === "PENDING_ACTIVATION"
-          ? <InviteForm accountId={s.accountId} who="student" />
+          ? <InviteForm accountId={s.accountId} who="student" email={s.email ?? "the student’s address"} />
           : <p className="panel-sub">{s.accountStatus === "ACTIVE" ? "The student has activated their sign-in." : "The student’s sign-in is disabled."}</p>}
         <StudentDetailsForm id={s.id} version={s.version} fullName={s.fullName} active={s.active} />
       </section>

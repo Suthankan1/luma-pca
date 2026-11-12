@@ -17,12 +17,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,23 +29,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 
 /** Self-service reset over real HTTP and PostgreSQL 17; emails are captured instead of sent. */
 @TestPropertySource(properties = {
-    "luma.password-reset.enabled=true",
-    "luma.password-reset.from=no-reply@example.invalid",
-    "luma.password-reset.web-origin=https://luma.example.invalid",
-    // Only makes the SMTP sender bean exist; the captured mailer below replaces it.
+    "luma.mail.enabled=true",
+    "luma.mail.from=no-reply@example.invalid",
+    "luma.mail.web-origin=https://luma.example.invalid",
     "spring.mail.host=localhost"})
-@Import(PasswordResetHttpIntegrationTest.CapturedMail.class)
+@Import(CapturedMail.class)
 @ExtendWith(OutputCaptureExtension.class)
 class PasswordResetHttpIntegrationTest extends PostgresIntegrationTest {
     private static final String OLD = "quiet river under bridge";
@@ -55,19 +49,7 @@ class PasswordResetHttpIntegrationTest extends PostgresIntegrationTest {
     private static final String EMAIL = "student@example.invalid";
     private static final Pattern LINK = Pattern.compile("^https://luma\\.example\\.invalid/reset-password#token=([A-Za-z0-9_-]{43})$");
 
-    record Mail(String to, String link, Instant expiresAt) {
-    }
-
-    static final BlockingQueue<Mail> SENT = new LinkedBlockingQueue<>();
-
-    @TestConfiguration
-    static class CapturedMail {
-        @Bean
-        @Primary
-        PasswordResetMailer capturingMailer() {
-            return (to, link, expiresAt) -> SENT.add(new Mail(to, link, expiresAt));
-        }
-    }
+    private static final java.util.concurrent.BlockingQueue<CapturedMail.Mail> SENT = CapturedMail.SENT;
 
     @Autowired
     AccountService accounts;
@@ -105,8 +87,9 @@ class PasswordResetHttpIntegrationTest extends PostgresIntegrationTest {
 
     /** The next captured email's token, after checking where it went and what the link looks like. */
     private String nextToken(String expectedTo) throws InterruptedException {
-        Mail mail = SENT.poll(5, TimeUnit.SECONDS);
+        CapturedMail.Mail mail = SENT.poll(5, TimeUnit.SECONDS);
         assertNotNull(mail, "a reset email was expected");
+        assertEquals("reset", mail.kind());
         assertEquals(expectedTo, mail.to());
         Matcher matcher = LINK.matcher(mail.link());
         assertTrue(matcher.matches(), mail.link());

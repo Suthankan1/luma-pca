@@ -1016,3 +1016,40 @@ build runs the Next.js default bundler and repeats the smoke test.
   administrator rather than emailed; rate limiting is per account only.
 - **Next planned feature:** emailing invitation links, or 003A when the
   academy's Zoom test webinar is available.
+
+## Checkpoint 001K — 2026-11-12 — Emailed invitations
+
+- **001J evidence:** merged as PR #28 (`4a769b7`) and PR #29 (`46c8701`); CI
+  green, real-stack CI caught one reset email.
+- **Feature ID / name:** 001K, emailed invitations.
+- **Branch:** `feature/001k-invitation-email`. **PR / merge SHA:** see the merged
+  pull request titled "feat: email invitation links".
+- **Settings renamed (nothing was deployed with the old names):** email is now
+  one shared setting for invitations and resets: `LUMA_MAIL_ENABLED`,
+  `LUMA_MAIL_FROM`, `LUMA_MAIL_WEB_ORIGIN` (+ `SPRING_MAIL_*`). The reset-only
+  `LUMA_PASSWORD_RESET_ENABLED/FROM/WEB_ORIGIN` named in checkpoint 001J part 1
+  no longer exist; `LUMA_PASSWORD_RESET_TTL` and `_MAX_REQUESTS_PER_HOUR` remain.
+- **Implemented behavior:** `POST /api/v1/accounts/{id}/invitations` accepts an
+  optional `{"delivery": "LINK" | "EMAIL"}` (LINK is the default, also with no
+  body, so existing callers are unchanged). EMAIL emails
+  `<web origin>/activate#token=…` (valid 72 hours) to the account's address after
+  the change commits and returns no token or path, so the link reaches only the
+  invitee; 503 "Email is not set up…" when email is off, before anything changes.
+  The audit record gains `delivery`. Staff and student record pages show "Email
+  invitation" (then "Email it again") beside "Create invitation link".
+- **Code:** `AccountMailer` (invitation and reset emails), `SmtpAccountMailer`,
+  `MailDelivery` (after-commit bounded queue), `MailProperties`, and a shared
+  `ServiceUnavailableException` mapped to 503 for every controller.
+- **Tests executed (macOS, JDK 21, Docker):** backend `mvn verify` 269 tests, 0
+  failures (5 new), also in random class order. Frontend lint, type-check, 34
+  unit, build; Playwright 58 (2 new) run twice. Real stack: the instructor's
+  invitation is now emailed through Mailpit and the test activates from the
+  email (the student's stays a copied link, so both paths run); 2 emails caught;
+  logs checked for activation and reset links and both addresses: none. Passed
+  three times.
+- **Known issues / not done:** no email provider chosen or provisioned; no
+  bounce or delivery tracking (an emailed invitation that never arrives looks the
+  same as one not yet opened; the administrator can email again or create a link).
+- **Next planned feature:** 003A when the academy's Zoom test webinar is
+  available; otherwise per-client rate limiting on public auth routes, or a
+  first-owner provisioning command.

@@ -64,6 +64,24 @@ test.describe("Staff accounts and batch assignments", () => {
     await expect(page.getByRole("button", { name: "Disable account" })).toHaveCount(0);
   });
 
+  test("Invitations are emailed to the person, or refused clearly when email is not set up", async ({ page }) => {
+    await signInAsAdmin(page);
+    await addStaff(page, `mailed.${p}@example.invalid`, ["Instructor"]);
+    await page.getByRole("link", { name: "Open their record →" }).click();
+    await page.getByRole("button", { name: "Email invitation" }).click();
+    await expect(page.locator("#invite-feedback")).toContainText(`Invitation emailed to mailed.${p}@example.invalid. The link expires`);
+    // The link itself never comes back to the administrator.
+    await expect(page.getByLabel("Invitation link")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Email it again" })).toBeVisible();
+
+    await addStaff(page, `teacher.${p}@nomail.example.invalid`, ["Instructor"]);
+    await page.getByRole("link", { name: "Open their record →" }).click();
+    await page.getByRole("button", { name: "Email invitation" }).click();
+    await expect(page.locator("#invite-feedback")).toHaveText("Email isn’t set up for the academy yet. Create a link to copy instead.");
+    await page.getByRole("button", { name: "Create invitation link" }).click();
+    await expect(page.getByLabel("Invitation link")).toHaveValue(/\/activate#token=[A-Z]{43}$/);
+  });
+
   test("Nobody can change themselves, and an administrator cannot touch an owner", async ({ page }) => {
     await signInAsAdmin(page);
     await page.goto("/staff/team/00000000-0000-4000-8000-0000000000aa");

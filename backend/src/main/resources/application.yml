@@ -44,14 +44,16 @@ luma:
     # Base64 of 32 random bytes from a secrets manager; encrypts authenticator secrets at rest.
     # Losing or changing it makes every enrolled authenticator unusable.
     mfa-encryption-key: ${LUMA_AUTH_MFA_ENCRYPTION_KEY:}
-  password-reset:
-    # Self-service reset by email stays off (503) until an SMTP server is configured with
-    # SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME and SPRING_MAIL_PASSWORD.
-    enabled: ${LUMA_PASSWORD_RESET_ENABLED:false}
+  mail:
+    # Email to account holders (invitations, password resets) stays off until an SMTP server
+    # is configured with SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME and
+    # SPRING_MAIL_PASSWORD. While off, self-service reset answers 503 and invitations are links.
+    enabled: ${LUMA_MAIL_ENABLED:false}
     # Sender address the SMTP provider allows, e.g. no-reply@academy.example.
-    from: ${LUMA_PASSWORD_RESET_FROM:}
-    # Where people open the link: the Next.js origin, https except for localhost.
-    web-origin: ${LUMA_PASSWORD_RESET_WEB_ORIGIN:}
+    from: ${LUMA_MAIL_FROM:}
+    # Where people open emailed links: the Next.js origin, https except for localhost.
+    web-origin: ${LUMA_MAIL_WEB_ORIGIN:}
+  password-reset:
     ttl: ${LUMA_PASSWORD_RESET_TTL:PT30M}
     max-requests-per-hour: ${LUMA_PASSWORD_RESET_MAX_REQUESTS_PER_HOUR:3}
   zoom:

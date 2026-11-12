@@ -7,6 +7,7 @@ import com.physicscube.luma.shared.security.CurrentAccount;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
@@ -38,12 +39,16 @@ class StaffAccountController {
     record ReplaceRolesRequest(@NotNull @Size(max = 5) List<String> roles, @NotNull @PositiveOrZero Long version) {
     }
 
+    record InviteRequest(@Pattern(regexp = "LINK|EMAIL") String delivery) {
+    }
+
     /**
      * The activation token is shown once; deliver it to the person and do not store it.
      * {@code activationPath} is appended to the web app's origin to form the link; the
-     * token sits in the fragment, which browsers never send to a server.
+     * token sits in the fragment, which browsers never send to a server. Both are null
+     * when the invitation was emailed.
      */
-    record InvitationResponse(UUID accountId, String activationToken, String activationPath, Instant expiresAt) {
+    record InvitationResponse(UUID accountId, String activationToken, String activationPath, Instant expiresAt, String delivery) {
     }
 
     @GetMapping("/api/v1/staff-accounts")
@@ -74,11 +79,20 @@ class StaffAccountController {
     }
 
     /** For any pending account of the academy, staff or student. Replaces any earlier invitation. */
+    /**
+     * {@code delivery} LINK (the default, also with no body) returns the link for the
+     * administrator to send. EMAIL emails it to the account's address and does not return
+     * it, so the token reaches only the invitee; 503 when email is not set up.
+     */
     @PostMapping("/api/v1/accounts/{accountId}/invitations")
-    ResponseEntity<InvitationResponse> invite(JwtAuthenticationToken authentication, @PathVariable UUID accountId) {
-        IssuedInvitation issued = staff.invite(CurrentAccount.from(authentication), accountId);
-        return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
-                .body(new InvitationResponse(issued.accountId(), issued.token(), "/activate#token=" + issued.token(),
-                        issued.expiresAt()));
+    ResponseEntity<InvitationResponse> invite(JwtAuthenticationToken authentication, @PathVariable UUID accountId,
+                                              @Valid @RequestBody(required = false) InviteRequest request) {
+        boolean email = request != null && "EMAIL".equals(request.delivery());
+        IssuedInvitation issued = staff.invite(CurrentAccount.from(authentication), accountId, email);
+        InvitationResponse body = email
+                ? new InvitationResponse(issued.accountId(), null, null, issued.expiresAt(), "EMAIL")
+                : new InvitationResponse(issued.accountId(), issued.token(), "/activate#token=" + issued.token(),
+                        issued.expiresAt(), "LINK");
+        return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore()).body(body);
     }
 }

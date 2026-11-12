@@ -136,9 +136,14 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.getByRole("button", { name: "Add staff member" }).click();
   await expect(page.locator("#staff-feedback")).toHaveText("real.instructor@example.invalid added. Open their record to send an invitation.");
   await page.getByRole("link", { name: "Open their record →" }).click();
-  await page.getByRole("button", { name: "Create invitation link" }).click();
-  const instructorInvite = await page.getByLabel("Invitation link").inputValue();
-  expect(instructorInvite).toMatch(/\/activate#token=[A-Za-z0-9_-]{43}$/);
+  // Emailed this time (the student's was a copied link): the link reaches only the instructor.
+  await page.getByRole("button", { name: "Email invitation" }).click();
+  await expect(page.locator("#invite-feedback")).toContainText("Invitation emailed to real.instructor@example.invalid.");
+  await expect(page.getByLabel("Invitation link")).toHaveCount(0);
+  const invitationEmail = await newestEmailTo("real.instructor@example.invalid");
+  expect(invitationEmail.subject).toBe("Your Physics Cube Academy LUMA account");
+  const instructorInvite = /http:\/\/127\.0\.0\.1:\d+\/activate#token=[A-Za-z0-9_-]{43}/.exec(invitationEmail.text)?.[0];
+  expect(instructorInvite, invitationEmail.text).toBeTruthy();
 
   await page.goto("/staff/courses");
   await page.getByRole("link", { name: /MON/ }).first().click();
@@ -198,7 +203,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   // 8. The instructor activates, signs in without MFA (not an elevated role) and sees only their batch.
   const instructorContext = await browser.newContext();
   const instructor = await instructorContext.newPage();
-  await instructor.goto(instructorInvite);
+  await instructor.goto(instructorInvite!);
   await instructor.fill("#password", passphrase);
   await instructor.fill("#confirm", passphrase);
   await instructor.getByRole("button", { name: "Activate account" }).click();

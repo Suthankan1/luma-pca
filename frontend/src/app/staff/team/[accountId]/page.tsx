@@ -41,7 +41,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ ac
       </section>
       <section className="panel" aria-labelledby="account-title">
         <h2 id="account-title" className="panel-title">ACCOUNT</h2>
-        {person.status === "PENDING_ACTIVATION" && manageable && <InviteForm accountId={person.id} who="staff member" />}
+        {person.status === "PENDING_ACTIVATION" && manageable && <InviteForm accountId={person.id} who="staff member" email={person.email} />}
         {person.status !== "DISABLED" && manageable && <DisableForm id={person.id} email={person.email} />}
         {(self || !manageable) && <p className="panel-sub">{self ? "You can’t disable your own account." : "Only an owner can manage this account."}</p>}
         {person.status === "DISABLED" && <p className="panel-sub">Disabled accounts cannot sign in.</p>}

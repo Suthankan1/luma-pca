@@ -151,6 +151,7 @@ const students = [];
 const enrollments = [];
 const invitationLetters = "PQRSTVWXYZ";
 let invitations = 0;
+const emailedInvitations = [];
 const staffRoles = ["INSTRUCTOR", "ATTENDANCE_OFFICER"];
 const publicStudent = student => {
   const copy = { ...student };
@@ -356,8 +357,15 @@ function academicApi(req, body, send) {
     if (student.accountStatus && student.accountStatus !== "PENDING_ACTIVATION") return send(409, { detail: "Only an account pending activation can be invited" });
     const token = invitationLetters[invitations++ % invitationLetters.length].repeat(43);
     student.invitationToken = token;
-    return send(201, { accountId: id, activationToken: token, activationPath: `/activate#token=${token}`,
-      expiresAt: new Date(Date.now() + 72 * 3600 * 1000).toISOString() });
+    const expiresAt = new Date(Date.now() + 72 * 3600 * 1000).toISOString();
+    // Addresses at nomail.example.invalid simulate a deployment without email; others are "sent" and recorded.
+    if (body?.delivery === "EMAIL") {
+      const address = student.email;
+      if (address.endsWith("@nomail.example.invalid")) return send(503, { detail: "Email is not set up for this academy yet." });
+      emailedInvitations.push({ to: address, token });
+      return send(201, { accountId: id, activationToken: null, activationPath: null, expiresAt, delivery: "EMAIL" });
+    }
+    return send(201, { accountId: id, activationToken: token, activationPath: `/activate#token=${token}`, expiresAt, delivery: "LINK" });
   }
 
   if (collection === "enrollments" && req.method === "PUT") {
