@@ -1096,3 +1096,41 @@ build runs the Next.js default bundler and repeats the smoke test.
   address, so a large botnet is only slowed by the per-account lockouts.
 - **Next planned feature:** 003A when the academy's Zoom test webinar is
   available; otherwise a first-owner provisioning command.
+
+## Checkpoint 001M — 2026-11-12 — First-owner operator command
+
+- **001L evidence:** merged as PR #31, merge commit `98e36a7`; all CI green.
+- **Feature ID / name:** 001M, first-owner provisioning.
+- **Branch:** `feature/001m-first-owner`. **PR / merge SHA:** see the merged pull
+  request titled "feat: first-owner operator command".
+- **Implemented behavior:** `scripts/bootstrap-owner.sh "Academy" owner@x [PRINT|EMAIL]`
+  starts the backend jar without a web server and runs `OwnerBootstrapService`: creates
+  the academy if no academy has that exact name, creates a pending owner, issues an
+  activation invitation (72 h), prints the link to standard output only or emails it,
+  and exits (0 done, 1 refused, 2 bad arguments, 3 email failed). Re-running before
+  activation reissues the link (old one cancelled). Refuses: an active owner exists, a
+  pending owner invitation for another address, an address used by another account, two
+  academies with the name. Serialised with a PostgreSQL advisory lock. Audited as
+  OWNER_BOOTSTRAPPED with no actor. No HTTP route. Runbook:
+  `docs/delivery/runbooks/FIRST-OWNER.md`.
+- **Also:** `SecurityConfig` now loads only in a servlet web application (the command
+  runs without one; a running server is unchanged).
+- **Defects caught by the real-stack run, fixed before commit:** Spring could not choose
+  between the command's two constructors (the test one and the Spring one) — the unit
+  tests construct it directly, so only a real run showed it; and Spring Security's web
+  configuration failed without a web server. Lesson for agents: run new entry points for
+  real, not only through their tests.
+- **Tests executed (macOS, JDK 21, Docker):** backend `mvn verify` 287 tests, 0 failures
+  (8 new: new academy and owner end to end with MFA required, re-run reissues, active
+  owner never replaced, conflicts refused and rolled back, existing academy without
+  owner, 6 concurrent runs → one academy and one owner, printed link never in the log,
+  email path and its failures), also in random class order. The command run twice by
+  hand against a throwaway database (created, then reissued). Real stack now seeds the
+  academy and owner through the command (no SQL for them), checks the link appears once
+  in the output, and that a second run after activation exits 1 ("already has an active
+  owner"); passed three times.
+- **Known issues / not done:** no automated recovery when every owner has lost both
+  password and authenticator (documented as needing a reviewed manual procedure).
+- **Next planned feature:** 003A when the academy's Zoom test webinar is available;
+  otherwise deployment infrastructure (needs the academy's authorisation for cloud
+  resources) or the load-test plan.

@@ -41,7 +41,8 @@ Students and staff receive first-party short-lived signed JWT **access** tokens 
 - **Implemented since (001D):** rotating refresh sessions with reuse detection, logout and logout-all; access tokens are bound to their session.
 - **Implemented since (002A):** academy-scoped course and batch create/read/update API for owners and administrators.
 - **Implemented since (001F):** TOTP MFA for owner/admin sign-in with recovery codes; backend only.
-- **Not implemented:** browser MFA step, password recovery, audit trail, first-account bootstrap, real user data, all course/batch CRUD, Zoom webhooks/oauth, attendance persistence/reconciliation, worker/SQS, SSE, reports and production infrastructure.
+- **Implemented since (001G–001M, 002B–002C, 003B–003D-1, UI-1–UI-3c):** browser MFA, staff administration and invitations (link or email), students, enrollments, staff assignments, class sessions, audit trail, signed Zoom webhook receipt with a retrying worker and occurrence linking, staff screens for every API area, password reset by email, per-visitor limits on public auth routes, and the first-owner operator command. The repository checkpoint (docs/ai/checkpoints/PROGRESS.md) has the details and evidence.
+- **Not implemented:** real user data, Zoom OAuth and participant identity, attendance persistence/reconciliation, SQS worker, SSE, reports and production infrastructure.
 - **Requires feasibility proof:** Zoom license and scopes; unique student registrations; recurring webinar UUID behavior; Q&A/poll data; native attendee emoji identity. See [Zoom rules](../integration/ZOOM-RULES.md).
 
 ## Diagrams and contracts
