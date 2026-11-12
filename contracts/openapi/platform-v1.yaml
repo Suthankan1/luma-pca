@@ -1107,6 +1107,12 @@ paths:
     put:
       summary: Replace a session, including its batch set and status (implemented; owner/admin only)
       operationId: updateClassSession
+      description: >-
+        In the same transaction, automatic Zoom occurrence links near the class's old and new
+        webinar and time are re-checked: kept only while exactly this class still fits, otherwise
+        moved to the one class that fits or returned to review; undecided occurrences nearby are
+        matched. Manual decisions are never changed. Creating classes (single or series) and
+        cancelling the rest of a series do the same.
       tags: [Sessions]
       security: [{bearerAuth: []}]
       requestBody:

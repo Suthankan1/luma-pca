@@ -236,18 +236,22 @@ class OccurrenceLinkingIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void reRunningTheMatcherLinksOccurrencesThatArrivedBeforeTheClassHadAWebinarId() {
+    void occurrencesThatArrivedBeforeTheClassHadAWebinarIdAreLinkedWhenItGetsOne() {
         String lesson = session("2027-03-01T08:30:00Z", "2027-03-01T10:30:00Z", null);
         deliver("webinar.started", WEBINAR, "Early==", "2027-03-01T08:31:00Z");
         deliver("webinar.started", WEBINAR, "Rehearsal==", "2027-03-01T08:40:00Z");
         assertEquals(200, decide(admin, "Rehearsal==", null, "Staff rehearsal").statusCode());
+        assertNull(link("Early=="));
+        // Giving the class its webinar ID re-checks the occurrences near it (slice ZM-5).
         assertEquals(200, api.put("/api/v1/class-sessions/" + lesson,
                 sessionBody("2027-03-01T08:30:00Z", "2027-03-01T10:30:00Z", WEBINAR, "SCHEDULED", 0, batch), admin).statusCode());
+        assertEquals(lesson, link("Early==").get("session"));
 
+        // Running the matcher by hand finds nothing left to link.
         HttpResponse<String> result = api.post("/api/v1/zoom/occurrences/auto-link", "", admin);
 
         assertEquals(200, result.statusCode(), result.body());
-        assertEquals(Map.of("linked", 1, "stillUndecided", 0), HttpApi.parse(result).entrySet().stream()
+        assertEquals(Map.of("linked", 0, "stillUndecided", 0), HttpApi.parse(result).entrySet().stream()
                 .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, e -> ((Number) e.getValue()).intValue())));
         assertEquals(lesson, link("Early==").get("session"));
         assertNull(link("Rehearsal==").get("session"), "manual decisions are left alone");

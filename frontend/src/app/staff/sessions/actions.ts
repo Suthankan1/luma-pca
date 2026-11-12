@@ -41,7 +41,7 @@ export async function updateSession(_previous: FormState, form: FormData): Promi
   revalidatePath("/staff/sessions");
   return { ok: true, message: form.get("intent") === "status"
     ? (status === "CANCELLED" ? "Class cancelled." : "Class restored.")
-    : "Saved. Expected students follow the new date and batches." };
+    : "Saved. Expected students and automatic Zoom links follow the new date, time and webinar." };
 }
 
 type SeriesResult = { created: boolean; seriesId: string | null;

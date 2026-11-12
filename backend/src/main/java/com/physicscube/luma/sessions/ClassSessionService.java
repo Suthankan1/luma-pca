@@ -41,11 +41,24 @@ public class ClassSessionService {
     private final ClassSessionRepository sessions;
     private final BatchService batches;
     private final EnrollmentService enrollments;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
-    ClassSessionService(ClassSessionRepository sessions, BatchService batches, EnrollmentService enrollments) {
+    ClassSessionService(ClassSessionRepository sessions, BatchService batches, EnrollmentService enrollments,
+                        org.springframework.context.ApplicationEventPublisher events) {
         this.sessions = sessions;
         this.batches = batches;
         this.enrollments = enrollments;
+        this.events = events;
+    }
+
+    private static ClassSessionChanged.ZoomSlot slot(ClassSession session) {
+        return session.getZoomWebinarId() == null ? null
+                : new ClassSessionChanged.ZoomSlot(session.getZoomWebinarId(), session.getStartsAt(), session.getEndsAt());
+    }
+
+    private void changed(CurrentAccount caller, ClassSession session, ClassSessionChanged.ZoomSlot before) {
+        events.publishEvent(new ClassSessionChanged(caller.academyId(), session.getId(), caller.accountId(), before, slot(session),
+                "SCHEDULED".equals(session.getStatus())));
     }
 
     /** Sessions starting in [from, to), at most 92 days; {@code batchId} narrows to one readable batch. */
@@ -124,6 +137,7 @@ public class ClassSessionService {
         Set<UUID> wanted = checkBatches(caller, batchIds, Set.of());
         ClassSession saved = sessions.saveAndFlush(
                 new ClassSession(caller.academyId(), title.strip(), startsAt, endsAt, zone, wanted, webinarId(zoomWebinarId)));
+        changed(caller, saved, null);
         return views(caller, List.of(saved), new BatchScope(true, Set.of())).get(0);
     }
 
@@ -202,6 +216,7 @@ public class ClassSessionService {
         List<ClassSession> saved = sessions.saveAllAndFlush(planned.stream()
                 .map(o -> new ClassSession(caller.academyId(), title.strip(), o.startsAt(), o.endsAt(), zone, wanted, webinar, seriesId))
                 .toList());
+        saved.forEach(c -> changed(caller, c, null));
         return new SeriesResult(true, seriesId, saved.stream()
                 .map(c -> new SeriesResult.Occurrence(c.localDate(), c.getStartsAt(), c.getEndsAt(), c.getId())).toList(), List.of());
     }
@@ -217,7 +232,7 @@ public class ClassSessionService {
         List<ClassSession> cancelled = series.stream()
                 .filter(c -> "SCHEDULED".equals(c.getStatus()) && !c.localDate().isBefore(fromDate)).toList();
         cancelled.forEach(ClassSession::cancel);
-        sessions.saveAllAndFlush(cancelled);
+        sessions.saveAllAndFlush(cancelled).forEach(c -> changed(caller, c, slot(c)));
         return cancelled.size();
     }
 
@@ -238,8 +253,11 @@ public class ClassSessionService {
             throw new ConflictException("The record was changed by someone else; reload and retry");
         }
         Set<UUID> wanted = checkBatches(caller, batchIds, session.batchIds());
+        ClassSessionChanged.ZoomSlot before = slot(session);
         session.update(title.strip(), startsAt, endsAt, zone, wanted, status, webinarId(zoomWebinarId));
-        return views(caller, List.of(sessions.saveAndFlush(session)), new BatchScope(true, Set.of())).get(0);
+        ClassSession saved = sessions.saveAndFlush(session);
+        changed(caller, saved, before);
+        return views(caller, List.of(saved), new BatchScope(true, Set.of())).get(0);
     }
 
     /**

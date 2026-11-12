@@ -88,7 +88,7 @@ test.describe("Classes", () => {
     await page.locator("#edit-title").fill("Waves (moved)");
     await page.locator("#edit-date").fill("2027-01-04");
     await page.getByRole("button", { name: "Save changes" }).click();
-    await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students follow the new date and batches.");
+    await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students and automatic Zoom links follow the new date, time and webinar.");
     await expect(page.locator(".sub").first()).toHaveText("Mon 4 Jan 2027 · 18:00–20:00 (Asia/Colombo)");
     await expect(page.getByText("No students are enrolled in these batches on that date.")).toBeVisible();
 
@@ -127,7 +127,7 @@ test.describe("Classes", () => {
     await other.goto(page.url());
     await other.locator("#edit-title").fill("Optics (first)");
     await other.getByRole("button", { name: "Save changes" }).click();
-    await expect(other.locator("#edit-feedback")).toHaveText("Saved. Expected students follow the new date and batches.");
+    await expect(other.locator("#edit-feedback")).toHaveText("Saved. Expected students and automatic Zoom links follow the new date, time and webinar.");
 
     await page.locator("#edit-title").fill("Optics (second)");
     await page.getByRole("button", { name: "Save changes" }).click();

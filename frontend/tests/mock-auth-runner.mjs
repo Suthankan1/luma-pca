@@ -236,11 +236,29 @@ const occurrenceView = o => {
   return { ...o, classSessionId: link?.classSessionId ?? null, linkSource: link?.linkSource ?? null, linkedAt: link?.linkedAt ?? null };
 };
 
+// As the API's ClassLinkReviser: after a class changes, automatic links on its webinars are kept only
+// while exactly that class still fits; undecided occurrences are matched again; manual decisions stay.
+function reviseLinks(webinarIds) {
+  for (const o of occurrences.filter(o => webinarIds.includes(o.webinarId))) {
+    const link = occurrenceLinks.get(o.occurrenceUuid);
+    if (link?.linkSource === "MANUAL") continue;
+    const at = Date.parse(o.firstEventAt);
+    const fits = classSessions.filter(s => s.status === "SCHEDULED" && s.zoomWebinarId === o.webinarId
+      && Date.parse(s.startsAt) - 3600_000 <= at && at <= Date.parse(s.endsAt) + 3600_000);
+    if (link && (fits.length !== 1 || fits[0].id !== link.classSessionId)) occurrenceLinks.delete(o.occurrenceUuid);
+    if (!occurrenceLinks.has(o.occurrenceUuid) && fits.length === 1) {
+      occurrenceLinks.set(o.occurrenceUuid, { classSessionId: fits[0].id, linkSource: "AUTOMATIC", linkedAt: new Date().toISOString() });
+    }
+  }
+}
+
 function zoomApi(req, body, send, parts, query) {
   const [, , , , resource, id, action] = parts;
   if (req.method === "GET" && resource === "occurrences") {
     const decided = new URLSearchParams(query).get("decided");
+    const sessionId = new URLSearchParams(query).get("sessionId");
     return send(200, occurrences.map(occurrenceView).filter(o => decided === null || String(o.linkSource !== null) === decided)
+      .filter(o => !sessionId || o.classSessionId === sessionId)
       .sort((a, b) => b.firstEventAt.localeCompare(a.firstEventAt)));
   }
   if (req.method === "POST" && resource === "occurrences" && id === "auto-link") {
@@ -362,6 +380,7 @@ function classSeries(body, send, seriesId, action) {
     if (series.length === 0) return send(404, { detail: "Not found" });
     const cancelled = series.filter(s => s.status === "SCHEDULED" && localDate(s.startsAt, s.timeZone) >= body.fromDate);
     for (const s of cancelled) { s.status = "CANCELLED"; s.version++; }
+    reviseLinks(cancelled.map(s => s.zoomWebinarId));
     return send(200, { cancelled: cancelled.length });
   }
   const days = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
@@ -387,8 +406,9 @@ function classSeries(body, send, seriesId, action) {
   for (const o of planned) {
     o.id = uuid();
     classSessions.push({ id: o.id, title: String(body.title).trim(), startsAt: o.startsAt, endsAt: o.endsAt, timeZone: "Asia/Colombo",
-      status: "SCHEDULED", zoomWebinarId: body.zoomWebinarId || null, batchIds: [...body.batchIds], seriesId: seriesIdNew, version: 0 });
+      status: "SCHEDULED", zoomWebinarId: body.zoomWebinarId?.replace(/[\s-]/g, "") || null, batchIds: [...body.batchIds], seriesId: seriesIdNew, version: 0 });
   }
+  reviseLinks([body.zoomWebinarId?.replace(/[\s-]/g, "") || null]);
   return send(200, { created: true, seriesId: seriesIdNew, occurrences: planned, conflicts: [] });
 }
 
@@ -556,6 +576,7 @@ function academicApi(req, body, send) {
         timeZone: body.timeZone ?? "Asia/Colombo", status: "SCHEDULED", zoomWebinarId: body.zoomWebinarId?.replace(/[\s-]/g, "") || null,
         batchIds: [...body.batchIds], version: 0 };
       classSessions.push(created);
+      reviseLinks([created.zoomWebinarId]);
       return send(201, sessionView(created));
     }
     if (id === "series" && req.method === "POST") return classSeries(body, send, sub, path.split("/")[6]);
@@ -578,8 +599,10 @@ function academicApi(req, body, send) {
       if (body.status !== "SCHEDULED" && body.status !== "CANCELLED") return send(400, { detail: "status must be SCHEDULED or CANCELLED" });
       if (session.version !== body.version) return stale();
       if (classSessionProblem(body, session.batchIds, send)) return;
+      const webinarBefore = session.zoomWebinarId;
       Object.assign(session, { title: String(body.title).trim(), startsAt: body.startsAt, endsAt: body.endsAt, timeZone: body.timeZone,
         status: body.status, zoomWebinarId: body.zoomWebinarId?.replace(/[\s-]/g, "") || null, batchIds: [...body.batchIds], version: session.version + 1 });
+      reviseLinks([webinarBefore, session.zoomWebinarId]);
       return send(200, sessionView(session));
     }
     return send(405);

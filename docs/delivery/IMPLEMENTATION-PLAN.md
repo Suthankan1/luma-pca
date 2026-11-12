@@ -36,6 +36,7 @@
 | 003B Webhook verification/receipt | URL validation, signature + replay window, idempotent database receipt | DONE against fixtures: signature and timestamp checks, URL validation, idempotent durable receipt, off by default. Real Zoom delivery unproven until 003A |
 | 003C Outbox/worker | Retry, DLQ, dedup, out-of-order receipts | DONE with an in-database queue: multi-worker claiming, backoff, dead letter, audited replay, per-occurrence event log. SQS transport and separate worker deployment remain the production plan |
 | 003D Webinar occurrence identity and registration mapping | Real Zoom tests, stable student IDs, review unknown users | PART 1 DONE: occurrence-to-class-session linking (automatic when unambiguous, audited manual decisions). Part 2, student identity from registrants and participants, needs a real test webinar (003A) |
+| ZM-5 Zoom links follow the timetable | Creating, moving, re-webinaring or cancelling a class re-checks automatic links; manual decisions stay | DONE: class-change event handled in the same transaction, links kept only while the matcher would still make them, nearby undecided occurrences matched, audited; class page lists its Zoom links |
 | 004A Provisional attendance timeline | Union/clip durations, SSE, late/missing and stale event handling | TODO |
 | 004B Official report reconciliation | Correct outcome vs golden dataset, audit finalization | TODO |
 | 004C Correction workflows + student history | Reasons, permissions, audit and appeal flow | TODO |

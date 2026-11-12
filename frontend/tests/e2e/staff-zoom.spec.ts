@@ -84,6 +84,20 @@ test.describe("Zoom review", () => {
     await page.getByRole("link", { name: "Needs review" }).click();
     await expect(manual).toHaveCount(0);
     await expect(auto).toHaveCount(0);
+
+    // The class page lists its link; moving the class to another day sends the occurrence back to review.
+    await page.goto("/staff/zoom?view=decided");
+    await auto.getByRole("link", { name: new RegExp(`^Zoom class ${p}, `) }).click();
+    const linked = page.getByRole("region", { name: "Zoom occurrences linked" });
+    await expect(linked.getByRole("listitem")).toHaveCount(1);
+    await expect(linked.getByRole("listitem")).toContainText(`Started ${n} Mar 2027 18:05 · 6 events`);
+    await expect(linked.getByRole("listitem").locator(".status")).toHaveText("Linked automatically");
+    await page.locator("#edit-date").fill(`2027-03-1${n}`);
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students and automatic Zoom links follow the new date, time and webinar.");
+    await expect(linked).toContainText("None yet.");
+    await page.goto("/staff/zoom");
+    await expect(auto.locator(".status")).toHaveText("Needs review");
   });
 
   test("A failed event is replayed with a reason", async ({ page }) => {
