@@ -1509,7 +1509,8 @@ build runs the Next.js default bundler and repeats the smoke test.
 ## Checkpoint AUD-1 — 2026-11-13 — Activity log
 
 - **Branch:** `feature/activity-log`. **PR / merge SHA:** see the merged pull request titled
-  "feat(audit): activity log for owners and administrators".
+  "feat(audit): activity log for owners and administrators" (PR #55, merge commit `a5a1245`;
+  all CI checks green; CI backend ran all 327 tests).
 - **Implemented:** `GET /api/v1/audit-events` (owner/admin, read-only): newest first, keyset paging
   on (time, id) so events sharing a timestamp page correctly, filters by area (staff, sign-in,
   students, zoom) or by one record (`targetId`), with the actor's email and a target label
@@ -1529,3 +1530,19 @@ build runs the Next.js default bundler and repeats the smoke test.
   terminated"); the new audit test had passed on its own earlier. The CI job is the full run.
 - **Also on 13 Nov:** an app restart closed the tunnel's terminal; the backend behind the still-running
   tunnel was restarted with the new `resume` mode (PR #54, `0582e8f`), keeping the validated Zoom URL.
+
+## Checkpoint OPS-1 — 2026-11-13 — Backups proven restorable
+
+- **Branch:** `feature/restore-drill`. **PR / merge SHA:** see the merged pull request titled
+  "feat(ops): backup script, restore drill and a restore test in CI".
+- **Implemented:** `scripts/db-backup.sh` (pg_dump custom format to gitignored `backups/`, private
+  permissions, personal-data warning); `scripts/db-restore-drill.sh` (fresh dump → throwaway PostgreSQL 17
+  → identical Flyway history, matching table counts, audit log still append-only; everything deleted
+  afterwards); `BackupRestoreIntegrationTest` in CI (seeded data from every area, Flyway `validate` on the
+  restored copy, every table's full contents equal, restored audit log refuses an update). `RESTORE.md`
+  rewritten from "planned" to the tested procedure.
+- **Drill run:** against the Zoom test database, 13 Nov — PASSED (15 migrations identical, 23 tables,
+  62 rows, update of 6 audit events refused). The first run reported "latest V9" (text comparison of
+  versions); fixed to the last applied migration.
+- **Still open:** RPO/RTO/retention (OPEN-QUESTIONS P1) and hosting budget (P0) decide the production
+  backup design; no cloud resources were created.
