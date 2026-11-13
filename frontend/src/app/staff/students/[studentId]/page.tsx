@@ -6,7 +6,7 @@ import { EnrollForm, EnrollmentAction, StudentDetailsForm } from "@/components/s
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { academyToday, accountStatusLabels, formatDate, isAcademyManager, uuidOrNull } from "@/lib/staff-forms";
+import { academyToday, accountStatusLabels, formatClassTime, formatDate, formatDuration, isAcademyManager, outcomeLabels, uuidOrNull, type AttendanceRecordView } from "@/lib/staff-forms";
 
 type Student = { id: string; studentNumber: string; fullName: string; email: string | null; accountId: string;
   accountStatus: string | null; active: boolean; version: number };
@@ -28,11 +28,12 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
     </StaffShell>;
   }
 
-  const [student, enrollments, batches, courses] = await Promise.all([
+  const [student, enrollments, batches, courses, attendance] = await Promise.all([
     staffApi<Student>(`/api/v1/students/${studentId}`),
     staffApi<Enrollment[]>(`/api/v1/students/${studentId}/enrollments`),
     staffApi<Batch[]>("/api/v1/batches"),
     staffApi<Course[]>("/api/v1/courses"),
+    staffApi<AttendanceRecordView[]>(`/api/v1/students/${studentId}/attendance`),
   ]);
   if (!student.ok && student.status === 404) notFound();
   if (!student.ok || !enrollments.ok || !batches.ok || !courses.ok) {
@@ -75,5 +76,20 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
         <StudentDetailsForm id={s.id} version={s.version} fullName={s.fullName} active={s.active} />
       </section>
     </div>
+    <section className="panel panel-gap" aria-labelledby="history-title">
+      <h2 id="history-title" className="panel-title">ATTENDANCE HISTORY</h2>
+      {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load attendance right now.</p>
+        : <ul className="dir-list">
+          {attendance.data.map(r => <li key={r.id} className="dir-row dir-course" aria-label={`History ${r.classTitle}`}>
+            <div><Link className="text-link" href={`/staff/sessions/${r.classSessionId}`}><strong>{r.classTitle}</strong></Link>
+              <span className="dir-dates muted"> {formatClassTime(r.classStartsAt, r.classEndsAt, r.timeZone)}</span>
+              <div className="dir-dates muted">{formatDuration(r.connectedSeconds)} connected
+                {r.outcome !== r.computedOutcome ? ` · corrected from ${outcomeLabels[r.computedOutcome].toLowerCase()}` : ""}
+                {r.appealStatus ? ` · appeal ${r.appealStatus.toLowerCase()}` : ""}</div></div>
+            <span className={`status ${r.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[r.outcome]}</span>
+          </li>)}
+          {attendance.data.length === 0 && <li className="dir-empty muted">No final attendance yet.</li>}
+        </ul>}
+    </section>
   </StaffShell>;
 }

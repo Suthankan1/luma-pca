@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { finaliseAttendance, savePolicy } from "@/app/staff/attendance/actions";
-import type { AttendancePolicy, FormState } from "@/lib/staff-forms";
+import { correctRecord, finaliseAttendance, resolveAppeal, savePolicy } from "@/app/staff/attendance/actions";
+import { attendanceOutcomes, outcomeLabels, type AttendanceOutcome, type AttendancePolicy, type FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, id }: { state: FormState; id: string }) {
   if (!state) return null;
@@ -34,5 +34,47 @@ export function FinaliseForm({ sessionId }: { sessionId: string }) {
     <input type="hidden" name="sessionId" value={sessionId} />
     <button className="action" type="submit" disabled={pending}>{pending ? "Finalising…" : "Finalise attendance"}</button>
     <Feedback state={state} id="finalise-feedback" />
+  </form>;
+}
+
+export function CorrectionForm({ prefix, sessionId, recordId, version, current }: {
+  prefix: string; sessionId: string; recordId: string; version: number; current: AttendanceOutcome;
+}) {
+  const [state, action, pending] = useActionState(correctRecord, null);
+  const values = state && !state.ok ? state.values : undefined;
+  const choices = attendanceOutcomes.filter(o => o !== current);
+  return <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
+    <input type="hidden" name="recordId" value={recordId} />
+    <input type="hidden" name="sessionId" value={sessionId} />
+    <input type="hidden" name="version" value={version} />
+    <label htmlFor={`${prefix}-outcome`}>Corrected outcome</label>
+    <select id={`${prefix}-outcome`} name="outcome" defaultValue={values?.outcome ?? choices[0]}>
+      {choices.map(o => <option key={o} value={o}>{outcomeLabels[o]}</option>)}
+    </select>
+    <label htmlFor={`${prefix}-reason`}>Reason <span className="muted">(recorded)</span></label>
+    <input id={`${prefix}-reason`} name="reason" maxLength={500} required autoComplete="off" defaultValue={values?.reason}
+      placeholder="Medical note received" />
+    <button className="action secondary" type="submit" disabled={pending}>{pending ? "Saving…" : "Save correction"}</button>
+    <Feedback state={state} id={`${prefix}-feedback`} />
+  </form>;
+}
+
+export function AppealDecisionForm({ prefix, appealId, current }: { prefix: string; appealId: string; current: AttendanceOutcome }) {
+  const [state, action, pending] = useActionState(resolveAppeal, null);
+  const values = state && !state.ok ? state.values : undefined;
+  const choices = attendanceOutcomes.filter(o => o !== current);
+  return <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
+    <input type="hidden" name="appealId" value={appealId} />
+    <label htmlFor={`${prefix}-outcome`}>Outcome if accepted</label>
+    <select id={`${prefix}-outcome`} name="outcome" defaultValue={values?.outcome ?? choices[0]}>
+      {choices.map(o => <option key={o} value={o}>{outcomeLabels[o]}</option>)}
+    </select>
+    <label htmlFor={`${prefix}-note`}>Note to the student</label>
+    <input id={`${prefix}-note`} name="note" maxLength={500} required autoComplete="off" defaultValue={values?.note} />
+    <div className="button-row">
+      <button className="action" type="submit" name="decision" value="ACCEPT" disabled={pending}>Accept</button>
+      <button className="action secondary" type="submit" name="decision" value="REJECT" disabled={pending}>Reject</button>
+    </div>
+    <Feedback state={state} id={`${prefix}-feedback`} />
   </form>;
 }

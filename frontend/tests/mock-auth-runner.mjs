@@ -25,11 +25,11 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance-policy)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance-policy|attendance-records|attendance-appeals)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
-  if (req.url.startsWith("/api/v1/me/")) return studentApi(req, send);
+  if (req.url.startsWith("/api/v1/me/")) return studentApi(req, send, body);
 
   switch (req.url) {
     case "/api/v1/auth/login":
@@ -153,13 +153,28 @@ const backend = createServer(async (req, res) => {
 // The signed-in student's own records: two batches (one left), and classes in the coming
 // days in Sri Lanka time, one cancelled and one shared by both batches. The real API's
 // per-date enrolment filtering is covered by the backend tests.
-function studentApi(req, send) {
+function studentApi(req, send, body) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   if (!roles.includes("STUDENT")) return send(403);
   const url = new URL(req.url, "http://mock");
   const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
   const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
   const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
+  if (url.pathname === "/api/v1/me/attendance" && req.method === "GET") {
+    return send(200, !studentHasEnrolments ? [] : [{ ...myRecord, appealStatus: appealStatusOf(myRecord.id) }]);
+  }
+  const appealPath = url.pathname.match(/^\/api\/v1\/me\/attendance\/([^/]+)\/appeals$/);
+  if (appealPath && req.method === "POST") {
+    if (appealPath[1] !== myRecord.id || !studentHasEnrolments) return send(404, { detail: "Attendance record not found" });
+    const message = String(body?.message ?? "").trim();
+    if (message.length < 10 || message.length > 1000) return send(400, { detail: "Explain the appeal in 10 to 1000 characters" });
+    if (appealStatusOf(myRecord.id) === "OPEN") return send(409, { detail: "An appeal for this class is already waiting for a decision" });
+    const appeal = { id: uuid(), recordId: myRecord.id, studentId: "00000000-0000-4000-8000-0000000000c1", studentNumber: "PCA-STUDENT",
+      studentName: "Mock Student", classTitle: myRecord.classTitle, classStartsAt: myRecord.classStartsAt, timeZone: myRecord.timeZone,
+      outcome: myRecord.outcome, message, status: "OPEN", createdAt: new Date().toISOString(), resolutionNote: null, resolvedAt: null };
+    attendanceAppeals.push(appeal);
+    return send(201, appeal);
+  }
   if (url.pathname === "/api/v1/me/enrollments") {
     return send(200, !studentHasEnrolments ? [] : [
       { id: "00000000-0000-4000-8000-0000000000e1", batchId: mon.batchId, batchCode: "MON", batchName: mon.name, enrolledOn: "2026-01-05",
@@ -284,6 +299,13 @@ for (const n of ["1", "2"]) {
 }
 // The academy's rule and finalised classes.
 let attendancePolicy = null;
+const attendanceRecords = [];
+// The signed-in mock student's own final record (Waves and oscillations, last week), and appeals from any student.
+const myRecord = { id: "00000000-0000-4000-8000-0000000000a1", classSessionId: "00000000-0000-4000-8000-0000000000f1", classTitle: "Waves and oscillations",
+  classStartsAt: "2026-11-02T12:30:00Z", classEndsAt: "2026-11-02T14:30:00Z", timeZone: "Asia/Colombo", computedOutcome: "ABSENT", outcome: "ABSENT",
+  connectedSeconds: 1200, firstJoinAt: "2026-11-02T13:50:00Z", secondsAfterStart: 4800, finalisedAt: "2026-11-02T15:00:00Z", version: 0 };
+const attendanceAppeals = [];
+const appealStatusOf = recordId => attendanceAppeals.filter(a => a.recordId === recordId).at(-1)?.status ?? null;
 const finalisedClasses = new Map();
 const occurrenceView = o => {
   const link = occurrenceLinks.get(o.occurrenceUuid);
@@ -603,7 +625,8 @@ function mockAttendance(session) {
   const final = finalisedClasses.get(session.id);
   const row = (student, expected) => ({ studentId: student.id, studentNumber: student.studentNumber, fullName: student.fullName, expected,
     seen: seen.has(student.id), ...(seen.get(student.id) ?? { visits: 0, openVisits: 0, connectedSeconds: 0, firstJoinAt: null, secondsAfterStart: null }),
-    recordId: final?.outcomes.has(student.id) ? `rec-${session.id}-${student.id}` : null, outcome: final?.outcomes.get(student.id) ?? null });
+    recordId: final?.outcomes.get(student.id)?.id ?? null, outcome: final?.outcomes.get(student.id)?.outcome ?? null,
+    recordVersion: final?.outcomes.get(student.id)?.version ?? null });
   const rows = [...students.filter(s => expectedIds.has(s.id)).map(s => row(s, true)),
     ...students.filter(s => seen.has(s.id) && !expectedIds.has(s.id)).map(s => row(s, false))]
     .sort((a, b) => Number(b.expected) - Number(a.expected) || a.studentNumber.localeCompare(b.studentNumber));
@@ -622,6 +645,37 @@ function academicApi(req, body, send) {
     return auditApi(query, send);
   }
   const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  if (collection === "attendance-appeals") {
+    if (!manager) return send(403, { detail: "Forbidden" });
+    if (req.method === "GET") {
+      const status = new URLSearchParams(query).get("status");
+      return send(200, attendanceAppeals.filter(a => !status || a.status === status).map(a => ({ ...a, outcome: a.recordId === myRecord.id ? myRecord.outcome : a.outcome })).reverse());
+    }
+    const appeal = attendanceAppeals.find(a => a.id === id);
+    if (!appeal) return send(404, { detail: "Appeal not found" });
+    if (appeal.status !== "OPEN") return send(409, { detail: "This appeal has already been decided" });
+    if (String(body.note ?? "").trim().length < 3) return send(400, { detail: "A note of 3 to 500 characters is required" });
+    if (body.decision === "ACCEPT") {
+      if (!body.outcome || body.outcome === myRecord.outcome) return send(400, { detail: "Choose a different outcome" });
+      myRecord.outcome = body.outcome;
+      audit("ATTENDANCE_CORRECTED", "CLASS_SESSION", myRecord.classSessionId, myRecord.classTitle, { from: appeal.outcome, to: body.outcome, reason: `Appeal accepted: ${body.note}` });
+    }
+    Object.assign(appeal, { status: body.decision === "ACCEPT" ? "ACCEPTED" : "REJECTED", resolutionNote: String(body.note).trim(), resolvedAt: new Date().toISOString() });
+    audit(body.decision === "ACCEPT" ? "ATTENDANCE_APPEAL_ACCEPTED" : "ATTENDANCE_APPEAL_REJECTED", "ATTENDANCE_RECORD", appeal.recordId, null, { note: appeal.resolutionNote });
+    return send(200, { ...appeal, outcome: myRecord.outcome });
+  }
+  if (collection === "attendance-records" && sub === "corrections" && req.method === "POST") {
+    if (!manager && !roles.includes("ATTENDANCE_OFFICER")) return send(403, { detail: "Forbidden" });
+    const record = attendanceRecords.find(r => r.id === id);
+    if (!record) return send(404, { detail: "Attendance record not found" });
+    if (record.version !== body.version) return send(409, { detail: "This record was changed by someone else; reload and try again" });
+    if (body.outcome === record.outcome) return send(400, { detail: `The record already says ${body.outcome}` });
+    if (String(body.reason ?? "").trim().length < 3) return send(400, { detail: "A reason of 3 to 500 characters is required" });
+    const session = classSessions.find(c => c.id === record.sessionId);
+    audit("ATTENDANCE_CORRECTED", "CLASS_SESSION", record.sessionId, session?.title ?? null, { from: record.outcome, to: body.outcome, reason: String(body.reason).trim() });
+    Object.assign(record, { outcome: body.outcome, version: record.version + 1 });
+    return send(200, record);
+  }
   if (collection === "attendance-policy") {
     if (req.method === "GET") return attendancePolicy ? send(200, attendancePolicy) : send(204);
     if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner records the attendance rule" });
@@ -658,6 +712,14 @@ function academicApi(req, body, send) {
 
   if (collection === "student-invitations") return studentInvitations(req, body, send, id);
 
+  if (collection === "students" && sub === "attendance" && req.method === "GET") {
+    return send(200, attendanceRecords.filter(r => r.studentId === id).map(r => {
+      const session = classSessions.find(c => c.id === r.sessionId);
+      return { id: r.id, classSessionId: r.sessionId, classTitle: session.title, classStartsAt: session.startsAt, classEndsAt: session.endsAt,
+        timeZone: session.timeZone, computedOutcome: r.computedOutcome, outcome: r.outcome, connectedSeconds: r.connectedSeconds, firstJoinAt: null,
+        secondsAfterStart: null, finalisedAt: r.finalisedAt, version: r.version, appealStatus: null };
+    }));
+  }
   if (collection === "students") {
     if (req.method === "GET" && !id) {
       const params = new URLSearchParams(query);
@@ -853,10 +915,14 @@ function academicApi(req, body, send) {
       const outcomes = new Map();
       for (const s of facts.students.filter(s => s.expected)) {
         const enough = s.connectedSeconds * 100 >= attendancePolicy.minConnectedPercent * length;
-        outcomes.set(s.studentId, !enough || !s.seen ? "ABSENT" : s.secondsAfterStart > attendancePolicy.lateAfterMinutes * 60 ? "LATE" : "PRESENT");
+        const outcome = !enough || !s.seen ? "ABSENT" : s.secondsAfterStart > attendancePolicy.lateAfterMinutes * 60 ? "LATE" : "PRESENT";
+        const record = { id: uuid(), sessionId: session.id, studentId: s.studentId, computedOutcome: outcome, outcome, version: 0,
+          connectedSeconds: s.connectedSeconds, finalisedAt: new Date().toISOString() };
+        attendanceRecords.push(record);
+        outcomes.set(s.studentId, record);
       }
       finalisedClasses.set(session.id, { at: new Date().toISOString(), outcomes });
-      const count = o => [...outcomes.values()].filter(v => v === o).length;
+      const count = o => [...outcomes.values()].filter(v => v.computedOutcome === o).length;
       audit("ATTENDANCE_FINALISED", "CLASS_SESSION", session.id, session.title, { present: String(count("PRESENT")), late: String(count("LATE")), absent: String(count("ABSENT")) });
       return send(200, { sessionId: session.id, finalisedAt: new Date().toISOString(), present: count("PRESENT"), late: count("LATE"), absent: count("ABSENT") });
     }

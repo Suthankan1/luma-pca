@@ -1695,3 +1695,19 @@ build runs the Next.js default bundler and repeats the smoke test.
   report, once per class, the rule kept after a change, CSV outcome; unfinished, cancelled, roles, other academy). Playwright:
   owner sets the rule, admin reads it, finalising a past class after fetching the report. Local: unit 52, Playwright 88.
   Docker Desktop on the Mac stopped responding during this slice, so backend tests ran in CI only.
+
+## Checkpoint 004C — 2026-11-13 — Corrections, student history and appeals
+
+- **Branch:** `feature/attendance-corrections`. **PR / merge SHA:** see the merged pull request titled
+  "feat(attendance): corrections, student history and appeals".
+- **Implemented:** V22 `attendance_appeals` (one open per record) and `attendance_corrections` (append-only by trigger).
+  Corrections: `POST /api/v1/attendance-records/{id}/corrections` (owners, administrators, attendance officers for students of
+  their batches; reason; version check; computed outcome kept; audited) and their history. History:
+  `GET /api/v1/students/{id}/attendance` (staff) and `GET /api/v1/me/attendance` (student). Appeals:
+  `POST /api/v1/me/attendance/{id}/appeals`, `GET /api/v1/attendance-appeals`, `POST /api/v1/attendance-appeals/{id}/resolution`
+  (accepting corrects the record, linked to the appeal; rejecting needs a note the student sees). UI: "Correct" on final rows,
+  attendance history on the student page, "My attendance" with appeals in the student portal, an appeals list on the
+  Attendance page; activity log wording for every attendance action.
+- **Tests:** `AttendanceCorrectionIntegrationTest` (3: history and append-only trigger, version and validation; officer scope;
+  appeal lifecycle, one open, own record only, accept/reject, audit). Playwright: correction and history; student appeal
+  accepted by an administrator. Local: unit 52.

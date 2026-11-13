@@ -26,9 +26,9 @@ export function staffApi<T>(path: `/api/v1/${string}`,
   return callApi<T>("staff", path, init, timeoutMs);
 }
 
-/** The student portal reads only the signed-in student's own records (`/api/v1/me/...`). */
-export function studentApi<T>(path: `/api/v1/me/${string}`): Promise<ApiResult<T>> {
-  return callApi<T>("student", path);
+/** The student portal reaches only the signed-in student's own records (`/api/v1/me/...`), such as an appeal. */
+export function studentApi<T>(path: `/api/v1/me/${string}`, init?: { method: "POST"; body: unknown }): Promise<ApiResult<T>> {
+  return callApi<T>("student", path, init);
 }
 
 async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`,

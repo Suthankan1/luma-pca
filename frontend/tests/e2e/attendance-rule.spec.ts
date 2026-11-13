@@ -94,5 +94,18 @@ test.describe("Attendance rule and final attendance", () => {
     await expect(final.getByRole("listitem", { name: `Attendance FN-${p.toUpperCase()}-1 Final Student` }).locator(".status")).toHaveText("Late");
     await expect(final).toContainText("Final since");
     await expect(page.getByRole("button", { name: "Finalise attendance" })).toHaveCount(0);
+
+    // A correction with a reason; the computed outcome stays visible in the student's history.
+    const row = final.getByRole("listitem", { name: `Attendance FN-${p.toUpperCase()}-1 Final Student` });
+    await row.getByText("Correct", { exact: true }).click();
+    await row.getByLabel("Corrected outcome").selectOption({ label: "Excused" });
+    await row.getByLabel(/^Reason/).fill("Medical note received");
+    await row.getByRole("button", { name: "Save correction" }).click();
+    await expect(row.locator(".status")).toHaveText("Excused");
+    await page.goto("/staff/students?q=" + `FN-${p.toUpperCase()}-1`);
+    await page.getByRole("link", { name: new RegExp(`FN-${p.toUpperCase()}-1`) }).first().click();
+    const history = page.getByRole("region", { name: "ATTENDANCE HISTORY" });
+    await expect(history.getByRole("listitem", { name: `History Final class ${p}` })).toContainText("corrected from late");
+    await expect(history.getByRole("listitem", { name: `History Final class ${p}` }).locator(".status")).toHaveText("Excused");
   });
 });

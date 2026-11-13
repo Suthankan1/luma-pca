@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
-import { FinaliseForm } from "@/components/staff/AttendanceForms";
+import { CorrectionForm, FinaliseForm } from "@/components/staff/AttendanceForms";
 import { CancelSeriesForm, EditSeriesForm, EditSessionForm, StatusForm, type SessionDefaults } from "@/components/staff/SessionForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
@@ -22,6 +22,7 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   const sessionId = uuidOrNull((await params).sessionId);
   if (!sessionId) notFound();
   const manager = isAcademyManager(identity.roles);
+  const canCorrect = manager || identity.roles.includes("ATTENDANCE_OFFICER");
   const [session, expected, batches, courses, zoom, attendance] = await Promise.all([
     staffApi<ClassSession>(`/api/v1/class-sessions/${sessionId}`),
     staffApi<ExpectedStudent[]>(`/api/v1/class-sessions/${sessionId}/students`),
@@ -125,6 +126,10 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
             </div>
             {a.outcome ? <span className={`status outcome ${a.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[a.outcome]}</span>
               : <span className={`status ${a.seen ? "on" : "off"}`}>{a.seen ? "Seen" : "Not seen"}</span>}
+            {a.outcome && a.recordId && a.recordVersion != null && canCorrect && <details className="decision correction">
+              <summary>Correct</summary>
+              <CorrectionForm prefix={`correct-${a.studentId}`} sessionId={s.id} recordId={a.recordId} version={a.recordVersion} current={a.outcome} />
+            </details>}
           </li>)}
           {attendance.data.students.length === 0 && <li className="dir-empty muted">No students are expected at this class.</li>}
         </ul>
