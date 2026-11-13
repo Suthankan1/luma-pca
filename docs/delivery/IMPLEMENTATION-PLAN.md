@@ -43,7 +43,7 @@
 | 004A Provisional attendance timeline | Union/clip durations, SSE, late/missing and stale event handling | DONE except live push: per class, time connected (rejoins merged, clipped to the class), first join and lateness, open visits (to the webinar end or now), unseen expected students; facts only, no present/absent until the academy approves a threshold. Recalculated on each read; SSE live updates not built |
 | 004B Official report reconciliation | Correct outcome vs golden dataset, audit finalization | PART DONE: Zoom's participant report fetched after each linked webinar ends (automatic with backoff, or by an administrator, audited) and used instead of live events (status RECONCILED). Finalising present/absent waits for the academy's attendance rule (OPEN-QUESTIONS P0); no golden dataset yet |
 | 004C Correction workflows + student history | Reasons, permissions, audit and appeal flow | TODO |
-| 005A Attendance CSV exports | Scoped, tested private outputs | TODO |
+| 005A Attendance CSV exports | Scoped, tested private outputs | DONE: class and batch-range (≤92 days) CSVs with the attendance view's facts and scoping, data source per row, no-store downloads through the web server, formula-safe cells, every export audited |
 | 006A Source-attributed engagement | Q&A/poll where available, portal reactions with consent | TODO |
 | 006B Portal pulse checks | Instructor-controlled learning questions, timing, abuse controls | TODO |
 | 006C Top 10/100 analytics | Valid source provenance, fair normalization and opt-in | TODO |

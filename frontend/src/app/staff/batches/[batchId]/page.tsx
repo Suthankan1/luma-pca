@@ -6,7 +6,8 @@ import { AssignForm, UnassignButton } from "@/components/staff/TeamForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { formatDate, isAcademyManager, staffRoleLabels, uuidOrNull } from "@/lib/staff-forms";
+import { AttendanceExportForm } from "@/components/staff/AttendanceExportForm";
+import { academyToday, formatDate, isAcademyManager, staffRoleLabels, uuidOrNull } from "@/lib/staff-forms";
 
 type Batch = { id: string; code: string; name: string; startsOn: string; endsOn: string | null; active: boolean };
 type Assignment = { id: string; email: string | null; role: string };
@@ -51,6 +52,13 @@ export default async function RosterPage({ params }: { params: Promise<{ batchId
         {roster.data.length === 0 && <li className="dir-empty muted">No students enrolled yet.</li>}
       </ul>
     </section>
+    <section className="panel panel-gap" aria-labelledby="batch-export-title">
+      <h2 id="batch-export-title" className="panel-title">ATTENDANCE EXPORT</h2>
+      <p className="panel-sub">A CSV of this batch’s students in its classes between two dates (at most 92 days), with the same facts as each
+        class page: time connected, first join, visits and whether the figures come from Zoom’s report. It contains personal data; keep it private.
+        Every export is recorded in the activity log.</p>
+      <AttendanceExportForm batchId={batchId} from={daysBefore(academyToday(), 30)} to={academyToday()} />
+    </section>
     {manager && <section className="panel panel-gap" aria-labelledby="batch-invite-title">
       <h2 id="batch-invite-title" className="panel-title">INVITE BY EMAIL</h2>
       <BulkInviteForm batchId={batchId} scope="this batch’s current students" />
@@ -68,4 +76,11 @@ export default async function RosterPage({ params }: { params: Promise<{ batchId
       </>}
     </section>}
   </StaffShell>;
+}
+
+/** The ISO date `days` before an ISO date. */
+function daysBefore(isoDate: string, days: number) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
 }

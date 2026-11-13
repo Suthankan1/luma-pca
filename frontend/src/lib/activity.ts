@@ -12,7 +12,7 @@ export const ACTIVITY_CATEGORIES = [
   { key: "staff", label: "Staff" },
   { key: "sign-in", label: "Invitations & sign-in" },
   { key: "students", label: "Students" },
-  { key: "classes", label: "Classes" },
+  { key: "classes", label: "Classes & attendance" },
   { key: "zoom", label: "Zoom" },
 ] as const;
 
@@ -87,6 +87,10 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
       detail: typeof d.reason === "string" ? `Reason: ${d.reason}` : undefined };
     case "ZOOM_OCCURRENCE_MARKED_NOT_CLASS": return { summary: "Marked a Zoom occurrence as not a class",
       detail: typeof d.reason === "string" ? `Reason: ${d.reason}` : undefined };
+    case "ATTENDANCE_EXPORTED": return { summary: d.scope === "batch" ? `Exported attendance of batch ${event.targetLabel ?? ""}`.trim()
+        : `Exported attendance of ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
+      detail: [d.scope === "batch" && typeof d.from === "string" && typeof d.to === "string" ? `${formatDate(d.from)} – ${formatDate(d.to)}` : "",
+        typeof d.rows === "string" ? `${d.rows} row${d.rows === "1" ? "" : "s"}` : ""].filter(Boolean).join(" · ") || undefined };
     case "ZOOM_IDENTITY_LINKED": return { summary: `Matched a Zoom account to student ${event.targetLabel ?? ""}`.trim(),
       detail: [typeof d.email === "string" ? d.email : "", typeof d.reason === "string" ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ") || undefined };
     case "ZOOM_IDENTITY_MARKED_NOT_STUDENT": return { summary: "Marked a Zoom account as not a student",

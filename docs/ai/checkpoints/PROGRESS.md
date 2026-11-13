@@ -1660,3 +1660,20 @@ build runs the Next.js default bundler and repeats the smoke test.
   unknown, instructor). Playwright: fetch from Zoom review and reconciled wording on the class page.
 - **Still open:** finalising present/absent needs the academy's attendance rule (P0); a golden dataset from a real class;
   corrections (004C).
+
+## Checkpoint 005A — 2026-11-13 — Attendance CSV exports
+
+- **Branch:** `feature/attendance-exports`. **PR / merge SHA:** see the merged pull request titled
+  "feat(attendance): CSV exports for a class and a batch".
+- **Implemented:** `GET /api/v1/class-sessions/{id}/attendance/export` and `GET /api/v1/batches/{id}/attendance/export?from&to`
+  (inclusive class dates, at most 92 days; only that batch's students). Rows are the attendance view's facts for the same
+  caller, with the data source (PROVISIONAL or RECONCILED) on each row and times in the class's zone. `text/csv`, attachment,
+  `Cache-Control: no-store`, `nosniff`; cells a spreadsheet would run as a formula get a leading apostrophe. Every export is
+  audited (`ATTENDANCE_EXPORTED`; shown under "Classes & attendance" in the activity log). Web: downloads go through route
+  handlers (`/staff/sessions/{id}/attendance-export`, `/staff/batches/{id}/attendance-export`) so the access token stays on the
+  server; "Download CSV" on the class page and a date-range export on the batch page.
+- **Found while testing:** on a phone the batch export's date inputs and button ran off the right edge (x 475 px of 412);
+  the row now wraps, and the browser test checks the link stays on screen.
+- **Tests:** `AttendanceExportIntegrationTest` (4: exact rows incl. a formula-like name, headers, audit; batch range and
+  limits; instructor scope incl. a shared class; cell quoting). Playwright: both downloads on desktop and phone and the
+  activity entries. Unit: activity wording. Local: unit 51, Playwright 84.

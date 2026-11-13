@@ -59,3 +59,12 @@ test("changing the rest of a series", () => {
     startTime: "17:30", endTime: "19:30" }, { targetType: "CLASS_SERIES", targetLabel: null })),
     { summary: "Changed 3 classes of a weekly series", detail: "From 18 Jan 2027; changed time 17:30–19:30, title" });
 });
+
+test("attendance exports and Zoom identity decisions", () => {
+  assert.deepEqual(describeActivity(event("ATTENDANCE_EXPORTED", { scope: "class", rows: "3", source: "PROVISIONAL" },
+    { targetType: "CLASS_SESSION", targetLabel: "Waves" })), { summary: "Exported attendance of “Waves”", detail: "3 rows" });
+  assert.deepEqual(describeActivity(event("ATTENDANCE_EXPORTED", { scope: "batch", from: "2027-04-01", to: "2027-04-30", rows: "1" },
+    { targetType: "BATCH", targetLabel: "A" })), { summary: "Exported attendance of batch A", detail: "1 Apr 2027 – 30 Apr 2027 · 1 row" });
+  assert.deepEqual(describeActivity(event("ZOOM_IDENTITY_LINKED", { email: "x@example.invalid", reason: "Checked" },
+    { targetType: "ZOOM_IDENTITY", targetLabel: "S-1" })), { summary: "Matched a Zoom account to student S-1", detail: "x@example.invalid · Reason: Checked" });
+});
