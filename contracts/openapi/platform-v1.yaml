@@ -1518,14 +1518,52 @@ paths:
         '404': {description: Email never seen in Zoom, or student not in the academy}
   /api/v1/class-sessions/{sessionId}/attendance:
     get:
-      summary: Proposed scoped attendance — NOT IMPLEMENTED
-      x-implementation-status: planned
+      summary: Provisional attendance from live Zoom events (implemented, 004A; reconciliation is 004B)
+      description: |
+        Recalculated on every read. Facts only, never present/absent: time connected within the class time with rejoins
+        merged, first join and seconds after the start, visits and visits with no leave yet (counted to the webinar's end,
+        or to now while it runs). Expected students are listed even if not seen; not seen is not proof of absence.
+        Owners/admins also see matched students who were not expected. Batch-scoped staff see only their classes and
+        students; others get 404.
+      operationId: getProvisionalAttendance
       security: [{bearerAuth: []}]
       tags: [Attendance]
       parameters:
         - {in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}
       responses:
-        '200': {description: Provisional or reconciled attendance; scoped}
+        '200':
+          description: Provisional attendance
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessionId, status, classStartsAt, classEndsAt, linkedOccurrences, webinarEnded, unmatchedPeople, calculatedAt, students]
+                properties:
+                  sessionId: {type: string, format: uuid}
+                  status: {type: string, enum: [PROVISIONAL]}
+                  classStartsAt: {type: string, format: date-time}
+                  classEndsAt: {type: string, format: date-time}
+                  linkedOccurrences: {type: integer}
+                  webinarEnded: {type: boolean, description: Every linked occurrence reported webinar.ended}
+                  unmatchedPeople: {type: integer}
+                  calculatedAt: {type: string, format: date-time}
+                  students:
+                    type: array
+                    items:
+                      type: object
+                      required: [studentId, studentNumber, fullName, expected, seen, visits, openVisits, connectedSeconds]
+                      properties:
+                        studentId: {type: string, format: uuid}
+                        studentNumber: {type: string}
+                        fullName: {type: string}
+                        expected: {type: boolean}
+                        seen: {type: boolean}
+                        visits: {type: integer}
+                        openVisits: {type: integer}
+                        connectedSeconds: {type: integer}
+                        firstJoinAt: {type: string, format: date-time, nullable: true}
+                        secondsAfterStart: {type: integer, nullable: true}
+        '404': {description: Class not found or not visible to the caller}
   /api/v1/zoom/webhooks:
     post:
       summary: Signed Zoom webhook ingress (implemented; off unless configured; verified against fixtures only)

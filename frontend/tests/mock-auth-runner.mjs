@@ -746,6 +746,31 @@ function academicApi(req, body, send) {
       }
       return send(200, [...expected.values()].sort((a, b) => a.studentNumber.localeCompare(b.studentNumber)));
     }
+    if (req.method === "GET" && sub === "attendance") {
+      // As the API: expected students, then matched students seen but not expected; time clipped to the class.
+      const day = localDate(session.startsAt, session.timeZone);
+      const expectedIds = new Set(enrollments.filter(e => session.batchIds.includes(e.batchId) && e.enrolledOn <= day
+        && !(e.withdrawnOn && e.withdrawnOn <= day)).map(e => e.studentId));
+      const linked = occurrences.filter(o => occurrenceLinks.get(o.occurrenceUuid)?.classSessionId === session.id);
+      const start = Date.parse(session.startsAt), end = Date.parse(session.endsAt);
+      const seen = new Map();
+      let unmatchedPeople = 0;
+      for (const o of linked) for (const person of zoomPeople.get(o.occurrenceUuid) ?? []) {
+        const { match, student } = resolvePerson(person);
+        if (match === "UNMATCHED") unmatchedPeople++;
+        if (!student) continue;
+        const from = Math.max(start, Date.parse(person.firstSeenAt)), to = Math.min(end, Date.parse(person.lastSeenAt));
+        seen.set(student.id, { visits: person.visits, openVisits: person.openVisits, connectedSeconds: Math.max(0, (to - from) / 1000),
+          firstJoinAt: person.firstSeenAt, secondsAfterStart: Math.max(0, (Date.parse(person.firstSeenAt) - start) / 1000) });
+      }
+      const row = (student, expected) => ({ studentId: student.id, studentNumber: student.studentNumber, fullName: student.fullName, expected,
+        seen: seen.has(student.id), ...(seen.get(student.id) ?? { visits: 0, openVisits: 0, connectedSeconds: 0, firstJoinAt: null, secondsAfterStart: null }) });
+      const rows = [...students.filter(s => expectedIds.has(s.id)).map(s => row(s, true)),
+        ...students.filter(s => seen.has(s.id) && !expectedIds.has(s.id)).map(s => row(s, false))]
+        .sort((a, b) => Number(b.expected) - Number(a.expected) || a.studentNumber.localeCompare(b.studentNumber));
+      return send(200, { sessionId: session.id, status: "PROVISIONAL", classStartsAt: session.startsAt, classEndsAt: session.endsAt,
+        linkedOccurrences: linked.length, webinarEnded: linked.length > 0, unmatchedPeople, calculatedAt: new Date().toISOString(), students: rows });
+    }
     if (req.method === "GET") return send(200, sessionView(session));
     if (req.method === "PUT") {
       if (body.status !== "SCHEDULED" && body.status !== "CANCELLED") return send(400, { detail: "status must be SCHEDULED or CANCELLED" });

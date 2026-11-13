@@ -228,6 +228,101 @@ public class ZoomParticipantService {
                 student == null ? null : student.fullName(), why, now);
     }
 
+    /**
+     * One visit by a matched student to an occurrence linked to the class.
+     *
+     * @param joinedAt {@code null} when only the leave arrived
+     * @param leftAt {@code null} when no leave has arrived
+     */
+    public record StudentVisit(UUID studentId, String occurrenceUuid, Instant joinedAt, Instant leftAt) {
+    }
+
+    /**
+     * Zoom activity of the occurrences linked to a class, for attendance.
+     *
+     * @param startedAt per occurrence: webinar.started, else its first event
+     * @param endedAt per occurrence that has a webinar.ended event
+     * @param unmatchedPeople people (not the host) matched to no student and not marked "not a student"
+     */
+    public record ClassActivity(List<String> occurrences, Map<String, Instant> startedAt, Map<String, Instant> endedAt,
+                                List<StudentVisit> visits, int unmatchedPeople) {
+    }
+
+    private static final class Visit {
+        final String email;
+        Instant joined;
+        Instant left;
+
+        Visit(String email) {
+            this.email = email;
+        }
+    }
+
+    /** For other modules: the Zoom activity of the occurrences linked to a class. No role check; the caller checks access. */
+    @Transactional(readOnly = true)
+    public ClassActivity activityForClass(UUID academyId, UUID sessionId) {
+        List<String> occurrences = jdbc.queryForList("SELECT occurrence_uuid FROM zoom_occurrence_links WHERE academy_id = ? "
+                + "AND class_session_id = ? ORDER BY occurrence_uuid", String.class, academyId, sessionId);
+        Map<String, Instant> started = new HashMap<>();
+        Map<String, Instant> ended = new HashMap<>();
+        Map<String, Map<String, Visit>> visitsByOccurrence = new LinkedHashMap<>();
+        Set<String> hosts = new HashSet<>();
+        for (String occurrence : occurrences) {
+            Map<String, Visit> visits = visitsByOccurrence.computeIfAbsent(occurrence, o -> new LinkedHashMap<>());
+            Instant[] first = new Instant[1];
+            jdbc.query("""
+                    SELECT event_type, event_ts, visit_key, participant_email, host FROM zoom_occurrence_events
+                    WHERE academy_id = ? AND occurrence_uuid = ? ORDER BY event_ts, id LIMIT ?
+                    """, row -> {
+                String type = row.getString("event_type");
+                Instant at = Instant.ofEpochMilli(row.getLong("event_ts"));
+                if (first[0] == null) {
+                    first[0] = at;
+                }
+                if ("webinar.started".equals(type)) {
+                    started.putIfAbsent(occurrence, at);
+                } else if ("webinar.ended".equals(type)) {
+                    ended.merge(occurrence, at, (a, b) -> a.isAfter(b) ? a : b);
+                }
+                String visitKey = row.getString("visit_key");
+                String email = row.getString("participant_email");
+                if (visitKey == null || email == null) {
+                    return;
+                }
+                if (row.getBoolean("host")) {
+                    hosts.add(email);
+                    return;
+                }
+                Visit visit = visits.computeIfAbsent(visitKey, k -> new Visit(email));
+                if ("webinar.participant_left".equals(type)) {
+                    visit.left = visit.left == null || at.isAfter(visit.left) ? at : visit.left;
+                } else if (visit.joined == null) {
+                    visit.joined = at;
+                }
+            }, academyId, occurrence, MAX_EVENTS_PER_OCCURRENCE);
+            if (first[0] != null) {
+                started.putIfAbsent(occurrence, first[0]);
+            }
+        }
+        Set<String> emails = visitsByOccurrence.values().stream().flatMap(v -> v.values().stream()).map(v -> v.email)
+                .filter(e -> !hosts.contains(e)).collect(Collectors.toSet());
+        Map<String, Resolved> resolved = resolve(academyId, emails);
+        List<StudentVisit> matched = new ArrayList<>();
+        Set<String> unmatched = new HashSet<>();
+        visitsByOccurrence.forEach((occurrence, visits) -> visits.values().forEach(visit -> {
+            if (hosts.contains(visit.email)) {
+                return;
+            }
+            Resolved match = resolved.get(visit.email);
+            if (match == null) {
+                unmatched.add(visit.email);
+            } else if (match.match() == Match.STUDENT && match.student() != null) {
+                matched.add(new StudentVisit(match.student().id(), occurrence, visit.joined, visit.left));
+            }
+        }));
+        return new ClassActivity(occurrences, started, ended, matched, unmatched.size());
+    }
+
     private record Resolved(Match match, String source, StudentView student) {
     }
 

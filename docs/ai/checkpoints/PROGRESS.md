@@ -1625,3 +1625,21 @@ build runs the Next.js default bundler and repeats the smoke test.
   backend tests 57 passed; unit tests and 82 Playwright tests passed; the full local backend run was killed by Docker
   memory (exit 137) after 107 passing tests, so CI's backend job is the full-suite evidence.
 - **Still open:** strip IP addresses from stored receipts before real students; removing a decision; attendance (004A).
+
+## Checkpoint 004A — 2026-11-13 — Provisional attendance per class
+
+- **Branch:** `feature/provisional-attendance`. **PR / merge SHA:** see the merged pull request titled
+  "feat(attendance): provisional attendance from live Zoom events".
+- **Implemented:** `GET /api/v1/class-sessions/{id}/attendance` (owners, admins, and assigned staff for their classes and
+  students). For each expected student, and for matched students not expected (managers only): time connected within the
+  class time with rejoins merged (existing `AttendanceDurationCalculator`), first join and seconds after the start, visits,
+  and visits with no leave yet, counted to the webinar's end or to now while it runs; a visit whose join never arrived
+  counts from the webinar's start. Also linked occurrences, whether the webinar ended, and how many Zoom participants are
+  unmatched. Recalculated on every read; nothing stored. Class page: "Provisional attendance" section.
+- **Policy:** facts only. No present/absent, because the attendance threshold is an open P0 question, and not being seen
+  in live events is not proof of absence (ZOOM-RULES 4 and 9). Official reconciliation is 004B.
+- **Tests:** `ProvisionalAttendanceIntegrationTest` (4: overlap and clipping, lateness, open visit to the webinar end and
+  to the class end, unseen and not-expected students, host and unmatched counts; no linked occurrence; instructor scope,
+  student and other-academy refusals). Playwright: the class page after matching and linking. Unit: duration format.
+  Local full runs: backend 341, unit 50, Playwright 82.
+- **Not built:** live push (SSE); a stored, finalised record (004B); corrections (004C); exports (005A).

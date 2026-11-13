@@ -6,8 +6,8 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  batchOptions, formatClassTime, formatDate, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
-  type ClassSession, type CourseRef, type Occurrence,
+  batchOptions, formatClassTime, formatDate, formatDuration, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
+  type ClassSession, type CourseRef, type Occurrence, type ProvisionalAttendance,
 } from "@/lib/staff-forms";
 
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -21,12 +21,13 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   const sessionId = uuidOrNull((await params).sessionId);
   if (!sessionId) notFound();
   const manager = isAcademyManager(identity.roles);
-  const [session, expected, batches, courses, zoom] = await Promise.all([
+  const [session, expected, batches, courses, zoom, attendance] = await Promise.all([
     staffApi<ClassSession>(`/api/v1/class-sessions/${sessionId}`),
     staffApi<ExpectedStudent[]>(`/api/v1/class-sessions/${sessionId}/students`),
     manager ? staffApi<Batch[]>("/api/v1/batches") : Promise.resolve(null),
     manager ? staffApi<CourseRef[]>("/api/v1/courses") : Promise.resolve(null),
     manager ? staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?decided=true&sessionId=${sessionId}&limit=50`) : Promise.resolve(null),
+    staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${sessionId}/attendance`),
   ]);
   if (!session.ok && (session.status === 404 || session.status === 403)) notFound();
   const shell = { active: "sessions" as const, crumb: "Timetable", hasStudentPortal: hasPortal(identity, "student") };
@@ -88,5 +89,32 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
         {s.seriesId && <CancelSeriesForm sessionId={s.id} seriesId={s.seriesId} fromDate={s.localDate} />}
       </section>}
     </div>
+    <section className="panel panel-gap" aria-labelledby="attendance-title">
+      <h2 id="attendance-title" className="panel-title">PROVISIONAL ATTENDANCE</h2>
+      {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load attendance right now. Please reload shortly.</p> : <>
+        <p className="panel-sub">From live Zoom events, recalculated each time this page loads ({formatInstant(attendance.data.calculatedAt)}).
+          {" "}Time connected counts rejoins once and only within the class time. This is not a final record: live events can arrive late
+          or not at all, and a student not seen here is not proof of absence.
+          {" "}{attendance.data.linkedOccurrences === 0 ? "No Zoom occurrence is linked to this class yet."
+            : attendance.data.webinarEnded ? "The webinar has ended." : "The webinar has not reported an end yet."}
+          {manager && attendance.data.unmatchedPeople > 0 && <> {attendance.data.unmatchedPeople} Zoom participant{attendance.data.unmatchedPeople === 1 ? " is" : "s are"} not
+            matched to a student; <Link className="text-link" href="/staff/zoom">match them in Zoom review</Link>.</>}</p>
+        <ul className="dir-list">
+          {attendance.data.students.map(a => <li key={a.studentId} className="dir-row dir-course attendance-row"
+            aria-label={`Attendance ${a.studentNumber} ${a.fullName}`}>
+            <div><strong>{a.studentNumber}</strong> <span>{a.fullName}</span>
+              {!a.expected && <span className="muted"> · not expected at this class</span>}
+              <div className="dir-dates">{a.seen
+                ? <>{formatDuration(a.connectedSeconds)} connected · first joined {formatInstant(a.firstJoinAt!, s.timeZone)}
+                    {a.secondsAfterStart ? ` (${formatDuration(a.secondsAfterStart)} after the start)` : ""}
+                    {" "}· {a.visits} visit{a.visits === 1 ? "" : "s"}{a.openVisits > 0 ? " · no leave received yet" : ""}</>
+                : <span className="muted">Not seen in Zoom yet</span>}</div>
+            </div>
+            <span className={`status ${a.seen ? "on" : "off"}`}>{a.seen ? "Seen" : "Not seen"}</span>
+          </li>)}
+          {attendance.data.students.length === 0 && <li className="dir-empty muted">No students are expected at this class.</li>}
+        </ul>
+      </>}
+    </section>
   </StaffShell>;
 }
