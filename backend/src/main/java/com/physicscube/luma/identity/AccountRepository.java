@@ -23,6 +23,8 @@ interface AccountRepository extends JpaRepository<Account, UUID> {
 
     Optional<Account> findByIdAndAcademyId(UUID id, UUID academyId);
 
+    java.util.List<Account> findByAcademyIdAndEmailIn(UUID academyId, java.util.Collection<String> emails);
+
     @Query("select distinct a from Account a join a.roles r where a.academyId = :academyId and r in :roles order by a.email")
     java.util.List<Account> withAnyRole(@Param("academyId") UUID academyId,
                                         @Param("roles") java.util.Collection<com.physicscube.luma.identity.domain.Role> roles);

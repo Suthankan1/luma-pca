@@ -234,6 +234,29 @@ for (const n of ["1", "2"]) {
   receipts.push({ id: `00000000-0000-4000-8000-00000000d00${n}`, eventType: "webinar.participant_joined", eventTs: Date.parse(`${day}T12:36:00Z`),
     status: "DEAD", attempts: 1, lastError: `Payload has no occurrence UUID (case ${n})`, receivedAt: `${day}T12:36:01Z`, nextAttemptAt: null, processedAt: null });
 }
+// People Zoom reported per occurrence (as stored from joined/left events), for the manual occurrences:
+// the host, a student who signs in with this email (created by the test), and a guest account.
+const zoomPeople = new Map();
+for (const n of ["1", "2"]) {
+  const day = `2027-03-0${n}`;
+  zoomPeople.set(`man/${n}AAAAAAAAAAAAAAA==`, [
+    { email: `teacher${n}@example.invalid`, displayName: "Teacher", host: true, visits: 1, openVisits: 0, firstSeenAt: `${day}T04:00:00Z`, lastSeenAt: `${day}T05:00:00Z` },
+    { email: `zoom.student${n}@example.invalid`, displayName: `Zoom Student ${n}`, host: false, visits: 2, openVisits: 1, firstSeenAt: `${day}T04:01:00Z`, lastSeenAt: `${day}T04:30:00Z` },
+    { email: `zoom.guest${n}@example.invalid`, displayName: `Guest Viewer ${n}`, host: false, visits: 1, openVisits: 0, firstSeenAt: `${day}T04:02:00Z`, lastSeenAt: `${day}T04:50:00Z` },
+  ]);
+}
+const identityLinks = new Map();
+function resolvePerson(person) {
+  if (person.host) return { match: "HOST", matchSource: null, student: null };
+  if (identityLinks.has(person.email)) {
+    const link = identityLinks.get(person.email);
+    const student = link.studentId && students.find(s => s.id === link.studentId);
+    return student ? { match: "STUDENT", matchSource: "MANUAL", student } : { match: "NOT_A_STUDENT", matchSource: "MANUAL", student: null };
+  }
+  const student = students.find(s => s.email === person.email);
+  return student ? { match: "STUDENT", matchSource: "SIGN_IN_EMAIL", student } : { match: "UNMATCHED", matchSource: null, student: null };
+}
+
 const occurrenceView = o => {
   const link = occurrenceLinks.get(o.occurrenceUuid);
   return { ...o, classSessionId: link?.classSessionId ?? null, linkSource: link?.linkSource ?? null, linkedAt: link?.linkedAt ?? null };
@@ -286,6 +309,45 @@ function zoomApi(req, body, send, parts, query) {
     if (session && session.status === "CANCELLED") return send(409, { detail: "An occurrence cannot be linked to a cancelled class" });
     occurrenceLinks.set(body.occurrenceUuid, { classSessionId: body.sessionId ?? null, linkSource: "MANUAL", linkedAt: new Date().toISOString() });
     return send(200, occurrenceView(occurrences.find(o => o.occurrenceUuid === body.occurrenceUuid)));
+  }
+  if (req.method === "GET" && resource === "participants" && id === "unmatched") {
+    const seen = new Map();
+    for (const people of zoomPeople.values()) for (const person of people) {
+      if (person.host || resolvePerson(person).match !== "UNMATCHED") continue;
+      const before = seen.get(person.email);
+      seen.set(person.email, { email: person.email, displayName: person.displayName, occurrences: (before?.occurrences ?? 0) + 1,
+        lastSeenAt: before && before.lastSeenAt > person.lastSeenAt ? before.lastSeenAt : person.lastSeenAt });
+    }
+    return send(200, [...seen.values()].sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt)));
+  }
+  if (req.method === "GET" && resource === "participants") {
+    const uuid = new URLSearchParams(query).get("occurrence");
+    const occurrence = occurrences.find(o => o.occurrenceUuid === uuid);
+    if (!occurrence) return send(404, { detail: "Occurrence not found" });
+    const sessionId = occurrenceLinks.get(uuid)?.classSessionId ?? null;
+    const session = sessionId && classSessions.find(s => s.id === sessionId);
+    const expected = new Set(session ? enrollments.filter(e => session.batchIds.includes(e.batchId) && !e.withdrawnOn).map(e => e.studentId) : []);
+    const order = ["UNMATCHED", "STUDENT", "NOT_A_STUDENT", "HOST"];
+    const participants = (zoomPeople.get(uuid) ?? []).map(person => {
+      const { match, matchSource, student } = resolvePerson(person);
+      return { email: person.email, displayName: person.displayName, visits: person.visits, openVisits: person.openVisits,
+        firstSeenAt: person.firstSeenAt, lastSeenAt: person.lastSeenAt, match, matchSource, studentId: student?.id ?? null,
+        studentNumber: student?.studentNumber ?? null, studentName: student?.fullName ?? null,
+        expected: session && student ? expected.has(student.id) : null };
+    }).sort((a, b) => order.indexOf(a.match) - order.indexOf(b.match));
+    return send(200, { occurrenceUuid: uuid, classSessionId: sessionId, participants });
+  }
+  if (req.method === "POST" && resource === "identity-links") {
+    const email = String(body.email ?? "").trim().toLowerCase();
+    if (reason.length < 3 || reason.length > 300) return send(400, { detail: "A reason of 3 to 300 characters is required" });
+    if (![...zoomPeople.values()].flat().some(p => p.email === email)) return send(404, { detail: "Zoom participant not found" });
+    const student = body.studentId && students.find(s => s.id === body.studentId);
+    if (body.studentId && !student) return send(404, { detail: "Student not found" });
+    identityLinks.set(email, { studentId: body.studentId ?? null, reason, linkedAt: new Date().toISOString() });
+    audit(student ? "ZOOM_IDENTITY_LINKED" : "ZOOM_IDENTITY_MARKED_NOT_STUDENT", "ZOOM_IDENTITY", body.studentId ?? null,
+      student ? student.studentNumber : null, { email, previous: "none", reason });
+    return send(200, { email, studentId: body.studentId ?? null, studentNumber: student?.studentNumber ?? null,
+      studentName: student?.fullName ?? null, reason, linkedAt: new Date().toISOString() });
   }
   if (req.method === "GET" && resource === "receipts") {
     const status = new URLSearchParams(query).get("status") ?? "DEAD";

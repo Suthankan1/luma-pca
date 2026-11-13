@@ -199,6 +199,15 @@ public class StudentService {
                 .collect(Collectors.toMap(StudentView::accountId, Function.identity()));
     }
 
+    /** For other modules: the academy's students whose sign-in email is one of these normalised emails, by email. No role check. */
+    @Transactional(readOnly = true)
+    public Map<String, StudentView> bySignInEmails(UUID academyId, Collection<String> normalizedEmails) {
+        Map<String, AccountSummary> found = accounts.findInAcademyByEmails(academyId, normalizedEmails);
+        Map<UUID, StudentView> byAccount = byAccountIds(academyId, found.values().stream().map(AccountSummary::id).toList());
+        return found.entrySet().stream().filter(entry -> byAccount.containsKey(entry.getValue().id()))
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> byAccount.get(entry.getValue().id())));
+    }
+
     /** For other modules: sign-in account ids of the academy's active students, or of those among {@code studentIds}. No role check. */
     @Transactional(readOnly = true)
     public List<UUID> activeAccountIds(UUID academyId, Collection<UUID> studentIds) {

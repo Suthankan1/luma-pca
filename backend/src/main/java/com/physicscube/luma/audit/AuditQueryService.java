@@ -53,6 +53,7 @@ public class AuditQueryService {
                          WHEN 'BATCH' THEN target_batch.code
                          WHEN 'CLASS_SESSION' THEN target_class.title
                          WHEN 'ZOOM_OCCURRENCE' THEN target_class.title
+                         WHEN 'ZOOM_IDENTITY' THEN target_student.student_number
                        END AS target_label,
                        e.details::text AS details
                 FROM audit_events e
@@ -63,6 +64,8 @@ public class AuditQueryService {
                   AND target_batch.academy_id = e.academy_id
                 LEFT JOIN class_sessions target_class ON e.target_type IN ('CLASS_SESSION', 'ZOOM_OCCURRENCE')
                   AND target_class.id = e.target_id AND target_class.academy_id = e.academy_id
+                LEFT JOIN students target_student ON e.target_type = 'ZOOM_IDENTITY' AND target_student.id = e.target_id
+                  AND target_student.academy_id = e.academy_id
                 WHERE e.academy_id = ?
                 """);
         List<Object> args = new ArrayList<>(List.of(caller.academyId()));

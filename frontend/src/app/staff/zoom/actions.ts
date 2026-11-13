@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireSameOriginAction, staffApi } from "@/lib/staff-api";
-import { occurrenceIdOrNull, parseReason, problemMessage, submittedValues, uuidOrNull, type FormState } from "@/lib/staff-forms";
+import { occurrenceIdOrNull, parseReason, problemMessage, submittedValues, uuidOrNull, zoomEmailOrNull, type FormState } from "@/lib/staff-forms";
 
 // Owners and administrators only; the API re-checks the role and academy, and records
 // every decision and replay with its reason in the audit trail.
@@ -47,4 +47,35 @@ export async function replayReceipt(_previous: FormState, form: FormData): Promi
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
   revalidatePath("/staff/zoom");
   return { ok: true, message: "Queued for processing again." };
+}
+
+/**
+ * Records which student a Zoom email belongs to (by student number), or (intent "not-student")
+ * that it is not a student. Applies to every webinar and replaces any earlier decision.
+ */
+export async function decideIdentity(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const email = zoomEmailOrNull(form.get("email"));
+  const notStudent = form.get("intent") === "not-student";
+  const values = submittedValues(form, ["reason", "studentNumber"]);
+  if (!email) return invalid;
+  let studentId: string | null = null;
+  if (!notStudent) {
+    const number = String(form.get("studentNumber") ?? "").trim().toUpperCase();
+    if (!number) return { ok: false, message: "Enter the student number this Zoom account belongs to.", values };
+    if (number.length > 60) return { ok: false, message: "That is not a student number.", values };
+    const found = await staffApi<{ items: { id: string; studentNumber: string }[] }>(
+      `/api/v1/students?${new URLSearchParams({ q: number, limit: "20" })}`);
+    if (!found.ok) return { ok: false, message: problemMessage(found.status, found.detail), values };
+    const student = found.data.items.find(s => s.studentNumber === number);
+    if (!student) return { ok: false, message: `No student has the number ${number}.`, values };
+    studentId = student.id;
+  }
+  const reason = parseReason(form);
+  if (typeof reason !== "string") return { ok: false, message: reason.error, values };
+  const result = await staffApi("/api/v1/zoom/identity-links", { method: "POST", body: { email, studentId, reason } });
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
+  revalidatePath("/staff/zoom");
+  revalidatePath("/staff/zoom/participants");
+  return { ok: true, message: notStudent ? "Marked as not a student." : "Matched to the student." };
 }

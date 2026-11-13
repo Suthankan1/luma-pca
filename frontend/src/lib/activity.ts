@@ -87,6 +87,10 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
       detail: typeof d.reason === "string" ? `Reason: ${d.reason}` : undefined };
     case "ZOOM_OCCURRENCE_MARKED_NOT_CLASS": return { summary: "Marked a Zoom occurrence as not a class",
       detail: typeof d.reason === "string" ? `Reason: ${d.reason}` : undefined };
+    case "ZOOM_IDENTITY_LINKED": return { summary: `Matched a Zoom account to student ${event.targetLabel ?? ""}`.trim(),
+      detail: [typeof d.email === "string" ? d.email : "", typeof d.reason === "string" ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ") || undefined };
+    case "ZOOM_IDENTITY_MARKED_NOT_STUDENT": return { summary: "Marked a Zoom account as not a student",
+      detail: [typeof d.email === "string" ? d.email : "", typeof d.reason === "string" ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ") || undefined };
     case "ZOOM_RECEIPT_REPLAYED": return { summary: "Replayed a failed Zoom event", detail: typeof d.reason === "string" ? `Reason: ${d.reason}` : undefined };
     case "ZOOM_LINKS_REVISED": return { summary: `Zoom links re-checked after ${event.targetLabel ? `“${event.targetLabel}”` : "a class"} changed`,
       detail: [Number(d.unlinked) ? `${d.unlinked} back to review` : "", Number(d.moved) ? `${d.moved} moved` : "", Number(d.linked) ? `${d.linked} linked` : ""]

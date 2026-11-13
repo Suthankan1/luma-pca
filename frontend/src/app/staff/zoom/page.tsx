@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
-import { AutoLinkForm, DecisionForm, ReplayForm } from "@/components/staff/ZoomForms";
+import { AutoLinkForm, DecisionForm, IdentityForm, ReplayForm } from "@/components/staff/ZoomForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
   candidateClasses, candidateWindow, formatClassTime, formatInstant, formatWebinarId, isAcademyManager, occurrenceState, zoomEventLabels,
-  type ClassSession, type Occurrence, type ZoomReceipt,
+  type ClassSession, type Occurrence, type UnmatchedZoomIdentity, type ZoomReceipt,
 } from "@/lib/staff-forms";
 
 export const metadata = { title: "Zoom review · LUMA" };
@@ -21,8 +21,9 @@ const LIMIT = 50;
 
 /**
  * Owners and administrators review what the webhook worker could not settle on its own:
- * webinar occurrences not linked to a class, and receipts that failed processing.
- * Receipt payloads (names, emails) are never shown; the API does not return them.
+ * webinar occurrences not linked to a class, Zoom accounts that match no student, and
+ * receipts that failed processing. Receipt payloads are never shown; Zoom names and emails
+ * appear only where staff must match people.
  */
 export default async function ZoomReviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const identity = await requirePortal("staff");
@@ -37,12 +38,13 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
     </StaffShell>;
   }
 
-  const [occurrences, dead, waiting] = await Promise.all([
+  const [occurrences, dead, waiting, unmatched] = await Promise.all([
     staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?limit=${LIMIT}${view.query}`),
     staffApi<ZoomReceipt[]>(`/api/v1/zoom/receipts?status=DEAD&limit=${LIMIT}`),
     staffApi<ZoomReceipt[]>("/api/v1/zoom/receipts?status=RECEIVED&limit=200"),
+    staffApi<UnmatchedZoomIdentity[]>(`/api/v1/zoom/participants/unmatched?limit=${LIMIT}`),
   ]);
-  if (!occurrences.ok || !dead.ok || !waiting.ok) {
+  if (!occurrences.ok || !dead.ok || !waiting.ok || !unmatched.ok) {
     return <StaffShell {...shell}>
       <p className="session-error" role="alert">We couldn’t load Zoom events right now. Please reload the page shortly.</p>
     </StaffShell>;
@@ -89,6 +91,7 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
               </div>
               <span className={`status ${state === "Needs review" ? "off" : "on"}`}>{state}</span>
             </div>
+            <p className="dir-dates"><Link className="text-link" href={`/staff/zoom/participants?${new URLSearchParams({ occurrence: o.occurrenceUuid })}`}>People in this occurrence</Link></p>
             {o.linkSource ? <details className="decision">
               <summary>Change decision</summary>
               <DecisionForm prefix={`occ-${index}`} occurrenceUuid={o.occurrenceUuid} candidates={candidateClasses(o, nearby)} current={o.classSessionId} />
@@ -98,6 +101,23 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
         {occurrences.data.length === 0 && <li className="dir-empty muted">{view.key === "review" ? "Nothing needs review." : "No webinar occurrences yet."}</li>}
       </ul>
       {occurrences.data.length === LIMIT && <p className="panel-sub">Showing the {LIMIT} most recent{view.key === "review" ? "" : `; ${reviewCount} of them need review`}.</p>}
+    </section>
+
+    <section className="panel panel-gap" aria-labelledby="identities-title">
+      <h2 id="identities-title" className="panel-title">ZOOM ACCOUNTS TO MATCH</h2>
+      <p className="panel-sub">Zoom emails that match no student’s sign-in email. Match each to a student, or mark it as not a student
+        (a teacher, guest or test account). A decision applies to every webinar and is recorded with its reason.</p>
+      <ul className="dir-list">
+        {unmatched.data.map((u, index) => <li key={u.email} className="dir-course identity" aria-label={`Zoom account ${u.email}`}>
+          <div className="dir-row">
+            <div><strong>{u.displayName ?? "Unknown name"}</strong>
+              <span className="dir-dates muted"> {u.email} · {u.occurrences} occurrence{u.occurrences === 1 ? "" : "s"} · last seen {formatInstant(u.lastSeenAt)}</span></div>
+            <span className="status off">Not matched</span>
+          </div>
+          <IdentityForm prefix={`identity-${index}`} email={u.email} />
+        </li>)}
+        {unmatched.data.length === 0 && <li className="dir-empty muted">Every Zoom account seen so far is matched or decided.</li>}
+      </ul>
     </section>
 
     <section className="panel panel-gap" aria-labelledby="receipts-title">

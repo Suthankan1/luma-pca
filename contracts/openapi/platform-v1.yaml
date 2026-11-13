@@ -1411,6 +1411,111 @@ paths:
                 properties:
                   linked: {type: integer}
                   stillUndecided: {type: integer}
+  /api/v1/zoom/participants:
+    get:
+      summary: People in a Zoom occurrence and the student each is matched to (implemented; owner/admin)
+      description: |
+        Provisional live data, not attendance. A person is identified by the email Zoom reports (lower-cased),
+        never by display name; a visitor without email is listed alone and stays unmatched. Matching order: an
+        administrator's decision for the email, then a student's LUMA sign-in email. The host is listed as HOST.
+        Unmatched people come first.
+      operationId: listZoomParticipants
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: occurrence, required: true, description: Occurrence UUID, schema: {type: string, maxLength: 100}}
+      responses:
+        '200':
+          description: Participants
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [occurrenceUuid, participants]
+                properties:
+                  occurrenceUuid: {type: string}
+                  classSessionId: {type: string, format: uuid, nullable: true}
+                  participants:
+                    type: array
+                    items:
+                      type: object
+                      required: [visits, openVisits, firstSeenAt, lastSeenAt, match]
+                      properties:
+                        email: {type: string, nullable: true}
+                        displayName: {type: string, nullable: true}
+                        visits: {type: integer, description: Separate joins; a rejoin is a new visit}
+                        openVisits: {type: integer, description: Visits with a join but no leave yet}
+                        firstSeenAt: {type: string, format: date-time}
+                        lastSeenAt: {type: string, format: date-time}
+                        match: {type: string, enum: [STUDENT, NOT_A_STUDENT, UNMATCHED, HOST]}
+                        matchSource: {type: string, enum: [MANUAL, SIGN_IN_EMAIL], nullable: true}
+                        studentId: {type: string, format: uuid, nullable: true}
+                        studentNumber: {type: string, nullable: true}
+                        studentName: {type: string, nullable: true}
+                        expected: {type: boolean, nullable: true, description: Expected at the linked class; null when not linked or not a student}
+        '404': {description: No such occurrence in the caller's academy}
+  /api/v1/zoom/participants/unmatched:
+    get:
+      summary: Zoom emails matching no student and with no decision, most recently seen first (implemented; owner/admin)
+      operationId: listUnmatchedZoomParticipants
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: limit, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        '200':
+          description: Emails for review
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [email, occurrences, lastSeenAt]
+                  properties:
+                    email: {type: string}
+                    displayName: {type: string, nullable: true}
+                    occurrences: {type: integer}
+                    lastSeenAt: {type: string, format: date-time}
+  /api/v1/zoom/identity-links:
+    get:
+      summary: Administrators' decisions about Zoom emails, newest first (implemented; owner/admin)
+      operationId: listZoomIdentityLinks
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: Decisions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/ZoomIdentityDecision'}
+    post:
+      summary: Record which student a Zoom email belongs to, or that it is not a student (implemented; owner/admin; audited)
+      description: Replaces any earlier decision for the email and applies to every webinar. The email must have been seen in the academy's Zoom events.
+      operationId: decideZoomIdentity
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, reason]
+              properties:
+                email: {type: string, maxLength: 254}
+                studentId: {type: string, format: uuid, nullable: true, description: null marks the email "not a student"}
+                reason: {type: string, minLength: 3, maxLength: 300}
+      responses:
+        '200':
+          description: The decision
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ZoomIdentityDecision'}
+        '400': {description: Invalid email or reason}
+        '404': {description: Email never seen in Zoom, or student not in the academy}
   /api/v1/class-sessions/{sessionId}/attendance:
     get:
       summary: Proposed scoped attendance — NOT IMPLEMENTED
@@ -1459,6 +1564,16 @@ paths:
         '503': {description: Receipt could not be stored; Zoom retries 5xx}
 components:
   schemas:
+    ZoomIdentityDecision:
+      type: object
+      required: [email, reason, linkedAt]
+      properties:
+        email: {type: string}
+        studentId: {type: string, format: uuid, nullable: true}
+        studentNumber: {type: string, nullable: true}
+        studentName: {type: string, nullable: true}
+        reason: {type: string}
+        linkedAt: {type: string, format: date-time}
     SystemStatus:
       type: object
       properties:
