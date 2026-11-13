@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
+import { LiveRefresh } from "@/components/LiveRefresh";
 import { CorrectionForm, FinaliseForm } from "@/components/staff/AttendanceForms";
 import { ClosePulseButton, PulseForm } from "@/components/staff/EngagementForms";
 import { CancelSeriesForm, EditSeriesForm, EditSessionForm, StatusForm, type SessionDefaults } from "@/components/staff/SessionForms";
@@ -109,6 +110,9 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
             : attendance.data.webinarEnded ? "The webinar has ended." : "The webinar has not reported an end yet."}
           {manager && attendance.data.unmatchedPeople > 0 && <> {attendance.data.unmatchedPeople} Zoom participant{attendance.data.unmatchedPeople === 1 ? " is" : "s are"} not
             matched to a student; <Link className="text-link" href="/staff/zoom">match them in Zoom review</Link>.</>}</p>
+        {!attendance.data.finalisedAt && !cancelled && Date.parse(s.startsAt) - 15 * 60_000 <= Date.parse(attendance.data.calculatedAt)
+          && Date.parse(attendance.data.calculatedAt) <= Date.parse(s.endsAt) + 30 * 60_000
+          && <LiveRefresh until={new Date(Date.parse(s.endsAt) + 30 * 60_000).toISOString()} />}
         {attendance.data.finalisedAt
           ? <p className="banner">Final since {formatInstant(attendance.data.finalisedAt)}, by the academy’s <Link className="text-link" href="/staff/attendance">attendance rule</Link>.
             Change a student’s outcome with a correction.</p>

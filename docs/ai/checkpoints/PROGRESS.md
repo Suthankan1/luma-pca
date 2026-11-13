@@ -1768,3 +1768,12 @@ build runs the Next.js default bundler and repeats the smoke test.
   per gate.
 - **Remaining for the academy:** P0 decisions, AWS account and budget, staging deployment and UAT, the one-batch pilot and
   sign-offs. No production data has been collected.
+
+## Checkpoint 004A-2 — 2026-11-13 — Live updates on a running class's page
+
+- **Branch:** `feature/live-refresh`. **PR / merge SHA:** see the merged pull request titled "feat(attendance): keep a running
+  class's page up to date".
+- **Implemented:** while a class runs (15 minutes before to 30 minutes after) and is not final, the class page re-renders from
+  the server every 30 seconds when the tab is visible, with a Pause/Resume control, so provisional attendance and engagement
+  counts stay current. This replaces the planned SSE channel: no long-lived connections for 600 users, nothing new to secure.
+- **Tests:** Playwright `live-refresh.spec` (a class running now shows the notice; pause works) on desktop and phone.
