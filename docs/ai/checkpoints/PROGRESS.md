@@ -1732,3 +1732,13 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Tests:** `EngagementIntegrationTest` (3: off by default, owner-only settings, consent and new wording, rate limit,
   unknown kind; pulses open/validate/answer once/close; rankings cap, consent-only, naming opt-in, roles). Playwright: owner
   switches on, student consents and reacts, staff open and close a question, ranking. Local: unit 52, Playwright 92.
+
+## Checkpoint PRIV-1 — 2026-11-13 — Zoom receipts stored without network and device details
+
+- **Branch:** `feature/strip-zoom-ips`. **PR / merge SHA:** see the merged pull request titled
+  "fix(privacy): store Zoom receipts without IP addresses or device details".
+- **Change:** `ZoomWebhookReceipts` removes participant `public_ip`, `private_ip`, `ip_address`, `location`, `device`,
+  `network_type`, `mac_addr` and `internal_ip_addresses` before storing a payload; the signature is still checked over the raw
+  body and duplicates are still recognised by the raw body's SHA-256. V24 removes the same fields from receipts already stored.
+  This was found in the first real test webinar (join/leave events carry public and private IP addresses).
+- **Tests:** `ZoomParticipantIntegrationTest` asserts stored receipts contain no IP and keep everything else.

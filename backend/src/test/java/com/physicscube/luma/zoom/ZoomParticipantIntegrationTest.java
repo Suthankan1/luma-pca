@@ -156,6 +156,11 @@ class ZoomParticipantIntegrationTest extends StaffApiIntegrationTest {
                 + "AND visit_key IS NOT NULL", academyId);
         assertEquals(8, stored.size());
         assertTrue(stored.stream().noneMatch(row -> row.toString().contains("192.0.2.10")));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM zoom_webhook_receipts WHERE academy_id = ? AND payload::text LIKE '%192.0.2.10%'",
+                Integer.class, academyId), "receipts are stored without the IP address");
+        assertEquals(8, jdbc.queryForObject("SELECT count(*) FROM zoom_webhook_receipts WHERE academy_id = ? "
+                + "AND payload #>> '{payload,object,participant,email}' IS NOT NULL OR (academy_id = ? AND payload #>> '{payload,object,participant,user_name}' = 'No Email')",
+                Integer.class, academyId, academyId), "everything else is kept");
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM zoom_occurrence_events WHERE academy_id = ? AND visit_key IS NULL",
                 Integer.class, academyId), "webinar.started has no visit");
     }
