@@ -35,7 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class AttendanceExportService {
     static final int MAX_DAYS = 92;
     static final String HEADER = "class_date,class_start,class_end,time_zone,class_title,class_status,data_source,student_number,"
-            + "student_name,expected,seen,visits,visits_without_leave,minutes_connected,first_join,minutes_after_start";
+            + "student_name,expected,seen,visits,visits_without_leave,minutes_connected,first_join,minutes_after_start,final_outcome";
     private static final DateTimeFormatter LOCAL = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -118,7 +118,8 @@ public class AttendanceExportService {
                     String.valueOf(s.openVisits()),
                     String.valueOf(s.connectedSeconds() / 60),
                     s.firstJoinAt() == null ? "" : cell(LOCAL.format(s.firstJoinAt().atZone(zone))),
-                    s.secondsAfterStart() == null ? "" : String.valueOf(s.secondsAfterStart() / 60)))).append("\r\n");
+                    s.secondsAfterStart() == null ? "" : String.valueOf(s.secondsAfterStart() / 60),
+                    s.outcome() == null ? "" : s.outcome()))).append("\r\n");
         }
         return students.size();
     }

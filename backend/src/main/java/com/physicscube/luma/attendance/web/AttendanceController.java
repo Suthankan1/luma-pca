@@ -1,6 +1,15 @@
 package com.physicscube.luma.attendance.web;
 
 import com.physicscube.luma.attendance.AttendanceExportService;
+import com.physicscube.luma.attendance.AttendanceFinalisationService;
+import com.physicscube.luma.attendance.AttendancePolicyService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.physicscube.luma.attendance.ProvisionalAttendanceService;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import java.nio.charset.StandardCharsets;
@@ -24,10 +33,37 @@ class AttendanceController {
 
     private final ProvisionalAttendanceService attendance;
     private final AttendanceExportService exports;
+    private final AttendancePolicyService policies;
+    private final AttendanceFinalisationService finalisation;
 
-    AttendanceController(ProvisionalAttendanceService attendance, AttendanceExportService exports) {
+    AttendanceController(ProvisionalAttendanceService attendance, AttendanceExportService exports, AttendancePolicyService policies,
+                         AttendanceFinalisationService finalisation) {
         this.attendance = attendance;
         this.exports = exports;
+        this.policies = policies;
+        this.finalisation = finalisation;
+    }
+
+    record PolicyRequest(@NotNull Integer minConnectedPercent, @NotNull Integer lateAfterMinutes, @NotBlank @Size(max = 500) String description,
+                         Long version) {
+    }
+
+    /** 204 while the academy has not recorded a rule. */
+    @GetMapping("/api/v1/attendance-policy")
+    ResponseEntity<AttendancePolicyService.PolicyView> policy(JwtAuthenticationToken authentication) {
+        return policies.get(CurrentAccount.from(authentication)).map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @PutMapping("/api/v1/attendance-policy")
+    AttendancePolicyService.PolicyView setPolicy(JwtAuthenticationToken authentication, @Valid @RequestBody PolicyRequest request) {
+        return policies.set(CurrentAccount.from(authentication), request.minConnectedPercent(), request.lateAfterMinutes(),
+                request.description(), request.version());
+    }
+
+    @PostMapping("/api/v1/class-sessions/{sessionId}/attendance/finalisation")
+    AttendanceFinalisationService.FinalisationResult finalise(JwtAuthenticationToken authentication, @PathVariable UUID sessionId) {
+        return finalisation.finalise(CurrentAccount.from(authentication), sessionId);
     }
 
     @GetMapping("/api/v1/class-sessions/{sessionId}/attendance")

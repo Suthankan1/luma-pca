@@ -221,3 +221,17 @@ test("durations are whole minutes, with hours when there are any", () => {
   assert.equal(forms.formatDuration(3900), "1 h 05 min");
   assert.equal(forms.formatDuration(-5), "0 min");
 });
+
+test("the attendance rule form accepts whole numbers in range and a description", () => {
+  const form = (percent, late, description) => {
+    const f = new FormData();
+    f.set("minConnectedPercent", percent); f.set("lateAfterMinutes", late); f.set("description", description);
+    return f;
+  };
+  assert.deepEqual(forms.parsePolicyForm(form("75", "10", "Approved 1 Nov")), { minConnectedPercent: 75, lateAfterMinutes: 10, description: "Approved 1 Nov" });
+  assert.match(forms.parsePolicyForm(form("0", "10", "Approved")).error, /1 to 100/);
+  assert.match(forms.parsePolicyForm(form("101", "10", "Approved")).error, /1 to 100/);
+  assert.match(forms.parsePolicyForm(form("75.5", "10", "Approved")).error, /whole number/);
+  assert.match(forms.parsePolicyForm(form("75", "241", "Approved")).error, /0 to 240/);
+  assert.match(forms.parsePolicyForm(form("75", "10", "ok")).error, /3 to 500/);
+});

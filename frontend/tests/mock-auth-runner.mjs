@@ -25,7 +25,7 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance-policy)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -46,6 +46,8 @@ const backend = createServer(async (req, res) => {
           mfaExpiresIn: 300,
           mfaEnrolled: false,
         });
+      } else if (body.email === "owner-enrolled@example.invalid") {
+        return send(200, { mfaRequired: true, mfaToken: "challenge-token-owner", mfaExpiresIn: 300, mfaEnrolled: true });
       } else if (body.email === "admin-enrolled@example.invalid") {
         return send(200, {
           mfaRequired: true,
@@ -80,6 +82,12 @@ const backend = createServer(async (req, res) => {
           refreshExpiresIn: 600,
           recoveryCodes: ["rec-1111", "rec-2222", "rec-3333", "rec-4444"],
         });
+      }
+      if (body.mfaToken === "challenge-token-owner") {
+        if (body.code !== "rec-recovery") return send(401);
+        roles = ["ACADEMY_OWNER"];
+        latestRefresh = `fake-opaque-refresh-${++rotation}`;
+        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
       }
       if (body.mfaToken === "challenge-token-enrolled") {
         if (body.code !== "654321" && body.code !== "rec-recovery") return send(401);
@@ -265,6 +273,18 @@ function resolvePerson(person) {
 
 // Zoom participant reports fetched per occurrence (all seeded occurrences have ended).
 const zoomReports = new Map();
+// A past webinar per project (5 / 6 Mar 2026), for finalising attendance: the host and one student.
+for (const n of ["1", "2"]) {
+  const day = `2026-03-0${Number(n) + 4}`;
+  occurrences.push({ occurrenceUuid: `past/${n}AAAAAAAAAAAAAAA==`, webinarId: `4440001110${n}`, firstEventAt: `${day}T03:35:00Z`, lastEventAt: `${day}T05:30:00Z`, eventCount: 4 });
+  zoomPeople.set(`past/${n}AAAAAAAAAAAAAAA==`, [
+    { email: `host.past${n}@example.invalid`, displayName: "Teacher", host: true, visits: 1, openVisits: 0, firstSeenAt: `${day}T03:30:00Z`, lastSeenAt: `${day}T05:30:00Z` },
+    { email: `final.student${n}@example.invalid`, displayName: `Final Student ${n}`, host: false, visits: 1, openVisits: 0, firstSeenAt: `${day}T03:45:00Z`, lastSeenAt: `${day}T05:30:00Z` },
+  ]);
+}
+// The academy's rule and finalised classes.
+let attendancePolicy = null;
+const finalisedClasses = new Map();
 const occurrenceView = o => {
   const link = occurrenceLinks.get(o.occurrenceUuid);
   const report = zoomReports.get(o.occurrenceUuid);
@@ -563,6 +583,36 @@ function auditApi(query, send) {
   return send(200, { items: page.map(e => Object.fromEntries(Object.entries(e).filter(([key]) => key !== "seq"))), nextBefore: matching.length > limit ? `${last.seq}_${last.id}` : null });
 }
 
+// As the API: expected students, then matched students seen but not expected; time clipped to the class; final outcomes once finalised.
+function mockAttendance(session) {
+  const day = localDate(session.startsAt, session.timeZone);
+  const expectedIds = new Set(enrollments.filter(e => session.batchIds.includes(e.batchId) && e.enrolledOn <= day
+    && !(e.withdrawnOn && e.withdrawnOn <= day)).map(e => e.studentId));
+  const linked = occurrences.filter(o => occurrenceLinks.get(o.occurrenceUuid)?.classSessionId === session.id);
+  const start = Date.parse(session.startsAt), end = Date.parse(session.endsAt);
+  const seen = new Map();
+  let unmatchedPeople = 0;
+  for (const o of linked) for (const person of zoomPeople.get(o.occurrenceUuid) ?? []) {
+    const { match, student } = resolvePerson(person);
+    if (match === "UNMATCHED") unmatchedPeople++;
+    if (!student) continue;
+    const from = Math.max(start, Date.parse(person.firstSeenAt)), to = Math.min(end, Date.parse(person.lastSeenAt));
+    seen.set(student.id, { visits: person.visits, openVisits: person.openVisits, connectedSeconds: Math.max(0, (to - from) / 1000),
+      firstJoinAt: person.firstSeenAt, secondsAfterStart: Math.max(0, (Date.parse(person.firstSeenAt) - start) / 1000) });
+  }
+  const final = finalisedClasses.get(session.id);
+  const row = (student, expected) => ({ studentId: student.id, studentNumber: student.studentNumber, fullName: student.fullName, expected,
+    seen: seen.has(student.id), ...(seen.get(student.id) ?? { visits: 0, openVisits: 0, connectedSeconds: 0, firstJoinAt: null, secondsAfterStart: null }),
+    recordId: final?.outcomes.has(student.id) ? `rec-${session.id}-${student.id}` : null, outcome: final?.outcomes.get(student.id) ?? null });
+  const rows = [...students.filter(s => expectedIds.has(s.id)).map(s => row(s, true)),
+    ...students.filter(s => seen.has(s.id) && !expectedIds.has(s.id)).map(s => row(s, false))]
+    .sort((a, b) => Number(b.expected) - Number(a.expected) || a.studentNumber.localeCompare(b.studentNumber));
+  const reported = linked.filter(o => zoomReports.has(o.occurrenceUuid)).length;
+  return { sessionId: session.id, status: linked.length > 0 && reported === linked.length ? "RECONCILED" : "PROVISIONAL",
+    classStartsAt: session.startsAt, classEndsAt: session.endsAt, linkedOccurrences: linked.length, reportedOccurrences: reported,
+    webinarEnded: linked.length > 0, unmatchedPeople, calculatedAt: new Date().toISOString(), students: rows, finalisedAt: final?.at ?? null };
+}
+
 function academicApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const [path, query = ""] = req.url.split("?");
@@ -572,6 +622,15 @@ function academicApi(req, body, send) {
     return auditApi(query, send);
   }
   const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  if (collection === "attendance-policy") {
+    if (req.method === "GET") return attendancePolicy ? send(200, attendancePolicy) : send(204);
+    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner records the attendance rule" });
+    if ((attendancePolicy?.version ?? null) !== (body.version ?? null)) return send(409, { detail: "The attendance rule was changed by someone else" });
+    attendancePolicy = { minConnectedPercent: body.minConnectedPercent, lateAfterMinutes: body.lateAfterMinutes, description: body.description,
+      version: attendancePolicy ? attendancePolicy.version + 1 : 0, updatedAt: new Date().toISOString() };
+    audit("ATTENDANCE_POLICY_SET", "ACADEMY", null, null, { minConnectedPercent: String(body.minConnectedPercent), lateAfterMinutes: String(body.lateAfterMinutes) });
+    return send(200, attendancePolicy);
+  }
   // Assigned staff may list batches; the mock has no assignments, so they see none.
   if (!manager && (collection === "batches" || collection === "class-sessions") && !id && req.method === "GET"
       && roles.some(r => staffRoles.includes(r))) return send(200, []);
@@ -782,32 +841,24 @@ function academicApi(req, body, send) {
       }
       return send(200, [...expected.values()].sort((a, b) => a.studentNumber.localeCompare(b.studentNumber)));
     }
-    if (req.method === "GET" && sub === "attendance") {
-      // As the API: expected students, then matched students seen but not expected; time clipped to the class.
-      const day = localDate(session.startsAt, session.timeZone);
-      const expectedIds = new Set(enrollments.filter(e => session.batchIds.includes(e.batchId) && e.enrolledOn <= day
-        && !(e.withdrawnOn && e.withdrawnOn <= day)).map(e => e.studentId));
-      const linked = occurrences.filter(o => occurrenceLinks.get(o.occurrenceUuid)?.classSessionId === session.id);
-      const start = Date.parse(session.startsAt), end = Date.parse(session.endsAt);
-      const seen = new Map();
-      let unmatchedPeople = 0;
-      for (const o of linked) for (const person of zoomPeople.get(o.occurrenceUuid) ?? []) {
-        const { match, student } = resolvePerson(person);
-        if (match === "UNMATCHED") unmatchedPeople++;
-        if (!student) continue;
-        const from = Math.max(start, Date.parse(person.firstSeenAt)), to = Math.min(end, Date.parse(person.lastSeenAt));
-        seen.set(student.id, { visits: person.visits, openVisits: person.openVisits, connectedSeconds: Math.max(0, (to - from) / 1000),
-          firstJoinAt: person.firstSeenAt, secondsAfterStart: Math.max(0, (Date.parse(person.firstSeenAt) - start) / 1000) });
+    if (sub === "attendance" && req.method === "GET") return send(200, mockAttendance(session));
+    if (sub === "attendance" && req.method === "POST" && path.endsWith("/attendance/finalisation")) {
+      // As the API: the academy's rule, a finished class, Zoom's report for every linked occurrence, once per class.
+      if (finalisedClasses.has(session.id)) return send(409, { detail: "This class's attendance is already final" });
+      if (!attendancePolicy) return send(409, { detail: "The academy has not recorded its attendance rule yet" });
+      if (Date.parse(session.endsAt) > Date.now()) return send(409, { detail: "The class has not finished yet" });
+      const facts = mockAttendance(session);
+      if (facts.status !== "RECONCILED") return send(409, { detail: "Zoom's participant report has not been fetched; live events alone are never final" });
+      const length = (Date.parse(session.endsAt) - Date.parse(session.startsAt)) / 1000;
+      const outcomes = new Map();
+      for (const s of facts.students.filter(s => s.expected)) {
+        const enough = s.connectedSeconds * 100 >= attendancePolicy.minConnectedPercent * length;
+        outcomes.set(s.studentId, !enough || !s.seen ? "ABSENT" : s.secondsAfterStart > attendancePolicy.lateAfterMinutes * 60 ? "LATE" : "PRESENT");
       }
-      const row = (student, expected) => ({ studentId: student.id, studentNumber: student.studentNumber, fullName: student.fullName, expected,
-        seen: seen.has(student.id), ...(seen.get(student.id) ?? { visits: 0, openVisits: 0, connectedSeconds: 0, firstJoinAt: null, secondsAfterStart: null }) });
-      const rows = [...students.filter(s => expectedIds.has(s.id)).map(s => row(s, true)),
-        ...students.filter(s => seen.has(s.id) && !expectedIds.has(s.id)).map(s => row(s, false))]
-        .sort((a, b) => Number(b.expected) - Number(a.expected) || a.studentNumber.localeCompare(b.studentNumber));
-      const reported = linked.filter(o => zoomReports.has(o.occurrenceUuid)).length;
-      return send(200, { sessionId: session.id, status: linked.length > 0 && reported === linked.length ? "RECONCILED" : "PROVISIONAL",
-        classStartsAt: session.startsAt, classEndsAt: session.endsAt, linkedOccurrences: linked.length, reportedOccurrences: reported,
-        webinarEnded: linked.length > 0, unmatchedPeople, calculatedAt: new Date().toISOString(), students: rows });
+      finalisedClasses.set(session.id, { at: new Date().toISOString(), outcomes });
+      const count = o => [...outcomes.values()].filter(v => v === o).length;
+      audit("ATTENDANCE_FINALISED", "CLASS_SESSION", session.id, session.title, { present: String(count("PRESENT")), late: String(count("LATE")), absent: String(count("ABSENT")) });
+      return send(200, { sessionId: session.id, finalisedAt: new Date().toISOString(), present: count("PRESENT"), late: count("LATE"), absent: count("ABSENT") });
     }
     if (req.method === "GET") return send(200, sessionView(session));
     if (req.method === "PUT") {

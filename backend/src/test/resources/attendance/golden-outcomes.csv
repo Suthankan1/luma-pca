@@ -1,0 +1,18 @@
+# Golden dataset for the attendance rule. Columns: case, class_minutes, min_percent, late_after_minutes,
+# connected_seconds, seconds_after_start (empty = never seen), expected outcome.
+# Shapes come from the 13 Nov 2026 test webinar (rejoins, late joins, host-ended leaves); values are made up.
+full class on time,120,75,10,7200,0,PRESENT
+early join counts from the start,120,75,10,7200,0,PRESENT
+exactly the threshold,120,75,10,5400,0,PRESENT
+one second short of the threshold,120,75,10,5399,0,ABSENT
+late within grace,120,75,10,6600,600,PRESENT
+one second past grace,120,75,10,6600,601,LATE
+late and too short,120,75,10,3000,1800,ABSENT
+rejoins merged to enough time,120,75,10,5460,300,PRESENT
+never seen,120,75,10,0,,ABSENT
+seen briefly,120,75,10,60,0,ABSENT
+zero grace,60,50,0,3600,1,LATE
+zero grace on time,60,50,0,3600,0,PRESENT
+lenient rule,90,1,30,54,0,PRESENT
+strict rule full time,90,100,0,5400,0,PRESENT
+strict rule one second short,90,100,0,5399,0,ABSENT

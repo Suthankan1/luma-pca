@@ -1677,3 +1677,21 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Tests:** `AttendanceExportIntegrationTest` (4: exact rows incl. a formula-like name, headers, audit; batch range and
   limits; instructor scope incl. a shared class; cell quoting). Playwright: both downloads on desktop and phone and the
   activity entries. Unit: activity wording. Local: unit 51, Playwright 84.
+
+## Checkpoint 004B-2 — 2026-11-13 — The academy's rule and final attendance
+
+- **Branch:** `feature/attendance-finalisation`. **PR / merge SHA:** see the merged pull request titled
+  "feat(attendance): the academy's rule and final attendance".
+- **Implemented:** V21 `attendance_policies` (one per academy, versioned) and `attendance_records` (per expected student:
+  computed and in-force outcome, facts, the rule used, who and when). `GET|PUT /api/v1/attendance-policy` (owners set it;
+  staff with attendance access read it; audited). `POST /api/v1/class-sessions/{id}/attendance/finalisation` (owners and
+  administrators): only with a rule, a finished scheduled class and Zoom's report for every linked occurrence; once per class.
+  `AttendanceRule` decides PRESENT / LATE / ABSENT. The attendance view and CSV show the final outcome. UI: "Attendance" page
+  (rule), "Finalise attendance" on the class page, outcome badges.
+- **Policy:** LUMA does not choose the threshold; the owner records the academy's approved rule (OPEN-QUESTIONS P0 asks for
+  it). Live events alone never finalise.
+- **Tests:** `AttendanceRuleTest` with a 15-case golden dataset (`src/test/resources/attendance/golden-outcomes.csv`);
+  `AttendanceFinalisationIntegrationTest` (rule roles, validation, versioning and audit; refused without a rule or the
+  report, once per class, the rule kept after a change, CSV outcome; unfinished, cancelled, roles, other academy). Playwright:
+  owner sets the rule, admin reads it, finalising a past class after fetching the report. Local: unit 52, Playwright 88.
+  Docker Desktop on the Mac stopped responding during this slice, so backend tests ran in CI only.

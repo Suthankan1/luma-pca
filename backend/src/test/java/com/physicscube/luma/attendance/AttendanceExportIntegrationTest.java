@@ -92,8 +92,8 @@ class AttendanceExportIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(AttendanceExportService.HEADER, lines.get(0));
         assertEquals(4, lines.size(), "three expected students from both batches");
         assertEquals("2026-02-02,14:00,16:00,Asia/Colombo,\"Optics, shared\",SCHEDULED,PROVISIONAL,S-001,Student S-001,yes,yes,1,0,60,"
-                + "2026-02-02 14:10,10", lines.get(1));
-        assertEquals("2026-02-02,14:00,16:00,Asia/Colombo,\"Optics, shared\",SCHEDULED,PROVISIONAL,S-002,\"'=SUM(1,2)\",yes,no,0,0,0,,",
+                + "2026-02-02 14:10,10,", lines.get(1));
+        assertEquals("2026-02-02,14:00,16:00,Asia/Colombo,\"Optics, shared\",SCHEDULED,PROVISIONAL,S-002,\"'=SUM(1,2)\",yes,no,0,0,0,,,",
                 lines.get(2), "a name that looks like a formula is neutralised");
         assertTrue(lines.get(3).contains(",S-005,"));
 
