@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { autoLinkOccurrences, decideOccurrence, replayReceipt } from "@/app/staff/zoom/actions";
+import { autoLinkOccurrences, decideIdentity, decideOccurrence, replayReceipt } from "@/app/staff/zoom/actions";
 import type { FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, className }: { state: FormState; className: string }) {
@@ -55,5 +55,25 @@ export function ReplayForm({ prefix, id }: { prefix: string; id: string }) {
       placeholder="Cause fixed in release 1.4" />
     <button className="action secondary" type="submit" disabled={pending}>{pending ? "Queuing…" : "Replay"}</button>
     <Feedback state={state} className="replay-feedback" />
+  </form>;
+}
+
+/** Match a Zoom email to a student by student number, or mark it as not a student. */
+export function IdentityForm({ prefix, email }: { prefix: string; email: string }) {
+  const [state, action, pending] = useActionState(decideIdentity, null);
+  const values = state && !state.ok ? state.values : undefined;
+  return <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
+    <input type="hidden" name="email" value={email} />
+    <label htmlFor={`${prefix}-number`}>Student number</label>
+    <input id={`${prefix}-number`} name="studentNumber" maxLength={60} autoComplete="off" defaultValue={values?.studentNumber}
+      placeholder="PCA-2027-001" />
+    <label htmlFor={`${prefix}-reason`}>Reason <span className="muted">(recorded)</span></label>
+    <input id={`${prefix}-reason`} name="reason" maxLength={300} required autoComplete="off" defaultValue={values?.reason}
+      placeholder="Confirmed with the student" />
+    <div className="button-row">
+      <button className="action" type="submit" name="intent" value="link" disabled={pending}>Match to student</button>
+      <button className="action secondary" type="submit" name="intent" value="not-student" disabled={pending}>Not a student</button>
+    </div>
+    <Feedback state={state} className="identity-feedback" />
   </form>;
 }

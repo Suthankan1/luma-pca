@@ -100,6 +100,58 @@ test.describe("Zoom review", () => {
     await expect(auto.locator(".status")).toHaveText("Needs review");
   });
 
+  test("Zoom participants are matched to students by sign-in email, or by an administrator with a reason", async ({ page }) => {
+    await signInAsAdmin(page);
+    const P = p.toUpperCase();
+    // A student whose sign-in email is the one Zoom reports for them, and one with another Zoom account.
+    await page.goto("/staff/students");
+    for (const [number, name, email] of [[`ZM-${P}-1`, "Zoom Student", `zoom.student${n}@example.invalid`],
+      [`ZM-${P}-2`, "Guest Student", `guest.student${n}@example.invalid`]]) {
+      await page.locator("#student-number").fill(number);
+      await page.locator("#student-name").fill(name);
+      await page.locator("#student-email").fill(email);
+      await page.getByRole("button", { name: "Add student" }).click();
+      await expect(page.locator("#student-feedback")).toHaveText(`Student ${number} added. Open the record to send an invitation.`);
+    }
+
+    await page.goto("/staff/zoom");
+    const toMatch = page.getByRole("region", { name: "ZOOM ACCOUNTS TO MATCH" });
+    await expect(toMatch.getByRole("listitem", { name: `Zoom account zoom.student${n}@example.invalid` })).toHaveCount(0);
+    await expect(toMatch.getByRole("listitem", { name: `Zoom account teacher${n}@example.invalid` })).toHaveCount(0);
+    const guest = toMatch.getByRole("listitem", { name: `Zoom account zoom.guest${n}@example.invalid` });
+    await expect(guest).toContainText(`Guest Viewer ${n}`);
+
+    // The occurrence's people: the student matched by sign-in email, the guest waiting, the host apart.
+    await page.getByRole("listitem", { name: `Webinar 555 0001 110${n} at ${n} Mar 2027 09:30` })
+      .getByRole("link", { name: "People in this occurrence" }).click();
+    await expect(page).toHaveURL(/\/staff\/zoom\/participants\?occurrence=man%2F/);
+    const people = page.getByRole("region", { name: "PEOPLE IN THIS OCCURRENCE" });
+    const student = people.getByRole("listitem", { name: `ZM-${P}-1 Zoom Student` });
+    await expect(student.locator(".status")).toHaveText("Student (sign-in email)");
+    await expect(student).toContainText("2 visits");
+    await expect(student).toContainText("no leave received yet");
+    await expect(people.getByRole("listitem", { name: `teacher${n}@example.invalid` }).locator(".status")).toHaveText("Host");
+    const unmatched = people.getByRole("listitem", { name: `zoom.guest${n}@example.invalid` });
+    await expect(unmatched.locator(".status")).toHaveText("Not matched");
+
+    // A wrong number is refused and keeps what was typed; then the guest account is matched.
+    await unmatched.getByLabel("Student number").fill("NOPE-1");
+    await unmatched.getByLabel(/^Reason/).fill("Confirmed with the student");
+    await unmatched.getByRole("button", { name: "Match to student" }).click();
+    await expect(unmatched.locator(".identity-feedback")).toHaveText("No student has the number NOPE-1.");
+    await expect(unmatched.getByLabel(/^Reason/)).toHaveValue("Confirmed with the student");
+    await unmatched.getByLabel("Student number").fill(`zm-${p}-2`);
+    await unmatched.getByRole("button", { name: "Match to student" }).click();
+    const matched = people.getByRole("listitem", { name: `ZM-${P}-2 Guest Student` });
+    await expect(matched.locator(".status")).toHaveText("Student (matched by staff)");
+    await expect(matched).toContainText(`shown in Zoom as “Guest Viewer ${n}”`);
+
+    await page.goto("/staff/zoom");
+    await expect(guest).toHaveCount(0);
+    await page.goto("/staff/activity?category=zoom");
+    await expect(page.getByText(`Matched a Zoom account to student ZM-${P}-2`).first()).toBeVisible();
+  });
+
   test("A failed event is replayed with a reason", async ({ page }) => {
     await signInAsAdmin(page);
     await page.goto("/staff/zoom");

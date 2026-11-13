@@ -1606,3 +1606,22 @@ build runs the Next.js default bundler and repeats the smoke test.
   volume; the Zoom event subscription should be deactivated until the next test.
 - **Next:** participant-to-registrant matching and visit pairing (003D part 2), then attendance
   sessions (004A); dropping IP addresses from stored payloads.
+
+## Checkpoint 003D-2 — 2026-11-13 — Zoom participants matched to students
+
+- **Branch:** `feature/zoom-participant-matching`. **PR / merge SHA:** see the merged pull request titled
+  "feat(zoom): match webinar participants to students".
+- **Implemented:** V19 adds visit, registrant ID, email, display name and host flag to `zoom_occurrence_events` (filled for
+  earlier events from their receipts; IP addresses never copied) and `zoom_identity_links` (an administrator's decision per
+  Zoom email). `GET /api/v1/zoom/participants?occurrence=`, `GET /api/v1/zoom/participants/unmatched`,
+  `GET|POST /api/v1/zoom/identity-links`. Matching: decision first, then the student's sign-in email; the host is never
+  matched; decisions are audited and named in the activity log. Staff UI: "People in this occurrence" page and a
+  "Zoom accounts to match" panel on the Zoom review page (match by student number, or "Not a student").
+- **Real data check:** the migration's backfill, run in a rolled-back transaction on the 13 Nov test webinar's events,
+  flagged the host and found 3 attendees with 4 visits, matching Zoom's report.
+- **Tests:** `ZoomParticipantIntegrationTest` (grouping across rejoins and letter case, sign-in match, expected flag,
+  host, visitor without email, no IP stored; decisions override and leave the review list, replacement and audit;
+  validation, roles and academy isolation). Playwright: matching by sign-in email and by an administrator. Local: Zoom
+  backend tests 57 passed; unit tests and 82 Playwright tests passed; the full local backend run was killed by Docker
+  memory (exit 137) after 107 passing tests, so CI's backend job is the full-suite evidence.
+- **Still open:** strip IP addresses from stored receipts before real students; removing a decision; attendance (004A).

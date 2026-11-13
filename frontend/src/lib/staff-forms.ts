@@ -353,6 +353,30 @@ export type Occurrence = { occurrenceUuid: string; webinarId: string; firstEvent
 export type ZoomReceipt = { id: string; eventType: string; eventTs: number; status: string; attempts: number; lastError: string | null;
   receivedAt: string; nextAttemptAt: string | null; processedAt: string | null };
 
+export type ZoomMatch = "STUDENT" | "NOT_A_STUDENT" | "UNMATCHED" | "HOST";
+export type ZoomParticipant = { email: string | null; displayName: string | null; visits: number; openVisits: number;
+  firstSeenAt: string; lastSeenAt: string; match: ZoomMatch; matchSource: "MANUAL" | "SIGN_IN_EMAIL" | null;
+  studentId: string | null; studentNumber: string | null; studentName: string | null; expected: boolean | null };
+export type OccurrenceParticipants = { occurrenceUuid: string; classSessionId: string | null; participants: ZoomParticipant[] };
+export type UnmatchedZoomIdentity = { email: string; displayName: string | null; occurrences: number; lastSeenAt: string };
+
+/** How a participant was matched, in words. */
+export function participantMatchLabel(p: ZoomParticipant) {
+  switch (p.match) {
+    case "HOST": return "Host";
+    case "UNMATCHED": return p.email ? "Not matched" : "No email from Zoom";
+    case "NOT_A_STUDENT": return "Not a student";
+    case "STUDENT": return p.matchSource === "MANUAL" ? "Student (matched by staff)" : "Student (sign-in email)";
+  }
+}
+
+/** A Zoom email as the API stores it, or null when it is not one. */
+export function zoomEmailOrNull(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return null;
+  const email = value.trim().toLowerCase();
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : null;
+}
+
 export const zoomEventLabels: Record<string, string> = {
   "webinar.started": "Webinar started",
   "webinar.ended": "Webinar ended",

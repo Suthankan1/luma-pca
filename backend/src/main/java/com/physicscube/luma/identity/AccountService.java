@@ -97,6 +97,13 @@ public class AccountService {
                 .collect(Collectors.toMap(AccountSummary::id, Function.identity()));
     }
 
+    /** For other modules: the academy's accounts with these normalised emails, by email. */
+    @Transactional(readOnly = true)
+    public Map<String, AccountSummary> findInAcademyByEmails(UUID academyId, Collection<String> normalizedEmails) {
+        return normalizedEmails.isEmpty() ? Map.of() : accounts.findByAcademyIdAndEmailIn(academyId, normalizedEmails).stream()
+                .map(AccountSummary::of).collect(Collectors.toMap(AccountSummary::email, Function.identity()));
+    }
+
     /** As {@link #findByEmail}, but empty instead of an error when the text is not an email address. */
     @Transactional(readOnly = true)
     public Optional<AccountSummary> findByEmailIfValid(String text) {

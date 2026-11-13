@@ -34,6 +34,23 @@
 - Owners and administrators review occurrences (`GET /api/v1/zoom/occurrences?decided=false`), record a decision with a reason (`POST /api/v1/zoom/occurrence-links`, link or `sessionId: null` for "not a class"), and re-run matching after adding webinar IDs (`POST /api/v1/zoom/occurrences/auto-link`). Manual decisions are audited and never changed automatically.
 - Still open: matching participants to students (registrant and participant fields need a real test webinar), and attendance.
 
+## As built (003D part 2, participant identity)
+- Field shapes come from the first real test webinar (13 Nov 2026). The handler copies, per joined/left event: the visit
+  (`participant_uuid`, else `user_id`; both new on every rejoin), `registrant_id`, the email (lower-cased), the display name,
+  and whether it is the host (`participant.id` equals `object.host_id`). IP addresses are not copied. Missing participant
+  fields are stored as unknown instead of failing the event. V19 fills the same fields for events processed earlier.
+- A person in an occurrence is identified by email, never by display name; a visitor without email is listed alone and
+  cannot be matched. Matching order: an administrator's decision for the email (a student, or "not a student"; applies to
+  every webinar, audited as `ZOOM_IDENTITY_LINKED` / `ZOOM_IDENTITY_MARKED_NOT_STUDENT`), then a student's LUMA sign-in
+  email. The host is never matched.
+- `GET /api/v1/zoom/participants?occurrence=` lists people with visits, open visits (no leave yet), first/last seen,
+  the match and, when the occurrence is linked to a class, whether the student is expected there.
+  `GET /api/v1/zoom/participants/unmatched` lists emails waiting for review; `GET|POST /api/v1/zoom/identity-links` lists
+  and records decisions. Owners and administrators only. This is provisional live data, not attendance (004A).
+- Still open: the receipt itself still holds the whole payload, IP addresses included (drop them before real students);
+  a decision can be replaced but not removed; matching by `registrant_id` against Zoom's registrant list is not used,
+  because email already identifies registrants and the registrant list needs an API call per webinar.
+
 ## First validation experiment
 Collect account capabilities, real Zoom webinar occurrence identifiers, signed joined/left webhook samples (redacted), participant report result, mapping inputs, and three student joins/rejoins. Confirm the events' order/timestamps, registration identifiers and report accuracy. Only then finalize DTOs and integration tests.
 
