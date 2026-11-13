@@ -29,6 +29,10 @@ __pycache__/
 *.log
 # Infrastructure
 **/.terraform/
+*.tfvars
+!*.tfvars.example
+*.tfstate
+*.tfstate.*
 *.tfstate
 *.tfstate.*
 *.tfplan

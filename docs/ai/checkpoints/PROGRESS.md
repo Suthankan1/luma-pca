@@ -1742,3 +1742,18 @@ build runs the Next.js default bundler and repeats the smoke test.
   body and duplicates are still recognised by the raw body's SHA-256. V24 removes the same fields from receipts already stored.
   This was found in the first real test webinar (join/leave events carry public and private IP addresses).
 - **Tests:** `ZoomParticipantIntegrationTest` asserts stored receipts contain no IP and keep everything else.
+
+## Checkpoint 007A — 2026-11-13 — Infrastructure as code and operations runbooks (not applied)
+
+- **Branch:** `feature/infra-terraform`. **PR / merge SHA:** see the merged pull request titled
+  "feat(infra): Terraform for the AWS design, validated in CI, plus runbooks".
+- **Implemented:** Terraform modules `network` (VPC, 2 AZs, public/private subnets, 1–2 NAT), `database` (RDS PostgreSQL 17,
+  private, encrypted, `rds.force_ssl`, managed master secret, backups, deletion protection), `storage` (private bucket,
+  KMS, versioning, TLS-only policy, export/backup lifecycle), `messaging` (SQS + DLQ), `compute` (ECS Fargate web + API,
+  HTTPS ALB with only the Zoom webhook path to the API, Cloud Map for web→API, least-privilege task roles, secrets by ARN,
+  circuit-breaker rollback, CPU autoscaling), `monitoring` (SNS + 9 alarms incl. log-based Zoom dead-letter and report
+  failures); `environments/staging` composes them with empty secret containers. `terraform validate` passes (Terraform
+  1.9.8, AWS provider ~> 5.80); new CI workflow `terraform` (fmt + validate, no credentials, never plans or applies).
+  Runbooks: `DEPLOY.md` (first deploy, releases, rollback, feature switches), `INCIDENT-RESPONSE.md`, `COSTS.md` (cost
+  drivers without invented prices).
+- **Not done:** no AWS resources exist; applying needs the academy's budget approval and account (ADR-0006 gates).
