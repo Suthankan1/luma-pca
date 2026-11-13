@@ -1,8 +1,26 @@
 # LUMA · Physics Cube Academy
 
-**Status: architecture-approved project bootstrap, NOT a production-ready attendance system.**
+**Status (13 Nov 2026): feature-complete for the pilot and tested; not yet deployed or used with real students.** The
+pilot, cloud deployment and sign-off are the academy's (`docs/delivery/PILOT-PLAN.md`, `GO-LIVE-CHECKLIST.md`).
 
-A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy, designed for real staff and students. The **implementation is intentionally incremental**: this archive provides working application shells, local PostgreSQL, an initial migration, a deterministic attendance calculation, tests, CI scaffolding, extensive technical/product documentation, diagrams, and AI-agent instructions. The backend supports password sign-in with RS256 access tokens, rotating refresh sessions, logout, account lockout and invitation activation. The Next.js sign-in supports staff and students, with two-factor authentication (TOTP) and one-time recovery codes for academy owners and administrators. Through the API, owners and administrators manage courses, batches, students (each with a sign-in account), enrollments, staff assignments and class sessions shared by several batches; assigned instructors and attendance officers read only their batches, rosters and sessions; students read only their own record and enrollments. Staff screens exist for courses, batches, students, enrolments, invitation links, batch rosters, staff accounts, batch assignments, class sessions (times entered in Sri Lanka time) and Zoom review (occurrence linking decisions and replay of failed events). Owners and administrators can also create staff accounts, change roles, disable accounts and issue activation invitations. An invitation is either emailed to the person or shown once as a link (`/activate#token=…`) for the administrator to send; the person opens it in the browser and chooses a password. Every such action is recorded in an append-only audit log. A signed Zoom webhook endpoint stores join/leave and start/end events durably, and a retrying background worker files them per webinar occurrence and links each occurrence to its class when unambiguous; it is off until configured and has only been tested against fixtures, not a real Zoom account. Through the API, people with an active account can reset a forgotten password by email from the sign-in page ("Forgot your password?"), and administrators can email invitations instead of copying the link; both are off until an SMTP server is configured (`LUMA_MAIL_ENABLED`, see `backend/.env.example`). The public sign-in, two-factor, activation and reset routes are limited per visitor address (429 with Retry-After), on top of per-account lockouts; behind a load balancer set `LUMA_TRUSTED_PROXIES` (API) and `LUMA_TRUSTED_PROXY_HOPS` (web). An academy's first owner is created with the operator command `scripts/bootstrap-owner.sh` (see `docs/delivery/runbooks/FIRST-OWNER.md`). Turning Zoom events into attendance, production attendance persistence, engagement and deployment are planned. Do not onboard real students until the security and release gates pass.
+A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy. What it does:
+
+- **Accounts and access:** staff and student sign-in (RS256 JWTs, rotating refresh sessions in HttpOnly cookies, TOTP MFA
+  with recovery codes for owners and administrators), invitations and password reset by email, per-visitor rate limits,
+  account lockout; roles scoped to the academy, assigned batches, or the student's own data on every route.
+- **Academic data:** courses, batches, students (CSV import), enrolments, staff assignments, classes and weekly series
+  shared by several batches, bulk invitation emails, an append-only activity log.
+- **Zoom:** signed webhook receipt (proven with a real test webinar), a retrying worker, automatic linking of each webinar
+  occurrence to its class, participants matched to students by Zoom email (or an administrator's audited decision), Zoom's
+  participant report fetched after each webinar; IP/device data is never stored.
+- **Attendance:** provisional facts live (time connected with rejoins merged, lateness), then final present/late/absent
+  from Zoom's report by the academy's own recorded rule; corrections with reasons, student appeals, histories, CSV exports.
+- **Engagement (off by default, consent-based):** portal reactions, instructor pulse questions, staff-only top 10/100.
+- **Operations:** Terraform for the AWS design (validated in CI, not applied), backup and tested restore drill, load-test
+  tooling, deploy/rollback/incident runbooks.
+
+Evidence of every slice (PRs, CI results, test counts) is in [docs/ai/checkpoints/PROGRESS.md](docs/ai/checkpoints/PROGRESS.md).
+Do not onboard real students until the academy's P0 decisions are signed off (`docs/product/OPEN-QUESTIONS.md`).
 
 - GitHub: https://github.com/Suthankan1/luma-pca
 - Figma: https://www.figma.com/design/QVzsewJyikM94Xp07hDwwi
@@ -17,12 +35,12 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
 | --- | --- |
 | Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4 (responsive staff/student web) |
 | API/backend | Java 21, Spring Boot 4.1.2, modular monolith; later Spring Modulith tests |
-| Authentication | **Implemented:** first-party RS256 JWTs, account lockout, rotating refresh sessions, Next.js HttpOnly session cookies, TOTP MFA with recovery codes for owners and administrators in both backend and Next.js browser flows, and Spring Security role, academy, batch-assignment and student-ownership checks on every academic route. **Planned:** password recovery. |
+| Authentication | **Implemented:** first-party RS256 JWTs, account lockout, rotating refresh sessions, Next.js HttpOnly session cookies, TOTP MFA with recovery codes, password reset and invitations by email, per-visitor rate limits, role/academy/batch/ownership checks on every route |
 | Database | PostgreSQL 17, Flyway; schema evolves through reviewed migrations |
-| Zoom | **Planned:** academy-owned S2S OAuth, REST reports, signed webhooks, idempotent event inbox |
-| Async | **Planned:** transactional inbox/outbox, SQS + DLQ, separately scaled Spring worker |
-| Updates | **Planned:** SSE for live dashboard; reconciliation before final attendance |
-| Production | **Planned:** AWS ECS/Fargate, RDS, SQS, S3, monitoring, IaC, CI/CD |
+| Zoom | **Implemented:** signed webhooks into an idempotent inbox with a retrying worker, S2S OAuth read-only client, post-webinar participant reports |
+| Async | **Implemented:** database inbox with SKIP LOCKED workers (Zoom receipts, invitation emails, reports). **Planned:** SQS + DLQ worker (queues defined in Terraform) |
+| Updates | **Implemented:** reconciliation with Zoom's report before final attendance. **Planned:** SSE live push (pages recalculate on load) |
+| Production | **As code, not applied:** AWS ECS/Fargate, RDS, SQS, S3, CloudWatch alarms (Terraform validated in CI); needs the academy's budget and account |
 
 ## Prerequisites
 

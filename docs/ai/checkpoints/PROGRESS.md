@@ -1757,3 +1757,14 @@ build runs the Next.js default bundler and repeats the smoke test.
   Runbooks: `DEPLOY.md` (first deploy, releases, rollback, feature switches), `INCIDENT-RESPONSE.md`, `COSTS.md` (cost
   drivers without invented prices).
 - **Not done:** no AWS resources exist; applying needs the academy's budget approval and account (ADR-0006 gates).
+
+## Checkpoint 007B — 2026-11-13 — Pilot readiness pack
+
+- **Branch:** `feature/pilot-pack`. **PR / merge SHA:** see the merged pull request titled "docs(pilot): pilot plan, UAT,
+  sign-off, guides and go-live evidence".
+- **Added:** `docs/delivery/PILOT-PLAN.md` (decisions → staging UAT → one batch → all, with exit criteria and rollback
+  switches), `SIGN-OFF.md` (the academy's decisions and phase sign-offs), `UAT-SCRIPT.md` (17 cases, each mapped to a user
+  story and its automated tests), `STAFF-GUIDE.md`, `STUDENT-GUIDE.md`; `GO-LIVE-CHECKLIST.md` now shows status and evidence
+  per gate.
+- **Remaining for the academy:** P0 decisions, AWS account and budget, staging deployment and UAT, the one-batch pilot and
+  sign-offs. No production data has been collected.

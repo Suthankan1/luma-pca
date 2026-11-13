@@ -68,8 +68,9 @@ attendance. Fixture tests cannot show that.
    phone, join late, leave early.
 7. **Review**: `scripts/zoom-test-tunnel.sh summary`, `scripts/zoom-api-check.sh`, and the Zoom review page at
    `http://127.0.0.1:3400/staff/zoom` (link the occurrence to a class there if needed).
-8. **Stop** the script (Ctrl+C) and **deactivate the event subscription** in Zoom until the
-   next test, because the URL changes on every start.
+8. **Stop** the script (Ctrl+C). Zoom's "Event Subscriptions" switch does not pause a subscription: turning it off
+   **removes** every subscription and its settings. Leaving it on is harmless while the tunnel is down (deliveries to the
+   dead URL fail and Zoom gives up); paste the new URL and validate it before the next test.
 
 ## Verified before the first real test
 
