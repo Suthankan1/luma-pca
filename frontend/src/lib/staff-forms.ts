@@ -377,6 +377,18 @@ export function zoomEmailOrNull(value: FormDataEntryValue | null) {
   return email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : null;
 }
 
+export type AttendanceRow = { studentId: string; studentNumber: string; fullName: string; expected: boolean; seen: boolean; visits: number;
+  openVisits: number; connectedSeconds: number; firstJoinAt: string | null; secondsAfterStart: number | null };
+export type ProvisionalAttendance = { sessionId: string; status: "PROVISIONAL"; classStartsAt: string; classEndsAt: string;
+  linkedOccurrences: number; webinarEnded: boolean; unmatchedPeople: number; calculatedAt: string; students: AttendanceRow[] };
+
+/** "1 h 05 min", "45 min", "0 min"; whole minutes, rounded down. */
+export function formatDuration(seconds: number) {
+  const minutes = Math.max(0, Math.floor(seconds / 60));
+  const hours = Math.floor(minutes / 60);
+  return hours ? `${hours} h ${String(minutes % 60).padStart(2, "0")} min` : `${minutes} min`;
+}
+
 export const zoomEventLabels: Record<string, string> = {
   "webinar.started": "Webinar started",
   "webinar.ended": "Webinar ended",

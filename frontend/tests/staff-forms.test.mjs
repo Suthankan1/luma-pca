@@ -213,3 +213,11 @@ test("Zoom review: reasons, occurrence ids, states and class candidates", () => 
   const wide = forms.candidateWindow([occurrence, { ...occurrence, firstEventAt: "2026-01-01T00:00:00Z" }]);
   assert.equal(Date.parse(wide.to) - Date.parse(wide.from), 92 * 86_400_000);
 });
+
+test("durations are whole minutes, with hours when there are any", () => {
+  assert.equal(forms.formatDuration(0), "0 min");
+  assert.equal(forms.formatDuration(59), "0 min");
+  assert.equal(forms.formatDuration(2700), "45 min");
+  assert.equal(forms.formatDuration(3900), "1 h 05 min");
+  assert.equal(forms.formatDuration(-5), "0 min");
+});

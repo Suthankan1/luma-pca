@@ -150,6 +150,55 @@ test.describe("Zoom review", () => {
     await expect(guest).toHaveCount(0);
     await page.goto("/staff/activity?category=zoom");
     await expect(page.getByText(`Matched a Zoom account to student ZM-${P}-2`).first()).toBeVisible();
+
+    // Provisional attendance: ZM-…-1 enrolled in the class's batch, the occurrence linked to the class.
+    const C = `ATT-${P}`;
+    await page.goto("/staff/courses");
+    await page.locator("#course-code").fill(`att-${p}`);
+    await page.locator("#course-title").fill("Attendance course");
+    await page.getByRole("button", { name: "Create course" }).click();
+    await page.locator("#batch-course").selectOption({ label: `${C} · Attendance course` });
+    await page.locator("#batch-code").fill("a");
+    await page.locator("#batch-name").fill("Batch A");
+    await page.locator("#batch-starts").fill("2027-01-01");
+    await page.getByRole("button", { name: "Create batch" }).click();
+    await expect(page.locator("#batch-feedback")).toHaveText("Batch A created.");
+    await page.goto(`/staff/students?q=ZM-${P}-1`);
+    await page.getByRole("link", { name: new RegExp(`ZM-${P}-1`) }).first().click();
+    await page.locator("#enroll-batch").selectOption({ label: `${C} · A · Batch A` });
+    await page.locator("#enroll-date").fill("2027-01-05");
+    await page.getByRole("button", { name: "Enrol", exact: true }).click();
+    await expect(page.locator("#enroll-feedback")).toHaveText("Enrolled.");
+
+    await page.goto("/staff/sessions");
+    await page.locator("#schedule-title").fill(`Attendance class ${p}`);
+    await page.locator("#schedule-date").fill(`2027-03-0${n}`);
+    await page.locator("#schedule-start").fill("09:00");
+    await page.locator("#schedule-end").fill("11:00");
+    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
+    await page.getByRole("button", { name: "Schedule class" }).click();
+    await expect(page.locator("#schedule-feedback")).toHaveText(`Attendance class ${p} scheduled.`);
+
+    await page.goto("/staff/zoom");
+    const occurrence = page.getByRole("listitem", { name: `Webinar 555 0001 110${n} at ${n} Mar 2027 09:30` });
+    if (await occurrence.getByText("Change decision").count()) await occurrence.getByText("Change decision").click();
+    const weekday = n === "1" ? "Mon" : "Tue";
+    await occurrence.getByLabel("Class").selectOption({ label: `${weekday} ${n} Mar 2027 · 09:00–11:00 · Attendance class ${p}` });
+    await occurrence.getByLabel(/^Reason/).fill("Checked against the timetable");
+    await occurrence.getByRole("button", { name: "Link to class" }).click();
+    await expect(occurrence.locator(".status")).toHaveText("Linked by an administrator");
+    await occurrence.getByRole("link", { name: new RegExp(`^Attendance class ${p}, `) }).click();
+
+    const attendance = page.getByRole("region", { name: "PROVISIONAL ATTENDANCE" });
+    await expect(attendance).toContainText("not proof of absence");
+    const expectedRow = attendance.getByRole("listitem", { name: `Attendance ZM-${P}-1 Zoom Student` });
+    await expect(expectedRow.locator(".status")).toHaveText("Seen");
+    await expect(expectedRow).toContainText("29 min connected");
+    await expect(expectedRow).toContainText("first joined 2 Mar 2027 09:31".replace("2 Mar", `${n} Mar`));
+    await expect(expectedRow).toContainText("31 min after the start");
+    await expect(expectedRow).toContainText("no leave received yet");
+    const extraRow = attendance.getByRole("listitem", { name: `Attendance ZM-${P}-2 Guest Student` });
+    await expect(extraRow).toContainText("not expected at this class");
   });
 
   test("A failed event is replayed with a reason", async ({ page }) => {
