@@ -22,6 +22,10 @@ Academy owner/admin; attendance officer; instructor assigned to batches; analyst
 8. Monthly Top 10/Top 100 separate metrics, per-class/per-hour normalized participation, opt-in/visibility controls.
 9. PDF/CSV reporting, staff notifications, operational dashboards.
 
+## Proposed extension — class-information assistant (not implemented)
+
+The academy considered the separately demonstrated RAG-enabled prototype/idea suitable at the third meeting. A proposed authenticated, source-cited assistant would answer class and upcoming-class FAQs from staff-reviewed, scope-controlled documents while preserving staff/WhatsApp fallback. It is **not** part of the implemented R1/R2 product and has no approved AI-vendor, data-retention or production rollout decision. See [RAG requirements and architecture](../rag/README.md) for the proposed permission, document and UAT gates.
+
 ## Future possible enhancements
 Payments and fees, learning management/assignments, parent portal, multiple branches/academies, native apps and other meeting platforms. Do not treat these as already built.
 

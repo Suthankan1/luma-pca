@@ -27,6 +27,7 @@ Do not onboard real students until the academy's P0 decisions are signed off (`d
 - Brand: Physics Cube Academy, navy / blue / cyan / white.
 - System design: [docs/architecture/overview.md](docs/architecture/overview.md)
 - Full signed-off *proposal*, not completed functionality: [docs/architecture/full-production-blueprint.md](docs/architecture/full-production-blueprint.md)
+- **Proposed class-information RAG extension (not implemented):** [docs/rag/README.md](docs/rag/README.md) — approved prototype suitability, pending architecture, security, vendor and pilot gates.
 - Agent onboarding: [AGENTS.md](AGENTS.md) and [docs/ai/START-HERE.md](docs/ai/START-HERE.md)
 
 ## Final technology decisions
