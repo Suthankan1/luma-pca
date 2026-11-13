@@ -3,7 +3,8 @@ import { Shell } from "@/components/Shell";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
-import { formatClassTime, formatDate, sessionWindow } from "@/lib/staff-forms";
+import { AppealForm } from "@/components/AppealForm";
+import { formatClassTime, formatDate, formatDuration, outcomeLabels, sessionWindow, type AttendanceRecordView } from "@/lib/staff-forms";
 
 type MyEnrollment = { id: string; batchCode: string; batchName: string; enrolledOn: string; withdrawnOn: string | null; status: string };
 type MyClass = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
@@ -19,9 +20,10 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
   const window = sessionWindow(params.from, undefined, WINDOW_DAYS);
   const href = (from?: string) => from ? `/student?from=${from}` : "/student";
   const query = new URLSearchParams({ from: window.fromInstant, to: window.toInstant });
-  const [enrollments, classes] = await Promise.all([
+  const [enrollments, classes, attendance] = await Promise.all([
     studentApi<MyEnrollment[]>("/api/v1/me/enrollments"),
     studentApi<MyClass[]>(`/api/v1/me/class-sessions?${query}`),
+    studentApi<AttendanceRecordView[]>("/api/v1/me/attendance"),
   ]);
 
   return <Shell active="student" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
@@ -63,7 +65,26 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
             {enrollments.data.length === 0 && <li className="dir-empty muted">You aren’t enrolled in a batch yet. The academy office can enrol you.</li>}
           </ul>
         </section>
-        <p className="banner">Attendance history will appear here when available.</p>
+        <section className="panel" aria-labelledby="my-attendance-title">
+          <h2 id="my-attendance-title" className="panel-title">MY ATTENDANCE</h2>
+          <p className="panel-sub">Final attendance for your classes, decided by the academy’s rule from Zoom’s report. If something looks
+            wrong, send an appeal and the academy will review it.</p>
+          {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load your attendance right now.</p>
+            : <ul className="dir-list">
+              {attendance.data.map((r, index) => <li key={r.id} className="dir-course my-attendance" aria-label={`Attendance ${r.classTitle}`}>
+                <div className="dir-row">
+                  <div><strong>{r.classTitle}</strong>
+                    <span className="dir-dates muted"> {formatClassTime(r.classStartsAt, r.classEndsAt, r.timeZone)}</span>
+                    <div className="dir-dates muted">{formatDuration(r.connectedSeconds)} connected
+                      {r.appealStatus === "OPEN" ? " · appeal waiting for a decision" : r.appealStatus ? ` · appeal ${r.appealStatus.toLowerCase()}` : ""}</div></div>
+                  <span className={`status ${r.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[r.outcome]}</span>
+                </div>
+                {r.appealStatus !== "OPEN" && <details className="decision"><summary>Appeal this</summary>
+                  <AppealForm prefix={`appeal-${index}`} recordId={r.id} /></details>}
+              </li>)}
+              {attendance.data.length === 0 && <li className="dir-empty muted">No final attendance yet.</li>}
+            </ul>}
+        </section>
       </>}
     <form method="post" action="/api/session/logout">
       <button className="action secondary" type="submit">Sign out</button>

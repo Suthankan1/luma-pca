@@ -389,7 +389,17 @@ export function zoomEmailOrNull(value: FormDataEntryValue | null) {
 export type AttendanceOutcome = "PRESENT" | "LATE" | "ABSENT" | "EXCUSED";
 export type AttendanceRow = { studentId: string; studentNumber: string; fullName: string; expected: boolean; seen: boolean; visits: number;
   openVisits: number; connectedSeconds: number; firstJoinAt: string | null; secondsAfterStart: number | null;
-  recordId?: string | null; outcome?: AttendanceOutcome | null };
+  recordId?: string | null; outcome?: AttendanceOutcome | null; recordVersion?: number | null };
+export type AttendanceRecordView = { id: string; classSessionId: string; classTitle: string; classStartsAt: string; classEndsAt: string;
+  timeZone: string; computedOutcome: AttendanceOutcome; outcome: AttendanceOutcome; connectedSeconds: number; firstJoinAt: string | null;
+  secondsAfterStart: number | null; finalisedAt: string; version: number; appealStatus: "OPEN" | "ACCEPTED" | "REJECTED" | null };
+export type AttendanceAppeal = { id: string; recordId: string; studentId: string; studentNumber: string; studentName: string; classTitle: string;
+  classStartsAt: string; timeZone: string; outcome: AttendanceOutcome; message: string; status: "OPEN" | "ACCEPTED" | "REJECTED";
+  createdAt: string; resolutionNote: string | null; resolvedAt: string | null };
+export const attendanceOutcomes = ["PRESENT", "LATE", "ABSENT", "EXCUSED"] as const;
+export function outcomeOrNull(value: FormDataEntryValue | null): AttendanceOutcome | null {
+  return typeof value === "string" && (attendanceOutcomes as readonly string[]).includes(value) ? value as AttendanceOutcome : null;
+}
 export type AttendancePolicy = { minConnectedPercent: number; lateAfterMinutes: number; description: string; version: number; updatedAt: string };
 export const outcomeLabels: Record<AttendanceOutcome, string> = { PRESENT: "Present", LATE: "Late", ABSENT: "Absent", EXCUSED: "Excused" };
 

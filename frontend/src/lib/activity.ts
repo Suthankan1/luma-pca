@@ -91,6 +91,16 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
         : `Exported attendance of ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
       detail: [d.scope === "batch" && typeof d.from === "string" && typeof d.to === "string" ? `${formatDate(d.from)} – ${formatDate(d.to)}` : "",
         typeof d.rows === "string" ? `${d.rows} row${d.rows === "1" ? "" : "s"}` : ""].filter(Boolean).join(" · ") || undefined };
+    case "ATTENDANCE_FINALISED": return { summary: `Finalised attendance of ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
+      detail: [`${d.present ?? 0} present`, `${d.late ?? 0} late`, `${d.absent ?? 0} absent`].join(", ") + (typeof d.rule === "string" ? ` (rule ${d.rule})` : "") };
+    case "ATTENDANCE_CORRECTED": return { summary: `Corrected attendance in ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
+      detail: [typeof d.from === "string" && typeof d.to === "string" ? `${d.from.toLowerCase()} → ${d.to.toLowerCase()}` : "",
+        typeof d.reason === "string" ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ") || undefined };
+    case "ATTENDANCE_POLICY_SET": return { summary: "Changed the attendance rule",
+      detail: `${d.minConnectedPercent}% connected, late after ${d.lateAfterMinutes} min` + (typeof d.previous === "string" ? ` (was ${d.previous})` : "") };
+    case "ATTENDANCE_APPEAL_SUBMITTED": return { summary: "A student appealed their attendance" };
+    case "ATTENDANCE_APPEAL_ACCEPTED": return { summary: "Attendance appeal accepted", detail: typeof d.note === "string" ? `Note: ${d.note}` : undefined };
+    case "ATTENDANCE_APPEAL_REJECTED": return { summary: "Attendance appeal rejected", detail: typeof d.note === "string" ? `Note: ${d.note}` : undefined };
     case "ZOOM_IDENTITY_LINKED": return { summary: `Matched a Zoom account to student ${event.targetLabel ?? ""}`.trim(),
       detail: [typeof d.email === "string" ? d.email : "", typeof d.reason === "string" ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ") || undefined };
     case "ZOOM_IDENTITY_MARKED_NOT_STUDENT": return { summary: "Marked a Zoom account as not a student",

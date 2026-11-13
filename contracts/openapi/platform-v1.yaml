@@ -1706,6 +1706,109 @@ paths:
                   late: {type: integer}
                   absent: {type: integer}
         '409': {description: No rule, not finished, cancelled, not reconciled, or already final}
+  /api/v1/attendance-records/{recordId}/corrections:
+    get:
+      summary: A final record's corrections, oldest first (implemented, 004C; staff who see the student at the class)
+      operationId: listAttendanceCorrections
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: recordId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: "Corrections: previousOutcome, newOutcome, reason, appealId, correctedAt"}
+    post:
+      summary: Correct a final record with a reason (owners, admins, attendance officers for their batches; audited ATTENDANCE_CORRECTED)
+      description: Append-only history; the computed outcome is kept. Optimistic version.
+      operationId: correctAttendance
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: recordId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome, reason, version]
+              properties:
+                outcome: {type: string, enum: [PRESENT, LATE, ABSENT, EXCUSED]}
+                reason: {type: string, maxLength: 500}
+                version: {type: integer}
+      responses:
+        '200': {description: The record with the outcome in force}
+        '409': {description: Changed by someone else}
+  /api/v1/students/{studentId}/attendance:
+    get:
+      summary: A student's final attendance history (implemented, 004C; owners/admins)
+      operationId: studentAttendanceHistory
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: studentId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: "Records newest first: class, computed and in-force outcome, facts, latest appeal status"}
+  /api/v1/me/attendance:
+    get:
+      summary: The signed-in student's final attendance (implemented, 004C)
+      operationId: myAttendance
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: The student's own records}
+  /api/v1/me/attendance/{recordId}/appeals:
+    post:
+      summary: Appeal one's own final record (implemented, 004C; one open appeal per record; audited)
+      operationId: appealAttendance
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: recordId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: {type: string, minLength: 10, maxLength: 1000}
+      responses:
+        '201': {description: The appeal}
+        '404': {description: Not the student's record}
+        '409': {description: An appeal is already open}
+  /api/v1/attendance-appeals:
+    get:
+      summary: Appeals, newest first (implemented, 004C; owners/admins)
+      operationId: listAttendanceAppeals
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: status, required: false, schema: {type: string, enum: [OPEN, ACCEPTED, REJECTED]}}
+      responses:
+        '200': {description: Appeals with student, class, message and status}
+  /api/v1/attendance-appeals/{appealId}/resolution:
+    post:
+      summary: Accept (correcting the record) or reject an appeal, with a note the student sees (implemented, 004C; audited)
+      operationId: resolveAttendanceAppeal
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: appealId, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, note]
+              properties:
+                decision: {type: string, enum: [ACCEPT, REJECT]}
+                outcome: {type: string, enum: [PRESENT, LATE, ABSENT, EXCUSED], description: Required when accepting}
+                note: {type: string, maxLength: 500}
+      responses:
+        '200': {description: The decided appeal}
+        '409': {description: Already decided}
   /api/v1/zoom/webhooks:
     post:
       summary: Signed Zoom webhook ingress (implemented; off unless configured; verified against fixtures only)

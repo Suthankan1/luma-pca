@@ -56,13 +56,14 @@ public class ProvisionalAttendanceService {
      * @param openVisits visits with no leave received: counted up to the webinar's end, or to now while it runs
      * @param recordId the final record, once the class is finalised; {@code null} before
      * @param outcome the outcome in force on the final record (PRESENT, LATE, ABSENT or EXCUSED); {@code null} before
+     * @param recordVersion the final record's version, for corrections (004C); {@code null} before
      */
     public record StudentAttendance(UUID studentId, String studentNumber, String fullName, boolean expected, boolean seen,
                                     int visits, int openVisits, long connectedSeconds, Instant firstJoinAt, Long secondsAfterStart,
-                                    UUID recordId, String outcome) {
-        StudentAttendance withRecord(UUID id, String finalOutcome) {
+                                    UUID recordId, String outcome, Long recordVersion) {
+        StudentAttendance withRecord(UUID id, String finalOutcome, long version) {
             return new StudentAttendance(studentId, studentNumber, fullName, expected, seen, visits, openVisits, connectedSeconds,
-                    firstJoinAt, secondsAfterStart, id, finalOutcome);
+                    firstJoinAt, secondsAfterStart, id, finalOutcome, version);
         }
     }
 
@@ -112,13 +113,13 @@ public class ProvisionalAttendanceService {
         // Final records, once the class is finalised (004B); corrections change the outcome in force (004C).
         Map<UUID, Object[]> records = new java.util.HashMap<>();
         Instant[] finalisedAt = new Instant[1];
-        jdbc.query("SELECT id, student_id, outcome, finalised_at FROM attendance_records WHERE academy_id = ? AND class_session_id = ?",
+        jdbc.query("SELECT id, student_id, outcome, finalised_at, version FROM attendance_records WHERE academy_id = ? AND class_session_id = ?",
                 row -> {
-                    records.put((UUID) row.getObject("student_id"), new Object[] {row.getObject("id"), row.getString("outcome")});
+                    records.put((UUID) row.getObject("student_id"), new Object[] {row.getObject("id"), row.getString("outcome"), row.getLong("version")});
                     finalisedAt[0] = row.getTimestamp("finalised_at").toInstant();
                 }, caller.academyId(), sessionId);
         List<StudentAttendance> withRecords = rows.stream().map(r -> records.containsKey(r.studentId())
-                ? r.withRecord((UUID) records.get(r.studentId())[0], (String) records.get(r.studentId())[1]) : r).toList();
+                ? r.withRecord((UUID) records.get(r.studentId())[0], (String) records.get(r.studentId())[1], (Long) records.get(r.studentId())[2]) : r).toList();
         return new ProvisionalAttendance(sessionId, reconciled ? "RECONCILED" : "PROVISIONAL", session.startsAt(), session.endsAt(),
                 activity.occurrences().size(), activity.reportedOccurrences().size(), ended, activity.unmatchedPeople(), now, withRecords,
                 finalisedAt[0]);
@@ -149,6 +150,6 @@ public class ProvisionalAttendanceService {
                 : AttendanceDurationCalculator.connectedDuration(session.startsAt(), session.endsAt(), intervals);
         Long after = firstJoin == null ? null : Math.max(0, Duration.between(session.startsAt(), firstJoin).toSeconds());
         return new StudentAttendance(id, number, name, expected, !visits.isEmpty(), visits.size(), open, connected.toSeconds(),
-                firstJoin, after, null, null);
+                firstJoin, after, null, null, null);
     }
 }

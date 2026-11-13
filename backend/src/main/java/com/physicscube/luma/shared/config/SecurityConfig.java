@@ -48,6 +48,11 @@ public class SecurityConfig {
                             "/api/v1/attendance-policy")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/assignments").hasAnyRole("INSTRUCTOR", "ATTENDANCE_OFFICER")
+                    // Corrections: services limit attendance officers to students of their batches.
+                    .requestMatchers(HttpMethod.POST, "/api/v1/attendance-records/*/corrections")
+                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "ATTENDANCE_OFFICER")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/attendance-records/*/corrections")
+                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
                     .requestMatchers("/api/v1/courses", "/api/v1/courses/**", "/api/v1/batches", "/api/v1/batches/**",
                             "/api/v1/students", "/api/v1/students/**", "/api/v1/enrollments/**", "/api/v1/assignments/**",
                             "/api/v1/class-sessions", "/api/v1/class-sessions/**",
@@ -56,10 +61,12 @@ public class SecurityConfig {
                             "/api/v1/zoom/receipts", "/api/v1/zoom/receipts/**",
                             "/api/v1/zoom/occurrences", "/api/v1/zoom/occurrences/**", "/api/v1/zoom/occurrence-links",
                             "/api/v1/zoom/participants", "/api/v1/zoom/participants/unmatched", "/api/v1/zoom/identity-links", "/api/v1/zoom/reports",
-                            "/api/v1/attendance-policy")
+                            "/api/v1/attendance-policy", "/api/v1/attendance-appeals", "/api/v1/attendance-appeals/*/resolution")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
                     // A student's own data; services resolve "own" from the token, never from input.
-                    .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments", "/api/v1/me/class-sessions").hasRole("STUDENT")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments", "/api/v1/me/class-sessions",
+                            "/api/v1/me/attendance").hasRole("STUDENT")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/me/attendance/*/appeals").hasRole("STUDENT")
                     .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
