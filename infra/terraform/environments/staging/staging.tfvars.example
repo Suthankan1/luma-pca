@@ -1,0 +1,10 @@
+# Copy to staging.tfvars (gitignored) and fill in. Never put secret values here.
+domain             = "luma-staging.example.lk"
+certificate_arn    = "arn:aws:acm:ap-south-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+api_image          = "123456789012.dkr.ecr.ap-south-1.amazonaws.com/luma-api:0.1.0"
+web_image          = "123456789012.dkr.ecr.ap-south-1.amazonaws.com/luma-web:0.1.0"
+academy_id         = "00000000-0000-0000-0000-000000000000"
+webinar_allow_list = ""
+alert_emails       = ["oncall@example.lk"]
+mail_host          = "email-smtp.ap-south-1.amazonaws.com"
+mail_from          = "LUMA <no-reply@example.lk>"

@@ -1,15 +1,12 @@
-# Infrastructure-as-code plan — NOT PROVISIONED
+# Infrastructure as code — validated, NOT APPLIED
 
-These directories map the proposed AWS target, **not** a deployable Terraform implementation. Never execute a fake or partial Terraform `apply` against the academy account. Resolve cost estimate, region, privacy obligations, VPC/NAT choices, availability targets and ownership before adding resources.
+`modules/` (network, database, storage, messaging, compute, monitoring) and `environments/staging` describe the proposed AWS
+design of ADR-0006: private RDS PostgreSQL 17 (encrypted, TLS-only, backups, deletion protection), a private versioned S3
+bucket (KMS, TLS-only, lifecycle), SQS with a DLQ, ECS Fargate for the web app and API behind an HTTPS load balancer (only
+Zoom's webhook path reaches the API directly), secrets from Secrets Manager by ARN, CloudWatch logs and alarms to SNS.
 
-Suggested modules to implement iteratively with review:
-1. Network: VPC, private subnets, NAT/cost choice, security groups, ALB.
-2. Database: encrypted RDS PostgreSQL, migrations, security groups, automated backups, restore drills.
-3. Compute: ECS/Fargate API and separate worker task, task roles and auto-scaling.
-4. Messaging: SQS + DLQ, idempotence and monitored queue age.
-5. Storage: private S3 report exports, KMS, retention, presigned URL controls.
-6. Secrets: Zoom S2S tokens and JWT keys in Secrets Manager/KMS, least privilege.
-7. Telemetry: CloudWatch dashboards/alarms, traces, notification routes.
-8. GitHub OIDC deployment with reviewable dev/staging/prod environments.
+CI (`.github/workflows/terraform.yml`) checks formatting and `terraform validate` on every change; it has no AWS credentials
+and never plans or applies. **Applying creates chargeable resources**: only with the academy's budget approval, its AWS
+account, a reviewed `plan`, and the steps in `docs/delivery/runbooks/DEPLOY.md`. Cost drivers: `docs/delivery/runbooks/COSTS.md`.
 
-Start with a small local proof and a reviewed cost plan, not Terraform scaffolding that appears to be production-ready.
+Secret values are never in Terraform or Git: Terraform creates empty secret containers; an operator fills them.
