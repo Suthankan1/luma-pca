@@ -4,7 +4,8 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
 import { AppealForm } from "@/components/AppealForm";
-import { formatClassTime, formatDate, formatDuration, outcomeLabels, sessionWindow, type AttendanceRecordView } from "@/lib/staff-forms";
+import { ConsentForm } from "@/components/StudentEngagement";
+import { formatClassTime, formatDate, formatDuration, outcomeLabels, sessionWindow, type AttendanceRecordView, type MyConsent } from "@/lib/staff-forms";
 
 type MyEnrollment = { id: string; batchCode: string; batchName: string; enrolledOn: string; withdrawnOn: string | null; status: string };
 type MyClass = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
@@ -20,10 +21,11 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
   const window = sessionWindow(params.from, undefined, WINDOW_DAYS);
   const href = (from?: string) => from ? `/student?from=${from}` : "/student";
   const query = new URLSearchParams({ from: window.fromInstant, to: window.toInstant });
-  const [enrollments, classes, attendance] = await Promise.all([
+  const [enrollments, classes, attendance, consent] = await Promise.all([
     studentApi<MyEnrollment[]>("/api/v1/me/enrollments"),
     studentApi<MyClass[]>(`/api/v1/me/class-sessions?${query}`),
     studentApi<AttendanceRecordView[]>("/api/v1/me/attendance"),
+    studentApi<MyConsent>("/api/v1/me/engagement-consent"),
   ]);
 
   return <Shell active="student" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
@@ -47,6 +49,8 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
                 <span className="dir-dates muted"> {formatClassTime(c.startsAt, c.endsAt, c.timeZone)} ({c.timeZone})</span>
                 <div className="dir-dates muted">{c.batches.map(batch => batch.code).join(", ")}</div>
               </div>
+              {c.status === "SCHEDULED" && consent.ok && consent.data.enabled && consent.data.granted
+                ? <Link className="text-link" href={`/student/classes/${c.id}`}>Take part</Link> : null}
               <span className={`status ${c.status === "SCHEDULED" ? "on" : "off"}`}>{c.status === "SCHEDULED" ? "Scheduled" : "Cancelled"}</span>
             </li>)}
             {classes.data.length === 0 && <li className="dir-empty muted">No classes in these four weeks.</li>}
@@ -65,6 +69,12 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
             {enrollments.data.length === 0 && <li className="dir-empty muted">You aren’t enrolled in a batch yet. The academy office can enrol you.</li>}
           </ul>
         </section>
+        {consent.ok && consent.data.enabled && <section className="panel" aria-labelledby="engagement-title">
+          <h2 id="engagement-title" className="panel-title">REACTIONS AND QUESTIONS</h2>
+          <p className="panel-sub">{consent.data.granted ? "You take part: during a class, open it below to react or answer questions."
+            : consent.data.granted === false ? "You chose not to take part. Nothing is recorded about you." : "The academy asks whether you want to take part."}</p>
+          <ConsentForm consent={consent.data} />
+        </section>}
         <section className="panel" aria-labelledby="my-attendance-title">
           <h2 id="my-attendance-title" className="panel-title">MY ATTENDANCE</h2>
           <p className="panel-sub">Final attendance for your classes, decided by the academy’s rule from Zoom’s report. If something looks

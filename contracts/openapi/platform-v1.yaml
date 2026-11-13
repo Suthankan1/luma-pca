@@ -1809,6 +1809,26 @@ paths:
       responses:
         '200': {description: The decided appeal}
         '409': {description: Already decided}
+  /api/v1/engagement-settings:
+    get: {summary: "Engagement settings (managers; 204 when never set) — implemented, 006", operationId: getEngagementSettings, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: "enabled, consentText, consentVersion, version, updatedAt"}, '204': {description: Never set; engagement is off}}}
+    put: {summary: "Switch engagement on/off with the consent wording (owners; audited)", operationId: setEngagementSettings, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: The settings}, '403': {description: Not an owner}, '409': {description: Changed by someone else}}}
+  /api/v1/me/engagement-consent:
+    get: {summary: "The student's own consent state", operationId: myEngagementConsent, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: "enabled, consentText, consentVersion, granted (null = not asked for this wording), leaderboardOptIn"}}}
+    put: {summary: "Opt in or out; leaderboardOptIn needs granted (audited)", operationId: decideEngagementConsent, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: The consent state}, '409': {description: Off, or the wording changed}}}
+  /api/v1/me/class-sessions/{sessionId}/engagement:
+    get: {summary: "Open questions for a class the student is expected at", operationId: myClassEngagement, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: Open pulse questions with the student's own answer}}}
+  /api/v1/me/class-sessions/{sessionId}/reactions:
+    post: {summary: "Send a reaction (UNDERSTOOD, CONFUSED, SLOW_DOWN, SPEED_UP) during the class; one per 10 s, at most 120 per class", operationId: sendReaction, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'204': {description: Recorded}, '409': {description: Off, no consent, not running, or rate limited}}}
+  /api/v1/me/class-sessions/{sessionId}/pulses/{questionId}/answers:
+    post: {summary: "Answer an open question once", operationId: answerPulse, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}, {in: path, name: questionId, required: true, schema: {type: string, format: uuid}}], responses: {'204': {description: Recorded}, '409': {description: Closed or already answered}}}
+  /api/v1/class-sessions/{sessionId}/engagement:
+    get: {summary: "Reaction counts and question results for staff who see the class", operationId: classEngagement, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: "reactions by kind, reactingStudents, pulses with counts, source"}}}
+  /api/v1/class-sessions/{sessionId}/pulses:
+    post: {summary: "Open a question for 1-10 minutes during the class (instructors, managers; audited)", operationId: openPulse, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'201': {description: The question}, '409': {description: Off, not running, or 20 questions already}}}
+  /api/v1/class-sessions/{sessionId}/pulses/{questionId}/closure:
+    post: {summary: "Close a question early", operationId: closePulse, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}, {in: path, name: questionId, required: true, schema: {type: string, format: uuid}}], responses: {'204': {description: Closed}}}
+  /api/v1/batches/{batchId}/engagement-ranking:
+    get: {summary: "Staff-only top 10/100 over a date range (managers); consenting students only, named only with opt-in", operationId: engagementRanking, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: batchId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}, {in: query, name: limit, schema: {type: integer, enum: [10, 100]}}], responses: {'200': {description: "limit, classes, studentsCounted, top[], method"}}}
   /api/v1/zoom/webhooks:
     post:
       summary: Signed Zoom webhook ingress (implemented; off unless configured; verified against fixtures only)

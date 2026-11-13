@@ -27,7 +27,7 @@ export function staffApi<T>(path: `/api/v1/${string}`,
 }
 
 /** The student portal reaches only the signed-in student's own records (`/api/v1/me/...`), such as an appeal. */
-export function studentApi<T>(path: `/api/v1/me/${string}`, init?: { method: "POST"; body: unknown }): Promise<ApiResult<T>> {
+export function studentApi<T>(path: `/api/v1/me/${string}`, init?: { method: "POST" | "PUT"; body: unknown }): Promise<ApiResult<T>> {
   return callApi<T>("student", path, init);
 }
 

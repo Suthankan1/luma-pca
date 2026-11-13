@@ -2,13 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
 import { CorrectionForm, FinaliseForm } from "@/components/staff/AttendanceForms";
+import { ClosePulseButton, PulseForm } from "@/components/staff/EngagementForms";
 import { CancelSeriesForm, EditSeriesForm, EditSessionForm, StatusForm, type SessionDefaults } from "@/components/staff/SessionForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
   batchOptions, formatClassTime, formatDate, formatDuration, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
-  outcomeLabels, type ClassSession, type CourseRef, type Occurrence, type ProvisionalAttendance,
+  outcomeLabels, reactionLabels, type ClassEngagement, type ClassSession, type CourseRef, type Occurrence, type ProvisionalAttendance,
 } from "@/lib/staff-forms";
 
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -23,13 +24,15 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   if (!sessionId) notFound();
   const manager = isAcademyManager(identity.roles);
   const canCorrect = manager || identity.roles.includes("ATTENDANCE_OFFICER");
-  const [session, expected, batches, courses, zoom, attendance] = await Promise.all([
+  const canAsk = manager || identity.roles.includes("INSTRUCTOR");
+  const [session, expected, batches, courses, zoom, attendance, engagement] = await Promise.all([
     staffApi<ClassSession>(`/api/v1/class-sessions/${sessionId}`),
     staffApi<ExpectedStudent[]>(`/api/v1/class-sessions/${sessionId}/students`),
     manager ? staffApi<Batch[]>("/api/v1/batches") : Promise.resolve(null),
     manager ? staffApi<CourseRef[]>("/api/v1/courses") : Promise.resolve(null),
     manager ? staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?decided=true&sessionId=${sessionId}&limit=50`) : Promise.resolve(null),
     staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${sessionId}/attendance`),
+    staffApi<ClassEngagement>(`/api/v1/class-sessions/${sessionId}/engagement`),
   ]);
   if (!session.ok && (session.status === 404 || session.status === 403)) notFound();
   const shell = { active: "sessions" as const, crumb: "Timetable", hasStudentPortal: hasPortal(identity, "student") };
@@ -135,5 +138,19 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
         </ul>
       </>}
     </section>
+    {engagement.ok && engagement.data.enabled && <section className="panel panel-gap" aria-labelledby="engagement-title">
+      <h2 id="engagement-title" className="panel-title">ENGAGEMENT</h2>
+      <p className="panel-sub">From the student portal, consenting students only ({engagement.data.reactingStudents} reacted). Source: {engagement.data.source}.</p>
+      <ul className="dir-list reaction-counts">{Object.entries(engagement.data.reactions).map(([kind, count]) =>
+        <li key={kind} className="dir-row"><span>{reactionLabels[kind] ?? kind}</span><strong>{count}</strong></li>)}</ul>
+      <h3 className="form-title">Questions</h3>
+      <ul className="dir-list">{engagement.data.pulses.map(q => <li key={q.id} className="dir-course pulse" aria-label={`Question ${q.prompt}`}>
+        <div className="dir-row"><strong>{q.prompt}</strong><span className={`status ${q.open ? "on" : "off"}`}>{q.open ? "Open" : "Closed"}</span></div>
+        <ul className="dir-list">{q.options.map((o, i) => <li key={i} className="dir-row"><span>{o}</span><strong>{q.counts?.[i] ?? 0}</strong></li>)}</ul>
+        {q.open && canAsk && <ClosePulseButton sessionId={s.id} questionId={q.id} />}
+      </li>)}
+        {engagement.data.pulses.length === 0 && <li className="dir-empty muted">No questions yet.</li>}</ul>
+      {canAsk && !cancelled && <PulseForm sessionId={s.id} />}
+    </section>}
   </StaffShell>;
 }
