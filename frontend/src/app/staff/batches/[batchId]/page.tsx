@@ -7,7 +7,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { AttendanceExportForm } from "@/components/staff/AttendanceExportForm";
-import { academyToday, formatDate, isAcademyManager, staffRoleLabels, uuidOrNull } from "@/lib/staff-forms";
+import { academyToday, type Ranking, formatDate, isAcademyManager, staffRoleLabels, uuidOrNull } from "@/lib/staff-forms";
 
 type Batch = { id: string; code: string; name: string; startsOn: string; endsOn: string | null; active: boolean };
 type Assignment = { id: string; email: string | null; role: string };
@@ -16,7 +16,7 @@ type Enrollment = { id: string; studentId: string; studentNumber: string; studen
 export const metadata = { title: "Batch roster · LUMA" };
 
 /** Readable by owners and administrators, and by instructors and attendance officers assigned to the batch. */
-export default async function RosterPage({ params }: { params: Promise<{ batchId: string }> }) {
+export default async function RosterPage({ params, searchParams }: { params: Promise<{ batchId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const identity = await requirePortal("staff");
   const batchId = uuidOrNull((await params).batchId);
   if (!batchId) notFound();
@@ -28,6 +28,13 @@ export default async function RosterPage({ params }: { params: Promise<{ batchId
   if (!batch.ok && (batch.status === 404 || batch.status === 403)) notFound();
   const manager = isAcademyManager(identity.roles);
   const assignments = manager ? await staffApi<Assignment[]>(`/api/v1/batches/${batchId}/assignments`) : null;
+  const query = await searchParams;
+  const rankFrom = typeof query.rankFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.rankFrom) ? query.rankFrom : null;
+  const rankTo = typeof query.rankTo === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.rankTo) ? query.rankTo : null;
+  const top = query.top === "100" ? 100 : 10;
+  const ranking = manager && rankFrom && rankTo
+    ? await staffApi<Ranking>(`/api/v1/batches/${batchId}/engagement-ranking?${new URLSearchParams({ from: rankFrom, to: rankTo, limit: String(top) })}`)
+    : null;
   const shell = { active: "courses" as const, crumb: "Academic setup", hasStudentPortal: hasPortal(identity, "student") };
   if (!batch.ok || !roster.ok) {
     return <StaffShell {...shell} title="Batch roster" subtitle="">
@@ -74,6 +81,29 @@ export default async function RosterPage({ params }: { params: Promise<{ batchId
         </li>)}</ul>
         <AssignForm batchId={batchId} />
       </>}
+    </section>}
+    {manager && <section className="panel panel-gap" aria-labelledby="ranking-title">
+      <h2 id="ranking-title" className="panel-title">ENGAGEMENT RANKING</h2>
+      <p className="panel-sub">Staff only. Students who consented to engagement, scored by portal reactions (at most 10 per class) and
+        three points per question answered, divided by the classes they were expected at. Students are named only if they opted in.</p>
+      <form method="get" className="export-range" aria-label="Ranking range">
+        <label htmlFor="rank-from">From</label>
+        <input id="rank-from" name="rankFrom" type="date" required defaultValue={rankFrom ?? daysBefore(academyToday(), 30)} />
+        <label htmlFor="rank-to">To</label>
+        <input id="rank-to" name="rankTo" type="date" required defaultValue={rankTo ?? academyToday()} />
+        <label htmlFor="rank-top">Show</label>
+        <select id="rank-top" name="top" defaultValue={String(top)}><option value="10">Top 10</option><option value="100">Top 100</option></select>
+        <button className="action secondary" type="submit">Show ranking</button>
+      </form>
+      {ranking && (!ranking.ok ? <p className="session-error" role="alert">{ranking.detail ?? "We couldn’t load the ranking right now."}</p>
+        : <>
+          <p className="panel-sub">{ranking.data.classes} class{ranking.data.classes === 1 ? "" : "es"} · {ranking.data.studentsCounted} consenting student{ranking.data.studentsCounted === 1 ? "" : "s"}</p>
+          <ol className="dir-list ranking">{ranking.data.top.map(r => <li key={r.studentId} className="dir-row" aria-label={`Rank ${r.rank}`}>
+            <span><strong>{r.rank}.</strong> {r.studentNumber ? `${r.studentNumber} ${r.name ?? ""}` : <span className="muted">Not named (no opt-in)</span>}</span>
+            <span className="muted">{r.score} · {r.reactions} reactions, {r.pulseAnswers} answers, {r.classes} classes</span>
+          </li>)}
+            {ranking.data.top.length === 0 && <li className="dir-empty muted">No consenting students took part in this range.</li>}</ol>
+        </>)}
     </section>}
   </StaffShell>;
 }

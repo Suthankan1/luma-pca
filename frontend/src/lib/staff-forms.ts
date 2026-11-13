@@ -479,3 +479,25 @@ export function candidateClasses(occurrence: Occurrence, sessions: readonly Clas
     .map(({ session, sameWebinar }) => ({ id: session.id,
       label: `${formatClassTime(session.startsAt, session.endsAt, session.timeZone)} · ${session.title}${sameWebinar ? " · same webinar" : ""}` }));
 }
+
+// ---- Engagement (006) ---------------------------------------------------------------------
+export type EngagementSettings = { enabled: boolean; consentText: string; consentVersion: number; version: number; updatedAt: string };
+export type MyConsent = { enabled: boolean; consentText: string | null; consentVersion: number; granted: boolean | null; leaderboardOptIn: boolean; current: boolean };
+export type PulseView = { id: string; prompt: string; options: string[]; openedAt: string; closesAt: string; open: boolean; counts: number[] | null; myAnswer: number | null };
+export type ClassEngagement = { sessionId: string; enabled: boolean; reactions: Record<string, number>; reactingStudents: number; pulses: PulseView[]; source: string };
+export type Ranking = { limit: number; classes: number; studentsCounted: number; method: string;
+  top: { rank: number; studentId: string; studentNumber: string | null; name: string | null; classes: number; reactions: number; pulseAnswers: number; score: number }[] };
+export const reactionLabels: Record<string, string> = { UNDERSTOOD: "I understand", CONFUSED: "I’m confused", SLOW_DOWN: "Slow down", SPEED_UP: "Speed up" };
+
+/** A pulse question from a form: prompt, 2–5 distinct options (one per line), minutes 1–10. */
+export function parsePulseForm(form: FormData): { prompt: string; options: string[]; minutes: number } | { error: string } {
+  const prompt = text(form, "prompt");
+  const options = String(form.get("options") ?? "").split("\n").map(o => o.trim()).filter(Boolean);
+  const minutes = Number(text(form, "minutes"));
+  if (prompt.length < 3 || prompt.length > 300) return { error: "Write a question of 3 to 300 characters." };
+  if (options.length < 2 || options.length > 5 || new Set(options).size !== options.length || options.some(o => o.length > 100)) {
+    return { error: "Give 2 to 5 different options, one per line, each up to 100 characters." };
+  }
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 10) return { error: "Keep it open for 1 to 10 minutes." };
+  return { prompt, options, minutes };
+}

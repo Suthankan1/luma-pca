@@ -1711,3 +1711,24 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Tests:** `AttendanceCorrectionIntegrationTest` (3: history and append-only trigger, version and validation; officer scope;
   appeal lifecycle, one open, own record only, accept/reject, audit). Playwright: correction and history; student appeal
   accepted by an administrator. Local: unit 52.
+
+## Checkpoint 006 — 2026-11-13 — Engagement with consent (reactions, pulse questions, rankings)
+
+- **Branch:** `feature/engagement`. **PR / merge SHA:** see the merged pull request titled
+  "feat(engagement): portal reactions, pulse questions and rankings with consent".
+- **Implemented:** V23 `engagement_settings`, `engagement_consents`, `portal_reactions`, `pulse_questions`, `pulse_answers`.
+  Owners switch engagement on with the consent wording (`/api/v1/engagement-settings`; new wording raises the consent
+  version). Students opt in, and separately opt in to being named in rankings (`/api/v1/me/engagement-consent`). Reactions and
+  pulse answers only from expected, consenting students while the class runs (±10 minutes); reactions one per 10 seconds and
+  at most 120 per class; pulse questions 2–5 distinct options, 1–10 minutes, at most 20 per class, one answer each. Staff
+  see counts per class (`/api/v1/class-sessions/{id}/engagement`); managers see top 10/100 per batch and range with the
+  scoring method and sources (`/api/v1/batches/{id}/engagement-ranking`). UI: settings on the Attendance page, consent and a
+  "Take part" page in the student portal, an Engagement panel on the class page, a ranking on the batch page.
+- **Not used:** Zoom Q&A and poll reports (the academy's app has no Q&A/poll report scopes; adding them is an account change
+  for the academy) and Zoom emoji (anonymous). Peer-visible leaderboards (OPEN-QUESTIONS P1) are not offered: staff only.
+- **Policy:** off by default; switch on only after OPEN-QUESTIONS P0 (ages, consent, retention) is signed off.
+- **Also:** `scripts/staff-ui-real-stack.sh` greps the invitation token with `-F -e`, since a random token starting with `-`
+  made grep fail (seen once in CI on PR #65).
+- **Tests:** `EngagementIntegrationTest` (3: off by default, owner-only settings, consent and new wording, rate limit,
+  unknown kind; pulses open/validate/answer once/close; rankings cap, consent-only, naming opt-in, roles). Playwright: owner
+  switches on, student consents and reacts, staff open and close a question, ranking. Local: unit 52, Playwright 92.

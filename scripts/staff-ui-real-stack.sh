@@ -42,7 +42,7 @@ bootstrap "$S/bootstrap.out" || { echo "owner bootstrap failed:"; grep "LUMA own
 INVITE=$(grep -oE "^$ORIGIN/activate#token=[A-Za-z0-9_-]{43}$" "$S/bootstrap.out" | head -1 | sed 's/.*token=//')
 [ -n "$INVITE" ] || { echo "the bootstrap printed no activation link"; grep "LUMA owner bootstrap" "$S/bootstrap.out"; exit 1; }
 # The link is printed once, on its own line, and appears in no log line.
-[ "$(grep -c "$INVITE" "$S/bootstrap.out")" = 1 ] || { echo "the invitation token appeared more than once in the command output"; exit 1; }
+[ "$(grep -c -F -e "$INVITE" "$S/bootstrap.out")" = 1 ] || { echo "the invitation token appeared more than once in the command output"; exit 1; }
 ACADEMY_ID=$(docker exec $PG psql -At -U luma -d luma -c "SELECT id FROM academies WHERE name = 'Real Stack Academy'")
 docker exec -i $PG psql -q -U luma -d luma -v ON_ERROR_STOP=1 <<SQL
 -- Zoom data as the (disabled) worker would have left it, without personal data: an occurrence on the

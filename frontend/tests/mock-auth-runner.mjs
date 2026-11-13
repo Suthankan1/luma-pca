@@ -25,7 +25,7 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance-policy|attendance-records|attendance-appeals)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -160,6 +160,35 @@ function studentApi(req, send, body) {
   const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
   const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
   const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
+  if (url.pathname === "/api/v1/me/engagement-consent") {
+    const settings = engagementSettings;
+    const view = () => ({ enabled: !!settings?.enabled, consentText: settings?.consentText ?? null, consentVersion: settings?.consentVersion ?? 0,
+      granted: myConsent && settings && myConsent.version === settings.consentVersion ? myConsent.granted : null,
+      leaderboardOptIn: !!myConsent?.leaderboardOptIn, current: !!(myConsent && settings && myConsent.version === settings.consentVersion) });
+    if (req.method === "GET") return send(200, view());
+    if (!settings?.enabled) return send(409, { detail: "Engagement is not switched on at this academy" });
+    if (body.consentVersion !== settings.consentVersion) return send(409, { detail: "The consent wording has changed; read it again" });
+    myConsent = { version: body.consentVersion, granted: body.granted, leaderboardOptIn: body.leaderboardOptIn };
+    return send(200, view());
+  }
+  const engagementPath = url.pathname.match(/^\/api\/v1\/me\/class-sessions\/([^/]+)\/(engagement|reactions|pulses\/([^/]+)\/answers)$/);
+  if (engagementPath) {
+    const sessionId = engagementPath[1];
+    if (engagementPath[2] === "engagement") return send(200, mockEngagement(sessionId, true));
+    if (!engagementSettings?.enabled || !myConsent?.granted) return send(409, { detail: "Turn on engagement in your portal first" });
+    if (engagementPath[2] === "reactions") {
+      const counts = reactionsBySession.get(sessionId) ?? {};
+      counts[body.kind] = (counts[body.kind] ?? 0) + 1;
+      reactionsBySession.set(sessionId, counts);
+      return send(204);
+    }
+    const question = (pulses.get(sessionId) ?? []).find(q => q.id === engagementPath[3]);
+    if (!question || !question.open) return send(409, { detail: "This question has closed" });
+    if (question.myAnswer != null) return send(409, { detail: "You have already answered this question" });
+    question.myAnswer = body.option;
+    question.counts[body.option]++;
+    return send(204);
+  }
   if (url.pathname === "/api/v1/me/attendance" && req.method === "GET") {
     return send(200, !studentHasEnrolments ? [] : [{ ...myRecord, appealStatus: appealStatusOf(myRecord.id) }]);
   }
@@ -305,6 +334,15 @@ const myRecord = { id: "00000000-0000-4000-8000-0000000000a1", classSessionId: "
   classStartsAt: "2026-11-02T12:30:00Z", classEndsAt: "2026-11-02T14:30:00Z", timeZone: "Asia/Colombo", computedOutcome: "ABSENT", outcome: "ABSENT",
   connectedSeconds: 1200, firstJoinAt: "2026-11-02T13:50:00Z", secondsAfterStart: 4800, finalisedAt: "2026-11-02T15:00:00Z", version: 0 };
 const attendanceAppeals = [];
+// Engagement (006): off until an owner switches it on; the mock student's consent; reactions and pulses per class.
+let engagementSettings = null;
+let myConsent = null;
+const pulses = new Map();
+const reactionsBySession = new Map();
+const mockEngagement = (sessionId, studentView) => ({ sessionId, enabled: !!engagementSettings?.enabled,
+  reactions: { UNDERSTOOD: 0, CONFUSED: 0, SLOW_DOWN: 0, SPEED_UP: 0, ...(reactionsBySession.get(sessionId) ?? {}) },
+  reactingStudents: Object.values(reactionsBySession.get(sessionId) ?? {}).some(n => n > 0) ? 1 : 0,
+  pulses: (pulses.get(sessionId) ?? []).filter(q => !studentView || q.open), source: "PORTAL_REACTION, PORTAL_PULSE" });
 const appealStatusOf = recordId => attendanceAppeals.filter(a => a.recordId === recordId).at(-1)?.status ?? null;
 const finalisedClasses = new Map();
 const occurrenceView = o => {
@@ -676,6 +714,17 @@ function academicApi(req, body, send) {
     Object.assign(record, { outcome: body.outcome, version: record.version + 1 });
     return send(200, record);
   }
+  if (collection === "engagement-settings") {
+    if (!manager) return send(403, { detail: "Forbidden" });
+    if (req.method === "GET") return engagementSettings ? send(200, engagementSettings) : send(204);
+    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner switches engagement on or off" });
+    if ((engagementSettings?.version ?? null) !== (body.version ?? null)) return send(409, { detail: "Changed by someone else" });
+    const newWording = engagementSettings && engagementSettings.consentText !== body.consentText;
+    engagementSettings = { enabled: body.enabled, consentText: body.consentText, consentVersion: (engagementSettings?.consentVersion ?? 1) + (newWording ? 1 : 0),
+      version: engagementSettings ? engagementSettings.version + 1 : 0, updatedAt: new Date().toISOString() };
+    audit("ENGAGEMENT_SETTINGS_CHANGED", "ACADEMY", null, null, { enabled: String(body.enabled), consentVersion: String(engagementSettings.consentVersion) });
+    return send(200, engagementSettings);
+  }
   if (collection === "attendance-policy") {
     if (req.method === "GET") return attendancePolicy ? send(200, attendancePolicy) : send(204);
     if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner records the attendance rule" });
@@ -806,6 +855,12 @@ function academicApi(req, body, send) {
     return send(204);
   }
 
+  if (collection === "batches" && sub === "engagement-ranking" && req.method === "GET") {
+    const params = new URLSearchParams(query);
+    if (!["10", "100"].includes(params.get("limit") ?? "10")) return send(400, { detail: "limit must be 10 or 100" });
+    return send(200, { limit: Number(params.get("limit") ?? 10), classes: classSessions.filter(c => c.batchIds.includes(id)).length,
+      studentsCounted: 0, top: [], method: "(reactions per class, at most 10) + 3 × pulse answers, divided by classes expected" });
+  }
   if (collection === "batches" && sub === "assignments") {
     const batch = batches.find(b => b.id === id);
     if (!batch) return notFound();
@@ -902,6 +957,23 @@ function academicApi(req, body, send) {
         expected.set(student.id, entry);
       }
       return send(200, [...expected.values()].sort((a, b) => a.studentNumber.localeCompare(b.studentNumber)));
+    }
+    if (sub === "engagement" && req.method === "GET") return send(200, mockEngagement(session.id, false));
+    if (sub === "pulses" && req.method === "POST") {
+      const questionId = path.split("/")[6];
+      const list = pulses.get(session.id) ?? [];
+      if (questionId) {
+        const q = list.find(q => q.id === questionId);
+        if (!q || !q.open) return send(409, { detail: "This question is not open" });
+        q.open = false;
+        return send(204);
+      }
+      if (!engagementSettings?.enabled) return send(409, { detail: "Engagement is not switched on at this academy" });
+      const question = { id: uuid(), prompt: body.prompt, options: body.options, openedAt: new Date().toISOString(),
+        closesAt: new Date(Date.now() + body.minutes * 60000).toISOString(), open: true, counts: body.options.map(() => 0), myAnswer: null };
+      pulses.set(session.id, [...list, question]);
+      audit("PULSE_OPENED", "CLASS_SESSION", session.id, session.title, { minutes: String(body.minutes), options: String(body.options.length) });
+      return send(201, question);
     }
     if (sub === "attendance" && req.method === "GET") return send(200, mockAttendance(session));
     if (sub === "attendance" && req.method === "POST" && path.endsWith("/attendance/finalisation")) {

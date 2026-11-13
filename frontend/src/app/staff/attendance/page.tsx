@@ -1,9 +1,10 @@
 import { StaffShell } from "@/components/StaffShell";
 import { AppealDecisionForm, PolicyForm } from "@/components/staff/AttendanceForms";
+import { EngagementSettingsForm } from "@/components/staff/EngagementForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { formatInstant, isAcademyManager, outcomeLabels, type AttendanceAppeal, type AttendancePolicy } from "@/lib/staff-forms";
+import { formatInstant, isAcademyManager, outcomeLabels, type AttendanceAppeal, type AttendancePolicy, type EngagementSettings } from "@/lib/staff-forms";
 
 export const metadata = { title: "Attendance · LUMA" };
 
@@ -15,9 +16,10 @@ export default async function AttendancePage() {
     subtitle: "The academy’s rule for final attendance, applied only to Zoom’s official participant report.",
     hasStudentPortal: hasPortal(identity, "student") };
   const manager = isAcademyManager(identity.roles);
-  const [policy, appeals] = await Promise.all([
+  const [policy, appeals, engagement] = await Promise.all([
     staffApi<AttendancePolicy | null>("/api/v1/attendance-policy"),
     manager ? staffApi<AttendanceAppeal[]>("/api/v1/attendance-appeals?status=OPEN") : Promise.resolve(null),
+    manager ? staffApi<EngagementSettings | null>("/api/v1/engagement-settings") : Promise.resolve(null),
   ]);
   if (!policy.ok) {
     return <StaffShell {...shell}><p className="session-error" role="alert">
@@ -51,6 +53,15 @@ export default async function AttendancePage() {
           </li>)}
           {appeals.data.length === 0 && <li className="dir-empty muted">No appeals are waiting.</li>}
         </ul>
+      </>}
+    </section>}
+    {engagement && <section className="panel panel-gap" aria-labelledby="engagement-title">
+      <h2 id="engagement-title" className="panel-title">ENGAGEMENT</h2>
+      {!engagement.ok ? <p className="session-error" role="alert">We couldn’t load engagement settings right now.</p> : <>
+        <p className="panel-sub">Reactions and short questions from the student portal, with each student’s consent. It is
+          {engagement.data?.enabled ? " on" : " off"}. Switch it on only after the academy has signed off its privacy and consent policy
+          (students’ ages, retention). Zoom emoji are anonymous and are never used.</p>
+        {owner ? <EngagementSettingsForm settings={engagement.data} /> : <p className="panel-sub">Only an academy owner can switch it on or off.</p>}
       </>}
     </section>}
   </StaffShell>;
