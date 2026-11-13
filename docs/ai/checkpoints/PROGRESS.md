@@ -1586,3 +1586,23 @@ build runs the Next.js default bundler and repeats the smoke test.
   access). Playwright series spec retimes the rest of a series and finds it in the activity log. Full
   local runs: backend 334, unit 49, Playwright 80 passed.
 - **Closes** the SES-2 caveat "editing a whole series at once".
+
+## Checkpoint 003A-2 — 2026-11-13 — First real test webinar received end to end
+
+- **Branch:** `docs/003a-webinar-findings` (documentation only).
+- **Run:** webinar 838 3442 8148 with the host and three test attendees, 11:28–11:32 Colombo, over
+  the local tunnel. The quick tunnel had been dropped by Cloudflare at 10:59 (error 1033) and was
+  replaced by restarting the tunnel container; the Zoom subscription was updated, validated, saved
+  and re-read after a reload (an earlier validated URL had never been saved).
+- **Result:** 12 events stored once each and processed on the first attempt (1 started, 5 joined,
+  5 left, 1 ended) into one occurrence; the read-only API check reported 3 registrants and
+  "5 join sessions by 4 people", matching the webhooks. Details, compared as hashes only, are in
+  `docs/integration/ZOOM-TEST-WEBINAR.md` ("Findings").
+- **Design inputs for 003D part 2 / 004A:** identify a person by `registrant_id` (then email);
+  pair a join with its leave by `participant.user_id`, which is new on each rejoin; the host has
+  `participant_user_id`, attendees do not. Payloads carry public/private IP addresses, which must
+  be stripped before storage before any real student data (P0).
+- **Afterwards:** tunnel stopped (public URL 530); test events kept in the `luma-zoom-test-data`
+  volume; the Zoom event subscription should be deactivated until the next test.
+- **Next:** participant-to-registrant matching and visit pairing (003D part 2), then attendance
+  sessions (004A); dropping IP addresses from stored payloads.
