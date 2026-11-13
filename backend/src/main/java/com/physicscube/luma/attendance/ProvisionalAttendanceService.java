@@ -38,11 +38,14 @@ public class ProvisionalAttendanceService {
     private final ClassSessionService sessions;
     private final ZoomParticipantService zoom;
     private final StudentService students;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    ProvisionalAttendanceService(ClassSessionService sessions, ZoomParticipantService zoom, StudentService students) {
+    ProvisionalAttendanceService(ClassSessionService sessions, ZoomParticipantService zoom, StudentService students,
+                                 org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.sessions = sessions;
         this.zoom = zoom;
         this.students = students;
+        this.jdbc = jdbc;
     }
 
     /**
@@ -51,9 +54,16 @@ public class ProvisionalAttendanceService {
      * @param firstJoinAt the earliest join; a visit whose join never arrived counts from the webinar's start
      * @param secondsAfterStart how long after the class start the first join was; 0 when on time or early
      * @param openVisits visits with no leave received: counted up to the webinar's end, or to now while it runs
+     * @param recordId the final record, once the class is finalised; {@code null} before
+     * @param outcome the outcome in force on the final record (PRESENT, LATE, ABSENT or EXCUSED); {@code null} before
      */
     public record StudentAttendance(UUID studentId, String studentNumber, String fullName, boolean expected, boolean seen,
-                                    int visits, int openVisits, long connectedSeconds, Instant firstJoinAt, Long secondsAfterStart) {
+                                    int visits, int openVisits, long connectedSeconds, Instant firstJoinAt, Long secondsAfterStart,
+                                    UUID recordId, String outcome) {
+        StudentAttendance withRecord(UUID id, String finalOutcome) {
+            return new StudentAttendance(studentId, studentNumber, fullName, expected, seen, visits, openVisits, connectedSeconds,
+                    firstJoinAt, secondsAfterStart, id, finalOutcome);
+        }
     }
 
     /**
@@ -62,10 +72,11 @@ public class ProvisionalAttendanceService {
      * @param webinarEnded every linked occurrence has a webinar.ended event or a fetched report
      * @param reportedOccurrences linked occurrences counted from Zoom's participant report
      * @param unmatchedPeople Zoom participants not matched to any student (see Zoom review)
+     * @param finalisedAt when the class was finalised against the academy's rule; {@code null} before
      */
     public record ProvisionalAttendance(UUID sessionId, String status, Instant classStartsAt, Instant classEndsAt,
                                         int linkedOccurrences, int reportedOccurrences, boolean webinarEnded, int unmatchedPeople,
-                                        Instant calculatedAt, List<StudentAttendance> students) {
+                                        Instant calculatedAt, List<StudentAttendance> students, Instant finalisedAt) {
     }
 
     @Transactional(readOnly = true)
@@ -98,8 +109,19 @@ public class ProvisionalAttendanceService {
         boolean reconciled = !activity.occurrences().isEmpty() && activity.reportedOccurrences().containsAll(activity.occurrences());
         boolean ended = !activity.occurrences().isEmpty() && activity.occurrences().stream()
                 .allMatch(o -> activity.endedAt().containsKey(o) || activity.reportedOccurrences().contains(o));
+        // Final records, once the class is finalised (004B); corrections change the outcome in force (004C).
+        Map<UUID, Object[]> records = new java.util.HashMap<>();
+        Instant[] finalisedAt = new Instant[1];
+        jdbc.query("SELECT id, student_id, outcome, finalised_at FROM attendance_records WHERE academy_id = ? AND class_session_id = ?",
+                row -> {
+                    records.put((UUID) row.getObject("student_id"), new Object[] {row.getObject("id"), row.getString("outcome")});
+                    finalisedAt[0] = row.getTimestamp("finalised_at").toInstant();
+                }, caller.academyId(), sessionId);
+        List<StudentAttendance> withRecords = rows.stream().map(r -> records.containsKey(r.studentId())
+                ? r.withRecord((UUID) records.get(r.studentId())[0], (String) records.get(r.studentId())[1]) : r).toList();
         return new ProvisionalAttendance(sessionId, reconciled ? "RECONCILED" : "PROVISIONAL", session.startsAt(), session.endsAt(),
-                activity.occurrences().size(), activity.reportedOccurrences().size(), ended, activity.unmatchedPeople(), now, rows);
+                activity.occurrences().size(), activity.reportedOccurrences().size(), ended, activity.unmatchedPeople(), now, withRecords,
+                finalisedAt[0]);
     }
 
     private static StudentAttendance row(UUID id, String number, String name, boolean expected, List<StudentVisit> visits,
@@ -127,6 +149,6 @@ public class ProvisionalAttendanceService {
                 : AttendanceDurationCalculator.connectedDuration(session.startsAt(), session.endsAt(), intervals);
         Long after = firstJoin == null ? null : Math.max(0, Duration.between(session.startsAt(), firstJoin).toSeconds());
         return new StudentAttendance(id, number, name, expected, !visits.isEmpty(), visits.size(), open, connected.toSeconds(),
-                firstJoin, after);
+                firstJoin, after, null, null);
     }
 }

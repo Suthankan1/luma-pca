@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
+import { FinaliseForm } from "@/components/staff/AttendanceForms";
 import { CancelSeriesForm, EditSeriesForm, EditSessionForm, StatusForm, type SessionDefaults } from "@/components/staff/SessionForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
   batchOptions, formatClassTime, formatDate, formatDuration, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
-  type ClassSession, type CourseRef, type Occurrence, type ProvisionalAttendance,
+  outcomeLabels, type ClassSession, type CourseRef, type Occurrence, type ProvisionalAttendance,
 } from "@/lib/staff-forms";
 
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -90,7 +91,8 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
       </section>}
     </div>
     <section className="panel panel-gap" aria-labelledby="attendance-title">
-      <h2 id="attendance-title" className="panel-title">{attendance.ok && attendance.data.status === "RECONCILED" ? "ATTENDANCE FROM ZOOM’S REPORT" : "PROVISIONAL ATTENDANCE"}</h2>
+      <h2 id="attendance-title" className="panel-title">{attendance.ok && attendance.data.finalisedAt ? "FINAL ATTENDANCE"
+        : attendance.ok && attendance.data.status === "RECONCILED" ? "ATTENDANCE FROM ZOOM’S REPORT" : "PROVISIONAL ATTENDANCE"}</h2>
       {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load attendance right now. Please reload shortly.</p> : <>
         <p className="panel-sub">{attendance.data.status === "RECONCILED"
             ? "From Zoom’s participant report, fetched after the webinar ended"
@@ -103,6 +105,11 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
             : attendance.data.webinarEnded ? "The webinar has ended." : "The webinar has not reported an end yet."}
           {manager && attendance.data.unmatchedPeople > 0 && <> {attendance.data.unmatchedPeople} Zoom participant{attendance.data.unmatchedPeople === 1 ? " is" : "s are"} not
             matched to a student; <Link className="text-link" href="/staff/zoom">match them in Zoom review</Link>.</>}</p>
+        {attendance.data.finalisedAt
+          ? <p className="banner">Final since {formatInstant(attendance.data.finalisedAt)}, by the academy’s <Link className="text-link" href="/staff/attendance">attendance rule</Link>.
+            Change a student’s outcome with a correction.</p>
+          : manager && attendance.data.status === "RECONCILED" && !cancelled && Date.parse(s.endsAt) <= Date.parse(attendance.data.calculatedAt)
+            ? <FinaliseForm sessionId={s.id} /> : null}
         <p className="link-row"><a className="text-link" href={`/staff/sessions/${s.id}/attendance-export`} download>Download CSV</a>
           <span className="muted">Personal data; keep it private. Exports are recorded in the activity log.</span></p>
         <ul className="dir-list">
@@ -116,7 +123,8 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
                     {" "}· {a.visits} visit{a.visits === 1 ? "" : "s"}{a.openVisits > 0 ? " · no leave received yet" : ""}</>
                 : <span className="muted">Not seen in Zoom yet</span>}</div>
             </div>
-            <span className={`status ${a.seen ? "on" : "off"}`}>{a.seen ? "Seen" : "Not seen"}</span>
+            {a.outcome ? <span className={`status outcome ${a.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[a.outcome]}</span>
+              : <span className={`status ${a.seen ? "on" : "off"}`}>{a.seen ? "Seen" : "Not seen"}</span>}
           </li>)}
           {attendance.data.students.length === 0 && <li className="dir-empty muted">No students are expected at this class.</li>}
         </ul>

@@ -386,10 +386,25 @@ export function zoomEmailOrNull(value: FormDataEntryValue | null) {
   return email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : null;
 }
 
+export type AttendanceOutcome = "PRESENT" | "LATE" | "ABSENT" | "EXCUSED";
 export type AttendanceRow = { studentId: string; studentNumber: string; fullName: string; expected: boolean; seen: boolean; visits: number;
-  openVisits: number; connectedSeconds: number; firstJoinAt: string | null; secondsAfterStart: number | null };
+  openVisits: number; connectedSeconds: number; firstJoinAt: string | null; secondsAfterStart: number | null;
+  recordId?: string | null; outcome?: AttendanceOutcome | null };
+export type AttendancePolicy = { minConnectedPercent: number; lateAfterMinutes: number; description: string; version: number; updatedAt: string };
+export const outcomeLabels: Record<AttendanceOutcome, string> = { PRESENT: "Present", LATE: "Late", ABSENT: "Absent", EXCUSED: "Excused" };
+
+/** The rule's numbers from a form, or an error to show. */
+export function parsePolicyForm(form: FormData): { minConnectedPercent: number; lateAfterMinutes: number; description: string } | { error: string } {
+  const percent = Number(text(form, "minConnectedPercent"));
+  const late = Number(text(form, "lateAfterMinutes"));
+  const description = text(form, "description");
+  if (!Number.isInteger(percent) || percent < 1 || percent > 100) return { error: "The connected share must be a whole number from 1 to 100." };
+  if (!Number.isInteger(late) || late < 0 || late > 240) return { error: "Lateness must be a whole number of minutes from 0 to 240." };
+  if (description.length < 3 || description.length > 500) return { error: "Say where the rule was approved, in 3 to 500 characters." };
+  return { minConnectedPercent: percent, lateAfterMinutes: late, description };
+}
 export type ProvisionalAttendance = { sessionId: string; status: "PROVISIONAL" | "RECONCILED"; classStartsAt: string; classEndsAt: string;
-  linkedOccurrences: number; reportedOccurrences: number; webinarEnded: boolean; unmatchedPeople: number; calculatedAt: string; students: AttendanceRow[] };
+  finalisedAt?: string | null; linkedOccurrences: number; reportedOccurrences: number; webinarEnded: boolean; unmatchedPeople: number; calculatedAt: string; students: AttendanceRow[] };
 
 /** "1 h 05 min", "45 min", "0 min"; whole minutes, rounded down. */
 export function formatDuration(seconds: number) {

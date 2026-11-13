@@ -1642,6 +1642,70 @@ paths:
               schema: {type: string}
         '400': {description: Missing or invalid range}
         '404': {description: Batch not found or not visible to the caller}
+  /api/v1/attendance-policy:
+    get:
+      summary: The academy's attendance rule (implemented, 004B; staff with attendance access)
+      operationId: getAttendancePolicy
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: The rule
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AttendancePolicy'}
+        '204': {description: No rule recorded yet; nothing can be finalised}
+    put:
+      summary: Record or change the rule (owners only; versioned; audited ATTENDANCE_POLICY_SET)
+      operationId: setAttendancePolicy
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minConnectedPercent, lateAfterMinutes, description]
+              properties:
+                minConnectedPercent: {type: integer, minimum: 1, maximum: 100}
+                lateAfterMinutes: {type: integer, minimum: 0, maximum: 240}
+                description: {type: string, maxLength: 500, description: Where the rule was approved}
+                version: {type: integer, nullable: true, description: null for the first rule; otherwise the version read}
+      responses:
+        '200':
+          description: The saved rule
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AttendancePolicy'}
+        '403': {description: Not an owner}
+        '409': {description: Changed by someone else}
+  /api/v1/class-sessions/{sessionId}/attendance/finalisation:
+    post:
+      summary: Finalise a class's attendance by the academy's rule (implemented, 004B; owners/admins; audited ATTENDANCE_FINALISED)
+      description: |
+        Only when a rule is recorded, the class is scheduled and over, and every linked occurrence is counted from Zoom's
+        participant report (RECONCILED). One record per expected student (PRESENT, LATE or ABSENT), with the facts and the
+        rule used. Once per class; later changes are corrections.
+      operationId: finaliseAttendance
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId: {type: string, format: uuid}
+                  finalisedAt: {type: string, format: date-time}
+                  present: {type: integer}
+                  late: {type: integer}
+                  absent: {type: integer}
+        '409': {description: No rule, not finished, cancelled, not reconciled, or already final}
   /api/v1/zoom/webhooks:
     post:
       summary: Signed Zoom webhook ingress (implemented; off unless configured; verified against fixtures only)
@@ -1680,6 +1744,15 @@ paths:
         '503': {description: Receipt could not be stored; Zoom retries 5xx}
 components:
   schemas:
+    AttendancePolicy:
+      type: object
+      required: [minConnectedPercent, lateAfterMinutes, description, version, updatedAt]
+      properties:
+        minConnectedPercent: {type: integer}
+        lateAfterMinutes: {type: integer}
+        description: {type: string}
+        version: {type: integer}
+        updatedAt: {type: string, format: date-time}
     ZoomIdentityDecision:
       type: object
       required: [email, reason, linkedAt]
