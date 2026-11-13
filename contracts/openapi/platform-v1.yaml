@@ -1411,6 +1411,40 @@ paths:
                 properties:
                   linked: {type: integer}
                   stillUndecided: {type: integer}
+  /api/v1/zoom/reports:
+    post:
+      summary: Fetch Zoom's participant report for an ended occurrence now (implemented, 004B; owner/admin; audited)
+      description: |
+        Reports are also fetched automatically for ended occurrences linked to a class (luma.zoom.reports.*), retried
+        with backoff and Zoom's Retry-After. A fetched report replaces the live events in attendance; a later failure
+        never discards it. Stored rows keep email, display name, registrant ID, join/leave times and duration only.
+      operationId: fetchZoomReport
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [occurrenceUuid]
+              properties:
+                occurrenceUuid: {type: string, maxLength: 100}
+      responses:
+        '200':
+          description: Outcome (a Zoom failure is reported here with status FAILED)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [occurrenceUuid, status]
+                properties:
+                  occurrenceUuid: {type: string}
+                  status: {type: string, enum: [FETCHED, FAILED]}
+                  joinSessions: {type: integer, nullable: true}
+                  error: {type: string, nullable: true, description: Zoom's HTTP status and error code, never response content}
+        '404': {description: Unknown occurrence}
+        '409': {description: The webinar has not ended, or the Zoom API is not configured}
   /api/v1/zoom/participants:
     get:
       summary: People in a Zoom occurrence and the student each is matched to (implemented; owner/admin)
@@ -1540,10 +1574,11 @@ paths:
                 required: [sessionId, status, classStartsAt, classEndsAt, linkedOccurrences, webinarEnded, unmatchedPeople, calculatedAt, students]
                 properties:
                   sessionId: {type: string, format: uuid}
-                  status: {type: string, enum: [PROVISIONAL]}
+                  status: {type: string, enum: [PROVISIONAL, RECONCILED], description: RECONCILED when every linked occurrence is counted from Zoom's participant report; neither is a present/absent decision}
                   classStartsAt: {type: string, format: date-time}
                   classEndsAt: {type: string, format: date-time}
                   linkedOccurrences: {type: integer}
+                  reportedOccurrences: {type: integer}
                   webinarEnded: {type: boolean, description: Every linked occurrence reported webinar.ended}
                   unmatchedPeople: {type: integer}
                   calculatedAt: {type: string, format: date-time}

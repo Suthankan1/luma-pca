@@ -1,0 +1,190 @@
+package com.physicscube.luma.zoom;
+
+import com.physicscube.luma.audit.AuditLog;
+import com.physicscube.luma.shared.api.ConflictException;
+import com.physicscube.luma.shared.api.ResourceNotFoundException;
+import com.physicscube.luma.shared.security.CurrentAccount;
+import com.physicscube.luma.shared.time.DbTime;
+import com.physicscube.luma.zoom.api.ZoomApiClient;
+import com.physicscube.luma.zoom.api.ZoomApiException;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * Fetches Zoom's participant report for a webinar occurrence after it has ended and keeps
+ * it, replacing any earlier copy (slice 004B). Attendance then uses the report instead of
+ * live events. Zoom is called outside any database transaction; only the result is stored.
+ * Report rows keep only what attendance needs: no IP addresses, devices or locations.
+ */
+@Service
+public class ZoomReportService {
+    static final int MAX_ATTEMPTS = 6;
+    private static final int BATCH = 10;
+    private static final Logger log = LoggerFactory.getLogger(ZoomReportService.class);
+
+    private final JdbcTemplate jdbc;
+    private final TransactionTemplate transactions;
+    private final ObjectProvider<ZoomApiClient> api;
+    private final AuditLog audit;
+    private final Duration delayAfterEnd;
+
+    ZoomReportService(JdbcTemplate jdbc, TransactionTemplate transactions, ObjectProvider<ZoomApiClient> api, AuditLog audit,
+                      @Value("${luma.zoom.reports.delay-after-end:PT15M}") Duration delayAfterEnd) {
+        this.jdbc = jdbc;
+        this.transactions = transactions;
+        this.api = api;
+        this.audit = audit;
+        this.delayAfterEnd = delayAfterEnd;
+    }
+
+    /** @param status FETCHED or FAILED; @param error our fixed text or Zoom's status and code, when FAILED */
+    public record FetchResult(String occurrenceUuid, String status, Integer joinSessions, String error) {
+    }
+
+    /** Whether report fetching can run at all (the Zoom API credentials are configured). */
+    public boolean available() {
+        return api.getIfAvailable() != null;
+    }
+
+    /** An owner or administrator fetches (or re-fetches) the report of an ended occurrence now. Audited. */
+    public FetchResult fetchNow(CurrentAccount caller, String occurrenceUuid) {
+        caller.requireAcademyManager();
+        Integer known = jdbc.queryForObject("SELECT count(*) FROM (SELECT 1 FROM zoom_occurrence_events WHERE academy_id = ? "
+                + "AND occurrence_uuid = ? LIMIT 1) s", Integer.class, caller.academyId(), occurrenceUuid);
+        if (known == null || known == 0) {
+            throw new ResourceNotFoundException("Occurrence");
+        }
+        Integer ended = jdbc.queryForObject("SELECT count(*) FROM zoom_occurrence_events WHERE academy_id = ? AND occurrence_uuid = ? "
+                + "AND event_type = 'webinar.ended'", Integer.class, caller.academyId(), occurrenceUuid);
+        if (ended == null || ended == 0) {
+            throw new ConflictException("Zoom publishes the participant report after the webinar ends");
+        }
+        if (!available()) {
+            throw new ConflictException("The Zoom API is not configured for this deployment");
+        }
+        FetchResult result = fetch(caller.academyId(), occurrenceUuid);
+        transactions.executeWithoutResult(status -> audit.record(caller.academyId(), caller.accountId(), "ZOOM_REPORT_FETCHED",
+                "ZOOM_OCCURRENCE", null, Map.of("occurrenceUuid", occurrenceUuid, "status", result.status(),
+                        "joinSessions", String.valueOf(result.joinSessions() == null ? 0 : result.joinSessions()))));
+        return result;
+    }
+
+    /**
+     * Fetches reports for occurrences linked to a class that ended at least {@code delayAfterEnd}
+     * ago and have no report yet, or whose last attempt failed and is due again.
+     *
+     * @return how many were attempted
+     */
+    public int runOnce() {
+        if (!available()) {
+            return 0;
+        }
+        Instant now = DbTime.now();
+        List<Map<String, Object>> due = jdbc.queryForList("""
+                SELECT l.academy_id, l.occurrence_uuid
+                FROM zoom_occurrence_links l
+                JOIN (SELECT academy_id, occurrence_uuid, max(event_ts) AS ended_ts FROM zoom_occurrence_events
+                      WHERE event_type = 'webinar.ended' GROUP BY academy_id, occurrence_uuid) e
+                  ON e.academy_id = l.academy_id AND e.occurrence_uuid = l.occurrence_uuid
+                LEFT JOIN zoom_report_fetches f ON f.academy_id = l.academy_id AND f.occurrence_uuid = l.occurrence_uuid
+                WHERE l.class_session_id IS NOT NULL AND e.ended_ts <= ?
+                  AND (f.occurrence_uuid IS NULL OR (f.status = 'FAILED' AND f.attempts < ? AND f.next_attempt_at <= ?))
+                ORDER BY e.ended_ts
+                LIMIT ?
+                """, now.minus(delayAfterEnd).toEpochMilli(), MAX_ATTEMPTS, Timestamp.from(now), BATCH);
+        for (Map<String, Object> row : due) {
+            fetch((UUID) row.get("academy_id"), (String) row.get("occurrence_uuid"));
+        }
+        return due.size();
+    }
+
+    FetchResult fetch(UUID academyId, String occurrenceUuid) {
+        ZoomApiClient client = api.getIfAvailable();
+        if (client == null) {
+            return new FetchResult(occurrenceUuid, "FAILED", null, "The Zoom API is not configured");
+        }
+        List<ZoomApiClient.Participant> report;
+        try {
+            report = client.pastParticipants(occurrenceUuid);
+        } catch (ZoomApiException e) {
+            return failed(academyId, occurrenceUuid, truncate(e.getMessage()), e.retryAfter());
+        } catch (RuntimeException e) {
+            return failed(academyId, occurrenceUuid, e.getClass().getSimpleName(), null);
+        }
+        List<Object[]> rows = new ArrayList<>();
+        for (ZoomApiClient.Participant p : report) {
+            if (p.joinTime() == null || p.leaveTime() == null || p.leaveTime().isBefore(p.joinTime())) {
+                continue; // incomplete row: not usable as an interval
+            }
+            String email = p.userEmail() == null || p.userEmail().isBlank() ? null : p.userEmail().strip().toLowerCase(Locale.ROOT);
+            rows.add(new Object[] {UUID.randomUUID(), academyId, occurrenceUuid, email != null && email.length() <= 254 ? email : null,
+                    clip(p.name(), 200), clip(p.registrantId(), 100), Timestamp.from(p.joinTime()), Timestamp.from(p.leaveTime()),
+                    Math.max(0, p.durationSeconds())});
+        }
+        Instant now = DbTime.now();
+        transactions.executeWithoutResult(status -> {
+            jdbc.update("DELETE FROM zoom_report_participants WHERE academy_id = ? AND occurrence_uuid = ?", academyId, occurrenceUuid);
+            jdbc.update("""
+                    INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, next_attempt_at, last_error, fetched_at, join_sessions)
+                    VALUES (?, ?, 'FETCHED', 1, NULL, NULL, ?, ?)
+                    ON CONFLICT (academy_id, occurrence_uuid) DO UPDATE SET status = 'FETCHED', attempts = zoom_report_fetches.attempts + 1,
+                      next_attempt_at = NULL, last_error = NULL, fetched_at = EXCLUDED.fetched_at, join_sessions = EXCLUDED.join_sessions
+                    """, academyId, occurrenceUuid, Timestamp.from(now), rows.size());
+            jdbc.batchUpdate("""
+                    INSERT INTO zoom_report_participants (id, academy_id, occurrence_uuid, email, display_name, registrant_id,
+                      joined_at, left_at, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, rows);
+        });
+        log.info("Zoom participant report stored for an occurrence: {} join sessions", rows.size());
+        return new FetchResult(occurrenceUuid, "FETCHED", rows.size(), null);
+    }
+
+    private FetchResult failed(UUID academyId, String occurrenceUuid, String error, Duration retryAfter) {
+        Instant now = DbTime.now();
+        transactions.executeWithoutResult(status -> {
+            Integer attempts = jdbc.query("SELECT attempts FROM zoom_report_fetches WHERE academy_id = ? AND occurrence_uuid = ? FOR UPDATE",
+                    rs -> rs.next() ? rs.getInt(1) : 0, academyId, occurrenceUuid);
+            int next = (attempts == null ? 0 : attempts) + 1;
+            // 15 minutes doubling (to 8 hours), or Zoom's Retry-After when it is longer.
+            Duration wait = Duration.ofMinutes(15L << Math.min(next - 1, 5));
+            if (retryAfter != null && retryAfter.compareTo(wait) > 0) {
+                wait = retryAfter;
+            }
+            // A failure never discards a report fetched earlier.
+            jdbc.update("""
+                    INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, next_attempt_at, last_error)
+                    VALUES (?, ?, 'FAILED', 1, ?, ?)
+                    ON CONFLICT (academy_id, occurrence_uuid) DO UPDATE SET attempts = zoom_report_fetches.attempts + 1,
+                      next_attempt_at = EXCLUDED.next_attempt_at, last_error = EXCLUDED.last_error
+                      WHERE zoom_report_fetches.status = 'FAILED'
+                    """, academyId, occurrenceUuid, Timestamp.from(now.plus(wait)), error);
+        });
+        log.warn("Zoom participant report could not be fetched: {}", error);
+        return new FetchResult(occurrenceUuid, "FAILED", null, error);
+    }
+
+    private static String clip(String text, int max) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        String trimmed = text.strip();
+        return trimmed.length() > max ? trimmed.substring(0, max) : trimmed;
+    }
+
+    private static String truncate(String text) {
+        return text == null ? "Zoom API error" : text.length() > 300 ? text.substring(0, 300) : text;
+    }
+}

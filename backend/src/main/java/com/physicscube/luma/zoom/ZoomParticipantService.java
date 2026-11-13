@@ -243,9 +243,10 @@ public class ZoomParticipantService {
      * @param startedAt per occurrence: webinar.started, else its first event
      * @param endedAt per occurrence that has a webinar.ended event
      * @param unmatchedPeople people (not the host) matched to no student and not marked "not a student"
+     * @param reportedOccurrences occurrences whose visits come from Zoom's participant report instead of live events
      */
     public record ClassActivity(List<String> occurrences, Map<String, Instant> startedAt, Map<String, Instant> endedAt,
-                                List<StudentVisit> visits, int unmatchedPeople) {
+                                List<StudentVisit> visits, int unmatchedPeople, Set<String> reportedOccurrences) {
     }
 
     private static final class Visit {
@@ -304,6 +305,20 @@ public class ZoomParticipantService {
                 started.putIfAbsent(occurrence, first[0]);
             }
         }
+        // Where Zoom's participant report has been fetched, it replaces the live visits (004B).
+        Set<String> reported = new HashSet<>(jdbc.queryForList("SELECT occurrence_uuid FROM zoom_report_fetches WHERE academy_id = ? "
+                + "AND status = 'FETCHED' AND occurrence_uuid = ANY (?)", String.class, academyId, occurrences.toArray(String[]::new)));
+        for (String occurrence : reported) {
+            Map<String, Visit> visits = new LinkedHashMap<>();
+            jdbc.query("SELECT id, email, joined_at, left_at FROM zoom_report_participants WHERE academy_id = ? AND occurrence_uuid = ? "
+                    + "AND email IS NOT NULL ORDER BY joined_at, id", row -> {
+                Visit visit = new Visit(row.getString("email"));
+                visit.joined = row.getTimestamp("joined_at").toInstant();
+                visit.left = row.getTimestamp("left_at").toInstant();
+                visits.put(row.getString("id"), visit);
+            }, academyId, occurrence);
+            visitsByOccurrence.put(occurrence, visits);
+        }
         Set<String> emails = visitsByOccurrence.values().stream().flatMap(v -> v.values().stream()).map(v -> v.email)
                 .filter(e -> !hosts.contains(e)).collect(Collectors.toSet());
         Map<String, Resolved> resolved = resolve(academyId, emails);
@@ -320,7 +335,7 @@ public class ZoomParticipantService {
                 matched.add(new StudentVisit(match.student().id(), occurrence, visit.joined, visit.left));
             }
         }));
-        return new ClassActivity(occurrences, started, ended, matched, unmatched.size());
+        return new ClassActivity(occurrences, started, ended, matched, unmatched.size(), reported);
     }
 
     private record Resolved(Match match, String source, StudentView student) {

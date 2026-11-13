@@ -79,3 +79,16 @@ export async function decideIdentity(_previous: FormState, form: FormData): Prom
   revalidatePath("/staff/zoom/participants");
   return { ok: true, message: notStudent ? "Marked as not a student." : "Matched to the student." };
 }
+
+/** Fetches Zoom's participant report for an ended occurrence now; it is otherwise fetched automatically. */
+export async function fetchReport(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const occurrenceUuid = occurrenceIdOrNull(form.get("occurrenceUuid"));
+  if (!occurrenceUuid) return invalid;
+  const result = await staffApi<{ status: "FETCHED" | "FAILED"; joinSessions: number | null; error: string | null }>(
+    "/api/v1/zoom/reports", { method: "POST", body: { occurrenceUuid } });
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
+  revalidatePath("/staff/zoom");
+  if (result.data.status === "FAILED") return { ok: false, message: `Zoom did not return the report (${result.data.error ?? "error"}). It will be retried automatically.` };
+  return { ok: true, message: `Report fetched: ${result.data.joinSessions} join session${result.data.joinSessions === 1 ? "" : "s"}.` };
+}

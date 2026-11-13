@@ -199,6 +199,18 @@ test.describe("Zoom review", () => {
     await expect(expectedRow).toContainText("no leave received yet");
     const extraRow = attendance.getByRole("listitem", { name: `Attendance ZM-${P}-2 Guest Student` });
     await expect(extraRow).toContainText("not expected at this class");
+
+    // After the webinar, Zoom's participant report replaces the live events.
+    await page.goto("/staff/zoom");
+    await expect(occurrence.locator(".report-state")).toHaveText("Zoom report will be fetched automatically");
+    await occurrence.getByRole("button", { name: "Fetch Zoom’s report" }).click();
+    await expect(occurrence.locator(".report-feedback")).toHaveText("Report fetched: 4 join sessions.");
+    await expect(occurrence.locator(".report-state")).toContainText("Zoom report fetched");
+    await expect(occurrence.getByRole("button", { name: "Fetch Zoom’s report again" })).toBeVisible();
+    await occurrence.getByRole("link", { name: new RegExp(`^Attendance class ${p}, `) }).click();
+    const reconciled = page.getByRole("region", { name: "ATTENDANCE FROM ZOOM’S REPORT" });
+    await expect(reconciled).toContainText("From Zoom’s participant report, fetched after the webinar ended");
+    await expect(reconciled).toContainText("No present or absent decision is made");
   });
 
   test("A failed event is replayed with a reason", async ({ page }) => {

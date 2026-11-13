@@ -349,7 +349,16 @@ export function batchOptions(courses: CourseRef[], batches: BatchRef[], include:
 // ---- Zoom review ------------------------------------------------------------------
 
 export type Occurrence = { occurrenceUuid: string; webinarId: string; firstEventAt: string; lastEventAt: string; eventCount: number;
-  classSessionId: string | null; linkSource: "AUTOMATIC" | "MANUAL" | null; linkedAt: string | null };
+  classSessionId: string | null; linkSource: "AUTOMATIC" | "MANUAL" | null; linkedAt: string | null;
+  ended?: boolean; reportStatus?: "FETCHED" | "FAILED" | null; reportFetchedAt?: string | null; reportJoinSessions?: number | null };
+
+/** Where an occurrence's Zoom participant report stands, in words. */
+export function reportState(o: Occurrence) {
+  if (o.reportStatus === "FETCHED") return `Zoom report fetched${o.reportFetchedAt ? ` ${formatInstant(o.reportFetchedAt)}` : ""} · ${o.reportJoinSessions ?? 0} join session${o.reportJoinSessions === 1 ? "" : "s"}`;
+  if (o.reportStatus === "FAILED") return "Zoom report not fetched yet (will retry)";
+  if (!o.ended) return "Zoom report available after the webinar ends";
+  return o.classSessionId ? "Zoom report will be fetched automatically" : "Zoom report: link the occurrence to a class first, or fetch it now";
+}
 export type ZoomReceipt = { id: string; eventType: string; eventTs: number; status: string; attempts: number; lastError: string | null;
   receivedAt: string; nextAttemptAt: string | null; processedAt: string | null };
 
@@ -379,8 +388,8 @@ export function zoomEmailOrNull(value: FormDataEntryValue | null) {
 
 export type AttendanceRow = { studentId: string; studentNumber: string; fullName: string; expected: boolean; seen: boolean; visits: number;
   openVisits: number; connectedSeconds: number; firstJoinAt: string | null; secondsAfterStart: number | null };
-export type ProvisionalAttendance = { sessionId: string; status: "PROVISIONAL"; classStartsAt: string; classEndsAt: string;
-  linkedOccurrences: number; webinarEnded: boolean; unmatchedPeople: number; calculatedAt: string; students: AttendanceRow[] };
+export type ProvisionalAttendance = { sessionId: string; status: "PROVISIONAL" | "RECONCILED"; classStartsAt: string; classEndsAt: string;
+  linkedOccurrences: number; reportedOccurrences: number; webinarEnded: boolean; unmatchedPeople: number; calculatedAt: string; students: AttendanceRow[] };
 
 /** "1 h 05 min", "45 min", "0 min"; whole minutes, rounded down. */
 export function formatDuration(seconds: number) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { autoLinkOccurrences, decideIdentity, decideOccurrence, replayReceipt } from "@/app/staff/zoom/actions";
+import { autoLinkOccurrences, decideIdentity, decideOccurrence, fetchReport, replayReceipt } from "@/app/staff/zoom/actions";
 import type { FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, className }: { state: FormState; className: string }) {
@@ -75,5 +75,14 @@ export function IdentityForm({ prefix, email }: { prefix: string; email: string 
       <button className="action secondary" type="submit" name="intent" value="not-student" disabled={pending}>Not a student</button>
     </div>
     <Feedback state={state} className="identity-feedback" />
+  </form>;
+}
+
+export function ReportForm({ occurrenceUuid, again }: { occurrenceUuid: string; again: boolean }) {
+  const [state, action, pending] = useActionState(fetchReport, null);
+  return <form action={action} className="inline-form">
+    <input type="hidden" name="occurrenceUuid" value={occurrenceUuid} />
+    <button className="action secondary" type="submit" disabled={pending}>{pending ? "Fetching…" : again ? "Fetch Zoom’s report again" : "Fetch Zoom’s report"}</button>
+    <Feedback state={state} className="report-feedback" />
   </form>;
 }

@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
-import { AutoLinkForm, DecisionForm, IdentityForm, ReplayForm } from "@/components/staff/ZoomForms";
+import { AutoLinkForm, DecisionForm, IdentityForm, ReplayForm, ReportForm } from "@/components/staff/ZoomForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  candidateClasses, candidateWindow, formatClassTime, formatInstant, formatWebinarId, isAcademyManager, occurrenceState, zoomEventLabels,
+  candidateClasses, candidateWindow, formatClassTime, formatInstant, formatWebinarId, isAcademyManager, occurrenceState, reportState, zoomEventLabels,
   type ClassSession, type Occurrence, type UnmatchedZoomIdentity, type ZoomReceipt,
 } from "@/lib/staff-forms";
 
@@ -92,6 +92,8 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
               <span className={`status ${state === "Needs review" ? "off" : "on"}`}>{state}</span>
             </div>
             <p className="dir-dates"><Link className="text-link" href={`/staff/zoom/participants?${new URLSearchParams({ occurrence: o.occurrenceUuid })}`}>People in this occurrence</Link></p>
+            <p className="dir-dates muted report-state">{reportState(o)}</p>
+            {o.ended && <ReportForm occurrenceUuid={o.occurrenceUuid} again={o.reportStatus === "FETCHED"} />}
             {o.linkSource ? <details className="decision">
               <summary>Change decision</summary>
               <DecisionForm prefix={`occ-${index}`} occurrenceUuid={o.occurrenceUuid} candidates={candidateClasses(o, nearby)} current={o.classSessionId} />

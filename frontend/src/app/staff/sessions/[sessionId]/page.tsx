@@ -90,11 +90,15 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
       </section>}
     </div>
     <section className="panel panel-gap" aria-labelledby="attendance-title">
-      <h2 id="attendance-title" className="panel-title">PROVISIONAL ATTENDANCE</h2>
+      <h2 id="attendance-title" className="panel-title">{attendance.ok && attendance.data.status === "RECONCILED" ? "ATTENDANCE FROM ZOOM’S REPORT" : "PROVISIONAL ATTENDANCE"}</h2>
       {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load attendance right now. Please reload shortly.</p> : <>
-        <p className="panel-sub">From live Zoom events, recalculated each time this page loads ({formatInstant(attendance.data.calculatedAt)}).
-          {" "}Time connected counts rejoins once and only within the class time. This is not a final record: live events can arrive late
-          or not at all, and a student not seen here is not proof of absence.
+        <p className="panel-sub">{attendance.data.status === "RECONCILED"
+            ? "From Zoom’s participant report, fetched after the webinar ended"
+            : attendance.data.reportedOccurrences > 0 ? "Partly from Zoom’s participant report, partly from live Zoom events"
+            : "From live Zoom events"}, recalculated each time this page loads ({formatInstant(attendance.data.calculatedAt)}).
+          {" "}Time connected counts rejoins once and only within the class time.
+          {" "}{attendance.data.status === "RECONCILED" ? "No present or absent decision is made until the academy sets its attendance rule."
+            : "This is not a final record: live events can arrive late or not at all, and a student not seen here is not proof of absence."}
           {" "}{attendance.data.linkedOccurrences === 0 ? "No Zoom occurrence is linked to this class yet."
             : attendance.data.webinarEnded ? "The webinar has ended." : "The webinar has not reported an end yet."}
           {manager && attendance.data.unmatchedPeople > 0 && <> {attendance.data.unmatchedPeople} Zoom participant{attendance.data.unmatchedPeople === 1 ? " is" : "s are"} not

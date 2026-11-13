@@ -257,9 +257,13 @@ function resolvePerson(person) {
   return student ? { match: "STUDENT", matchSource: "SIGN_IN_EMAIL", student } : { match: "UNMATCHED", matchSource: null, student: null };
 }
 
+// Zoom participant reports fetched per occurrence (all seeded occurrences have ended).
+const zoomReports = new Map();
 const occurrenceView = o => {
   const link = occurrenceLinks.get(o.occurrenceUuid);
-  return { ...o, classSessionId: link?.classSessionId ?? null, linkSource: link?.linkSource ?? null, linkedAt: link?.linkedAt ?? null };
+  const report = zoomReports.get(o.occurrenceUuid);
+  return { ...o, classSessionId: link?.classSessionId ?? null, linkSource: link?.linkSource ?? null, linkedAt: link?.linkedAt ?? null,
+    ended: true, reportStatus: report ? "FETCHED" : null, reportFetchedAt: report?.fetchedAt ?? null, reportJoinSessions: report?.joinSessions ?? null };
 };
 
 // As the API's ClassLinkReviser: after a class changes, automatic links on its webinars are kept only
@@ -336,6 +340,14 @@ function zoomApi(req, body, send, parts, query) {
         expected: session && student ? expected.has(student.id) : null };
     }).sort((a, b) => order.indexOf(a.match) - order.indexOf(b.match));
     return send(200, { occurrenceUuid: uuid, classSessionId: sessionId, participants });
+  }
+  if (req.method === "POST" && resource === "reports") {
+    const occurrence = occurrences.find(o => o.occurrenceUuid === body.occurrenceUuid);
+    if (!occurrence) return send(404, { detail: "Occurrence not found" });
+    const joinSessions = (zoomPeople.get(occurrence.occurrenceUuid) ?? []).reduce((n, p) => n + p.visits, 0);
+    zoomReports.set(occurrence.occurrenceUuid, { fetchedAt: new Date().toISOString(), joinSessions });
+    audit("ZOOM_REPORT_FETCHED", "ZOOM_OCCURRENCE", null, null, { occurrenceUuid: occurrence.occurrenceUuid, status: "FETCHED", joinSessions: String(joinSessions) });
+    return send(200, { occurrenceUuid: occurrence.occurrenceUuid, status: "FETCHED", joinSessions, error: null });
   }
   if (req.method === "POST" && resource === "identity-links") {
     const email = String(body.email ?? "").trim().toLowerCase();
@@ -768,8 +780,10 @@ function academicApi(req, body, send) {
       const rows = [...students.filter(s => expectedIds.has(s.id)).map(s => row(s, true)),
         ...students.filter(s => seen.has(s.id) && !expectedIds.has(s.id)).map(s => row(s, false))]
         .sort((a, b) => Number(b.expected) - Number(a.expected) || a.studentNumber.localeCompare(b.studentNumber));
-      return send(200, { sessionId: session.id, status: "PROVISIONAL", classStartsAt: session.startsAt, classEndsAt: session.endsAt,
-        linkedOccurrences: linked.length, webinarEnded: linked.length > 0, unmatchedPeople, calculatedAt: new Date().toISOString(), students: rows });
+      const reported = linked.filter(o => zoomReports.has(o.occurrenceUuid)).length;
+      return send(200, { sessionId: session.id, status: linked.length > 0 && reported === linked.length ? "RECONCILED" : "PROVISIONAL",
+        classStartsAt: session.startsAt, classEndsAt: session.endsAt, linkedOccurrences: linked.length, reportedOccurrences: reported,
+        webinarEnded: linked.length > 0, unmatchedPeople, calculatedAt: new Date().toISOString(), students: rows });
     }
     if (req.method === "GET") return send(200, sessionView(session));
     if (req.method === "PUT") {

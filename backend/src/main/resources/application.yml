@@ -115,3 +115,9 @@ luma:
       poll-interval: ${LUMA_ZOOM_PROCESSING_POLL_INTERVAL:PT5S}
       # Receipts handled per poll (1 to 500); with the interval this sets the drain rate per instance.
       batch-size: ${LUMA_ZOOM_PROCESSING_BATCH_SIZE:50}
+    reports:
+      # Fetches Zoom's participant report for webinars linked to a class, once they have ended
+      # (only when the API credentials above are set). Zoom publishes reports with some delay.
+      enabled: ${LUMA_ZOOM_REPORTS_ENABLED:true}
+      poll-interval: ${LUMA_ZOOM_REPORTS_POLL_INTERVAL:PT5M}
+      delay-after-end: ${LUMA_ZOOM_REPORTS_DELAY_AFTER_END:PT15M}

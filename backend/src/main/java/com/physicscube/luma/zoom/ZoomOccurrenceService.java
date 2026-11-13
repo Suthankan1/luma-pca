@@ -51,9 +51,12 @@ public class ZoomOccurrenceService {
         }
         StringBuilder sql = new StringBuilder("""
                 SELECT e.occurrence_uuid, min(e.webinar_id) AS webinar_id, min(e.event_ts) AS first_ts, max(e.event_ts) AS last_ts,
-                       count(*) AS events, l.class_session_id, l.link_source, l.linked_at
+                       count(*) AS events, l.class_session_id, l.link_source, l.linked_at,
+                       bool_or(e.event_type = 'webinar.ended') AS ended, f.status AS report_status, f.fetched_at AS report_fetched_at,
+                       f.join_sessions AS report_join_sessions
                 FROM zoom_occurrence_events e
                 LEFT JOIN zoom_occurrence_links l ON l.academy_id = e.academy_id AND l.occurrence_uuid = e.occurrence_uuid
+                LEFT JOIN zoom_report_fetches f ON f.academy_id = e.academy_id AND f.occurrence_uuid = e.occurrence_uuid
                 WHERE e.academy_id = ?
                 """);
         List<Object> args = new ArrayList<>(List.of(caller.academyId()));
@@ -64,7 +67,7 @@ public class ZoomOccurrenceService {
             sql.append(" AND l.class_session_id = ?");
             args.add(sessionId);
         }
-        sql.append(" GROUP BY e.occurrence_uuid, l.class_session_id, l.link_source, l.linked_at"
+        sql.append(" GROUP BY e.occurrence_uuid, l.class_session_id, l.link_source, l.linked_at, f.status, f.fetched_at, f.join_sessions"
                 + " ORDER BY min(e.event_ts) DESC, e.occurrence_uuid LIMIT ?");
         args.add(limit);
         return jdbc.query(sql.toString(), (row, i) -> view(row), args.toArray());
@@ -135,9 +138,11 @@ public class ZoomOccurrenceService {
 
     private static OccurrenceView view(ResultSet row) throws SQLException {
         Timestamp linkedAt = row.getTimestamp("linked_at");
+        Timestamp reportFetchedAt = row.getTimestamp("report_fetched_at");
         return new OccurrenceView(row.getString("occurrence_uuid"), row.getString("webinar_id"),
                 Instant.ofEpochMilli(row.getLong("first_ts")), Instant.ofEpochMilli(row.getLong("last_ts")), row.getInt("events"),
                 (UUID) row.getObject("class_session_id"), row.getString("link_source"),
-                linkedAt == null ? null : linkedAt.toInstant());
+                linkedAt == null ? null : linkedAt.toInstant(), row.getBoolean("ended"), row.getString("report_status"),
+                reportFetchedAt == null ? null : reportFetchedAt.toInstant(), (Integer) row.getObject("report_join_sessions"));
     }
 }

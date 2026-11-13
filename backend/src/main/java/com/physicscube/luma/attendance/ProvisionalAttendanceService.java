@@ -26,8 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Provisional attendance for one class, recalculated on every read from live Zoom events
- * (slice 004A). It reports facts only: time connected (rejoins merged, clipped to the class
+ * Attendance facts for one class, recalculated on every read (slices 004A/004B): from Zoom's
+ * participant report where it has been fetched after the webinar, otherwise from live events. It reports facts only: time connected (rejoins merged, clipped to the class
  * time), first join and how long after the start, visits, and visits with no leave yet.
  * It never decides present or absent: the academy's threshold is an open question, live
  * events can be late or missing, and someone not seen is not proof of absence. Official
@@ -57,12 +57,15 @@ public class ProvisionalAttendanceService {
     }
 
     /**
-     * @param webinarEnded every linked occurrence has a webinar.ended event
+     * @param status PROVISIONAL (some or all from live events) or RECONCILED (every linked occurrence from Zoom's
+     *               participant report). Neither is a present/absent decision.
+     * @param webinarEnded every linked occurrence has a webinar.ended event or a fetched report
+     * @param reportedOccurrences linked occurrences counted from Zoom's participant report
      * @param unmatchedPeople Zoom participants not matched to any student (see Zoom review)
      */
     public record ProvisionalAttendance(UUID sessionId, String status, Instant classStartsAt, Instant classEndsAt,
-                                        int linkedOccurrences, boolean webinarEnded, int unmatchedPeople, Instant calculatedAt,
-                                        List<StudentAttendance> students) {
+                                        int linkedOccurrences, int reportedOccurrences, boolean webinarEnded, int unmatchedPeople,
+                                        Instant calculatedAt, List<StudentAttendance> students) {
     }
 
     @Transactional(readOnly = true)
@@ -92,9 +95,11 @@ public class ProvisionalAttendanceService {
             }
         }
         rows.sort(Comparator.comparing(StudentAttendance::expected).reversed().thenComparing(StudentAttendance::studentNumber));
-        boolean ended = !activity.occurrences().isEmpty() && activity.endedAt().keySet().containsAll(activity.occurrences());
-        return new ProvisionalAttendance(sessionId, "PROVISIONAL", session.startsAt(), session.endsAt(), activity.occurrences().size(),
-                ended, activity.unmatchedPeople(), now, rows);
+        boolean reconciled = !activity.occurrences().isEmpty() && activity.reportedOccurrences().containsAll(activity.occurrences());
+        boolean ended = !activity.occurrences().isEmpty() && activity.occurrences().stream()
+                .allMatch(o -> activity.endedAt().containsKey(o) || activity.reportedOccurrences().contains(o));
+        return new ProvisionalAttendance(sessionId, reconciled ? "RECONCILED" : "PROVISIONAL", session.startsAt(), session.endsAt(),
+                activity.occurrences().size(), activity.reportedOccurrences().size(), ended, activity.unmatchedPeople(), now, rows);
     }
 
     private static StudentAttendance row(UUID id, String number, String name, boolean expected, List<StudentVisit> visits,

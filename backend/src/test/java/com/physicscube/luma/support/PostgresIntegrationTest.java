@@ -15,6 +15,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         properties = {"luma.auth.ephemeral-signing-key=true",
         // Tests drive the receipt processor directly; no background polling.
         "luma.zoom.processing.enabled=false",
+        // Tests drive Zoom report fetching directly.
+        "luma.zoom.reports.enabled=false",
         // Tests drive the invitation email sender directly.
         "luma.mail.bulk.enabled=false",
         // Every test signs in from this machine; AuthRateLimitIntegrationTest turns limits on with small values.
