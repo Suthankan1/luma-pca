@@ -1599,6 +1599,49 @@ paths:
                         firstJoinAt: {type: string, format: date-time, nullable: true}
                         secondsAfterStart: {type: integer, nullable: true}
         '404': {description: Class not found or not visible to the caller}
+  /api/v1/class-sessions/{sessionId}/attendance/export:
+    get:
+      summary: The class's attendance facts as CSV (implemented, 005A; audited ATTENDANCE_EXPORTED)
+      description: The same rows and scoping as GET .../attendance for the caller.
+      operationId: exportClassAttendance
+      security: [{bearerAuth: []}]
+      tags: [Attendance]
+      parameters:
+        - {in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: |
+            text/csv (UTF-8, CRLF), Content-Disposition attachment, Cache-Control no-store. Columns: class_date, class_start,
+            class_end, time_zone, class_title, class_status, data_source (PROVISIONAL or RECONCILED), student_number,
+            student_name, expected, seen, visits, visits_without_leave, minutes_connected, first_join, minutes_after_start.
+            Times are in the class's own zone. Cells starting with = + - @ tab or CR are prefixed with an apostrophe.
+          content:
+            text/csv:
+              schema: {type: string}
+        '404': {description: Class not found or not visible to the caller}
+  /api/v1/batches/{batchId}/attendance/export:
+    get:
+      summary: A batch's attendance facts over a date range as CSV (implemented, 005A; audited ATTENDANCE_EXPORTED)
+      description: Classes of the batch whose own date is from..to (inclusive, at most 92 days); only students of that batch.
+      operationId: exportBatchAttendance
+      security: [{bearerAuth: []}]
+      tags: [Attendance]
+      parameters:
+        - {in: path, name: batchId, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: from, required: true, schema: {type: string, format: date}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: |
+            text/csv (UTF-8, CRLF), Content-Disposition attachment, Cache-Control no-store. Columns: class_date, class_start,
+            class_end, time_zone, class_title, class_status, data_source (PROVISIONAL or RECONCILED), student_number,
+            student_name, expected, seen, visits, visits_without_leave, minutes_connected, first_join, minutes_after_start.
+            Times are in the class's own zone. Cells starting with = + - @ tab or CR are prefixed with an apostrophe.
+          content:
+            text/csv:
+              schema: {type: string}
+        '400': {description: Missing or invalid range}
+        '404': {description: Batch not found or not visible to the caller}
   /api/v1/zoom/webhooks:
     post:
       summary: Signed Zoom webhook ingress (implemented; off unless configured; verified against fixtures only)

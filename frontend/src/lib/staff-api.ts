@@ -58,6 +58,37 @@ async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`
 }
 
 /**
+ * A file download (an attendance CSV) for a route handler, as the signed-in staff member.
+ * The API decides access; only its file headers are passed on, and never cached.
+ */
+export async function staffDownload(path: `/api/v1/${string}`): Promise<Response> {
+  const access = await accessToken("staff");
+  let response: Response;
+  try {
+    response = await fetch(new URL(path, process.env.API_INTERNAL_URL ?? "http://localhost:8080"), {
+      cache: "no-store", redirect: "error", signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${access}` },
+    });
+  } catch {
+    return new Response("The export could not be prepared right now. Please try again shortly.", { status: 503, headers: plainText });
+  }
+  if (response.status === 401) redirect("/sign-in?portal=staff&error=expired");
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const detail = response.status === 400 && typeof body?.detail === "string" ? body.detail.slice(0, 300)
+      : response.status === 403 || response.status === 404 ? "You can’t export this." : "The export could not be prepared right now.";
+    return new Response(detail, { status: response.status, headers: plainText });
+  }
+  return new Response(response.body, { status: 200, headers: {
+    "Content-Type": response.headers.get("Content-Type") ?? "text/csv; charset=utf-8",
+    "Content-Disposition": response.headers.get("Content-Disposition") ?? "attachment; filename=\"attendance.csv\"",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+  } });
+}
+
+const plainText = { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
+
+/**
  * Server Actions already require the Origin to match the Host. This repeats the
  * check against the configured public origin, as the session routes do, so a
  * misconfigured proxy cannot widen it.

@@ -18,6 +18,12 @@ const backend = createServer(async (req, res) => {
     res.writeHead(status, { "content-type": "application/json" });
     res.end(value ? JSON.stringify(value) : "");
   };
+  // A CSV download, as the API's attendance exports answer.
+  send.csv = (filename, text) => {
+    res.writeHead(200, { "content-type": "text/csv;charset=UTF-8", "cache-control": "no-store",
+      "content-disposition": `attachment; filename="${filename}"` });
+    res.end(text);
+  };
 
   if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
@@ -543,7 +549,7 @@ function audit(action, targetType, targetId, targetLabel, details) {
   auditEvents.push({ id: uuid(), seq: auditEvents.length + 1, occurredAt: new Date().toISOString(), action,
     actorAccountId: SELF_ID, actorEmail: "admin-enrolled@example.invalid", targetType, targetId, targetLabel, details });
 }
-const auditCategories = { staff: /^(STAFF_|OWNER_)/, "sign-in": /^(INVITATIONS?_|PASSWORD_RESET_)/, students: /^STUDENTS_/, classes: /^CLASS_/, zoom: /^ZOOM_/ };
+const auditCategories = { staff: /^(STAFF_|OWNER_)/, "sign-in": /^(INVITATIONS?_|PASSWORD_RESET_)/, students: /^STUDENTS_/, classes: /^(CLASS_|ATTENDANCE_)/, zoom: /^ZOOM_/ };
 function auditApi(query, send) {
   const params = new URLSearchParams(query);
   const category = params.get("category");
@@ -570,6 +576,24 @@ function academicApi(req, body, send) {
   if (!manager && (collection === "batches" || collection === "class-sessions") && !id && req.method === "GET"
       && roles.some(r => staffRoles.includes(r))) return send(200, []);
   if (!manager) return send(403, { detail: "Forbidden" });
+  if (req.method === "GET" && path.endsWith("/attendance/export")) {
+    // The real export has more columns and one row per student; the mock proves the download path.
+    const header = "class_date,class_title,data_source,student_number,student_name,minutes_connected\r\n";
+    if (collection === "class-sessions") {
+      const session = classSessions.find(s => s.id === id);
+      if (!session) return send(404, { detail: "Not found" });
+      audit("ATTENDANCE_EXPORTED", "CLASS_SESSION", session.id, session.title, { scope: "class", rows: "0" });
+      return send.csv(`attendance-${localDate(session.startsAt, session.timeZone)}.csv`, header);
+    }
+    const batch = batches.find(b => b.id === id);
+    const params = new URLSearchParams(query);
+    if (!batch) return send(404, { detail: "Not found" });
+    if (!params.get("from") || !params.get("to") || params.get("to") < params.get("from")) {
+      return send(400, { detail: "from and to are required, to not before from, at most 92 days" });
+    }
+    audit("ATTENDANCE_EXPORTED", "BATCH", batch.id, batch.code, { scope: "batch", from: params.get("from"), to: params.get("to"), rows: "0" });
+    return send.csv(`attendance-${batch.code.toLowerCase()}-${params.get("from")}-to-${params.get("to")}.csv`, header);
+  }
   const stale = () => send(409, { detail: "The record was changed by someone else; reload and retry" });
   const notFound = () => send(404, { detail: "Not found" });
 

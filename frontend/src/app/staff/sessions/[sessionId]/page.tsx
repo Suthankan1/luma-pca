@@ -103,6 +103,8 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
             : attendance.data.webinarEnded ? "The webinar has ended." : "The webinar has not reported an end yet."}
           {manager && attendance.data.unmatchedPeople > 0 && <> {attendance.data.unmatchedPeople} Zoom participant{attendance.data.unmatchedPeople === 1 ? " is" : "s are"} not
             matched to a student; <Link className="text-link" href="/staff/zoom">match them in Zoom review</Link>.</>}</p>
+        <p className="link-row"><a className="text-link" href={`/staff/sessions/${s.id}/attendance-export`} download>Download CSV</a>
+          <span className="muted">Personal data; keep it private. Exports are recorded in the activity log.</span></p>
         <ul className="dir-list">
           {attendance.data.students.map(a => <li key={a.studentId} className="dir-row dir-course attendance-row"
             aria-label={`Attendance ${a.studentNumber} ${a.fullName}`}>
