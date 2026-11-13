@@ -117,14 +117,14 @@ class EngagementIntegrationTest extends StaffApiIntegrationTest {
         body.put("prompt", "Which unit is force measured in?");
         body.put("options", List.of("Newton", "Joule", "Watt"));
         body.put("minutes", 5);
-        assertEquals(403, api.post("/api/v1/class-sessions/" + live + "/pulses", HttpApi.json(body), studentTokens.get("1")).statusCode());
+        assertEquals(403, api.post("/api/v1/class-sessions/" + live + "/pulses", toJson(body), studentTokens.get("1")).statusCode());
         body.put("minutes", 11);
-        assertEquals(400, api.post("/api/v1/class-sessions/" + live + "/pulses", HttpApi.json(body), admin).statusCode(), "at most 10 minutes");
+        assertEquals(400, api.post("/api/v1/class-sessions/" + live + "/pulses", toJson(body), admin).statusCode(), "at most 10 minutes");
         body.put("minutes", 5);
         body.put("options", List.of("Newton", "Newton"));
-        assertEquals(400, api.post("/api/v1/class-sessions/" + live + "/pulses", HttpApi.json(body), admin).statusCode(), "distinct options");
+        assertEquals(400, api.post("/api/v1/class-sessions/" + live + "/pulses", toJson(body), admin).statusCode(), "distinct options");
         body.put("options", List.of("Newton", "Joule", "Watt"));
-        HttpResponse<String> opened = api.post("/api/v1/class-sessions/" + live + "/pulses", HttpApi.json(body), admin);
+        HttpResponse<String> opened = api.post("/api/v1/class-sessions/" + live + "/pulses", toJson(body), admin);
         assertEquals(201, opened.statusCode(), opened.body());
         String question = (String) HttpApi.parse(opened).get("id");
 
@@ -169,5 +169,13 @@ class EngagementIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(400, api.get(path + "&limit=7", admin).statusCode());
         assertEquals(403, api.get(path, studentTokens.get("1")).statusCode());
         assertEquals(403, api.get(path, tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+    }
+
+    private static String toJson(Object value) {
+        try {
+            return new tools.jackson.databind.ObjectMapper().writeValueAsString(value);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 }
