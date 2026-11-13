@@ -28,3 +28,15 @@
 **Negative acceptance examples:** student A cannot request student B's record by guessing ID; teacher for Batch A cannot export Batch B; staff cannot access another academy's integration; guest/unregistered users are not blindly counted; a student in two batches sees only classes associated with enrollments.
 
 See `docs/architecture/adr/ADR-0004-multi-course-batch.md`.
+
+## Proposed-only RAG access extension (not implemented)
+
+| Capability | Owner/Admin | Instructor/Officer | Student | Guest |
+| --- | --- | --- | --- | --- |
+| Upload draft knowledge | Allowed, own academy | Not in MVP | No | No |
+| Review/publish/archive document | Allowed, own academy | Not in MVP | No | No |
+| See academy-wide published student FAQ | Allowed in future staff preview | Not in MVP | Signed in, own academy | No |
+| Retrieve course/batch/class document | Allowed in future staff preview | Requires separate assigned-scope policy | Current eligible enrollment and currently published version only | No |
+| Ask the assistant / source citation link | Not needed for staff in MVP | Not needed in MVP | **Own account + current enrolled scopes only** | No |
+
+The Spring backend must resolve student ID from validated JWT subject, intersect every search with current enrollment and academy, and revalidate citation access. Names, query text, guessed resource IDs, cached dialogue and UI filters grant no permissions. See [RAG security](../rag/SECURITY-AND-SAFETY.md).

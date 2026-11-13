@@ -1,0 +1,28 @@
+sequenceDiagram
+    autonumber
+    participant Student as Student portal
+    participant BFF as Next.js BFF
+    participant API as Spring assistant
+    participant DB as PostgreSQL knowledge
+    participant AI as Approved model provider
+    Student->>BFF: Ask about a class
+    BFF->>API: Authenticated question (server token)
+    API->>DB: Resolve signed-in student and active scopes
+    DB-->>API: Verified eligible scopes
+    alt Scope ambiguous
+        API-->>BFF: CLARIFICATION with allowed choices
+    else Scope selected and authorized
+        API->>DB: Search published, effective, scoped chunks
+        DB-->>API: Authorized passages + citation IDs
+        opt Passages available and current
+            API->>AI: Minimal permitted evidence and question
+            AI-->>API: Draft answer + citation IDs
+        end
+        API->>DB: Recheck published versions and access
+        alt Supported and cited
+            API-->>BFF: ANSWERED and valid citations
+        else Missing, revoked, conflicting or unsafe
+            API-->>BFF: NO_SOURCE or ESCALATE
+        end
+    end
+    BFF-->>Student: Answer / choice / staff fallback

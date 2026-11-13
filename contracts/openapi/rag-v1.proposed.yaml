@@ -1,0 +1,319 @@
+openapi: 3.1.0
+info:
+  title: LUMA Class Information Assistant — PROPOSAL ONLY
+  version: 0.1.0-proposed
+  description: >-
+    Planning contract, not implemented endpoints or a live API. Backend always
+    resolves the current student and academy from the authenticated session;
+    supplied scope IDs are selectors only and must pass current enrollment checks.
+servers:
+  - url: /api/v1
+tags:
+  - name: StudentAssistant
+  - name: StaffKnowledge
+security:
+  - bearerAuth: []
+paths:
+  /me/assistant/scopes:
+    get:
+      tags: [StudentAssistant]
+      summary: List authenticated student's permitted class-information scopes
+      responses:
+        '200':
+          description: Verified profile display name and allowed choices, no class rosters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeCatalog'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /me/assistant/questions:
+    post:
+      tags: [StudentAssistant]
+      summary: Ask a source-grounded question using authorized published documents
+      description: >-
+        A question never grants access to a class. No studentId, academyId,
+        role, display-name lookup or arbitrary document filter is accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionRequest'
+      responses:
+        '200':
+          description: Answer, clarification or safe abstention
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /me/assistant/sources/{documentId}:
+    get:
+      tags: [StudentAssistant]
+      summary: Fetch authorized, currently published source preview or download
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Authorized document preview with no raw object storage key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  title: { type: string }
+                  version: { type: integer }
+                  excerpt: { type: string }
+                required: [title, version, excerpt]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /me/assistant/answers/{answerId}/feedback:
+    post:
+      tags: [StudentAssistant]
+      summary: Submit simple feedback on caller's own previous answer
+      parameters:
+        - name: answerId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                helpful: { type: boolean }
+              required: [helpful]
+              additionalProperties: false
+      responses:
+        '204': { description: Feedback recorded without raw text }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /knowledge/documents:
+    get:
+      tags: [StaffKnowledge]
+      summary: List academy-scoped knowledge documents (owner/admin in MVP)
+      responses:
+        '200':
+          description: Paginated list of owned document metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DocumentSummary' }
+                  nextCursor: { type: [string, 'null'] }
+                required: [items]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [StaffKnowledge]
+      summary: Upload a scoped draft; never automatically publish
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                metadata: { $ref: '#/components/schemas/DocumentMetadata' }
+              required: [file, metadata]
+      responses:
+        '202':
+          description: Accepted for scanning/processing, still unpublished
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId: { type: string, format: uuid }
+                  version: { type: integer }
+                  processingState: { type: string, const: UPLOADED }
+                required: [documentId, version, processingState]
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { description: File exceeds academy-approved size limit }
+        '415': { description: Unsupported or mismatched file content type }
+  /knowledge/documents/{documentId}:
+    get:
+      tags: [StaffKnowledge]
+      summary: Inspect extraction status, scoped versions and safe preview
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Document and version metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /knowledge/documents/{documentId}/publish:
+    post:
+      tags: [StaffKnowledge]
+      summary: Atomically publish reviewed READY version
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: integer, minimum: 1 }
+              required: [version]
+              additionalProperties: false
+      responses:
+        '200':
+          description: Published version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Stale precondition or not READY }
+  /knowledge/documents/{documentId}/archive:
+    post:
+      tags: [StaffKnowledge]
+      summary: Archive all published versions for retrieval immediately
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+              required: [reason]
+              additionalProperties: false
+      responses:
+        '204': { description: Archived and audited }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    Scope:
+      type: object
+      properties:
+        type: { type: string, enum: [COURSE, BATCH, CLASS_SESSION] }
+        id: { type: string, format: uuid }
+      required: [type, id]
+      additionalProperties: false
+    ScopeChoice:
+      type: object
+      properties:
+        type: { type: string, enum: [COURSE, BATCH, CLASS_SESSION] }
+        id: { type: string, format: uuid }
+        label: { type: string }
+      required: [type, id, label]
+      additionalProperties: false
+    ScopeCatalog:
+      type: object
+      properties:
+        displayName: { type: string }
+        choices:
+          type: array
+          items: { $ref: '#/components/schemas/ScopeChoice' }
+      required: [displayName, choices]
+    QuestionRequest:
+      type: object
+      properties:
+        question: { type: string, minLength: 1, maxLength: 1000 }
+        scope: { $ref: '#/components/schemas/Scope' }
+      required: [question]
+      additionalProperties: false
+    Citation:
+      type: object
+      properties:
+        documentId: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+        title: { type: string }
+        locator: { type: string }
+        updatedAt: { type: string, format: date-time }
+        sourceUrl: { type: string, description: Re-authorized same-origin API route }
+      required: [documentId, version, title, locator, sourceUrl]
+    QuestionResponse:
+      type: object
+      properties:
+        answerId: { type: string, format: uuid }
+        mode: { type: string, enum: [ANSWERED, CLARIFICATION, NO_SOURCE, ESCALATE] }
+        answer: { type: string }
+        scope: { $ref: '#/components/schemas/Scope' }
+        choices:
+          type: array
+          items: { $ref: '#/components/schemas/ScopeChoice' }
+        citations:
+          type: array
+          items: { $ref: '#/components/schemas/Citation' }
+      required: [mode, answer, citations]
+    DocumentMetadata:
+      type: object
+      properties:
+        title: { type: string, minLength: 2, maxLength: 200 }
+        language: { type: string, description: BCP-47 language tag }
+        scopes:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              type: { type: string, enum: [ACADEMY_GENERAL, COURSE, BATCH, CLASS_SESSION] }
+              id: { type: string, format: uuid }
+            required: [type]
+        effectiveFrom: { type: string, format: date-time }
+        effectiveUntil: { type: string, format: date-time }
+      required: [title, language, scopes]
+    DocumentSummary:
+      type: object
+      properties:
+        documentId: { type: string, format: uuid }
+        title: { type: string }
+        version: { type: integer }
+        processingState: { type: string, enum: [UPLOADED, PROCESSING, READY, FAILED] }
+        publishState: { type: string, enum: [DRAFT, PUBLISHED, SUPERSEDED, ARCHIVED] }
+      required: [documentId, title, version, processingState, publishState]
+  responses:
+    Unauthorized: { description: Authentication required }
+    Forbidden: { description: Authenticated but wrong capability }
+    NotFound: { description: Resource not found or not authorized }
+    BadRequest: { description: Invalid request }
+    RateLimited: { description: Student query rate limit exceeded }
+    Unavailable: { description: AI provider unavailable; staff fallback }

@@ -1777,3 +1777,12 @@ build runs the Next.js default bundler and repeats the smoke test.
   the server every 30 seconds when the tab is visible, with a Pause/Resume control, so provisional attendance and engagement
   counts stay current. This replaces the planned SSE channel: no long-lived connections for 600 users, nothing new to secure.
 - **Tests:** Playwright `live-refresh.spec` (a class running now shows the notice; pause works) on desktop and phone.
+
+## Checkpoint RAG-PLAN — 2026-11-13 — Scoped class-information assistant proposal
+
+- **Branch:** docs/rag-class-assistant-plan (planning PR into main; merge/commit status is not asserted here).
+- **Business context:** User reports the third academy meeting endorsed the suitability of the LUMA prototype and idea. Separate production, AI provider, privacy, document-visibility and UAT sign-offs remain open.
+- **Docs-only design:** Added docs/rag/ (requirements, secure student identity and enrollment-aware retrieval, document publish/revoke pipeline, proposed data and API contracts, safety, evaluation, roadmap and agent instructions), a **proposed** ADR-0007, Mermaid sequence and synthetic JSON/Markdown fixtures/OpenAPI fragment. Linked the proposal from README, PRD, open questions, authorization matrix and agent onboarding.
+- **Implementation:** No new Spring/Next endpoint, Flyway migration, LLM client, embedding index, S3 object, deployed service or real student data. Existing attendance, Zoom and engagement behaviors are unchanged.
+- **Local checks performed on proposal:** Python JSON parse and YAML parse passed; relative Markdown links checked and passed. **Backend tests, frontend tests, actual model evaluation and deployment were not run** because this is a planning-only change.
+- **Next:** Academy/team decide P0 visibility/vendor/privacy questions and review ADR, then implement one tested PR starting with RAG-01 (server-side authenticated scope catalog).

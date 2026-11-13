@@ -17,3 +17,19 @@
 | P1 | What are uptime, RPO, RTO and retention requirements? | Hosting, backups, incident response |
 
 **Do not enable real data collection until P0 questions are signed off.**
+
+## Proposed class-information RAG extension — open decisions
+
+The academy's endorsement of the idea/prototype in meeting three does not resolve these technical or privacy choices. Keep the assistant disabled until P0 decisions and UAT are signed off.
+
+| Priority | Question | Why it matters |
+| --- | --- | --- |
+| P0 | Who uploads, reviews, and publishes course/batch/class source documents? | Prevent wrong or unapproved class information reaching students |
+| P0 | Which documents are academy-wide vs enrollment-restricted? May prospective students use the assistant? | Model visibility and prevent cross-batch leaks |
+| P0 | Which AI/embedding provider and data processing, retention, residency and training terms are approved? | External processing of prompts/document passages |
+| P0 | What minors/guardian/consent, privacy notice and deletion rules apply to chatbot questions? | Student protection and compliance |
+| P0 | What staff contact/WhatsApp route is approved for unanswered questions? | Reliable human fallback without inventing a contact |
+| P1 | Which source is authoritative for live schedules if uploaded timetables disagree with class session records? | Avoid stale time/date answers |
+| P1 | Which document formats, languages, sizes, update cadence and budget are acceptable? | Parsing quality and operations |
+
+See [docs/rag/REQUIREMENTS.md](../rag/REQUIREMENTS.md) for full scope.

@@ -18,3 +18,7 @@ See `PROMPT-LIBRARY.md` for copy-ready starter messages and `docs/delivery/IMPLE
 
 ## Workflow
 Identify one slice → inspect existing code/constraints → small plan → write tests → implement → run checks → update contracts/docs/checkpoint → give summary including actual commands, risks and next slice. Prefer PRs for reviewed changes and never push to production without explicit user request.
+
+## Proposed RAG class assistant (not implemented)
+
+See [docs/rag/README.md](../rag/README.md) and the **proposed** [ADR-0007](../architecture/adr/ADR-0007-scoped-class-assistant.md) before any chatbot work. The academy confirmed concept/prototype suitability, **not** live AI deployment. Reuse the signed-in student's existing account, current enrollments, authorized document filters and Next.js BFF; never trust a typed name for identity. Take only one reviewed slice at a time from [RAG roadmap](../rag/IMPLEMENTATION-ROADMAP.md).
