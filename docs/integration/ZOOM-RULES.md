@@ -47,7 +47,7 @@
   the match and, when the occurrence is linked to a class, whether the student is expected there.
   `GET /api/v1/zoom/participants/unmatched` lists emails waiting for review; `GET|POST /api/v1/zoom/identity-links` lists
   and records decisions. Owners and administrators only. This is provisional live data, not attendance (004A).
-- Still open: the receipt itself still holds the whole payload, IP addresses included (drop them before real students);
+- Receipts are stored without participant IP addresses, location, device, network type or MAC address (PRIV-1, V24 for older rows);
   a decision can be replaced but not removed; matching by `registrant_id` against Zoom's registrant list is not used,
   because email already identifies registrants and the registrant list needs an API call per webinar.
 
