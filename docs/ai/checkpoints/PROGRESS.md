@@ -1643,3 +1643,20 @@ build runs the Next.js default bundler and repeats the smoke test.
   student and other-academy refusals). Playwright: the class page after matching and linking. Unit: duration format.
   Local full runs: backend 341, unit 50, Playwright 82.
 - **Not built:** live push (SSE); a stored, finalised record (004B); corrections (004C); exports (005A).
+
+## Checkpoint 004B-1 — 2026-11-13 — Zoom's participant report replaces live events
+
+- **Branch:** `feature/zoom-report-reconciliation`. **PR / merge SHA:** see the merged pull request titled
+  "feat(attendance): reconcile with Zoom's participant report".
+- **Implemented:** V20 `zoom_report_fetches` and `zoom_report_participants` (no IP, device or location fields).
+  `ZoomReportService` fetches the report for ended, linked occurrences (poller after 15 minutes; backoff 15 min doubling to
+  8 h or Retry-After; 6 attempts), calls Zoom outside transactions, replaces earlier copies, and never discards a report on a
+  later failure. `POST /api/v1/zoom/reports` for an administrator (audited `ZOOM_REPORT_FETCHED`; 409 before the end or
+  without API credentials). Attendance uses report rows where present; status RECONCILED when every linked occurrence has
+  one. Occurrences show `ended` and report status. UI: report state and "Fetch Zoom's report" on Zoom review; the class
+  page says when figures come from Zoom's report.
+- **Tests:** `ZoomReportIntegrationTest` (4, fake Zoom server: replacement of live data incl. a student missed live, guest
+  and host and no-email rows; re-fetch and failure keeping the earlier report, audit; 429 Retry-After backoff; not ended,
+  unknown, instructor). Playwright: fetch from Zoom review and reconciled wording on the class page.
+- **Still open:** finalising present/absent needs the academy's attendance rule (P0); a golden dataset from a real class;
+  corrections (004C).

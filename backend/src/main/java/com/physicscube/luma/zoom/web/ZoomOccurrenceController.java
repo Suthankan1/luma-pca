@@ -3,6 +3,7 @@ package com.physicscube.luma.zoom.web;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import com.physicscube.luma.zoom.OccurrenceView;
 import com.physicscube.luma.zoom.ZoomOccurrenceService;
+import com.physicscube.luma.zoom.ZoomReportService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -19,9 +20,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 class ZoomOccurrenceController {
     private final ZoomOccurrenceService occurrences;
+    private final ZoomReportService reports;
 
-    ZoomOccurrenceController(ZoomOccurrenceService occurrences) {
+    ZoomOccurrenceController(ZoomOccurrenceService occurrences, ZoomReportService reports) {
         this.occurrences = occurrences;
+        this.reports = reports;
+    }
+
+    record ReportRequest(@NotBlank @Size(max = 100) String occurrenceUuid) {
+    }
+
+    /** Fetches Zoom's participant report for an ended occurrence now (it is also fetched automatically). */
+    @PostMapping("/api/v1/zoom/reports")
+    ZoomReportService.FetchResult fetchReport(JwtAuthenticationToken authentication, @Valid @RequestBody ReportRequest request) {
+        return reports.fetchNow(CurrentAccount.from(authentication), request.occurrenceUuid());
     }
 
     /** @param sessionId {@code null} marks the occurrence "not a class" */

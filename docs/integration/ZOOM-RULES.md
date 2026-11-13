@@ -55,3 +55,14 @@
 Collect account capabilities, real Zoom webinar occurrence identifiers, signed joined/left webhook samples (redacted), participant report result, mapping inputs, and three student joins/rejoins. Confirm the events' order/timestamps, registration identifiers and report accuracy. Only then finalize DTOs and integration tests.
 
 Full research citations: [`docs/research/zoom-feasibility-full.md`](../research/zoom-feasibility-full.md) and [`docs/architecture/full-production-blueprint.md`](../architecture/full-production-blueprint.md).
+
+## As built (004A/004B, attendance facts and Zoom's report)
+- `GET /api/v1/class-sessions/{id}/attendance` reports facts per student (time connected within the class, rejoins merged;
+  first join and lateness; visits; visits without a leave), never present/absent (rule 9; threshold is OPEN-QUESTIONS P0).
+- After a webinar linked to a class ends, a poller (`luma.zoom.reports.*`, every 5 minutes, 15 minutes after the end) fetches
+  `GET /past_webinars/{uuid}/participants` outside any transaction and stores it, replacing earlier copies; failures retry
+  from 15 minutes doubling to 8 hours (or Zoom's Retry-After), six attempts. A later failure never discards a stored report.
+  Administrators can fetch one now (`POST /api/v1/zoom/reports`, audited). Rows keep only email, name, registrant ID,
+  join/leave and duration. Where every linked occurrence has a report, attendance says RECONCILED.
+- Field mapping of the report was confirmed against the real test webinar by `scripts/zoom-api-check.sh` (13 Nov: 5 join
+  sessions by 4 people); storage, retry and replacement are tested against a fake Zoom server.
