@@ -92,3 +92,32 @@ export async function fetchReport(_previous: FormState, form: FormData): Promise
   if (result.data.status === "FAILED") return { ok: false, message: `Zoom did not return the report (${result.data.error ?? "error"}). It will be retried automatically.` };
   return { ok: true, message: `Report fetched: ${result.data.joinSessions} join session${result.data.joinSessions === 1 ? "" : "s"}.` };
 }
+
+/** Fetches Zoom's participant report for one past run of a webinar found by link or ID. */
+export async function fetchRunReport(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const webinar = String(form.get("webinar") ?? "").trim();
+  const occurrenceUuid = occurrenceIdOrNull(form.get("occurrenceUuid"));
+  if (!webinar || webinar.length > 500 || !occurrenceUuid) return invalid;
+  const result = await staffApi<{ joinSessions: number }>("/api/v1/zoom/webinar-lookup/reports", { method: "POST", body: { webinar, occurrenceUuid } }, 30000);
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
+  revalidatePath("/staff/zoom/check");
+  return { ok: true, message: `Zoom's report fetched: ${result.data.joinSessions} join session${result.data.joinSessions === 1 ? "" : "s"}.` };
+}
+
+/** Links a checked run to a class; its attendance then counts there, from Zoom's report. */
+export async function linkRun(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const webinar = String(form.get("webinar") ?? "").trim();
+  const occurrenceUuid = occurrenceIdOrNull(form.get("occurrenceUuid"));
+  const sessionId = uuidOrNull(form.get("sessionId"));
+  const values = submittedValues(form, ["reason", "sessionId"]);
+  if (!webinar || !occurrenceUuid) return invalid;
+  if (!sessionId) return { ok: false, message: "Choose the class this run was.", values };
+  const reason = parseReason(form);
+  if (typeof reason !== "string") return { ok: false, message: reason.error, values };
+  const result = await staffApi("/api/v1/zoom/webinar-lookup/links", { method: "POST", body: { webinar, occurrenceUuid, sessionId, reason } });
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
+  revalidatePath("/staff/zoom/check");
+  return { ok: true, message: "Linked to the class." };
+}

@@ -501,3 +501,12 @@ export function parsePulseForm(form: FormData): { prompt: string; options: strin
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 10) return { error: "Keep it open for 1 to 10 minutes." };
   return { prompt, options, minutes };
 }
+
+// ---- Webinar lookup ------------------------------------------------------------------------
+export type WebinarRun = { occurrenceUuid: string; startTime: string | null; reported: boolean; linkedSessionId: string | null };
+export type WebinarLookup = { webinarId: string; topic: string | null; durationMinutes: number | null; timezone: string | null; runs: WebinarRun[] };
+export type RunAttendee = { email: string | null; displayName: string | null; joinSessions: number; connectedSeconds: number;
+  firstJoinAt: string; lastLeaveAt: string | null; match: ZoomMatch; matchSource: string | null; studentId: string | null;
+  studentNumber: string | null; studentName: string | null };
+export type RunAttendance = { webinarId: string; occurrenceUuid: string; startTime: string | null; endTime: string | null;
+  joinSessions: number; linkedSessionId: string | null; attendees: RunAttendee[] };

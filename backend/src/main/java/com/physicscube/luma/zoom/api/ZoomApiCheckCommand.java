@@ -39,7 +39,14 @@ class ZoomApiCheckCommand implements ApplicationRunner {
                         IntConsumer exit) {
         this.client = client;
         this.webhook = webhook;
-        this.webinarId = webinarId == null ? "" : webinarId.replaceAll("[\\s-]", "");
+        // A join link or a typed ID, read the same way as the staff "Check a webinar" page.
+        String id;
+        try {
+            id = com.physicscube.luma.zoom.ZoomLookupService.webinarId(webinarId);
+        } catch (RuntimeException e) {
+            id = webinarId == null ? "" : webinarId.replaceAll("[\\s-]", "");
+        }
+        this.webinarId = id;
         this.out = out;
         this.exit = exit;
     }
@@ -86,6 +93,17 @@ class ZoomApiCheckCommand implements ApplicationRunner {
                 long people = sessions.stream().map(p -> p.userEmail() != null ? p.userEmail() : p.name()).distinct().count();
                 out.println("Latest instance " + latest.startTime() + ": " + sessions.size() + " join sessions by " + people
                         + " people (identities not shown)");
+                // The "Check a webinar" model: people by email, join sessions merged (minutes only, no identities).
+                java.util.Map<String, List<java.time.Instant[]>> byPerson = new java.util.LinkedHashMap<>();
+                for (ZoomApiClient.Participant p : sessions) {
+                    if (p.joinTime() != null && p.leaveTime() != null) {
+                        String key = p.userEmail() != null ? "e:" + p.userEmail().strip().toLowerCase(java.util.Locale.ROOT) : "n:" + p.name();
+                        byPerson.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(new java.time.Instant[] {p.joinTime(), p.leaveTime()});
+                    }
+                }
+                out.println("Check-a-webinar view: " + byPerson.size() + " people, " + byPerson.keySet().stream().filter(k -> k.startsWith("e:")).count()
+                        + " with email; minutes connected per person " + byPerson.values().stream()
+                        .map(v -> com.physicscube.luma.zoom.ZoomLookupService.mergedSeconds(v) / 60).sorted().toList());
             }
             out.println("Zoom API check passed.");
             return 0;

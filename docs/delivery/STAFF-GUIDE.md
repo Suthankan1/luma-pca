@@ -13,6 +13,10 @@
 - **Zoom review**: each time a webinar runs it appears here and links itself to the class when exactly one class fits.
   Decide the others. **People in this occurrence** shows who joined; **Zoom accounts to match** lists emails that match no
   student: match them by student number, or mark them "not a student". A decision applies to every future webinar.
+- **Check a webinar** (Zoom review → "Check a webinar by link or ID"): paste a join link (…/w/… or …/j/…) or the ID to
+  see every past run, even ones LUMA never received live. Pick a run → **Check attendance** fetches Zoom's report and shows
+  each person (matched to students by email) with time connected; **Link to class** makes it that class's attendance,
+  ready to finalise. Registration links (…/register/WN_…) do not contain the ID: copy the ID from the webinar in Zoom.
 - **Failed events**: replay one with a reason once its cause is fixed.
 
 ## Attendance
