@@ -120,3 +120,23 @@ export async function inviteProgress(): Promise<InviteProgress | null> {
   const result = await staffApi<InviteProgress>("/api/v1/student-invitations/progress");
   return result.ok ? result.data : null;
 }
+
+/** Erases a student's personal data on request (owners only; the student's number must be typed again). Audited. */
+export async function eraseStudent(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const studentId = uuidOrNull(form.get("studentId"));
+  const confirmStudentNumber = String(form.get("confirm") ?? "").trim();
+  const reason = String(form.get("reason") ?? "").trim();
+  const values = submittedValues(form, ["reason"]);
+  if (!studentId) return { ok: false, message: "That request was not valid. Reload the page." };
+  if (!confirmStudentNumber) return { ok: false, message: "Type the student’s number to confirm.", values };
+  if (reason.length < 3 || reason.length > 300) return { ok: false, message: "Give a reason of 3 to 300 characters.", values };
+  const result = await staffApi<{ placeholderNumber: string }>(`/api/v1/students/${studentId}/erasure`, { method: "POST", body: { confirmStudentNumber, reason } });
+  if (!result.ok) {
+    return { ok: false, values, message: result.status === 403 ? "Only an academy owner can erase a student’s data."
+      : result.status === 400 && result.detail?.includes("confirm") ? "That isn’t this student’s number." : problemMessage(result.status, result.detail) };
+  }
+  revalidatePath(`/staff/students/${studentId}`);
+  revalidatePath("/staff/students");
+  return { ok: true, message: `Erased. The record is now ${result.data.placeholderNumber}.` };
+}

@@ -96,6 +96,7 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
             </ul>}
         </section>
       </>}
+    <p className="link-row"><Link className="text-link" href="/account/password">Change password</Link></p>
     <form method="post" action="/api/session/logout">
       <button className="action secondary" type="submit">Sign out</button>
     </form>

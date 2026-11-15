@@ -32,6 +32,18 @@ class RateLimitConfig {
         return registration;
     }
 
+    /** Heavier signed-in actions, per account (after authentication). */
+    @Bean
+    org.springframework.web.servlet.config.annotation.WebMvcConfigurer accountRateLimits(RateLimitProperties properties) {
+        AccountRateLimitInterceptor interceptor = new AccountRateLimitInterceptor(counters, properties);
+        return new org.springframework.web.servlet.config.annotation.WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+                registry.addInterceptor(interceptor);
+            }
+        };
+    }
+
     /** Client addresses are kept at most a day. */
     @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT1M")
     void deleteOldCounters() {

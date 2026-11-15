@@ -94,6 +94,10 @@ luma:
     reset-request:
       limit: ${LUMA_RATE_LIMIT_RESET_REQUEST_LIMIT:10}
       window: ${LUMA_RATE_LIMIT_RESET_REQUEST_WINDOW:PT1H}
+    # Per signed-in account: attendance exports, Zoom lookups and report fetches, engagement rankings.
+    heavy-staff:
+      limit: ${LUMA_RATE_LIMIT_HEAVY_STAFF_LIMIT:60}
+      window: ${LUMA_RATE_LIMIT_HEAVY_STAFF_WINDOW:PT10M}
   zoom:
     webhook:
       # Webhook ingress stays off (404) until a secret token is set. Never commit one.
@@ -121,3 +125,9 @@ luma:
       enabled: ${LUMA_ZOOM_REPORTS_ENABLED:true}
       poll-interval: ${LUMA_ZOOM_REPORTS_POLL_INTERVAL:PT5M}
       delay-after-end: ${LUMA_ZOOM_REPORTS_DELAY_AFTER_END:PT15M}
+  retention:
+    # Nightly (Asia/Colombo): scrub names/emails from processed raw Zoom payloads after N days (attendance facts stay);
+    # delete engagement reactions/answers after N days (0 keeps them). Set from the academy's retention policy.
+    enabled: ${LUMA_RETENTION_ENABLED:true}
+    zoom-payload-days: ${LUMA_RETENTION_ZOOM_PAYLOAD_DAYS:180}
+    engagement-days: ${LUMA_RETENTION_ENGAGEMENT_DAYS:0}

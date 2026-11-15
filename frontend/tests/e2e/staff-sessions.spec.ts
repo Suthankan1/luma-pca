@@ -144,6 +144,8 @@ test.describe("Classes", () => {
     await page.fill("#email", "instructor@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
+    await page.fill("#code", "rec-recovery");
+    await page.getByRole("button", { name: "Verify" }).click();
     await expect(page).toHaveURL(/\/staff$/);
     await page.goto("/staff/sessions?from=2027-01-03");
     await expect(page.locator(".banner")).toContainText("Only academy owners and administrators schedule classes.");

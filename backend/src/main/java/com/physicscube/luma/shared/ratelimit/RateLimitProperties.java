@@ -19,7 +19,9 @@ public record RateLimitProperties(
         /** POST /auth/activate and /auth/password-reset/confirm (redeeming a 256-bit link). */
         @DefaultValue({"30", "PT10M"}) Rule linkRedemption,
         /** POST /auth/password-reset/request: limits email sent to many addresses from one place. */
-        @DefaultValue({"10", "PT1H"}) Rule resetRequest) {
+        @DefaultValue({"10", "PT1H"}) Rule resetRequest,
+        /** Heavier signed-in actions per account: attendance exports, Zoom lookups and report fetches, rankings. */
+        @DefaultValue({"60", "PT10M"}) Rule heavyStaff) {
 
     public record Rule(int limit, Duration window) {
         public Rule {

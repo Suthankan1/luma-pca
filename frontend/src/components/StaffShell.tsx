@@ -37,6 +37,7 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, c
       </nav>
       <div className="staff-railfoot">
         <p className="staff-academy">PHYSICS CUBE ACADEMY</p>
+        <Link href="/account/password" prefetch={false} className="staff-signout staff-password">Change password</Link>
         <form method="post" action="/api/session/logout">
           <button className="staff-signout" type="submit">Sign out</button>
         </form>

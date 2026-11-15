@@ -329,20 +329,20 @@ class MfaHttpIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void anAccountPromotedAfterSignInMustSignInAgainWithMfa() {
-        UUID instructorId = register("instructor@example.invalid", Role.INSTRUCTOR);
-        Map<String, Object> tokens = HttpApi.parse(login("instructor@example.invalid", PASSPHRASE));
+        UUID instructorId = register("learner@example.invalid", Role.STUDENT);
+        Map<String, Object> tokens = HttpApi.parse(login("learner@example.invalid", PASSPHRASE));
         String access = (String) tokens.get("accessToken");
         assertEquals(200, me(access));
 
         jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'ACADEMY_ADMIN')", instructorId);
 
-        assertEquals(401, me(access), "a session without MFA must not carry administrator authority");
+        assertEquals(401, me(access), "a session without MFA must not carry staff authority");
         assertEquals(401, api.get("/api/v1/courses", access).statusCode());
         assertEquals(401, api.post("/api/v1/auth/refresh", HttpApi.json(Map.of("refreshToken", tokens.get("refreshToken"))))
                 .statusCode());
         assertEquals("ACCOUNT_CHANGED", jdbc.queryForObject(
                 "SELECT revoke_reason FROM refresh_sessions WHERE account_id = ?", String.class, instructorId));
-        assertEquals(true, HttpApi.parse(login("instructor@example.invalid", PASSPHRASE)).get("mfaRequired"));
+        assertEquals(true, HttpApi.parse(login("learner@example.invalid", PASSPHRASE)).get("mfaRequired"));
     }
 
     @Test

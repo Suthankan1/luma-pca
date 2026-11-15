@@ -215,7 +215,7 @@ class StaffAccountHttpIntegrationTest extends StaffApiIntegrationTest {
     void roleChangesUseVersionsAndApplyOnTheNextRequest() {
         String address = activeStaff(admin, "INSTRUCTOR");
         Object id = accounts.findByEmail(address).orElseThrow().id();
-        String token = (String) HttpApi.parse(passwordLogin(address)).get("accessToken");
+        String token = login(address);
         int before = version(id);
 
         HttpResponse<String> changed = setRoles(admin, id, before, "ANALYST", "ATTENDANCE_OFFICER");
@@ -232,7 +232,7 @@ class StaffAccountHttpIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void disablingEndsEverySessionImmediately() {
         String address = activeStaff(admin, "INSTRUCTOR");
-        Map<String, Object> session = HttpApi.parse(passwordLogin(address));
+        Map<String, Object> session = loginSession(address);
         String access = (String) session.get("accessToken");
         assertEquals(200, api.get("/api/v1/auth/me", access).statusCode());
         Object id = accounts.findByEmail(address).orElseThrow().id();
@@ -359,7 +359,7 @@ class StaffAccountHttpIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void aReEnabledAccountSignsInWithItsPasswordButOldSessionsStayEnded() {
         String address = activeStaff(admin, "INSTRUCTOR");
-        Map<String, Object> before = HttpApi.parse(passwordLogin(address));
+        Map<String, Object> before = loginSession(address);
         Object id = accounts.findByEmail(address).orElseThrow().id();
         assertEquals(200, disable(admin, id).statusCode());
 
@@ -370,9 +370,8 @@ class StaffAccountHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(401, api.get("/api/v1/auth/me", (String) before.get("accessToken")).statusCode(), "old tokens stay invalid");
         assertEquals(401, api.post("/api/v1/auth/refresh", HttpApi.json(Map.of("refreshToken", (String) before.get("refreshToken"))))
                 .statusCode(), "old sessions stay ended");
-        HttpResponse<String> again = passwordLogin(address);
-        assertEquals(200, again.statusCode(), "signs in with the same password");
-        assertEquals(200, api.get("/api/v1/auth/me", (String) HttpApi.parse(again).get("accessToken")).statusCode());
+        Map<String, Object> again = loginSession(address);
+        assertEquals(200, api.get("/api/v1/auth/me", (String) again.get("accessToken")).statusCode(), "signs in with the same password");
 
         assertEquals(200, enable(admin, id, "").statusCode(), "enabling an active account changes nothing");
         assertEquals(1, auditCount("STAFF_ACCOUNT_ENABLED"));

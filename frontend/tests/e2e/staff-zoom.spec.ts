@@ -240,6 +240,8 @@ test.describe("Zoom review", () => {
     await page.fill("#email", "instructor@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
+    await page.fill("#code", "rec-recovery");
+    await page.getByRole("button", { name: "Verify" }).click();
     await expect(page).toHaveURL(/\/staff$/);
     await page.goto("/staff/zoom");
     await expect(page.locator(".banner")).toContainText("Only academy owners and administrators review Zoom events.");

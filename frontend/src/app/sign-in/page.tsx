@@ -14,9 +14,9 @@ const messages = {
 };
 
 export default async function SignIn({ searchParams }: {
-  searchParams: Promise<{ error?: string; portal?: string; signedOut?: string; activated?: string; reset?: string }>;
+  searchParams: Promise<{ error?: string; portal?: string; signedOut?: string; activated?: string; reset?: string; changed?: string }>;
 }) {
-  const { error, portal, signedOut, activated, reset } = await searchParams;
+  const { error, portal, signedOut, activated, reset, changed } = await searchParams;
   const { identity, canRefresh, unavailable } = await currentSession();
   const destination = identity ? portalPath(identity, portal) : null;
   if (destination && error !== "sign-out" && (destination === "/staff" || destination === "/student")) {
@@ -33,7 +33,7 @@ export default async function SignIn({ searchParams }: {
       {message && <p className="session-error" role="alert">{message}</p>}
       {signedOut === "1" && <p className="sub" role="status">You’re signed out.</p>}
       {activated === "1" && <p className="sub" role="status">Your account is active. Sign in with your new password.</p>}
-      {reset === "1" && <p className="sub" role="status">Your password has been changed and you were signed out everywhere. Sign in with your new password.</p>}
+      {(reset === "1" || changed === "1") && <p className="sub" role="status">Your password has been changed and you were signed out everywhere. Sign in with your new password.</p>}
       {error === "sign-out" || identity || canRefresh ? <>
         {canRefresh && !identity && error !== "sign-out" && <form method="post" action="/api/session/refresh" className="session-form">
           {(portal === "staff" || portal === "student") && <input type="hidden" name="portal" value={portal} />}

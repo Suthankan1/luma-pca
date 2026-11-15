@@ -191,3 +191,13 @@ export function resetPath(error?: string, token?: string | null) {
 export function activationPath(error?: string, token?: string | null) {
   return `/activate${error ? `?error=${encodeURIComponent(error)}` : ""}${token ? `#token=${token}` : ""}`;
 }
+
+/** Checks before asking the API to change a password: the current one given, the new one confirmed and 12–128 characters. */
+export function passwordChangeProblem(current: string, next: string, confirm: string): "current" | "mismatch" | "weak" | "same" | null {
+  if (!current) return "current";
+  if (next !== confirm) return "mismatch";
+  const length = [...next].length;
+  if (length < 12 || length > 128) return "weak";
+  if (next === current) return "same";
+  return null;
+}

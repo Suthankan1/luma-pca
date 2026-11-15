@@ -137,6 +137,8 @@ test.describe("MFA and Authentication Flows", () => {
     await page.fill("#email", "instructor@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
+    await page.fill("#code", "rec-recovery");
+    await page.getByRole("button", { name: "Verify" }).click();
 
     await expect(page).toHaveURL(/\/staff/);
     await expect(page.getByRole("heading", { name: "Staff portal" })).toBeVisible();

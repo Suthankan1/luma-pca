@@ -14,7 +14,9 @@ import {
   activationProblem,
   extractActivationToken,
   isSameOrigin,
+  openAccess,
   openMfa,
+  passwordChangeProblem,
   portalPath,
   resetPath,
   sealAccess,
@@ -29,7 +31,8 @@ const noStore = { "Cache-Control": "no-store" };
 
 export async function POST(request: NextRequest, context: { params: Promise<{ action: string }> }) {
   const { action } = await context.params;
-  const allowedActions = ["login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery", "activate", "reset-request", "reset-confirm"];
+  const allowedActions = ["login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery", "activate", "reset-request", "reset-confirm",
+    "password-change"];
   if (!allowedActions.includes(action)) {
     return new NextResponse(null, { status: 404, headers: noStore });
   }
@@ -164,6 +167,33 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       if (activated.status === 422) return go(activationPath("weak", token));
       if (activated.status === 429) return go(activationPath("limited", token));
       return go(activationPath("unavailable", token));
+    }
+
+    if (action === "password-change") {
+      // Signed in: the API re-checks the current password, then ends every session, so this browser signs in again.
+      const sealed = request.cookies.get(names.access)?.value;
+      const access = sealed ? openAccess(sealed, key) : null;
+      if (!access) return clearAll("/sign-in?error=expired");
+      const current = form.get("current") ?? "";
+      const next = form.get("password") ?? "";
+      const problem = passwordChangeProblem(current, next, form.get("confirm") ?? "");
+      if (problem) return go(`/account/password?error=${problem}`);
+      let changed: Response;
+      try {
+        changed = await fetch(new URL("/api/v1/auth/password", process.env.API_INTERNAL_URL ?? "http://localhost:8080"), {
+          method: "POST", cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5000),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${access}`, ...(client ? { "X-Forwarded-For": client } : {}) },
+          body: JSON.stringify({ currentPassword: current, newPassword: next }),
+        });
+      } catch {
+        return go("/account/password?error=unavailable");
+      }
+      if (changed.status === 204) return clearAll("/sign-in?changed=1");
+      if (changed.status === 400) return go("/account/password?error=current");
+      if (changed.status === 422) return go("/account/password?error=weak");
+      if (changed.status === 429) return go("/account/password?error=limited");
+      if (changed.status === 401) return clearAll("/sign-in?error=expired");
+      return go("/account/password?error=unavailable");
     }
 
     if (action === "reset-request") {
