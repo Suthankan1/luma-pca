@@ -22,10 +22,14 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         // Tests drive the invitation email sender directly.
         "luma.mail.bulk.enabled=false",
         // Every test signs in from this machine; AuthRateLimitIntegrationTest turns limits on with small values.
-        "luma.rate-limit.enabled=false"})
+        "luma.rate-limit.enabled=false",
+        // Small pools: many test contexts share one database.
+        "spring.datasource.hikari.maximum-pool-size=5"})
 public abstract class PostgresIntegrationTest {
     @ServiceConnection
-    protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine");
+    // Several cached application contexts (different test properties) each hold a connection pool: allow plenty.
+    protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
+            .withCommand("postgres", "-c", "max_connections=400");
 
     static {
         POSTGRES.start();
