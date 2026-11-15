@@ -53,6 +53,12 @@ class ZoomReportIntegrationTest extends StaffApiIntegrationTest {
                 status = 200;
                 body = "{\"access_token\":\"fixture-access\",\"token_type\":\"bearer\",\"expires_in\":3600,"
                         + "\"scope\":\"webinar:read:list_past_participants:admin\"}";
+            } else if (target.equals("GET /v2/webinars/" + WEBINAR)) {
+                status = 200;
+                body = "{\"id\":" + WEBINAR + ",\"topic\":\"Optics\",\"type\":5,\"host_id\":\"zoomhost\"}";
+            } else if (target.equals("GET /v2/webinars/" + WEBINAR + "/registrants")) {
+                status = 200;
+                body = "{\"next_page_token\":\"\",\"registrants\":[{\"id\":\"reg-two\",\"email\":\"Student2@example.test\"}]}";
             } else if (target.startsWith("GET /v2/past_webinars/") && target.endsWith("/participants")) {
                 REPORT_CALLS.incrementAndGet();
                 Object[] reply = REPORT.get();
@@ -244,5 +250,43 @@ class ZoomReportIntegrationTest extends StaffApiIntegrationTest {
         String instructor = tokenFor(academyId, Role.INSTRUCTOR);
         assertEquals(403, api.post("/api/v1/zoom/reports", "{\"occurrenceUuid\":\"" + OCCURRENCE + "\"}", instructor).statusCode());
         assertEquals(0, REPORT_CALLS.get());
+    }
+
+    /** A run never seen live: the host comes from Zoom's webinar details, a student is matched by registration email. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aReportOnlyRunRecognisesTheHostMatchesByRegistrationEmailAndIsListed() {
+        REPORT.set(new Object[] {200, "{\"next_page_token\":\"\",\"participants\":["
+                + "{\"id\":\"zoomhost\",\"name\":\"Teacher\",\"user_email\":\"teacher.solo@example.test\",\"join_time\":\"2026-02-02T08:25:00Z\","
+                + "\"leave_time\":\"2026-02-02T10:30:00Z\",\"duration\":7500},"
+                + "{\"id\":\"\",\"name\":\"Two\",\"user_email\":\"other.account@example.test\",\"registrant_id\":\"reg-two\","
+                + "\"join_time\":\"2026-02-02T08:30:00Z\",\"leave_time\":\"2026-02-02T10:30:00Z\",\"duration\":7200}]}", null});
+        assertEquals("FETCHED", reports.fetch(academyId, "Solo==", WEBINAR).status());
+        jdbc.update("INSERT INTO zoom_occurrence_links (academy_id, occurrence_uuid, webinar_id, class_session_id, link_source, linked_by, linked_at) "
+                + "VALUES (?, 'Solo==', ?, ?::uuid, 'MANUAL', ?, now())", academyId, WEBINAR, session, UUID.randomUUID());
+
+        Map<String, Object> view = attendance();
+        assertEquals("RECONCILED", view.get("status"));
+        assertEquals(0, view.get("unmatchedPeople"), "the host is recognised and not counted");
+        Map<String, Object> second = student(view, "S-002");
+        assertEquals(true, second.get("seen"), "joined from another Zoom account; registered with the email LUMA knows");
+        assertEquals(7200, seconds(second));
+
+        List<Map<String, Object>> listed = (List<Map<String, Object>>) (Object) HttpApi.parseList(api.get("/api/v1/zoom/occurrences?sessionId=" + session, admin));
+        Map<String, Object> run = listed.stream().filter(o -> "Solo==".equals(o.get("occurrenceUuid"))).findFirst().orElseThrow();
+        assertEquals(0, run.get("eventCount"), "listed although Zoom never sent live events for it");
+        assertEquals("FETCHED", run.get("reportStatus"));
+        assertEquals(WEBINAR, run.get("webinarId"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void afterSixFailedAttemptsTheRunSaysItGaveUp() {
+        liveClass(true);
+        jdbc.update("INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, next_attempt_at, last_error) "
+                + "VALUES (?, ?, 'FAILED', 6, now(), 'Zoom 500')", academyId, OCCURRENCE);
+        assertEquals(0, reports.runOnce(), "no more automatic attempts");
+        Map<String, Object> occurrence = (Map<String, Object>) HttpApi.parseList(api.get("/api/v1/zoom/occurrences", admin)).get(0);
+        assertEquals("GAVE_UP", occurrence.get("reportStatus"));
     }
 }

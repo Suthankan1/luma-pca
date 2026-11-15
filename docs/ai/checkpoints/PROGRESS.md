@@ -1795,3 +1795,17 @@ build runs the Next.js default bundler and repeats the smoke test.
   `webinar-check.spec` on desktop and phone.
 - **Limits:** Zoom meetings are not covered (webinars only); runs linked this way are not listed on the Zoom review page
   (they have no live events) but appear on their class.
+
+## Checkpoint FIX-1 — 2026-11-15 — Zoom flow fixes from the gap audit
+
+- **Branch:** `fix/zoom-flows`. Fixes audit items 6, 7, 9, 10 and 14.
+- Runs known only from Zoom's report (checked by link or ID) are listed in Zoom review and on their class ("from Zoom's
+  report"), with "people" linking to the right view; decisions work for them too.
+- The host is recognised in report rows (participant id = the webinar's `host_id` from Zoom, or a host email known from
+  live events) and never counted as an unmatched person.
+- Registrants are stored at report time (`zoom_registrants`, V25); someone who joined from another Zoom account but
+  registered with the email LUMA knows is matched (source REGISTRATION_EMAIL), in live and report views.
+- After 6 failed report attempts the run says so ("GAVE_UP") instead of "will retry".
+- An administrator can remove a Zoom-account decision (audited), restoring the automatic match.
+- **Tests:** new cases in `ZoomReportIntegrationTest`, `ZoomParticipantIntegrationTest`; Zoom/attendance backend tests 88/88;
+  Playwright 96, unit 52.

@@ -229,4 +229,33 @@ class ZoomParticipantIntegrationTest extends StaffApiIntegrationTest {
                 otherAdmin).statusCode());
         assertEquals(List.of(), HttpApi.parseList(api.get("/api/v1/zoom/participants/unmatched", otherAdmin)));
     }
+
+    @Test
+    void aDecisionCanBeRemovedSoTheAutomaticMatchAppliesAgain() {
+        runWebinar();
+        assertEquals(200, decide("first.student@example.test", null, "Thought it was a parent").statusCode());
+        assertEquals("NOT_A_STUDENT", byEmail(people(), "first.student@example.test").get("match"));
+        assertEquals(400, api.post("/api/v1/zoom/identity-links/removals", "{\"email\":\"first.student@example.test\",\"reason\":\"\"}", admin)
+                .statusCode());
+        assertEquals(204, api.post("/api/v1/zoom/identity-links/removals",
+                "{\"email\":\"First.Student@example.test\",\"reason\":\"It was the student after all\"}", admin).statusCode());
+        Map<String, Object> first = byEmail(people(), "first.student@example.test");
+        assertEquals("STUDENT", first.get("match"));
+        assertEquals("SIGN_IN_EMAIL", first.get("matchSource"));
+        assertEquals(404, api.post("/api/v1/zoom/identity-links/removals",
+                "{\"email\":\"first.student@example.test\",\"reason\":\"Again\"}", admin).statusCode(), "nothing left to remove");
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE academy_id = ? AND action = 'ZOOM_IDENTITY_DECISION_REMOVED'",
+                Integer.class, academyId));
+    }
+
+    @Test
+    void someoneWhoJoinedFromAnotherZoomAccountIsMatchedByTheirRegistrationEmail() {
+        jdbc.update("INSERT INTO zoom_registrants (academy_id, webinar_id, registrant_id, email, fetched_at) VALUES (?, ?, 'reg-', "
+                + "'second.student@example.test', now())", academyId, WEBINAR);
+        runWebinar();
+        Map<String, Object> guest = byEmail(people(), "guest@example.test");
+        assertEquals("STUDENT", guest.get("match"), "the guest's own email matches nobody; its registration email is student 2's");
+        assertEquals("REGISTRATION_EMAIL", guest.get("matchSource"));
+        assertEquals("S-002", guest.get("studentNumber"));
+    }
 }

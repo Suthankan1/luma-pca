@@ -52,7 +52,8 @@ public class ZoomOccurrenceService {
         StringBuilder sql = new StringBuilder("""
                 SELECT e.occurrence_uuid, min(e.webinar_id) AS webinar_id, min(e.event_ts) AS first_ts, max(e.event_ts) AS last_ts,
                        count(*) AS events, l.class_session_id, l.link_source, l.linked_at,
-                       bool_or(e.event_type = 'webinar.ended') AS ended, f.status AS report_status, f.fetched_at AS report_fetched_at,
+                       bool_or(e.event_type = 'webinar.ended') AS ended,
+                       CASE WHEN f.status = 'FAILED' AND f.attempts >= 6 /* ZoomReportService.MAX_ATTEMPTS */ THEN 'GAVE_UP' ELSE f.status END AS report_status, f.fetched_at AS report_fetched_at,
                        f.join_sessions AS report_join_sessions
                 FROM zoom_occurrence_events e
                 LEFT JOIN zoom_occurrence_links l ON l.academy_id = e.academy_id AND l.occurrence_uuid = e.occurrence_uuid
@@ -67,10 +68,46 @@ public class ZoomOccurrenceService {
             sql.append(" AND l.class_session_id = ?");
             args.add(sessionId);
         }
-        sql.append(" GROUP BY e.occurrence_uuid, l.class_session_id, l.link_source, l.linked_at, f.status, f.fetched_at, f.join_sessions"
+        sql.append(" GROUP BY e.occurrence_uuid, l.class_session_id, l.link_source, l.linked_at, f.status, f.attempts, f.fetched_at, f.join_sessions"
                 + " ORDER BY min(e.event_ts) DESC, e.occurrence_uuid LIMIT ?");
         args.add(limit);
-        return jdbc.query(sql.toString(), (row, i) -> view(row), args.toArray());
+        List<OccurrenceView> live = jdbc.query(sql.toString(), (row, i) -> view(row), args.toArray());
+        // Runs known only from Zoom's participant report (checked by link or ID, never seen live).
+        StringBuilder reportOnly = new StringBuilder("""
+                SELECT f.occurrence_uuid, f.webinar_id, min(p.joined_at) AS first_at, max(p.left_at) AS last_at,
+                       l.class_session_id, l.link_source, l.linked_at, f.status AS report_status, f.fetched_at AS report_fetched_at,
+                       f.join_sessions AS report_join_sessions
+                FROM zoom_report_fetches f
+                LEFT JOIN zoom_report_participants p ON p.academy_id = f.academy_id AND p.occurrence_uuid = f.occurrence_uuid
+                LEFT JOIN zoom_occurrence_links l ON l.academy_id = f.academy_id AND l.occurrence_uuid = f.occurrence_uuid
+                WHERE f.academy_id = ? AND f.status = 'FETCHED' AND f.webinar_id IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM zoom_occurrence_events e WHERE e.academy_id = f.academy_id AND e.occurrence_uuid = f.occurrence_uuid)
+                """);
+        List<Object> reportArgs = new ArrayList<>(List.of(caller.academyId()));
+        if (decided != null) {
+            reportOnly.append(decided ? " AND l.occurrence_uuid IS NOT NULL" : " AND l.occurrence_uuid IS NULL");
+        }
+        if (sessionId != null) {
+            reportOnly.append(" AND l.class_session_id = ?");
+            reportArgs.add(sessionId);
+        }
+        reportOnly.append(" GROUP BY f.occurrence_uuid, f.webinar_id, l.class_session_id, l.link_source, l.linked_at, f.status, f.fetched_at, "
+                + "f.join_sessions HAVING min(p.joined_at) IS NOT NULL ORDER BY min(p.joined_at) DESC LIMIT ?");
+        reportArgs.add(limit);
+        List<OccurrenceView> fromReports = jdbc.query(reportOnly.toString(), (row, i) -> {
+            Timestamp linkedAt = row.getTimestamp("linked_at");
+            return new OccurrenceView(row.getString("occurrence_uuid"), row.getString("webinar_id"), row.getTimestamp("first_at").toInstant(),
+                    row.getTimestamp("last_at").toInstant(), 0, (UUID) row.getObject("class_session_id"), row.getString("link_source"),
+                    linkedAt == null ? null : linkedAt.toInstant(), true, row.getString("report_status"),
+                    row.getTimestamp("report_fetched_at").toInstant(), (Integer) row.getObject("report_join_sessions"));
+        }, reportArgs.toArray());
+        if (fromReports.isEmpty()) {
+            return live;
+        }
+        List<OccurrenceView> all = new ArrayList<>(live);
+        all.addAll(fromReports);
+        all.sort(java.util.Comparator.comparing(OccurrenceView::firstEventAt).reversed().thenComparing(OccurrenceView::occurrenceUuid));
+        return all.size() > limit ? all.subList(0, limit) : all;
     }
 
     /**
@@ -85,8 +122,9 @@ public class ZoomOccurrenceService {
         if (why.length() < 3 || why.length() > 300) {
             throw new InvalidRequestException("A reason of 3 to 300 characters is required");
         }
-        List<String> webinar = jdbc.queryForList("SELECT webinar_id FROM zoom_occurrence_events WHERE academy_id = ? "
-                + "AND occurrence_uuid = ? LIMIT 1", String.class, caller.academyId(), occurrenceUuid);
+        List<String> webinar = jdbc.queryForList("SELECT webinar_id FROM zoom_occurrence_events WHERE academy_id = ? AND occurrence_uuid = ? "
+                + "UNION ALL SELECT webinar_id FROM zoom_report_fetches WHERE academy_id = ? AND occurrence_uuid = ? AND webinar_id IS NOT NULL LIMIT 1",
+                String.class, caller.academyId(), occurrenceUuid, caller.academyId(), occurrenceUuid);
         if (webinar.isEmpty()) {
             throw new ResourceNotFoundException("Occurrence");
         }

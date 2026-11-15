@@ -112,6 +112,11 @@ public class ZoomReportService {
     }
 
     FetchResult fetch(UUID academyId, String occurrenceUuid) {
+        return fetch(academyId, occurrenceUuid, null);
+    }
+
+    /** @param webinarId the webinar, when the caller knows it (a lookup); otherwise found from links or live events */
+    FetchResult fetch(UUID academyId, String occurrenceUuid, String webinarId) {
         ZoomApiClient client = api.getIfAvailable();
         if (client == null) {
             return new FetchResult(occurrenceUuid, "FAILED", null, "The Zoom API is not configured");
@@ -124,29 +129,67 @@ public class ZoomReportService {
         } catch (RuntimeException e) {
             return failed(academyId, occurrenceUuid, e.getClass().getSimpleName(), null);
         }
+        // The webinar (to recognise the host and read registrants): given, or known from links and live events.
+        String webinar = webinarId != null ? webinarId : jdbc.query("""
+                SELECT coalesce((SELECT l.webinar_id FROM zoom_occurrence_links l WHERE l.academy_id = ? AND l.occurrence_uuid = ?),
+                                (SELECT min(e.webinar_id) FROM zoom_occurrence_events e WHERE e.academy_id = ? AND e.occurrence_uuid = ?))
+                """, rs -> rs.next() ? rs.getString(1) : null, academyId, occurrenceUuid, academyId, occurrenceUuid);
+        String hostId = null;
+        Map<String, String> registrantEmails = new java.util.HashMap<>();
+        if (webinar != null) {
+            try {
+                hostId = client.webinar(webinar).hostId();
+            } catch (RuntimeException e) {
+                log.warn("Zoom webinar details unavailable for host detection: {}", e.getClass().getSimpleName());
+            }
+            try {
+                for (ZoomApiClient.Registrant r : client.registrants(webinar, null, "approved")) {
+                    if (r.id() != null && r.email() != null && !r.email().isBlank()) {
+                        registrantEmails.put(r.id(), r.email().strip().toLowerCase(Locale.ROOT));
+                    }
+                }
+            } catch (RuntimeException e) {
+                log.warn("Zoom registrants unavailable for matching: {}", e.getClass().getSimpleName());
+            }
+        }
+        java.util.Set<String> knownHosts = new java.util.HashSet<>(jdbc.queryForList("SELECT DISTINCT participant_email FROM zoom_occurrence_events "
+                + "WHERE academy_id = ? AND host AND participant_email IS NOT NULL", String.class, academyId));
         List<Object[]> rows = new ArrayList<>();
         for (ZoomApiClient.Participant p : report) {
             if (p.joinTime() == null || p.leaveTime() == null || p.leaveTime().isBefore(p.joinTime())) {
                 continue; // incomplete row: not usable as an interval
             }
             String email = p.userEmail() == null || p.userEmail().isBlank() ? null : p.userEmail().strip().toLowerCase(Locale.ROOT);
-            rows.add(new Object[] {UUID.randomUUID(), academyId, occurrenceUuid, email != null && email.length() <= 254 ? email : null,
-                    clip(p.name(), 200), clip(p.registrantId(), 100), Timestamp.from(p.joinTime()), Timestamp.from(p.leaveTime()),
-                    Math.max(0, p.durationSeconds())});
+            email = email != null && email.length() <= 254 ? email : null;
+            boolean host = (hostId != null && hostId.equals(p.id())) || (email != null && knownHosts.contains(email));
+            String registered = p.registrantId() == null ? null : registrantEmails.get(p.registrantId());
+            rows.add(new Object[] {UUID.randomUUID(), academyId, occurrenceUuid, email, clip(p.name(), 200), clip(p.registrantId(), 100),
+                    Timestamp.from(p.joinTime()), Timestamp.from(p.leaveTime()), Math.max(0, p.durationSeconds()), host,
+                    registered != null && registered.length() <= 254 ? registered : null});
         }
         Instant now = DbTime.now();
+        String webinarForRow = webinar;
         transactions.executeWithoutResult(status -> {
             jdbc.update("DELETE FROM zoom_report_participants WHERE academy_id = ? AND occurrence_uuid = ?", academyId, occurrenceUuid);
             jdbc.update("""
-                    INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, next_attempt_at, last_error, fetched_at, join_sessions)
-                    VALUES (?, ?, 'FETCHED', 1, NULL, NULL, ?, ?)
+                    INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, next_attempt_at, last_error, fetched_at, join_sessions, webinar_id)
+                    VALUES (?, ?, 'FETCHED', 1, NULL, NULL, ?, ?, ?)
                     ON CONFLICT (academy_id, occurrence_uuid) DO UPDATE SET status = 'FETCHED', attempts = zoom_report_fetches.attempts + 1,
-                      next_attempt_at = NULL, last_error = NULL, fetched_at = EXCLUDED.fetched_at, join_sessions = EXCLUDED.join_sessions
-                    """, academyId, occurrenceUuid, Timestamp.from(now), rows.size());
+                      next_attempt_at = NULL, last_error = NULL, fetched_at = EXCLUDED.fetched_at, join_sessions = EXCLUDED.join_sessions,
+                      webinar_id = coalesce(EXCLUDED.webinar_id, zoom_report_fetches.webinar_id)
+                    """, academyId, occurrenceUuid, Timestamp.from(now), rows.size(), webinarForRow);
             jdbc.batchUpdate("""
                     INSERT INTO zoom_report_participants (id, academy_id, occurrence_uuid, email, display_name, registrant_id,
-                      joined_at, left_at, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      joined_at, left_at, duration_seconds, host, registrant_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, rows);
+            if (webinarForRow != null && !registrantEmails.isEmpty()) {
+                List<Object[]> registrants = registrantEmails.entrySet().stream().filter(e -> e.getKey().length() <= 100 && e.getValue().length() <= 254)
+                        .map(e -> new Object[] {academyId, webinarForRow, e.getKey(), e.getValue(), Timestamp.from(now)}).toList();
+                jdbc.batchUpdate("""
+                        INSERT INTO zoom_registrants (academy_id, webinar_id, registrant_id, email, fetched_at) VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT (academy_id, webinar_id, registrant_id) DO UPDATE SET email = EXCLUDED.email, fetched_at = EXCLUDED.fetched_at
+                        """, registrants);
+            }
         });
         log.info("Zoom participant report stored for an occurrence: {} join sessions", rows.size());
         return new FetchResult(occurrenceUuid, "FETCHED", rows.size(), null);

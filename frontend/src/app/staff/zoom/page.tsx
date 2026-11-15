@@ -5,7 +5,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  candidateClasses, candidateWindow, formatClassTime, formatInstant, formatWebinarId, isAcademyManager, occurrenceState, reportState, zoomEventLabels,
+  candidateClasses, candidateWindow, formatClassTime, formatInstant, formatWebinarId, isAcademyManager, occurrencePeopleHref, occurrenceSource, occurrenceState, reportState, zoomEventLabels,
   type ClassSession, type Occurrence, type UnmatchedZoomIdentity, type ZoomReceipt,
 } from "@/lib/staff-forms";
 
@@ -83,7 +83,7 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
             <div className="dir-row">
               <div>
                 <strong>Webinar {formatWebinarId(o.webinarId)}</strong>
-                <span className="dir-dates muted"> {formatInstant(o.firstEventAt)} – {formatInstant(o.lastEventAt)} · {o.eventCount} event{o.eventCount === 1 ? "" : "s"}</span>
+                <span className="dir-dates muted"> {formatInstant(o.firstEventAt)} – {formatInstant(o.lastEventAt)} · {occurrenceSource(o)}</span>
                 {o.classSessionId && <div className="dir-dates">
                   {linked ? <Link className="text-link" href={`/staff/sessions/${linked.id}`}>{linked.title}, {formatClassTime(linked.startsAt, linked.endsAt, linked.timeZone)}</Link>
                     : <Link className="text-link" href={`/staff/sessions/${o.classSessionId}`}>Linked class</Link>}
@@ -91,7 +91,7 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
               </div>
               <span className={`status ${state === "Needs review" ? "off" : "on"}`}>{state}</span>
             </div>
-            <p className="dir-dates"><Link className="text-link" href={`/staff/zoom/participants?${new URLSearchParams({ occurrence: o.occurrenceUuid })}`}>People in this occurrence</Link></p>
+            <p className="dir-dates"><Link className="text-link" href={occurrencePeopleHref(o)}>People in this occurrence</Link></p>
             <p className="dir-dates muted report-state">{reportState(o)}</p>
             {o.ended && <ReportForm occurrenceUuid={o.occurrenceUuid} again={o.reportStatus === "FETCHED"} />}
             {o.linkSource ? <details className="decision">

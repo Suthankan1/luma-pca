@@ -350,12 +350,13 @@ export function batchOptions(courses: CourseRef[], batches: BatchRef[], include:
 
 export type Occurrence = { occurrenceUuid: string; webinarId: string; firstEventAt: string; lastEventAt: string; eventCount: number;
   classSessionId: string | null; linkSource: "AUTOMATIC" | "MANUAL" | null; linkedAt: string | null;
-  ended?: boolean; reportStatus?: "FETCHED" | "FAILED" | null; reportFetchedAt?: string | null; reportJoinSessions?: number | null };
+  ended?: boolean; reportStatus?: "FETCHED" | "FAILED" | "GAVE_UP" | null; reportFetchedAt?: string | null; reportJoinSessions?: number | null };
 
 /** Where an occurrence's Zoom participant report stands, in words. */
 export function reportState(o: Occurrence) {
   if (o.reportStatus === "FETCHED") return `Zoom report fetched${o.reportFetchedAt ? ` ${formatInstant(o.reportFetchedAt)}` : ""} · ${o.reportJoinSessions ?? 0} join session${o.reportJoinSessions === 1 ? "" : "s"}`;
   if (o.reportStatus === "FAILED") return "Zoom report not fetched yet (will retry)";
+  if (o.reportStatus === "GAVE_UP") return "Zoom report could not be fetched after 6 tries: fetch it now";
   if (!o.ended) return "Zoom report available after the webinar ends";
   return o.classSessionId ? "Zoom report will be fetched automatically" : "Zoom report: link the occurrence to a class first, or fetch it now";
 }
@@ -364,7 +365,7 @@ export type ZoomReceipt = { id: string; eventType: string; eventTs: number; stat
 
 export type ZoomMatch = "STUDENT" | "NOT_A_STUDENT" | "UNMATCHED" | "HOST";
 export type ZoomParticipant = { email: string | null; displayName: string | null; visits: number; openVisits: number;
-  firstSeenAt: string; lastSeenAt: string; match: ZoomMatch; matchSource: "MANUAL" | "SIGN_IN_EMAIL" | null;
+  firstSeenAt: string; lastSeenAt: string; match: ZoomMatch; matchSource: "MANUAL" | "SIGN_IN_EMAIL" | "REGISTRATION_EMAIL" | null;
   studentId: string | null; studentNumber: string | null; studentName: string | null; expected: boolean | null };
 export type OccurrenceParticipants = { occurrenceUuid: string; classSessionId: string | null; participants: ZoomParticipant[] };
 export type UnmatchedZoomIdentity = { email: string; displayName: string | null; occurrences: number; lastSeenAt: string };
@@ -375,7 +376,8 @@ export function participantMatchLabel(p: ZoomParticipant) {
     case "HOST": return "Host";
     case "UNMATCHED": return p.email ? "Not matched" : "No email from Zoom";
     case "NOT_A_STUDENT": return "Not a student";
-    case "STUDENT": return p.matchSource === "MANUAL" ? "Student (matched by staff)" : "Student (sign-in email)";
+    case "STUDENT": return p.matchSource === "MANUAL" ? "Student (matched by staff)"
+      : p.matchSource === "REGISTRATION_EMAIL" ? "Student (registration email)" : "Student (sign-in email)";
   }
 }
 
@@ -446,6 +448,18 @@ export function parseReason(form: FormData): string | { error: string } {
   const reason = text(form, "reason");
   if (reason.length < 3 || reason.length > 300) return { error: "Give a reason of 3 to 300 characters. Don’t include names or emails." };
   return reason;
+}
+
+/** Where to see who joined: the live participants page, or the "Check a webinar" view for a run known only from Zoom's report. */
+export function occurrencePeopleHref(o: Occurrence) {
+  return o.eventCount === 0
+    ? `/staff/zoom/check?${new URLSearchParams({ webinar: o.webinarId, run: o.occurrenceUuid })}`
+    : `/staff/zoom/participants?${new URLSearchParams({ occurrence: o.occurrenceUuid })}`;
+}
+
+/** "6 events", or that the run is known from Zoom's report only. */
+export function occurrenceSource(o: Occurrence) {
+  return o.eventCount === 0 ? "from Zoom’s report" : `${o.eventCount} event${o.eventCount === 1 ? "" : "s"}`;
 }
 
 export function occurrenceState(occurrence: Occurrence) {

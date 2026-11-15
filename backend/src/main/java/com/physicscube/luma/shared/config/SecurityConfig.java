@@ -65,7 +65,7 @@ public class SecurityConfig {
                             "/api/v1/student-invitations", "/api/v1/student-invitations/progress", "/api/v1/student-invitations/failures", "/api/v1/audit-events",
                             "/api/v1/zoom/receipts", "/api/v1/zoom/receipts/**",
                             "/api/v1/zoom/occurrences", "/api/v1/zoom/occurrences/**", "/api/v1/zoom/occurrence-links",
-                            "/api/v1/zoom/participants", "/api/v1/zoom/participants/unmatched", "/api/v1/zoom/identity-links", "/api/v1/zoom/reports",
+                            "/api/v1/zoom/participants", "/api/v1/zoom/participants/unmatched", "/api/v1/zoom/identity-links", "/api/v1/zoom/identity-links/removals", "/api/v1/zoom/reports",
                             "/api/v1/zoom/webinar-lookup", "/api/v1/zoom/webinar-lookup/**",
                             "/api/v1/attendance-policy", "/api/v1/attendance-appeals", "/api/v1/attendance-appeals/*/resolution",
                             "/api/v1/engagement-settings")

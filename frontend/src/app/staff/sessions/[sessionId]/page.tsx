@@ -9,7 +9,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  batchOptions, formatClassTime, formatDate, formatDuration, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
+  batchOptions, occurrencePeopleHref, occurrenceSource, formatClassTime, formatDate, formatDuration, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
   outcomeLabels, reactionLabels, type ClassEngagement, type ClassSession, type CourseRef, type Occurrence, type ProvisionalAttendance,
 } from "@/lib/staff-forms";
 
@@ -81,7 +81,7 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
             : zoom.data.length === 0 ? <p className="panel-sub">None yet. Links are made when Zoom reports this webinar running around the class time,
               and checked again whenever the class is changed.</p>
             : <ul className="dir-list">{zoom.data.map(o => <li key={o.occurrenceUuid} className="dir-row">
-              <span>Started {formatInstant(o.firstEventAt)} · {o.eventCount} event{o.eventCount === 1 ? "" : "s"}</span>
+              <span>Started {formatInstant(o.firstEventAt)} · {occurrenceSource(o)} · <Link className="text-link" href={occurrencePeopleHref(o)}>people</Link></span>
               <span className="status on">{occurrenceState(o)}</span>
             </li>)}</ul>}
           <p className="panel-sub"><Link className="text-link" href="/staff/zoom">Review Zoom occurrences →</Link></p>

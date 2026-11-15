@@ -103,6 +103,8 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
     case "ATTENDANCE_APPEAL_REJECTED": return { summary: "Attendance appeal rejected", detail: typeof d.note === "string" ? `Note: ${d.note}` : undefined };
     case "ZOOM_IDENTITY_LINKED": return { summary: `Matched a Zoom account to student ${event.targetLabel ?? ""}`.trim(),
       detail: [typeof d.email === "string" ? d.email : "", typeof d.reason === "string" ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ") || undefined };
+    case "ZOOM_IDENTITY_DECISION_REMOVED": return { summary: "Removed a Zoom account decision",
+      detail: [typeof d.email === "string" ? d.email : "", typeof d.reason === "string" ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ") || undefined };
     case "ZOOM_IDENTITY_MARKED_NOT_STUDENT": return { summary: "Marked a Zoom account as not a student",
       detail: [typeof d.email === "string" ? d.email : "", typeof d.reason === "string" ? `Reason: ${d.reason}` : ""].filter(Boolean).join(" · ") || undefined };
     case "ZOOM_RECEIPT_REPLAYED": return { summary: "Replayed a failed Zoom event", detail: typeof d.reason === "string" ? `Reason: ${d.reason}` : undefined };

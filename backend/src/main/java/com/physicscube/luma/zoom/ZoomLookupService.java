@@ -132,7 +132,7 @@ public class ZoomLookupService {
         caller.requireAcademyManager();
         String id = webinarId(input);
         requirePastRun(id, occurrenceUuid);
-        ZoomReportService.FetchResult result = reports.fetch(caller.academyId(), occurrenceUuid);
+        ZoomReportService.FetchResult result = reports.fetch(caller.academyId(), occurrenceUuid, id);
         if (!"FETCHED".equals(result.status())) {
             throw new ConflictException("Zoom did not return the participant report (" + result.error() + "); try again shortly");
         }
@@ -151,22 +151,29 @@ public class ZoomLookupService {
         if (fetched == null || fetched == 0) {
             throw new ResourceNotFoundException("Participant report");
         }
-        record Row(String email, String name, Instant joined, Instant left) {
+        record Row(String email, String name, Instant joined, Instant left, boolean host, String registered) {
         }
-        List<Row> rows = jdbc.query("SELECT email, display_name, joined_at, left_at FROM zoom_report_participants WHERE academy_id = ? "
-                + "AND occurrence_uuid = ? ORDER BY joined_at, id", (r, i) -> new Row(r.getString(1), r.getString(2),
-                r.getTimestamp(3).toInstant(), r.getTimestamp(4).toInstant()), caller.academyId(), occurrenceUuid);
+        List<Row> rows = jdbc.query("SELECT email, display_name, joined_at, left_at, host, registrant_email FROM zoom_report_participants "
+                + "WHERE academy_id = ? AND occurrence_uuid = ? ORDER BY joined_at, id", (r, i) -> new Row(r.getString(1), r.getString(2),
+                r.getTimestamp(3).toInstant(), r.getTimestamp(4).toInstant(), r.getBoolean(5), r.getString(6)), caller.academyId(), occurrenceUuid);
         Map<String, List<Row>> people = new LinkedHashMap<>();
         for (Row row : rows) {
             String key = row.email() != null ? "e:" + row.email() : "n:" + (row.name() == null ? "?" : row.name());
             people.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
         }
-        Set<String> emails = rows.stream().map(Row::email).filter(e -> e != null).collect(Collectors.toSet());
-        Map<String, Resolved> resolved = participants.resolve(caller.academyId(), emails);
+        Map<String, String> byEmail = new java.util.HashMap<>();
+        rows.stream().filter(r -> r.email() != null && !r.host()).forEach(r -> {
+            byEmail.putIfAbsent(r.email(), null);
+            if (r.registered() != null) {
+                byEmail.put(r.email(), r.registered());
+            }
+        });
+        Map<String, Resolved> resolved = participants.resolveWithRegistration(caller.academyId(), byEmail);
         List<Attendee> attendees = new ArrayList<>();
         for (List<Row> visits : people.values()) {
             Row first = visits.get(0);
-            Resolved match = first.email() == null ? null : resolved.get(first.email());
+            boolean host = visits.stream().anyMatch(Row::host);
+            Resolved match = host ? new Resolved(Match.HOST, null, null) : first.email() == null ? null : resolved.get(first.email());
             StudentView student = match == null ? null : match.student();
             attendees.add(new Attendee(first.email(), visits.get(visits.size() - 1).name(), visits.size(),
                     mergedSeconds(visits.stream().map(v -> new Instant[] {v.joined(), v.left()}).toList()), first.joined(),

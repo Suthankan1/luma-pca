@@ -121,3 +121,18 @@ export async function linkRun(_previous: FormState, form: FormData): Promise<For
   revalidatePath("/staff/zoom/check");
   return { ok: true, message: "Linked to the class." };
 }
+
+/** Removes a decision about a Zoom email, so the automatic match by sign-in or registration email applies again. */
+export async function removeIdentityDecision(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const email = zoomEmailOrNull(form.get("email"));
+  const values = submittedValues(form, ["reason"]);
+  if (!email) return invalid;
+  const reason = parseReason(form);
+  if (typeof reason !== "string") return { ok: false, message: reason.error, values };
+  const result = await staffApi("/api/v1/zoom/identity-links/removals", { method: "POST", body: { email, reason } });
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
+  revalidatePath("/staff/zoom");
+  revalidatePath("/staff/zoom/participants");
+  return { ok: true, message: "Decision removed; the automatic match applies again." };
+}
