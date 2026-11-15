@@ -338,11 +338,11 @@ public class ZoomParticipantService {
         return new ClassActivity(occurrences, started, ended, matched, unmatched.size(), reported);
     }
 
-    private record Resolved(Match match, String source, StudentView student) {
+    record Resolved(Match match, String source, StudentView student) {
     }
 
     /** Decisions first, then student sign-in emails. */
-    private Map<String, Resolved> resolve(UUID academyId, Set<String> emails) {
+    Map<String, Resolved> resolve(UUID academyId, Set<String> emails) {
         Map<String, Resolved> result = new HashMap<>();
         if (emails.isEmpty()) {
             return result;

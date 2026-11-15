@@ -1777,3 +1777,21 @@ build runs the Next.js default bundler and repeats the smoke test.
   the server every 30 seconds when the tab is visible, with a Pause/Resume control, so provisional attendance and engagement
   counts stay current. This replaces the planned SSE channel: no long-lived connections for 600 users, nothing new to secure.
 - **Tests:** Playwright `live-refresh.spec` (a class running now shows the notice; pause works) on desktop and phone.
+
+## Checkpoint ZM-LOOKUP — 2026-11-15 — Check any webinar by join link or ID
+
+- **Branch:** `feature/webinar-lookup`. **PR / merge SHA:** see the merged pull request titled "feat(zoom): check any webinar's
+  attendance by its join link or ID".
+- **Implemented:** `ZoomLookupService`: reads the webinar ID from a join link (`/j/`, `/w/`, `/s/`, `/wc/join/`, `/webinar/`,
+  https only) or a typed ID (spaces/hyphens allowed); registration links are refused with guidance. Lists past runs from
+  Zoom, fetches one run's participant report (only a run of that webinar; stored like other reports; audited), shows people
+  by email with join sessions merged, matched to students like live participants, and links a run to a class (manual,
+  audited) so the class counts it from Zoom's report and can be finalised. Staff page "Check a webinar" (from Zoom review).
+- **Real check (15 Nov):** `scripts/zoom-api-check.sh "https://us06web.zoom.us/w/83834428148?tk=…"` resolved the link to the
+  test webinar and produced the page's view of the 13 Nov run from Zoom's report: 5 join sessions → 4 people, all with email,
+  1–3 minutes each (counts only; identities not printed).
+- **Tests:** `ZoomLookupIntegrationTest` (3: link and ID parsing incl. refusals; a never-seen past run fetched, grouped,
+  matched, linked and counted as RECONCILED in the class; unknown webinar/run, report-first, roles). Playwright
+  `webinar-check.spec` on desktop and phone.
+- **Limits:** Zoom meetings are not covered (webinars only); runs linked this way are not listed on the Zoom review page
+  (they have no live events) but appear on their class.

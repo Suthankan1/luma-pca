@@ -304,6 +304,7 @@ for (const n of ["1", "2"]) {
   ]);
 }
 const identityLinks = new Map();
+const lookupReports = new Set();
 function resolvePerson(person) {
   if (person.host) return { match: "HOST", matchSource: null, student: null };
   if (identityLinks.has(person.email)) {
@@ -446,6 +447,46 @@ function zoomApi(req, body, send, parts, query) {
       student ? student.studentNumber : null, { email, previous: "none", reason });
     return send(200, { email, studentId: body.studentId ?? null, studentNumber: student?.studentNumber ?? null,
       studentName: student?.fullName ?? null, reason, linkedAt: new Date().toISOString() });
+  }
+  if (resource === "webinar-lookup") {
+    // As the API, for webinar 777 0001 2345: two past runs; the older one's report has the zoom.student and a guest.
+    const params = new URLSearchParams(query);
+    const raw = String(req.method === "GET" ? params.get("webinar") ?? "" : body.webinar ?? "").trim();
+    const compact = raw.replace(/[\s-]/g, "");
+    const linkId = raw.match(/^https:\/\/[^ ]*\/(?:j|w|s|wc\/join|webinar)\/(\d{9,20})(?:[/?#]|$)/)?.[1];
+    const webinarId = /^\d{9,20}$/.test(compact) ? compact : linkId;
+    if (!webinarId) return send(400, { detail: "Paste the webinar's join link or its ID (9 to 20 digits). Registration links (…/webinar/register/WN_…) do not contain the ID: copy the ID from the webinar's page in Zoom." });
+    if (webinarId !== "77700012345") return send(404, { detail: "Webinar in the academy's Zoom account not found" });
+    const runs = [{ occurrenceUuid: "lookup/oldAAAAAAAAAAAAA==", startTime: "2026-03-10T03:30:00Z" }, { occurrenceUuid: "lookup/newAAAAAAAAAAAAA==", startTime: "2026-03-17T03:30:00Z" }];
+    const runView = r => ({ ...r, reported: lookupReports.has(r.occurrenceUuid), linkedSessionId: occurrenceLinks.get(r.occurrenceUuid)?.classSessionId ?? null });
+    const attendance = uuid => {
+      const people = [{ email: "lookup.student@example.invalid", displayName: "Lookup Student", joinSessions: 2, connectedSeconds: 4140,
+          firstJoinAt: "2026-03-10T03:31:00Z", lastLeaveAt: "2026-03-10T04:40:00Z" },
+        { email: "lookup.guest@example.invalid", displayName: "Lookup Guest", joinSessions: 1, connectedSeconds: 600,
+          firstJoinAt: "2026-03-10T03:40:00Z", lastLeaveAt: "2026-03-10T03:50:00Z" }].map(p => {
+        const { match, matchSource, student } = resolvePerson({ ...p, host: false });
+        return { ...p, match, matchSource, studentId: student?.id ?? null, studentNumber: student?.studentNumber ?? null, studentName: student?.fullName ?? null };
+      }).sort((a, b) => (a.match === "UNMATCHED" ? 0 : 1) - (b.match === "UNMATCHED" ? 0 : 1));
+      return { webinarId, occurrenceUuid: uuid, startTime: "2026-03-10T03:31:00Z", endTime: "2026-03-10T04:40:00Z", joinSessions: 3,
+        linkedSessionId: occurrenceLinks.get(uuid)?.classSessionId ?? null, attendees: people };
+    };
+    if (req.method === "GET" && !id) return send(200, { webinarId, topic: "Lookup revision", durationMinutes: 60, timezone: "Asia/Colombo", runs: runs.map(runView).reverse() });
+    if (req.method === "GET" && id === "attendance") {
+      const uuid = params.get("occurrence");
+      return lookupReports.has(uuid) ? send(200, attendance(uuid)) : send(404, { detail: "Participant report not found" });
+    }
+    if (req.method === "POST" && id === "reports") {
+      if (!runs.some(r => r.occurrenceUuid === body.occurrenceUuid)) return send(404, { detail: "Webinar run not found" });
+      lookupReports.add(body.occurrenceUuid);
+      return send(200, attendance(body.occurrenceUuid));
+    }
+    if (req.method === "POST" && id === "links") {
+      if (!lookupReports.has(body.occurrenceUuid)) return send(409, { detail: "Fetch Zoom's participant report for this run first" });
+      if (String(body.reason ?? "").trim().length < 3) return send(400, { detail: "A reason of 3 to 300 characters is required" });
+      occurrenceLinks.set(body.occurrenceUuid, { classSessionId: body.sessionId, linkSource: "MANUAL", linkedAt: new Date().toISOString() });
+      return send(200, attendance(body.occurrenceUuid));
+    }
+    return send(405);
   }
   if (req.method === "GET" && resource === "receipts") {
     const status = new URLSearchParams(query).get("status") ?? "DEAD";

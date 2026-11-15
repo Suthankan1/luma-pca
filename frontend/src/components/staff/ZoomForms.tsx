@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { autoLinkOccurrences, decideIdentity, decideOccurrence, fetchReport, replayReceipt } from "@/app/staff/zoom/actions";
+import { autoLinkOccurrences, decideIdentity, decideOccurrence, fetchReport, fetchRunReport, linkRun, replayReceipt } from "@/app/staff/zoom/actions";
 import type { FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, className }: { state: FormState; className: string }) {
@@ -84,5 +84,35 @@ export function ReportForm({ occurrenceUuid, again }: { occurrenceUuid: string; 
     <input type="hidden" name="occurrenceUuid" value={occurrenceUuid} />
     <button className="action secondary" type="submit" disabled={pending}>{pending ? "Fetching…" : again ? "Fetch Zoom’s report again" : "Fetch Zoom’s report"}</button>
     <Feedback state={state} className="report-feedback" />
+  </form>;
+}
+
+export function RunReportForm({ webinar, occurrenceUuid, again }: { webinar: string; occurrenceUuid: string; again: boolean }) {
+  const [state, action, pending] = useActionState(fetchRunReport, null);
+  return <form action={action} className="inline-form">
+    <input type="hidden" name="webinar" value={webinar} />
+    <input type="hidden" name="occurrenceUuid" value={occurrenceUuid} />
+    <button className="action" type="submit" disabled={pending}>{pending ? "Fetching…" : again ? "Fetch again" : "Check attendance"}</button>
+    <Feedback state={state} className="run-report-feedback" />
+  </form>;
+}
+
+export function LinkRunForm({ webinar, occurrenceUuid, candidates, current }: {
+  webinar: string; occurrenceUuid: string; candidates: { id: string; label: string }[]; current: string | null;
+}) {
+  const [state, action, pending] = useActionState(linkRun, null);
+  const values = state && !state.ok ? state.values : undefined;
+  if (candidates.length === 0) return <p className="panel-sub">No scheduled class within a day of this run. Schedule it first, then come back.</p>;
+  return <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
+    <input type="hidden" name="webinar" value={webinar} />
+    <input type="hidden" name="occurrenceUuid" value={occurrenceUuid} />
+    <label htmlFor="run-class">Class</label>
+    <select id="run-class" name="sessionId" defaultValue={values?.sessionId ?? current ?? candidates[0].id}>
+      {candidates.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+    </select>
+    <label htmlFor="run-reason">Reason <span className="muted">(recorded)</span></label>
+    <input id="run-reason" name="reason" maxLength={300} required autoComplete="off" defaultValue={values?.reason} placeholder="Checked against the timetable" />
+    <button className="action secondary" type="submit" disabled={pending}>Link to class</button>
+    <Feedback state={state} className="link-run-feedback" />
   </form>;
 }
