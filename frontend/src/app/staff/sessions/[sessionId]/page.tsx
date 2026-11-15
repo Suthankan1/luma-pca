@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
 import { LiveRefresh } from "@/components/LiveRefresh";
-import { CorrectionForm, FinaliseForm } from "@/components/staff/AttendanceForms";
+import { CorrectionForm, FinaliseForm, RecalculateForm } from "@/components/staff/AttendanceForms";
 import { ClosePulseButton, PulseForm } from "@/components/staff/EngagementForms";
 import { CancelSeriesForm, EditSeriesForm, EditSessionForm, StatusForm, type SessionDefaults } from "@/components/staff/SessionForms";
 import { requirePortal } from "@/lib/auth-server";
@@ -114,8 +114,9 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
           && Date.parse(attendance.data.calculatedAt) <= Date.parse(s.endsAt) + 30 * 60_000
           && <LiveRefresh until={new Date(Date.parse(s.endsAt) + 30 * 60_000).toISOString()} />}
         {attendance.data.finalisedAt
-          ? <p className="banner">Final since {formatInstant(attendance.data.finalisedAt)}, by the academy’s <Link className="text-link" href="/staff/attendance">attendance rule</Link>.
+          ? <><p className="banner">Final since {formatInstant(attendance.data.finalisedAt)}, by the academy’s <Link className="text-link" href="/staff/attendance">attendance rule</Link>.
             Change a student’s outcome with a correction.</p>
+            {manager && <RecalculateForm sessionId={s.id} />}</>
           : manager && attendance.data.status === "RECONCILED" && !cancelled && Date.parse(s.endsAt) <= Date.parse(attendance.data.calculatedAt)
             ? <FinaliseForm sessionId={s.id} /> : null}
         <p className="link-row"><a className="text-link" href={`/staff/sessions/${s.id}/attendance-export`} download>Download CSV</a>

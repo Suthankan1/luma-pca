@@ -175,4 +175,41 @@ class AttendanceFinalisationIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(403, finalise(session, tokenFor(academyId, Role.STUDENT)).statusCode());
         assertEquals(404, finalise(session, tokenFor(academy("Other"), Role.ACADEMY_ADMIN)).statusCode());
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aFinalClassIsRecalculatedFromTheCurrentReportKeepingCorrections() {
+        assertEquals(200, setPolicy(owner, 75, 10, null).statusCode());
+        report();
+        assertEquals(409, api.post("/api/v1/class-sessions/" + session + "/attendance/recalculation", "{\"reason\":\"Too early\"}", admin)
+                .statusCode(), "not final yet");
+        assertEquals(200, finalise(session, admin).statusCode());
+        Map<String, String> records = new LinkedHashMap<>();
+        for (Map<String, Object> s : (List<Map<String, Object>>) HttpApi.parse(api.get("/api/v1/class-sessions/" + session + "/attendance", admin))
+                .get("students")) {
+            records.put((String) s.get("studentNumber"), (String) s.get("recordId"));
+        }
+        // S-004 was never seen and is excused by hand; then Zoom's report is fetched again with S-003 there all class.
+        assertEquals(200, api.post("/api/v1/attendance-records/" + records.get("S-004") + "/corrections",
+                "{\"outcome\":\"EXCUSED\",\"reason\":\"Medical note\",\"version\":0}", admin).statusCode());
+        jdbc.update("DELETE FROM zoom_report_participants WHERE academy_id = ? AND email = 'student3@example.test'", academyId);
+        row("student3@example.test", "08:30", "10:30");
+        row("student4@example.test", "08:30", "10:30");
+
+        assertEquals(400, api.post("/api/v1/class-sessions/" + session + "/attendance/recalculation", "{\"reason\":\"\"}", admin).statusCode());
+        HttpResponse<String> done = api.post("/api/v1/class-sessions/" + session + "/attendance/recalculation",
+                "{\"reason\":\"Zoom report fetched again\"}", admin);
+        assertEquals(200, done.statusCode(), done.body());
+        assertEquals(1, HttpApi.parse(done).get("changed"), "S-003 absent → present");
+        assertEquals(1, HttpApi.parse(done).get("kept"), "S-004's correction stays although the rule now says present");
+        Map<String, String> outcomes = new LinkedHashMap<>();
+        for (Map<String, Object> s : (List<Map<String, Object>>) HttpApi.parse(api.get("/api/v1/class-sessions/" + session + "/attendance", admin))
+                .get("students")) {
+            outcomes.put((String) s.get("studentNumber"), (String) s.get("outcome"));
+        }
+        assertEquals("PRESENT", outcomes.get("S-003"));
+        assertEquals("EXCUSED", outcomes.get("S-004"));
+        assertEquals(403, api.post("/api/v1/class-sessions/" + session + "/attendance/recalculation", "{\"reason\":\"Officer\"}",
+                tokenFor(academyId, Role.ATTENDANCE_OFFICER)).statusCode());
+    }
 }

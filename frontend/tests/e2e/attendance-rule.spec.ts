@@ -102,6 +102,11 @@ test.describe("Attendance rule and final attendance", () => {
     await row.getByLabel(/^Reason/).fill("Medical note received");
     await row.getByRole("button", { name: "Save correction" }).click();
     await expect(row.locator(".status")).toHaveText("Excused");
+    await page.getByText("Recalculate from Zoom’s report").click();
+    await page.locator("#recalc-reason").fill("Zoom report fetched again");
+    await page.getByRole("button", { name: "Recalculate" }).click();
+    await expect(page.locator("#recalc-feedback")).toHaveText("Recalculated: 0 changed, 1 corrected kept, 0 added.");
+    await expect(row.locator(".status")).toHaveText("Excused");
     await page.goto("/staff/students?q=" + `FN-${p.toUpperCase()}-1`);
     await page.getByRole("link", { name: new RegExp(`FN-${p.toUpperCase()}-1`) }).first().click();
     const history = page.getByRole("region", { name: "ATTENDANCE HISTORY" });
