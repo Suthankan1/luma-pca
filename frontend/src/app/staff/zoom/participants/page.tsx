@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
-import { IdentityForm } from "@/components/staff/ZoomForms";
+import { IdentityForm, RemoveDecisionForm } from "@/components/staff/ZoomForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
@@ -67,7 +67,8 @@ export default async function ZoomParticipantsPage({ searchParams }: { searchPar
           </div>
           {p.email && p.match !== "HOST" && (p.match === "UNMATCHED"
             ? <IdentityForm prefix={`person-${index}`} email={p.email} />
-            : <details className="decision"><summary>Change match</summary><IdentityForm prefix={`person-${index}`} email={p.email} /></details>)}
+            : <details className="decision"><summary>Change match</summary><IdentityForm prefix={`person-${index}`} email={p.email} />
+              {p.matchSource === "MANUAL" && <RemoveDecisionForm prefix={`person-${index}`} email={p.email} />}</details>)}
         </li>)}
         {participants.length === 0 && <li className="dir-empty muted">No one joined this occurrence.</li>}
       </ul>

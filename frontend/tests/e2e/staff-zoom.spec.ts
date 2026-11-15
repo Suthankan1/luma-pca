@@ -146,6 +146,17 @@ test.describe("Zoom review", () => {
     await expect(matched.locator(".status")).toHaveText("Student (matched by staff)");
     await expect(matched).toContainText(`shown in Zoom as “Guest Viewer ${n}”`);
 
+    // A decision can be removed again, with a reason; the account then waits for review.
+    await matched.getByText("Change match").click();
+    await matched.getByLabel(/^Reason/).last().fill("Matched the wrong student");
+    await matched.getByRole("button", { name: "Remove decision" }).click();
+    await expect(people.getByRole("listitem", { name: `zoom.guest${n}@example.invalid` }).locator(".status")).toHaveText("Not matched");
+    const again = people.getByRole("listitem", { name: `zoom.guest${n}@example.invalid` });
+    await again.getByLabel("Student number").fill(`zm-${p}-2`);
+    await again.getByLabel(/^Reason/).fill("Confirmed with the student");
+    await again.getByRole("button", { name: "Match to student" }).click();
+    await expect(people.getByRole("listitem", { name: `ZM-${P}-2 Guest Student` }).locator(".status")).toHaveText("Student (matched by staff)");
+
     await page.goto("/staff/zoom");
     await expect(guest).toHaveCount(0);
     await page.goto("/staff/activity?category=zoom");

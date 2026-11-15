@@ -44,6 +44,15 @@ class ZoomParticipantController {
         return participants.decisions(CurrentAccount.from(authentication));
     }
 
+    record RemovalRequest(@NotBlank @Size(max = 254) String email, @NotBlank @Size(max = 300) String reason) {
+    }
+
+    @PostMapping("/api/v1/zoom/identity-links/removals")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    void remove(JwtAuthenticationToken authentication, @Valid @RequestBody RemovalRequest request) {
+        participants.removeDecision(CurrentAccount.from(authentication), request.email(), request.reason());
+    }
+
     @PostMapping("/api/v1/zoom/identity-links")
     ZoomParticipantService.IdentityDecision decide(JwtAuthenticationToken authentication, @Valid @RequestBody DecisionRequest request) {
         return participants.decide(CurrentAccount.from(authentication), request.email(), request.studentId(), request.reason());

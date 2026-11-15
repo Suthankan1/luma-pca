@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { autoLinkOccurrences, decideIdentity, decideOccurrence, fetchReport, fetchRunReport, linkRun, replayReceipt } from "@/app/staff/zoom/actions";
+import { autoLinkOccurrences, decideIdentity, decideOccurrence, fetchReport, fetchRunReport, linkRun, removeIdentityDecision, replayReceipt } from "@/app/staff/zoom/actions";
 import type { FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, className }: { state: FormState; className: string }) {
@@ -114,5 +114,17 @@ export function LinkRunForm({ webinar, occurrenceUuid, candidates, current }: {
     <input id="run-reason" name="reason" maxLength={300} required autoComplete="off" defaultValue={values?.reason} placeholder="Checked against the timetable" />
     <button className="action secondary" type="submit" disabled={pending}>Link to class</button>
     <Feedback state={state} className="link-run-feedback" />
+  </form>;
+}
+
+export function RemoveDecisionForm({ prefix, email }: { prefix: string; email: string }) {
+  const [state, action, pending] = useActionState(removeIdentityDecision, null);
+  const values = state && !state.ok ? state.values : undefined;
+  return <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
+    <input type="hidden" name="email" value={email} />
+    <label htmlFor={`${prefix}-remove-reason`}>Reason <span className="muted">(recorded)</span></label>
+    <input id={`${prefix}-remove-reason`} name="reason" maxLength={300} required autoComplete="off" defaultValue={values?.reason} />
+    <button className="action secondary" type="submit" disabled={pending}>Remove decision</button>
+    <Feedback state={state} className="remove-feedback" />
   </form>;
 }

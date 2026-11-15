@@ -33,8 +33,9 @@ public class ZoomApiClient {
     public record Occurrence(String occurrenceId, Instant startTime, int duration, String status) {
     }
 
+    /** @param hostId the host's Zoom user ID; a participant whose {@code id} equals it is the host */
     public record Webinar(long id, String uuid, String topic, Instant startTime, int duration, String timezone, int type,
-                          Integer approvalType, Integer registrationType, List<Occurrence> occurrences) {
+                          Integer approvalType, Integer registrationType, List<Occurrence> occurrences, String hostId) {
     }
 
     public record PastInstance(String uuid, Instant startTime) {
@@ -99,7 +100,7 @@ public class ZoomApiClient {
         return new Webinar(((Number) json.get("id")).longValue(), text(json.get("uuid")), text(json.get("topic")),
                 instant(json.get("start_time")), number(json.get("duration")), text(json.get("timezone")), number(json.get("type")),
                 settings.get("approval_type") instanceof Number n ? n.intValue() : null,
-                settings.get("registration_type") instanceof Number n ? n.intValue() : null, occurrences);
+                settings.get("registration_type") instanceof Number n ? n.intValue() : null, occurrences, text(json.get("host_id")));
     }
 
     public List<PastInstance> pastInstances(String webinarId) {

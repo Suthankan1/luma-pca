@@ -436,6 +436,13 @@ function zoomApi(req, body, send, parts, query) {
     audit("ZOOM_REPORT_FETCHED", "ZOOM_OCCURRENCE", null, null, { occurrenceUuid: occurrence.occurrenceUuid, status: "FETCHED", joinSessions: String(joinSessions) });
     return send(200, { occurrenceUuid: occurrence.occurrenceUuid, status: "FETCHED", joinSessions, error: null });
   }
+  if (req.method === "POST" && resource === "identity-links" && id === "removals") {
+    const email = String(body.email ?? "").trim().toLowerCase();
+    if (String(body.reason ?? "").trim().length < 3) return send(400, { detail: "A reason of 3 to 300 characters is required" });
+    if (!identityLinks.delete(email)) return send(404, { detail: "Decision for this Zoom email not found" });
+    audit("ZOOM_IDENTITY_DECISION_REMOVED", "ZOOM_IDENTITY", null, null, { email, reason: String(body.reason).trim() });
+    return send(204);
+  }
   if (req.method === "POST" && resource === "identity-links") {
     const email = String(body.email ?? "").trim().toLowerCase();
     if (reason.length < 3 || reason.length > 300) return send(400, { detail: "A reason of 3 to 300 characters is required" });
