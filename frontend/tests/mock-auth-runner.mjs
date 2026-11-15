@@ -1024,6 +1024,15 @@ function academicApi(req, body, send) {
       return send(201, question);
     }
     if (sub === "attendance" && req.method === "GET") return send(200, mockAttendance(session));
+    if (sub === "attendance" && req.method === "POST" && path.endsWith("/attendance/recalculation")) {
+      const final = finalisedClasses.get(session.id);
+      if (!final) return send(409, { detail: "This class is not final yet; finalise it instead" });
+      if (String(body.reason ?? "").trim().length < 3) return send(400, { detail: "A reason of 3 to 300 characters is required" });
+      let kept = 0;
+      for (const record of final.outcomes.values()) if (record.outcome !== record.computedOutcome) kept++;
+      audit("ATTENDANCE_RECALCULATED", "CLASS_SESSION", session.id, session.title, { changed: "0", kept: String(kept), added: "0", reason: String(body.reason).trim() });
+      return send(200, { sessionId: session.id, changed: 0, kept, added: 0 });
+    }
     if (sub === "attendance" && req.method === "POST" && path.endsWith("/attendance/finalisation")) {
       // As the API: the academy's rule, a finished class, Zoom's report for every linked occurrence, once per class.
       if (finalisedClasses.has(session.id)) return send(409, { detail: "This class's attendance is already final" });

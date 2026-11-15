@@ -68,3 +68,19 @@ export async function resolveAppeal(_previous: FormState, form: FormData): Promi
   revalidatePath("/staff/attendance");
   return { ok: true, message: decision === "ACCEPT" ? "Appeal accepted; the record is corrected." : "Appeal rejected." };
 }
+
+/** Recalculates a final class from Zoom's current report; corrected records keep their outcome. */
+export async function recalculateAttendance(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const sessionId = uuidOrNull(form.get("sessionId"));
+  const reason = String(form.get("reason") ?? "").trim();
+  const values = submittedValues(form, ["reason"]);
+  if (!sessionId) return { ok: false, message: "That request was not valid. Reload the page." };
+  if (reason.length < 3 || reason.length > 300) return { ok: false, message: "Give a reason of 3 to 300 characters.", values };
+  const result = await staffApi<{ changed: number; kept: number; added: number }>(`/api/v1/class-sessions/${sessionId}/attendance/recalculation`,
+    { method: "POST", body: { reason } });
+  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
+  revalidatePath(`/staff/sessions/${sessionId}`);
+  const { changed, kept, added } = result.data;
+  return { ok: true, message: `Recalculated: ${changed} changed, ${kept} corrected kept, ${added} added.` };
+}

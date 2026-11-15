@@ -61,6 +61,15 @@ class AttendanceController {
                 request.description(), request.version());
     }
 
+    record RecalculationRequest(@NotBlank @Size(max = 300) String reason) {
+    }
+
+    @PostMapping("/api/v1/class-sessions/{sessionId}/attendance/recalculation")
+    AttendanceFinalisationService.RecalculationResult recalculate(JwtAuthenticationToken authentication, @PathVariable UUID sessionId,
+                                                                  @Valid @RequestBody RecalculationRequest request) {
+        return finalisation.recalculate(CurrentAccount.from(authentication), sessionId, request.reason());
+    }
+
     @PostMapping("/api/v1/class-sessions/{sessionId}/attendance/finalisation")
     AttendanceFinalisationService.FinalisationResult finalise(JwtAuthenticationToken authentication, @PathVariable UUID sessionId) {
         return finalisation.finalise(CurrentAccount.from(authentication), sessionId);

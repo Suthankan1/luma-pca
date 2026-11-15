@@ -1809,3 +1809,12 @@ build runs the Next.js default bundler and repeats the smoke test.
 - An administrator can remove a Zoom-account decision (audited), restoring the automatic match.
 - **Tests:** new cases in `ZoomReportIntegrationTest`, `ZoomParticipantIntegrationTest`; Zoom/attendance backend tests 88/88;
   Playwright 96, unit 52.
+
+## Checkpoint FIX-2 — 2026-11-15 — Recalculate a final class
+
+- **Branch:** `fix/refinalise`. Fixes audit item 8.
+- `POST /api/v1/class-sessions/{id}/attendance/recalculation` (owners/admins, reason, audited `ATTENDANCE_RECALCULATED`):
+  recomputes every record from Zoom's current report with the rule it was finalised with; corrected records keep their
+  outcome (facts refreshed); students expected now without a record get one. UI: "Recalculate from Zoom's report" on a final
+  class. Tests: `AttendanceFinalisationIntegrationTest` (recalculation keeps a correction, changes an uncorrected record,
+  refusals); Playwright in `attendance-rule.spec`.
