@@ -129,6 +129,7 @@ class EngagementIntegrationTest extends StaffApiIntegrationTest {
         String question = (String) HttpApi.parse(opened).get("id");
 
         Map<String, Object> seen = HttpApi.parse(api.get("/api/v1/me/class-sessions/" + live + "/engagement", studentTokens.get("1")));
+        assertTrue(seen.get("classEndsAt") != null, "the student's page knows when the class ends");
         assertEquals(1, ((List<?>) seen.get("pulses")).size());
         String answer = "/api/v1/me/class-sessions/" + live + "/pulses/" + question + "/answers";
         assertEquals(400, api.post(answer, "{\"option\":3}", studentTokens.get("1")).statusCode());
@@ -167,6 +168,22 @@ class EngagementIntegrationTest extends StaffApiIntegrationTest {
         assertNull(top.get(1).get("studentNumber"));
         assertTrue(((String) ranking.get("method")).contains("PORTAL_REACTION"));
         assertEquals(400, api.get(path + "&limit=7", admin).statusCode());
+
+        // The same over the whole course, and as a CSV download (audited).
+        String course = jdbc.queryForObject("SELECT course_id::text FROM batches WHERE id = ?::uuid", String.class, batch);
+        String range = "?from=" + today.minusDays(1) + "&to=" + today.plusDays(1);
+        Map<String, Object> courseRanking = HttpApi.parse(api.get("/api/v1/courses/" + course + "/engagement-ranking" + range, admin));
+        assertEquals(2, courseRanking.get("studentsCounted"));
+        HttpResponse<String> csv = api.get("/api/v1/courses/" + course + "/engagement-ranking/export" + range + "&limit=100", admin);
+        assertEquals(200, csv.statusCode(), csv.body());
+        assertTrue(csv.headers().firstValue("Content-Type").orElse("").startsWith("text/csv"));
+        String[] lines = csv.body().split("\r\n");
+        assertEquals("rank,student_number,student_name,classes,reactions,pulse_answers,score", lines[0]);
+        assertTrue(lines[1].startsWith("1,E-001,"), lines[1]);
+        assertTrue(lines[2].startsWith("2,,,"), "unnamed without opt-in: " + lines[2]);
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE academy_id = ? AND action = 'ENGAGEMENT_RANKING_EXPORTED'",
+                Integer.class, academyId));
+        assertEquals(403, api.get("/api/v1/courses/" + course + "/engagement-ranking/export" + range, studentTokens.get("1")).statusCode());
         assertEquals(403, api.get(path, studentTokens.get("1")).statusCode());
         assertEquals(403, api.get(path, tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
     }

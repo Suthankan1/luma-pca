@@ -39,7 +39,9 @@ test.describe("Engagement with consent", () => {
     await expect(panel).toContainText("LUMA records the reactions and answers");
     await panel.getByRole("button", { name: "I agree" }).click();
     await expect(panel).toContainText("You take part");
-    await page.getByRole("listitem", { name: "Waves and oscillations" }).getByRole("link", { name: "Take part" }).click();
+    await expect(page.getByRole("listitem", { name: "Waves and oscillations" }).getByRole("link", { name: "Take part" })).toHaveCount(0);
+    await page.getByRole("listitem", { name: "Live class now" }).getByRole("link", { name: "Take part" }).click();
+    await expect(page.locator(".live-refresh")).toContainText("Updating every 20 seconds");
     await page.getByRole("button", { name: "I understand" }).click();
     await expect(page.locator("#reaction-feedback")).toHaveText("Sent.");
 
@@ -82,7 +84,11 @@ test.describe("Engagement with consent", () => {
     await page.getByRole("link", { name: "Roster →" }).first().click();
     const ranking = page.getByRole("region", { name: "ENGAGEMENT RANKING" });
     await ranking.getByLabel("Show", { exact: true }).selectOption("100");
+    await ranking.getByLabel("Over").selectOption("course");
     await ranking.getByRole("button", { name: "Show ranking" }).click();
     await expect(ranking).toContainText("No consenting students took part in this range.");
+    const download = page.waitForEvent("download");
+    await ranking.getByRole("link", { name: "Download CSV" }).click();
+    expect((await download).suggestedFilename()).toMatch(/^engagement-ranking-\d{4}-\d{2}-\d{2}-to-\d{4}-\d{2}-\d{2}\.csv$/);
   });
 });

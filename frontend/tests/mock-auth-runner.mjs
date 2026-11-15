@@ -188,7 +188,10 @@ function studentApi(req, send, body) {
   const engagementPath = url.pathname.match(/^\/api\/v1\/me\/class-sessions\/([^/]+)\/(engagement|reactions|pulses\/([^/]+)\/answers)$/);
   if (engagementPath) {
     const sessionId = engagementPath[1];
-    if (engagementPath[2] === "engagement") return send(200, mockEngagement(sessionId, true));
+    if (engagementPath[2] === "engagement") {
+      return send(200, { ...mockEngagement(sessionId, true), classStartsAt: new Date(Date.now() - 20 * 60_000).toISOString(),
+        classEndsAt: new Date(Date.now() + 90 * 60_000).toISOString() });
+    }
     if (!engagementSettings?.enabled || !myConsent?.granted) return send(409, { detail: "Turn on engagement in your portal first" });
     if (engagementPath[2] === "reactions") {
       const counts = reactionsBySession.get(sessionId) ?? {};
@@ -235,8 +238,13 @@ function studentApi(req, send, body) {
       { id: "00000000-0000-4000-8000-0000000000f2", title: "Revision for both batches", offset: 4, status: "CANCELLED", batches: [mon, sat] },
       { id: "00000000-0000-4000-8000-0000000000f3", title: "Far future class", offset: 40, status: "SCHEDULED", batches: [mon] },
     ];
-    return send(200, classes.map(({ offset, ...c }) => ({ ...c, startsAt: `${day(offset)}T12:30:00Z`, endsAt: `${day(offset)}T14:30:00Z`,
-      timeZone: "Asia/Colombo", localDate: day(offset) })).filter(c => Date.parse(c.startsAt) >= from && Date.parse(c.startsAt) < to));
+    // One class running now (20 minutes in), so "Take part" can be offered during a class.
+    const live = !studentHasEnrolments ? [] : [{ id: "00000000-0000-4000-8000-0000000000f4", title: "Live class now", status: "SCHEDULED", batches: [mon],
+      startsAt: new Date(Date.now() - 20 * 60_000).toISOString(), endsAt: new Date(Date.now() + 90 * 60_000).toISOString(), timeZone: "Asia/Colombo",
+      localDate: new Date(Date.now() - 20 * 60_000).toISOString().slice(0, 10) }];
+    return send(200, [...classes.map(({ offset, ...c }) => ({ ...c, startsAt: `${day(offset)}T12:30:00Z`, endsAt: `${day(offset)}T14:30:00Z`,
+      timeZone: "Asia/Colombo", localDate: day(offset) })), ...live].filter(c => Date.parse(c.startsAt) >= from && Date.parse(c.startsAt) < to)
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
   }
   return send(404);
 }
@@ -927,6 +935,14 @@ function academicApi(req, body, send) {
     return send(204);
   }
 
+  if ((collection === "batches" || collection === "courses") && sub === "engagement-ranking" && req.method === "GET" && path.endsWith("/export")) {
+    const params = new URLSearchParams(query);
+    audit("ENGAGEMENT_RANKING_EXPORTED", collection === "courses" ? "COURSE" : "BATCH", id, null, { from: params.get("from"), to: params.get("to") });
+    return send.csv(`engagement-ranking-${params.get("from")}-to-${params.get("to")}.csv`, "rank,student_number,student_name,classes,reactions,pulse_answers,score\r\n");
+  }
+  if (collection === "courses" && sub === "engagement-ranking" && req.method === "GET") {
+    return send(200, { limit: 10, classes: 0, studentsCounted: 0, top: [], method: "(reactions per class, at most 10) + 3 × pulse answers, divided by classes expected" });
+  }
   if (collection === "batches" && sub === "engagement-ranking" && req.method === "GET") {
     const params = new URLSearchParams(query);
     if (!["10", "100"].includes(params.get("limit") ?? "10")) return send(400, { detail: "limit must be 10 or 100" });

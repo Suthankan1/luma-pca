@@ -36,12 +36,38 @@ public class AttendanceRecordService {
     private final ClassSessionService sessions;
     private final StudentService students;
     private final AuditLog audit;
+    private final com.physicscube.luma.identity.AccountNotifier notifier;
 
-    AttendanceRecordService(JdbcTemplate jdbc, ClassSessionService sessions, StudentService students, AuditLog audit) {
+    AttendanceRecordService(JdbcTemplate jdbc, ClassSessionService sessions, StudentService students, AuditLog audit,
+                            com.physicscube.luma.identity.AccountNotifier notifier) {
         this.jdbc = jdbc;
         this.sessions = sessions;
         this.students = students;
         this.audit = audit;
+        this.notifier = notifier;
+    }
+
+    private static final java.time.format.DateTimeFormatter DAY = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.ENGLISH);
+
+    /** The record's class and the student's account, for notices. */
+    private record Context(UUID studentAccountId, String classTitle, String classDay) {
+    }
+
+    private Context context(UUID recordId) {
+        return jdbc.query("""
+                SELECT st.account_id, s.title, s.starts_at, s.time_zone FROM attendance_records r
+                JOIN students st ON st.id = r.student_id AND st.academy_id = r.academy_id
+                JOIN class_sessions s ON s.id = r.class_session_id AND s.academy_id = r.academy_id WHERE r.id = ?
+                """, (row, i) -> new Context((UUID) row.getObject(1), row.getString(2),
+                DAY.format(row.getTimestamp(3).toInstant().atZone(java.time.ZoneId.of(row.getString(4))))), recordId).get(0);
+    }
+
+    private String portalLine(String path) {
+        return notifier.webOrigin() == null ? "" : "\n\nOpen LUMA: " + notifier.webOrigin() + path;
+    }
+
+    private static String label(String outcome) {
+        return outcome.charAt(0) + outcome.substring(1).toLowerCase(java.util.Locale.ROOT);
     }
 
     public record Correction(UUID id, String previousOutcome, String newOutcome, String reason, UUID appealId, Instant correctedAt) {
@@ -123,6 +149,12 @@ public class AttendanceRecordService {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO attendance_appeals (id, academy_id, record_id, student_id, message, status, created_at) VALUES (?, ?, ?, ?, ?, 'OPEN', ?)",
                 id, caller.academyId(), recordId, studentId, text, Timestamp.from(DbTime.now()));
+        Context appealed = context(recordId);
+        for (UUID manager : notifier.activeManagers(caller.academyId())) {
+            notifier.notify(manager, "appeal-submitted", "A student appealed their attendance",
+                    "A student appealed their attendance for " + appealed.classTitle() + " on " + appealed.classDay()
+                            + ". Review it on the Attendance page." + portalLine("/staff/attendance"));
+        }
         audit.record(caller.academyId(), caller.accountId(), "ATTENDANCE_APPEAL_SUBMITTED", "ATTENDANCE_RECORD", recordId,
                 Map.of("outcome", found.get(0).outcome()));
         return appealView(caller.academyId(), id);
@@ -163,6 +195,12 @@ public class AttendanceRecordService {
         }
         jdbc.update("UPDATE attendance_appeals SET status = ?, resolved_by = ?, resolved_at = ?, resolution_note = ? WHERE id = ?",
                 accept ? "ACCEPTED" : "REJECTED", caller.accountId(), Timestamp.from(DbTime.now()), text, appealId);
+        if (!accept) {
+            Context c = context(recordId);
+            notifier.notify(c.studentAccountId(), "appeal-decided", "Your attendance appeal was not accepted",
+                    "Your appeal about " + c.classTitle() + " on " + c.classDay() + " was not accepted.\nNote from the academy: " + text
+                            + portalLine("/student"));
+        }
         audit.record(caller.academyId(), caller.accountId(), accept ? "ATTENDANCE_APPEAL_ACCEPTED" : "ATTENDANCE_APPEAL_REJECTED",
                 "ATTENDANCE_RECORD", recordId, Map.of("note", text));
         return appealView(caller.academyId(), appealId);
@@ -184,6 +222,10 @@ public class AttendanceRecordService {
                 """, UUID.randomUUID(), caller.academyId(), record.id(), record.outcome(), next, reason, appealId, caller.accountId(),
                 Timestamp.from(DbTime.now()));
         jdbc.update("UPDATE attendance_records SET outcome = ?, version = version + 1 WHERE id = ?", next, record.id());
+        Context c = context(record.id());
+        notifier.notify(c.studentAccountId(), "attendance-corrected", "Your attendance was updated",
+                "Your attendance for " + c.classTitle() + " on " + c.classDay() + " is now " + label(next) + " (it was "
+                        + label(record.outcome()) + ").\nReason: " + reason + portalLine("/student"));
         audit.record(caller.academyId(), caller.accountId(), "ATTENDANCE_CORRECTED", "CLASS_SESSION", record.sessionId(), Map.of(
                 "recordId", record.id().toString(), "from", record.outcome(), "to", next, "reason", reason));
     }

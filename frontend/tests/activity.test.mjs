@@ -68,3 +68,9 @@ test("attendance exports and Zoom identity decisions", () => {
   assert.deepEqual(describeActivity(event("ZOOM_IDENTITY_LINKED", { email: "x@example.invalid", reason: "Checked" },
     { targetType: "ZOOM_IDENTITY", targetLabel: "S-1" })), { summary: "Matched a Zoom account to student S-1", detail: "x@example.invalid · Reason: Checked" });
 });
+
+test("privacy and ranking actions", () => {
+  assert.deepEqual(describeActivity(event("STUDENT_ERASED", { placeholder: "ERASED-1234ABCD", reason: "Guardian request" }, { targetType: "STUDENT", targetLabel: null })),
+    { summary: "Erased a student’s personal data (now ERASED-1234ABCD)", detail: "Reason: Guardian request" });
+  assert.deepEqual(describeActivity(event("PASSWORD_CHANGED", {}, { targetLabel: null })), { summary: "Changed their password" });
+});

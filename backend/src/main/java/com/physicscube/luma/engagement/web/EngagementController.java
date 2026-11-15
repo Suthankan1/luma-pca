@@ -102,6 +102,29 @@ class EngagementController {
         engagement.closePulse(CurrentAccount.from(authentication), sessionId, questionId);
     }
 
+    @GetMapping("/api/v1/courses/{courseId}/engagement-ranking")
+    EngagementService.Ranking courseRanking(JwtAuthenticationToken authentication, @PathVariable UUID courseId,
+                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                            @RequestParam(defaultValue = "10") int limit) {
+        return engagement.courseRanking(CurrentAccount.from(authentication), courseId, from, to, limit);
+    }
+
+    @GetMapping({"/api/v1/batches/{scopeId}/engagement-ranking/export", "/api/v1/courses/{scopeId}/engagement-ranking/export"})
+    ResponseEntity<byte[]> exportRanking(JwtAuthenticationToken authentication, jakarta.servlet.http.HttpServletRequest request,
+                                         @PathVariable UUID scopeId,
+                                         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                         @RequestParam(defaultValue = "10") int limit) {
+        boolean course = request.getRequestURI().startsWith("/api/v1/courses/");
+        String csv = engagement.exportRanking(CurrentAccount.from(authentication), course ? null : scopeId, course ? scopeId : null, from, to, limit);
+        return ResponseEntity.ok().contentType(new org.springframework.http.MediaType("text", "csv", java.nio.charset.StandardCharsets.UTF_8))
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"engagement-ranking-" + from + "-to-" + to + ".csv\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .body(csv.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     @GetMapping("/api/v1/batches/{batchId}/engagement-ranking")
     EngagementService.Ranking ranking(JwtAuthenticationToken authentication, @PathVariable UUID batchId,
                                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

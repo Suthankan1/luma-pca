@@ -27,6 +27,11 @@ class MailConfig {
                 public void passwordReset(String to, String link, java.time.Instant expiresAt) {
                     throw new IllegalStateException("Email is not configured");
                 }
+
+                @Override
+                public void notice(String to, String subject, String text) {
+                    throw new IllegalStateException("Email is not configured");
+                }
             };
         }
         return new SmtpAccountMailer(available, properties.from());

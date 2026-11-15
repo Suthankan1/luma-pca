@@ -1837,3 +1837,16 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Academy decisions recorded (15 Nov):** student ages are not an issue; data is collected only for attendance; guardians agree.
 - **Tests:** `PrivacyIntegrationTest` (3), `AccountRateLimitIntegrationTest`, updated auth/MFA/staff tests (all pass locally);
   Playwright `account-privacy.spec` and instructor MFA in 7 specs; unit 53, Playwright 100.
+
+## Checkpoint FIX-4 — 2026-11-15 — Notices, take-part timing, live student page, course rankings
+
+- **Branch:** `fix/student-flows`. Fixes audit items 11, 12, 13 and 23.
+- **Email notices** (`AccountNotifier`, after commit on the account-mail queue, only when mail is on and the account active):
+  the student when a record is corrected or an appeal is accepted (new and old outcome, reason) or rejected (note);
+  owners/administrators when a student appeals. No personal data in logs.
+- **"Take part"** shows only from 10 minutes before to 10 minutes after a class; the student's class page refreshes every 20 s
+  until 10 minutes after the end (class times now in the student engagement response).
+- **Rankings:** over the whole course (`GET /api/v1/courses/{id}/engagement-ranking`) as well as a batch, and as CSV
+  (`…/engagement-ranking/export`, audited `ENGAGEMENT_RANKING_EXPORTED`, formula-safe, unnamed rows stay unnamed).
+- **Tests:** notice assertions in `AttendanceCorrectionIntegrationTest`; course ranking and CSV in `EngagementIntegrationTest`;
+  unit tests for the take-part window and wording; Playwright engagement/portal specs. Unit 55, Playwright 100.

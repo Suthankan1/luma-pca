@@ -235,3 +235,12 @@ test("the attendance rule form accepts whole numbers in range and a description"
   assert.match(forms.parsePolicyForm(form("75", "241", "Approved")).error, /0 to 240/);
   assert.match(forms.parsePolicyForm(form("75", "10", "ok")).error, /3 to 500/);
 });
+
+test("students may take part from ten minutes before a class until ten minutes after it", () => {
+  const at = iso => new Date(iso);
+  const start = "2027-03-01T08:30:00Z", end = "2027-03-01T10:30:00Z";
+  assert.equal(forms.classOpenForEngagement(start, end, at("2027-03-01T08:19:59Z")), false);
+  assert.equal(forms.classOpenForEngagement(start, end, at("2027-03-01T08:20:00Z")), true);
+  assert.equal(forms.classOpenForEngagement(start, end, at("2027-03-01T10:40:00Z")), true);
+  assert.equal(forms.classOpenForEngagement(start, end, at("2027-03-01T10:40:01Z")), false);
+});

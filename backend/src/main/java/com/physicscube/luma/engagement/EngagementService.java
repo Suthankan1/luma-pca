@@ -75,8 +75,9 @@ public class EngagementService {
                             List<Integer> counts, Integer myAnswer) {
     }
 
+    /** @param classStartsAt / classEndsAt the class time, so the student's page knows when to stop refreshing */
     public record ClassEngagement(UUID sessionId, boolean enabled, Map<String, Integer> reactions, int reactingStudents,
-                                  List<PulseView> pulses, String source) {
+                                  List<PulseView> pulses, String source, Instant classStartsAt, Instant classEndsAt) {
     }
 
     /** @param name {@code null} when the student did not opt in to being named */
@@ -218,10 +219,11 @@ public class EngagementService {
     public ClassEngagement forStudent(CurrentAccount caller, UUID sessionId) {
         UUID student = ownStudent(caller);
         boolean enabled = find(caller.academyId()).map(Settings::enabled).orElse(false);
-        requireExpected(caller.academyId(), sessionId, student);
+        Map<String, Object> session = requireExpected(caller.academyId(), sessionId, student);
         List<PulseView> open = pulses(caller.academyId(), sessionId, student).stream().filter(PulseView::open)
                 .map(p -> new PulseView(p.id(), p.prompt(), p.options(), p.openedAt(), p.closesAt(), true, null, p.myAnswer())).toList();
-        return new ClassEngagement(sessionId, enabled, Map.of(), 0, open, "PORTAL");
+        return new ClassEngagement(sessionId, enabled, Map.of(), 0, open, "PORTAL",
+                ((java.sql.Timestamp) session.get("starts_at")).toInstant(), ((java.sql.Timestamp) session.get("ends_at")).toInstant());
     }
 
     // ---- staff: pulses and class view -----------------------------------------------------------
@@ -301,8 +303,9 @@ public class EngagementService {
                 row -> { reactions.put(row.getString(1), row.getInt(2)); }, caller.academyId(), sessionId);
         Integer reacting = jdbc.queryForObject("SELECT count(DISTINCT student_id) FROM portal_reactions WHERE academy_id = ? AND class_session_id = ?",
                 Integer.class, caller.academyId(), sessionId);
+        SessionView view = sessions.get(caller, sessionId);
         return new ClassEngagement(sessionId, enabled, reactions, reacting == null ? 0 : reacting, pulses(caller.academyId(), sessionId, null),
-                "PORTAL_REACTION, PORTAL_PULSE");
+                "PORTAL_REACTION, PORTAL_PULSE", view.startsAt(), view.endsAt());
     }
 
     // ---- 006C rankings (staff only) ----------------------------------------------------------
@@ -315,6 +318,22 @@ public class EngagementService {
      */
     @Transactional(readOnly = true)
     public Ranking ranking(CurrentAccount caller, UUID batchId, java.time.LocalDate from, java.time.LocalDate to, int limit) {
+        return ranking(caller, java.util.Set.of(batchId), from, to, limit);
+    }
+
+    /** As the batch ranking, over every batch of a course: classes of any of them, students of any of them. */
+    @Transactional(readOnly = true)
+    public Ranking courseRanking(CurrentAccount caller, UUID courseId, java.time.LocalDate from, java.time.LocalDate to, int limit) {
+        caller.requireAcademyManager();
+        java.util.Set<UUID> batchIds = new java.util.HashSet<>(jdbc.queryForList("SELECT id FROM batches WHERE academy_id = ? AND course_id = ?",
+                UUID.class, caller.academyId(), courseId));
+        if (batchIds.isEmpty()) {
+            throw new ResourceNotFoundException("Course");
+        }
+        return ranking(caller, batchIds, from, to, limit);
+    }
+
+    private Ranking ranking(CurrentAccount caller, java.util.Set<UUID> batchIds, java.time.LocalDate from, java.time.LocalDate to, int limit) {
         caller.requireAcademyManager();
         if (limit != 10 && limit != 100) {
             throw new InvalidRequestException("limit must be 10 or 100");
@@ -327,15 +346,17 @@ public class EngagementService {
         Map<UUID, SessionView> classes = new LinkedHashMap<>();
         for (Instant piece = start; piece.isBefore(end); piece = piece.plus(Duration.ofDays(60))) {
             Instant pieceEnd = piece.plus(Duration.ofDays(60)).isBefore(end) ? piece.plus(Duration.ofDays(60)) : end;
-            sessions.list(caller, piece, pieceEnd, batchId).stream()
-                    .filter(s -> "SCHEDULED".equals(s.status()) && !s.localDate().isBefore(from) && !s.localDate().isAfter(to))
-                    .forEach(s -> classes.putIfAbsent(s.id(), s));
+            for (UUID batchId : batchIds) {
+                sessions.list(caller, piece, pieceEnd, batchId).stream()
+                        .filter(s -> "SCHEDULED".equals(s.status()) && !s.localDate().isBefore(from) && !s.localDate().isAfter(to))
+                        .forEach(s -> classes.putIfAbsent(s.id(), s));
+            }
         }
         Map<UUID, int[]> perStudent = new LinkedHashMap<>(); // classes expected, reactions (capped), pulse answers
         Map<UUID, String> numbers = new LinkedHashMap<>();
         for (SessionView session : classes.values()) {
             for (ExpectedStudent e : sessions.expectedStudents(caller, session.id())) {
-                if (!e.batchIds().contains(batchId)) {
+                if (e.batchIds().stream().noneMatch(batchIds::contains)) {
                     continue;
                 }
                 numbers.put(e.studentId(), e.studentNumber());
@@ -374,6 +395,37 @@ public class EngagementService {
         }
         return new Ranking(limit, classes.size(), rows.size(), top, "(reactions per class, at most " + REACTION_SCORE_CAP
                 + ") + 3 × pulse answers, divided by classes expected; consenting students only; sources PORTAL_REACTION, PORTAL_PULSE");
+    }
+
+    /** A ranking downloaded as CSV; audited (it can name students). @param courseId set for a course, else batchId */
+    @Transactional
+    public String exportRanking(CurrentAccount caller, UUID batchId, UUID courseId, java.time.LocalDate from, java.time.LocalDate to, int limit) {
+        Ranking ranking = courseId != null ? courseRanking(caller, courseId, from, to, limit) : ranking(caller, batchId, from, to, limit);
+        audit.record(caller.academyId(), caller.accountId(), "ENGAGEMENT_RANKING_EXPORTED", courseId != null ? "COURSE" : "BATCH",
+                courseId != null ? courseId : batchId, Map.of("from", from.toString(), "to", to.toString(), "limit", String.valueOf(limit),
+                        "rows", String.valueOf(ranking.top().size())));
+        return rankingCsv(ranking);
+    }
+
+    /** A ranking as CSV (rank, student number, name, classes, reactions, answers, score); unnamed rows stay unnamed. */
+    public static String rankingCsv(Ranking ranking) {
+        StringBuilder csv = new StringBuilder("rank,student_number,student_name,classes,reactions,pulse_answers,score\r\n");
+        for (Ranked r : ranking.top()) {
+            csv.append(r.rank()).append(',').append(cell(r.studentNumber())).append(',').append(cell(r.name())).append(',')
+                    .append(r.classes()).append(',').append(r.reactions()).append(',').append(r.pulseAnswers()).append(',').append(r.score())
+                    .append("\r\n");
+        }
+        return csv.toString();
+    }
+
+    /** Quoted when needed; a leading formula character gets an apostrophe (as in attendance exports). */
+    private static String cell(String value) {
+        if (value == null) {
+            return "";
+        }
+        String text = !value.isEmpty() && "=+-@\t\r".indexOf(value.charAt(0)) >= 0 ? "'" + value : value;
+        return text.contains(",") || text.contains("\"") || text.contains("\n") || text.startsWith("'")
+                ? "\"" + text.replace("\"", "\"\"") + "\"" : text;
     }
 
     // ---- internals ----------------------------------------------------------------------------

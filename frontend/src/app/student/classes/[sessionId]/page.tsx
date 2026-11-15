@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/Shell";
+import { LiveRefresh } from "@/components/LiveRefresh";
 import { PulseAnswer, ReactionButtons } from "@/components/StudentEngagement";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
@@ -22,6 +23,7 @@ export default async function StudentClassPage({ params }: { params: Promise<{ s
     {!engagement.ok ? <p className="session-error" role="alert">We couldn’t load this class right now.</p>
       : !engagement.data.enabled ? <p className="banner">Reactions and questions are not switched on at the academy.</p>
       : <>
+        <LiveRefresh until={new Date(Date.parse(engagement.data.classEndsAt) + 10 * 60_000).toISOString()} seconds={20} />
         <section className="panel" aria-labelledby="react-title">
           <h2 id="react-title" className="panel-title">HOW IS IT GOING?</h2>
           <p className="panel-sub">Your reaction goes to staff with your name. One every few seconds.</p>

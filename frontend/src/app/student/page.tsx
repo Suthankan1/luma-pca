@@ -5,7 +5,7 @@ import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
 import { AppealForm } from "@/components/AppealForm";
 import { ConsentForm } from "@/components/StudentEngagement";
-import { formatClassTime, formatDate, formatDuration, outcomeLabels, sessionWindow, type AttendanceRecordView, type MyConsent } from "@/lib/staff-forms";
+import { formatClassTime, formatDate, classOpenForEngagement, formatDuration, outcomeLabels, sessionWindow, type AttendanceRecordView, type MyConsent } from "@/lib/staff-forms";
 
 type MyEnrollment = { id: string; batchCode: string; batchName: string; enrolledOn: string; withdrawnOn: string | null; status: string };
 type MyClass = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
@@ -49,7 +49,7 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
                 <span className="dir-dates muted"> {formatClassTime(c.startsAt, c.endsAt, c.timeZone)} ({c.timeZone})</span>
                 <div className="dir-dates muted">{c.batches.map(batch => batch.code).join(", ")}</div>
               </div>
-              {c.status === "SCHEDULED" && consent.ok && consent.data.enabled && consent.data.granted
+              {c.status === "SCHEDULED" && consent.ok && consent.data.enabled && consent.data.granted && classOpenForEngagement(c.startsAt, c.endsAt)
                 ? <Link className="text-link" href={`/student/classes/${c.id}`}>Take part</Link> : null}
               <span className={`status ${c.status === "SCHEDULED" ? "on" : "off"}`}>{c.status === "SCHEDULED" ? "Scheduled" : "Cancelled"}</span>
             </li>)}

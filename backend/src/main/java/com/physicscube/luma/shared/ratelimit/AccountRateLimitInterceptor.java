@@ -16,7 +16,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  */
 class AccountRateLimitInterceptor implements HandlerInterceptor {
     private static final Pattern HEAVY = Pattern.compile(
-            "/api/v1/(class-sessions/[^/]+/attendance/export|batches/[^/]+/attendance/export|batches/[^/]+/engagement-ranking"
+            "/api/v1/(class-sessions/[^/]+/attendance/export|batches/[^/]+/attendance/export|(batches|courses)/[^/]+/engagement-ranking(/export)?"
                     + "|zoom/webinar-lookup(/.*)?|zoom/reports)");
 
     private final RateLimitCounters counters;
