@@ -11,6 +11,8 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
   rate limits, account lockout; roles scoped to the academy, assigned batches, or the student's own data on every route.
 - **Academic data:** courses, batches, students (CSV import), enrolments, staff assignments, classes and weekly series
   shared by several batches, bulk invitation emails, an append-only activity log.
+- **Less manual work:** classes imported from the academy's upcoming Zoom webinars, a home page of what needs attention,
+  every ready class finalised at once or automatically once Zoom's report is in.
 - **Zoom:** signed webhook receipt (proven with a real test webinar), a retrying worker, automatic linking of each webinar
   occurrence to its class, participants matched to students by Zoom email (or an administrator's audited decision), Zoom's
   participant report fetched after each webinar (host marked, registrants matched by their registration email); "Check a

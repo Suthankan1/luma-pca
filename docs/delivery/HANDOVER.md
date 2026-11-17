@@ -6,12 +6,14 @@ A working web application, tested end to end, that replaces roll call in the aca
 
 - **Staff portal** (owner, administrator, instructor, attendance officer, analyst; every staff sign-in uses an
   authenticator app): courses, batches, students (one by one or from CSV), enrolments, staff and their batches, classes and
-  weekly series, invitations by email.
+  weekly series (or **imported from the academy's upcoming Zoom webinars** in one step), invitations by email, and a home page
+  with today's classes and everything that needs attention.
 - **Zoom:** signed webhooks from the academy's Zoom account, automatic linking of each webinar run to its class, people
   matched to students by email or registration email, staff decisions for the rest, Zoom's participant report after
   every class, and "Check a webinar" by join link or ID for any past run.
 - **Attendance:** live provisional view; final present / late / absent from Zoom's report by the academy's own rule;
-  corrections with reasons, recalculation, student appeals, email notices; per-student rates per batch, totals per batch,
+  every ready class finalised at once, or **automatically** once Zoom's report is in (owner's choice); corrections with
+  reasons, recalculation, student appeals, email notices; per-student rates per batch, totals per batch,
   CSV exports.
 - **Student portal** (phone first): own classes, final attendance, appeals, password change; reactions and questions
   during class if the academy switches engagement on (consent-based, staff-only rankings).
@@ -39,7 +41,9 @@ Every slice and its pull request: [PROGRESS.md](../ai/checkpoints/PROGRESS.md).
 1. Fill in [SIGN-OFF.md](SIGN-OFF.md) (rule, retention, registration policy, hosting owner and budget, domain, mail sender).
 2. Choose hosting; deploy with [runbooks/DEPLOY.md](runbooks/DEPLOY.md) (or the Terraform in `infra/terraform`), then
    create the first owner with `scripts/bootstrap-owner.sh` ([runbooks/FIRST-OWNER.md](runbooks/FIRST-OWNER.md)).
-3. Point the Zoom app's event subscription at `https://<domain>/api/v1/zoom/webhooks`; keep "registration required" with
+3. In the Zoom app (Marketplace → the server-to-server app → Scopes), add `webinar:read:list_webinars:admin` so **Import
+   classes from Zoom** can list the academy's webinars (the other read scopes are already granted). Point the Zoom app's
+   event subscription at `https://<domain>/api/v1/zoom/webhooks`; keep "registration required" with
    Zoom sign-in on class webinars.
 4. Phase 1: staff repeat [UAT-SCRIPT.md](UAT-SCRIPT.md) on staging and the load test at 600 users.
 5. Phase 2 and 3 of [PILOT-PLAN.md](PILOT-PLAN.md): one batch for two weeks against the register, then all batches.
