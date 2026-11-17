@@ -1,6 +1,10 @@
 spring:
   application:
     name: luma-backend
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/luma}
     username: ${DB_USERNAME:luma_dev}
@@ -18,6 +22,8 @@ spring:
       hibernate.order_inserts: true
   flyway:
     enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
   mvc:
     problemdetails:
       enabled: true

@@ -1962,3 +1962,10 @@ build runs the Next.js default bundler and repeats the smoke test.
   and a webinar's dates are read only when it is opened (`GET /api/v1/zoom/upcoming-webinars/{id}`; first real webinar: 15
   future dates in 543 ms).
 - Tests: `ZoomImportIntegrationTest` (list order, counts, search, per-webinar dates), `staff-automation.spec`.
+
+## Checkpoint CONFIG-1 — 2026-11-17 — Managed PostgreSQL & Supabase support
+
+- **Branch:** `config/supabase-managed-db`.
+- **Application config:** Added `spring.config.import` for optional `.env[.properties]` files (root and backend folders) to load local settings without manual shell export. Configured `spring.flyway.baseline-on-migrate: true` and `baseline-version: 0` so Flyway safely initializes and migrates managed PostgreSQL instances (e.g. Supabase, AWS RDS) where cloud routines or extensions exist in schema `public`.
+- **Validation:** Successfully applied all 26 migrations against Supabase pooler, bootstrapped initial academy/owner, and verified system readiness.
+
