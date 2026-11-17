@@ -1,0 +1,73 @@
+name: Deploy Backend to Oracle Cloud
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, Deploy & Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Build Spring Boot JAR
+        run: mvn -B -ntp -f backend/pom.xml clean package -DskipTests
+
+      - name: Set up SSH
+        env:
+          OCI_SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$OCI_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$OCI_HOST" >> ~/.ssh/known_hosts
+
+      - name: Transfer JAR and restart backend service
+        env:
+          OCI_HOST: ${{ secrets.OCI_HOST }}
+          OCI_USERNAME: ${{ secrets.OCI_USERNAME }}
+        run: |
+          echo "Uploading new backend JAR to Oracle Cloud VM..."
+          scp -i ~/.ssh/id_rsa backend/target/luma-backend-0.1.0-SNAPSHOT.jar "$OCI_USERNAME@$OCI_HOST:/opt/luma/luma-backend.jar.tmp"
+          
+          echo "Replacing binary and restarting luma-backend service..."
+          ssh -i ~/.ssh/id_rsa "$OCI_USERNAME@$OCI_HOST" "
+            mv /opt/luma/luma-backend.jar.tmp /opt/luma/luma-backend.jar &&
+            sudo systemctl restart luma-backend
+          "
+
+      - name: Verify Health Check
+        run: |
+          echo "Waiting for Spring Boot backend to report status UP..."
+          HEALTH_URL="https://129.225.114.202.sslip.io/actuator/health"
+          for i in {1..30}; do
+            STATUS=$(curl -s --max-time 5 "$HEALTH_URL" | grep -o '"status":"UP"' || true)
+            if [ "$STATUS" = '"status":"UP"' ]; then
+              echo "✅ Backend is UP and reporting healthy!"
+              exit 0
+            fi
+            echo "Waiting for backend startup (attempt $i/30)..."
+            sleep 3
+          done
+          echo "❌ Health check timed out after 90 seconds."
+          exit 1
