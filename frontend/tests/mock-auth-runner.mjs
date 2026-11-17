@@ -25,7 +25,7 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
-  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -40,6 +40,8 @@ const backend = createServer(async (req, res) => {
       } else if (body.email === "instructor@example.invalid") {
         // Every staff role signs in with a second factor, as the API requires.
         return send(200, { mfaRequired: true, mfaToken: "challenge-token-instructor", mfaExpiresIn: 300, mfaEnrolled: true });
+      } else if (body.email === "analyst@example.invalid") {
+        return send(200, { mfaRequired: true, mfaToken: "challenge-token-analyst", mfaExpiresIn: 300, mfaEnrolled: true });
       } else if (body.email === "admin-unenrolled@example.invalid") {
         return send(200, {
           mfaRequired: true,
@@ -90,6 +92,12 @@ const backend = createServer(async (req, res) => {
           refreshExpiresIn: 600,
           recoveryCodes: ["rec-1111", "rec-2222", "rec-3333", "rec-4444"],
         });
+      }
+      if (body.mfaToken === "challenge-token-analyst") {
+        if (body.code !== "rec-recovery") return send(401);
+        roles = ["ANALYST"];
+        latestRefresh = `fake-opaque-refresh-${++rotation}`;
+        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
       }
       if (body.mfaToken === "challenge-token-instructor") {
         if (body.code !== "rec-recovery") return send(401);
@@ -803,6 +811,35 @@ function academicApi(req, body, send) {
       version: attendancePolicy ? attendancePolicy.version + 1 : 0, updatedAt: new Date().toISOString() };
     audit("ATTENDANCE_POLICY_SET", "ACADEMY", null, null, { minConnectedPercent: String(body.minConnectedPercent), lateAfterMinutes: String(body.lateAfterMinutes) });
     return send(200, attendancePolicy);
+  }
+  // Attendance over a period (fixed figures; the real API counts final records). Academy totals: managers and analysts.
+  const summaryMethod = "Final attendance only. Rate = (present + late) / (present + late + absent); excused classes are left out.";
+  const counts = (present, late, absent, excused) => ({ present, late, absent, excused,
+    ratePercent: present + late + absent === 0 ? null : Math.round(100 * (present + late) / (present + late + absent)) });
+  if (collection === "attendance" && id === "summary" && req.method === "GET") {
+    if (!manager && !roles.includes("ANALYST")) return send(403, { detail: "Owner, administrator or analyst role required" });
+    const params = new URLSearchParams(query);
+    if (!params.get("from") || !params.get("to") || params.get("to") < params.get("from")) return send(400, { detail: "from and to are required" });
+    const withClasses = batches.filter(b => classSessions.some(c => c.batchIds.includes(b.id)));
+    return send(200, { from: params.get("from"), to: params.get("to"), method: summaryMethod,
+      batches: withClasses.map(b => ({ batchId: b.id, batchCode: b.code, batchName: b.name,
+        courseCode: courses.find(c => c.id === b.courseId)?.code ?? "", courseTitle: courses.find(c => c.id === b.courseId)?.title ?? "",
+        finalClasses: 2, classesNotFinal: 1, totals: counts(5, 1, 2, 1) })) });
+  }
+  if (collection === "batches" && path.endsWith("/attendance/summary") && req.method === "GET") {
+    if (!manager) return send(403, { detail: "Forbidden" });
+    if (!batches.some(b => b.id === id)) return notFound();
+    const params = new URLSearchParams(query);
+    if (!params.get("from") || !params.get("to") || params.get("to") < params.get("from")) return send(400, { detail: "from and to are required" });
+    const rows = enrollments.filter(e => e.batchId === id).map((e, i) => {
+      const student = students.find(st => st.id === e.studentId);
+      return { studentId: e.studentId, studentNumber: student?.studentNumber ?? "", fullName: student?.fullName ?? "",
+        counts: i % 2 === 0 ? counts(1, 0, 1, 0) : counts(2, 0, 0, 0) };
+    }).sort((a, b) => (a.counts.ratePercent ?? 101) - (b.counts.ratePercent ?? 101) || a.studentNumber.localeCompare(b.studentNumber));
+    const sum = rows.reduce((t, r) => counts(t.present + r.counts.present, t.late + r.counts.late, t.absent + r.counts.absent,
+      t.excused + r.counts.excused), counts(0, 0, 0, 0));
+    return send(200, { from: params.get("from"), to: params.get("to"), finalClasses: rows.length ? 2 : 0, classesNotFinal: 0,
+      totals: sum, students: rows, method: summaryMethod });
   }
   // Assigned staff may list batches; the mock has no assignments, so they see none.
   if (!manager && (collection === "batches" || collection === "class-sessions") && !id && req.method === "GET"

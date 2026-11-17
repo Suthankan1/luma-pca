@@ -17,7 +17,8 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
   webinar" by join link or ID shows any past run, even ones LUMA never received live; IP/device data is never stored.
 - **Attendance:** provisional facts live (time connected with rejoins merged, lateness), then final present/late/absent
   from Zoom's report by the academy's own recorded rule; corrections with reasons, recalculation after a late report or a
-  rule change, student appeals, email notices to students and managers, histories, CSV exports.
+  rule change, student appeals, email notices to students and managers, histories, per-student attendance
+  rates per batch, academy totals per batch for analysts, CSV exports.
 - **Engagement (off by default, consent-based):** portal reactions, instructor pulse questions, staff-only top 10/100 per class, batch
   or course, with CSV download.
 - **Privacy:** an owner can erase a student on request (attendance kept, anonymised); a nightly job removes emails from

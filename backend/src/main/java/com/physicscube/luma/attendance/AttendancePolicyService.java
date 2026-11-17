@@ -40,7 +40,7 @@ public class AttendancePolicyService {
 
     @Transactional(readOnly = true)
     public Optional<PolicyView> get(CurrentAccount caller) {
-        if (!caller.isAcademyManager() && caller.batchScopedRoles().isEmpty()) {
+        if (!caller.isAcademyManager() && caller.batchScopedRoles().isEmpty() && !caller.hasRole("ANALYST")) {
             throw new AccessDeniedException("No role that reads attendance");
         }
         return find(caller.academyId());
