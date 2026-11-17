@@ -28,7 +28,7 @@ about it.
 - **Zoom app → Features → Event Subscriptions:** turning the subscription switch off **deletes** the subscriptions; it
   does not pause them. To stop events, change the endpoint or leave it on and ignore them. Re-creating needs the event
   list in ZOOM-TEST-WEBINAR.md and a new endpoint validation.
-- **Branch protection** for `main` is available but off; see CONTRIBUTING.md.
+- **Branch protection** is on for `main` (pull requests and the secret scan required, no force-push); see CONTRIBUTING.md.
 - **Notion status page** ("02 · Current Build Status") stopped at PR #63 because the connector was turned off. This
   repository's PROGRESS.md is the record.
 - **PR #71** (RAG class information assistant plan) is the repository owner's own draft and is not part of this delivery.
