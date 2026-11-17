@@ -1863,3 +1863,16 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Accessibility:** `accessibility.spec` runs axe (WCAG 2.1 A/AA) on public, staff and student pages; serious or critical
   issues fail. It found low-contrast muted text (4.42:1 on the page background); `--pca-muted` is now #4a6684 (5.57:1).
 - Local: Playwright 106 (incl. accessibility on both projects), real-stack 1/1.
+
+## Checkpoint FIX-6 — 2026-11-17 — Operations gaps closed (infrastructure code, not applied)
+
+- **Branch:** `fix/ops`. Fixes audit items 31–35.
+- **Unused SQS queue removed:** Zoom events are queued in PostgreSQL; the module, IAM grant and DLQ alarm are gone.
+- **WAF** in front of the load balancer (AWS common + known-bad-inputs rule groups, per-address rate limit; body-size rule
+  counts only, for CSV uploads). **VPC endpoints:** S3 gateway always (free); ECR/Logs/Secrets Manager optional.
+- **AWS Backup:** daily snapshot at 02:00 Colombo, own vault, kept 35 days, beside RDS point-in-time recovery.
+- **Alarms:** four more log-phrase alarms (webhook signature, webhook storage, retention, email). `AlarmLogPhrasesTest`
+  fails the build if the API stops writing any phrase an alarm counts.
+- **Images workflow:** builds both Dockerfiles on every relevant PR (no push, no deploy) and checks they run as non-root.
+- **Branch protection:** available but off; documented in CONTRIBUTING.md for the owner to enable.
+- Local: `terraform fmt`/`validate` pass (1.9.8), actionlint passes.

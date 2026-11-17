@@ -233,10 +233,6 @@ data "aws_iam_policy_document" "api_task" {
     actions   = ["s3:PutObject", "s3:GetObject"]
     resources = ["${var.private_bucket_arn}/exports/*"]
   }
-  statement {
-    actions   = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:ChangeMessageVisibility"]
-    resources = [var.queue_arn]
-  }
 }
 
 resource "aws_iam_role_policy" "api_task" {
@@ -380,4 +376,90 @@ resource "aws_appautoscaling_policy" "api_cpu" {
       predefined_metric_type = "ECSServiceAverageCPUUtilization"
     }
   }
+}
+
+# Web application firewall in front of the load balancer: AWS's common and known-bad-input rule
+# sets, plus a per-address rate limit. The body-size rule only counts, because staff upload
+# student lists as CSV; the application limits sizes itself.
+resource "aws_wafv2_web_acl" "this" {
+  name  = "${var.name}-waf"
+  scope = "REGIONAL"
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "aws-common"
+    priority = 10
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+        rule_action_override {
+          name = "SizeRestrictions_BODY"
+          action_to_use {
+            count {}
+          }
+        }
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.name}-aws-common"
+      sampled_requests_enabled   = false
+    }
+  }
+
+  rule {
+    name     = "aws-known-bad-inputs"
+    priority = 20
+    override_action {
+      none {}
+    }
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.name}-known-bad-inputs"
+      sampled_requests_enabled   = false
+    }
+  }
+
+  rule {
+    name     = "per-address-rate"
+    priority = 30
+    action {
+      block {}
+    }
+    statement {
+      rate_based_statement {
+        limit              = var.waf_rate_limit
+        aggregate_key_type = "IP"
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.name}-rate"
+      sampled_requests_enabled   = false
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${var.name}-waf"
+    sampled_requests_enabled   = false
+  }
+  tags = var.tags
+}
+
+resource "aws_wafv2_web_acl_association" "alb" {
+  resource_arn = aws_lb.this.arn
+  web_acl_arn  = aws_wafv2_web_acl.this.arn
 }

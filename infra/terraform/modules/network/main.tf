@@ -80,3 +80,48 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
 }
+
+# S3 traffic (exports) stays inside AWS through a free gateway endpoint.
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.this.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = aws_route_table.private[*].id
+  tags              = merge(var.tags, { Name = "${var.name}-s3" })
+}
+
+# Optional private endpoints for pulling images, writing logs and reading secrets without the
+# NAT gateway. Each costs per hour per zone, so they are off unless the academy turns them on.
+data "aws_region" "current" {}
+
+locals {
+  interface_services = var.interface_endpoints ? toset(["ecr.api", "ecr.dkr", "logs", "secretsmanager"]) : toset([])
+}
+
+resource "aws_security_group" "endpoints" {
+  count       = var.interface_endpoints ? 1 : 0
+  name        = "${var.name}-endpoints"
+  description = "HTTPS from inside the VPC to AWS service endpoints"
+  vpc_id      = aws_vpc.this.id
+  tags        = var.tags
+}
+
+resource "aws_vpc_security_group_ingress_rule" "endpoints_https" {
+  count             = var.interface_endpoints ? 1 : 0
+  security_group_id = aws_security_group.endpoints[0].id
+  cidr_ipv4         = aws_vpc.this.cidr_block
+  from_port         = 443
+  to_port           = 443
+  ip_protocol       = "tcp"
+}
+
+resource "aws_vpc_endpoint" "interface" {
+  for_each            = local.interface_services
+  vpc_id              = aws_vpc.this.id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.${each.value}"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.endpoints[0].id]
+  private_dns_enabled = true
+  tags                = merge(var.tags, { Name = "${var.name}-${each.value}" })
+}

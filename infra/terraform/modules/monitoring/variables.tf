@@ -19,10 +19,6 @@ variable "db_instance_id" {
   type = string
 }
 
-variable "dlq_name" {
-  type = string
-}
-
 variable "api_log_group" {
   type = string
 }
