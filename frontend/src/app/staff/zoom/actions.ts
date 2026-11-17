@@ -148,7 +148,7 @@ export async function importWebinar(_previous: FormState, form: FormData): Promi
   if (batchIds.length === 0) return { ok: false, message: "Choose the batch or batches these classes are for." };
   if (occurrenceIds.length === 0) return { ok: false, message: "Choose at least one date." };
   const result = await staffApi<{ created: number; alreadyScheduled: number }>("/api/v1/zoom/webinar-imports",
-    { method: "POST", body: { webinarId, batchIds, occurrenceIds, title: title || null } });
+    { method: "POST", body: { webinarId, batchIds, occurrenceIds, title: title || null } }, 30000);
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
   revalidatePath("/staff/zoom/import");
   revalidatePath("/staff/sessions");
