@@ -48,10 +48,11 @@ export async function authRequest(
   options?: ({ body: object } | { access: string }) & { client?: string | null }
 ) {
   const url = new URL(`/api/v1/auth/${path}`, process.env.API_INTERNAL_URL ?? "http://localhost:8080");
+  const timeoutMs = Number(process.env.API_AUTH_TIMEOUT_MS ?? 15000);
   return fetch(url, {
     cache: "no-store",
     redirect: "error",
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(timeoutMs),
     // The visitor's address, for the API's per-client limits; the API trusts it only from configured proxies.
     ...(options && "body" in options
       ? { method: "POST", headers: { "Content-Type": "application/json", ...(options.client ? { "X-Forwarded-For": options.client } : {}) },
