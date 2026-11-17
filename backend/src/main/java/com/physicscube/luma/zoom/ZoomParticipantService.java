@@ -325,6 +325,7 @@ public class ZoomParticipantService {
         Map<String, Instant> ended = new HashMap<>();
         Map<String, Map<String, Visit>> visitsByOccurrence = new LinkedHashMap<>();
         Set<String> hosts = new HashSet<>();
+        Set<String> reported = new HashSet<>();
         if (!occurrences.isEmpty()) {
             String[] occArray = occurrences.toArray(String[]::new);
             Map<String, Instant> firstEvents = new HashMap<>();
@@ -366,7 +367,7 @@ public class ZoomParticipantService {
             firstEvents.forEach((occ, at) -> started.putIfAbsent(occ, at));
 
             // Where Zoom's participant report has been fetched, it replaces the live visits (004B).
-            Set<String> reported = new HashSet<>(jdbc.queryForList("SELECT occurrence_uuid FROM zoom_report_fetches WHERE academy_id = ? "
+            reported.addAll(jdbc.queryForList("SELECT occurrence_uuid FROM zoom_report_fetches WHERE academy_id = ? "
                     + "AND status = 'FETCHED' AND occurrence_uuid = ANY (?)", String.class, academyId, occArray));
             if (!reported.isEmpty()) {
                 String[] repArray = reported.toArray(String[]::new);

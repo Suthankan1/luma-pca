@@ -89,9 +89,6 @@ public class CourseService {
     private void evict(UUID academyId) {
         courseCache.keySet().removeIf(k -> k.academyId().equals(academyId));
     }
-            throw translate(e);
-        }
-    }
 
     /**
      * For other modules: confirms the course belongs to the academy and returns
