@@ -16,7 +16,8 @@ accounts to match, failed Zoom events); each line opens the page where it is han
 
 ## Timetable and Zoom
 - **Import classes from Zoom** (Classes → "Import classes from your Zoom webinars"): LUMA lists the academy's upcoming
-  webinars from Zoom, every date of a recurring one. Tick the dates and the batches, keep or change the title, and press
+  webinars from Zoom (search by topic or ID; each shows its next date and how many of its dates are already classes).
+  Open one to see every upcoming date of a recurring webinar. Tick the dates and the batches, keep or change the title, and press
   **Create classes**: each becomes a class with its webinar ID, so attendance links and fills in by itself. Dates that are
   already classes are shown and never created twice. Webinars with no fixed time in Zoom cannot be imported.
 - **Classes**: or schedule a class or a weekly series by hand for one or more batches, with the Zoom **webinar ID**. Each

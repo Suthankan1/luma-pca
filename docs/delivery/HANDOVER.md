@@ -41,9 +41,8 @@ Every slice and its pull request: [PROGRESS.md](../ai/checkpoints/PROGRESS.md).
 1. Fill in [SIGN-OFF.md](SIGN-OFF.md) (rule, retention, registration policy, hosting owner and budget, domain, mail sender).
 2. Choose hosting; deploy with [runbooks/DEPLOY.md](runbooks/DEPLOY.md) (or the Terraform in `infra/terraform`), then
    create the first owner with `scripts/bootstrap-owner.sh` ([runbooks/FIRST-OWNER.md](runbooks/FIRST-OWNER.md)).
-3. In the Zoom app (Marketplace → the server-to-server app → Scopes), add `webinar:read:list_webinars:admin` so **Import
-   classes from Zoom** can list the academy's webinars (the other read scopes are already granted). Point the Zoom app's
-   event subscription at `https://<domain>/api/v1/zoom/webhooks`; keep "registration required" with
+3. The Zoom app already has every read scope LUMA uses, including `webinar:read:list_webinars:admin` for **Import classes
+   from Zoom** (added 17 Nov). Point the Zoom app's event subscription at `https://<domain>/api/v1/zoom/webhooks`; keep "registration required" with
    Zoom sign-in on class webinars.
 4. Phase 1: staff repeat [UAT-SCRIPT.md](UAT-SCRIPT.md) on staging and the load test at 600 users.
 5. Phase 2 and 3 of [PILOT-PLAN.md](PILOT-PLAN.md): one batch for two weeks against the register, then all batches.

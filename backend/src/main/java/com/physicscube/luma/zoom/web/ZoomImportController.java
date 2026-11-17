@@ -11,7 +11,9 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,8 +32,14 @@ class ZoomImportController {
     }
 
     @GetMapping("/api/v1/zoom/upcoming-webinars")
-    List<ZoomImportService.UpcomingWebinar> upcoming(JwtAuthenticationToken authentication) {
-        return imports.upcoming(CurrentAccount.from(authentication));
+    List<ZoomImportService.WebinarSummary> upcoming(JwtAuthenticationToken authentication,
+                                                    @RequestParam(required = false) @Size(max = 100) String q) {
+        return imports.upcoming(CurrentAccount.from(authentication), q);
+    }
+
+    @GetMapping("/api/v1/zoom/upcoming-webinars/{webinarId}")
+    ZoomImportService.UpcomingWebinar webinar(JwtAuthenticationToken authentication, @PathVariable String webinarId) {
+        return imports.webinar(CurrentAccount.from(authentication), webinarId);
     }
 
     @PostMapping("/api/v1/zoom/webinar-imports")

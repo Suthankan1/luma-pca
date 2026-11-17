@@ -505,6 +505,8 @@ export type PendingClass = { sessionId: string; title: string; startsAt: string;
 export type PendingAttendance = { ruleRecorded: boolean; autoFinalise: boolean; classes: PendingClass[] };
 export const pendingStateLabels: Record<PendingClass["state"], string> = {
   READY: "Ready to finalise", WAITING_FOR_REPORT: "Waiting for Zoom's report", NO_ZOOM_RUN: "No Zoom run linked" };
+export type WebinarSummary = { webinarId: string; topic: string | null; nextStart: string | null; durationMinutes: number;
+  timeZone: string | null; recurring: boolean; upcomingClasses: number; liveEvents: boolean };
 export type UpcomingRun = { occurrenceId: string; startsAt: string; endsAt: string; classId: string | null };
 export type UpcomingWebinar = { webinarId: string; topic: string | null; timeZone: string | null; recurring: boolean; runs: UpcomingRun[];
   note: string | null; liveEvents?: boolean };

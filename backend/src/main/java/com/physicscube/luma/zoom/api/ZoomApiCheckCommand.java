@@ -107,9 +107,21 @@ class ZoomApiCheckCommand implements ApplicationRunner {
             }
             // Import from Zoom: only counts and types are printed, never topics.
             try {
+                long started = System.nanoTime();
                 List<ZoomApiClient.ListedWebinar> upcoming = zoom.upcomingWebinars(System.getenv().getOrDefault("LUMA_ZOOM_IMPORT_HOSTS", "me").split(",")[0]);
+                long listMs = (System.nanoTime() - started) / 1_000_000;
                 out.println("Upcoming webinars (import from Zoom): " + upcoming.size() + ", types " + upcoming.stream().map(ZoomApiClient.ListedWebinar::type)
-                        .distinct().sorted().toList());
+                        .distinct().sorted().toList() + ", listed in " + listMs + " ms, " + upcoming.stream().filter(w -> w.startTime() != null).count()
+                        + " with a next date");
+                if (!upcoming.isEmpty()) {
+                    started = System.nanoTime();
+                    ZoomApiClient.Webinar first = zoom.webinar(String.valueOf(upcoming.get(0).id()));
+                    java.time.Instant now = java.time.Instant.now();
+                    long future = first.occurrences().stream().filter(o -> o.startTime() != null && o.startTime().isAfter(now)
+                            && !"deleted".equalsIgnoreCase(o.status())).count();
+                    out.println("Upcoming webinars (import from Zoom): first one has " + future + " future dates, read in "
+                            + (System.nanoTime() - started) / 1_000_000 + " ms");
+                }
             } catch (ZoomApiException e) {
                 out.println("Upcoming webinars (import from Zoom): not available: " + e.getMessage());
             }

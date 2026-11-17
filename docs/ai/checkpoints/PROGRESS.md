@@ -1951,3 +1951,14 @@ build runs the Next.js default bundler and repeats the smoke test.
   to where each is handled: classes ready to finalise, ended classes waiting for Zoom, appeals, Zoom accounts to match,
   failed Zoom events. Instructors and attendance officers see their batches; analysts their report.
 - Tests: `staff-overview.spec` (both projects); the import page joins `accessibility.spec`.
+
+## Checkpoint FEAT-3 — 2026-11-17 — Import from Zoom proven on the real account; built for scale
+
+- **Branch:** `fix/import-scale`.
+- Added the scope `webinar:read:list_webinars:admin` to the academy's Zoom app (Marketplace → Scopes → Add scopes →
+  Continue). Zoom now grants it; `zoom-api-check.sh` lists **93 upcoming webinars** (all recurring) in 735 ms.
+- Real data showed the first design (reading every webinar's details on each page load) would cost about 93 Zoom calls
+  (~50 s). Now the list comes from the one listing call (topic, next date, classes already in LUMA; search by topic or ID),
+  and a webinar's dates are read only when it is opened (`GET /api/v1/zoom/upcoming-webinars/{id}`; first real webinar: 15
+  future dates in 543 ms).
+- Tests: `ZoomImportIntegrationTest` (list order, counts, search, per-webinar dates), `staff-automation.spec`.

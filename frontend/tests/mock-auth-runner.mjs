@@ -406,11 +406,20 @@ function zoomApi(req, body, send, parts, query) {
     endsAt: `${d}T14:30:00.000Z` }));
   const scheduledFor = run => classSessions.find(c => c.zoomWebinarId === "84400000001" && c.status === "SCHEDULED"
     && Math.abs(Date.parse(c.startsAt) - Date.parse(run.startsAt)) <= 30 * 60_000)?.id ?? null;
-  if (req.method === "GET" && resource === "upcoming-webinars") {
-    return send(200, [{ webinarId: "84400000001", topic: "A/L Physics weekly", timeZone: "Asia/Colombo", recurring: true, note: null, liveEvents: true,
-      runs: upcomingRuns.map(r => ({ ...r, classId: scheduledFor(r) })) },
-    { webinarId: "84400000002", topic: "Office hours", timeZone: "Asia/Colombo", recurring: true, runs: [], liveEvents: false,
-      note: "A recurring webinar with no fixed time has no dates to import" }]);
+  const mockWebinars = [{ webinarId: "84400000001", topic: "A/L Physics weekly", timeZone: "Asia/Colombo", recurring: true, note: null,
+    liveEvents: true, runs: upcomingRuns.map(r => ({ ...r, classId: scheduledFor(r) })) },
+  { webinarId: "84400000002", topic: "Office hours", timeZone: "Asia/Colombo", recurring: true, runs: [], liveEvents: false,
+    note: "A recurring webinar with no fixed time has no dates to import" }];
+  if (req.method === "GET" && resource === "upcoming-webinars" && !id) {
+    const q = (new URLSearchParams(query).get("q") ?? "").toLowerCase();
+    return send(200, mockWebinars.filter(w => !q || w.topic.toLowerCase().includes(q) || w.webinarId.includes(q.replace(/\D/g, "") || "~"))
+      .map(w => ({ webinarId: w.webinarId, topic: w.topic, nextStart: w.runs[0]?.startsAt ?? null, durationMinutes: 120,
+        timeZone: w.timeZone, recurring: w.recurring, liveEvents: w.liveEvents,
+        upcomingClasses: w.runs.filter(r => r.classId).length })));
+  }
+  if (req.method === "GET" && resource === "upcoming-webinars" && id) {
+    const found = mockWebinars.find(w => w.webinarId === id);
+    return found ? send(200, found) : send(404, { detail: "Zoom webinar not found" });
   }
   if (req.method === "POST" && resource === "webinar-imports") {
     if (body.webinarId !== "84400000001") return send(404, { detail: "Zoom webinar not found" });

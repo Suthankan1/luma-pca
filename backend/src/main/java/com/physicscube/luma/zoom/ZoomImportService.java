@@ -38,7 +38,6 @@ public class ZoomImportService {
     /** A class counts as the same run when it starts within this of Zoom's start time. */
     static final Duration SAME_RUN = Duration.ofMinutes(30);
     static final Duration HORIZON = Duration.ofDays(120);
-    static final int MAX_RUNS = 300;
 
     private final ObjectProvider<ZoomApiClient> api;
     private final ClassSessionService sessions;
@@ -80,8 +79,18 @@ public class ZoomImportService {
         return client;
     }
 
-    /** Upcoming webinars of the configured Zoom hosts, soonest first, each with its runs in the next 120 days. */
-    public List<UpcomingWebinar> upcoming(CurrentAccount caller) {
+    /**
+     * One line per upcoming webinar, from Zoom's listing alone (one paged call, however many webinars the academy has).
+     *
+     * @param nextStart        the next run's start as Zoom lists it (for recurring webinars, the next occurrence)
+     * @param upcomingClasses  LUMA classes already scheduled with this webinar ID that have not started yet
+     */
+    public record WebinarSummary(String webinarId, String topic, Instant nextStart, int durationMinutes, String timeZone,
+                                 boolean recurring, int upcomingClasses, boolean liveEvents) {
+    }
+
+    /** The configured hosts' upcoming webinars, soonest first; {@code query} filters by topic or ID. */
+    public List<WebinarSummary> upcoming(CurrentAccount caller, String query) {
         caller.requireAcademyManager();
         ZoomApiClient client = client();
         Map<Long, ZoomApiClient.ListedWebinar> listed = new LinkedHashMap<>();
@@ -92,19 +101,30 @@ public class ZoomImportService {
         } catch (ZoomApiException e) {
             throw new ConflictException(explain(e));
         }
-        Instant now = DbTime.now();
-        List<UpcomingWebinar> result = new ArrayList<>();
-        int runs = 0;
-        for (ZoomApiClient.ListedWebinar w : listed.values()) {
-            if (runs >= MAX_RUNS) {
-                break;
-            }
-            UpcomingWebinar view = view(caller.academyId(), client, String.valueOf(w.id()), now);
-            runs += view.runs().size();
-            result.add(view);
+        String q = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
+        String digits = q.replaceAll("[\\s-]", "");
+        Map<String, Integer> scheduled = new java.util.HashMap<>();
+        jdbc.query("SELECT zoom_webinar_id, count(*) FROM class_sessions WHERE academy_id = ? AND status = 'SCHEDULED' "
+                + "AND zoom_webinar_id IS NOT NULL AND starts_at > ? GROUP BY zoom_webinar_id",
+                (org.springframework.jdbc.core.RowCallbackHandler) row -> scheduled.put(row.getString(1), row.getInt(2)),
+                caller.academyId(), Timestamp.from(DbTime.now()));
+        return listed.values().stream()
+                .filter(w -> q.isEmpty() || (w.topic() != null && w.topic().toLowerCase(java.util.Locale.ROOT).contains(q))
+                        || (!digits.isEmpty() && String.valueOf(w.id()).contains(digits)))
+                .map(w -> new WebinarSummary(String.valueOf(w.id()), w.topic(), w.startTime(), w.duration(), validZone(w.timezone()),
+                        w.type() == 6 || w.type() == 9, scheduled.getOrDefault(String.valueOf(w.id()), 0),
+                        allowList.isEmpty() || allowList.contains(String.valueOf(w.id()))))
+                .sorted(Comparator.comparing((WebinarSummary w) -> w.nextStart() == null ? Instant.MAX : w.nextStart()))
+                .toList();
+    }
+
+    /** One webinar's upcoming runs (next 120 days), read from Zoom when staff open it. */
+    public UpcomingWebinar webinar(CurrentAccount caller, String webinarId) {
+        caller.requireAcademyManager();
+        if (webinarId == null || !webinarId.matches("[0-9]{9,20}")) {
+            throw new InvalidRequestException("webinarId must be a Zoom webinar ID");
         }
-        result.sort(Comparator.comparing((UpcomingWebinar u) -> u.runs().isEmpty() ? Instant.MAX : u.runs().get(0).startsAt()));
-        return result;
+        return view(caller.academyId(), client(), webinarId, DbTime.now());
     }
 
     /** Creates a class for each chosen upcoming run (all when {@code occurrenceIds} is empty) that has none yet; all or nothing. */
