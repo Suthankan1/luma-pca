@@ -157,30 +157,54 @@ public class ZoomParticipantService {
         return new OccurrenceParticipants(occurrenceUuid, sessionId, views);
     }
 
-    /** Emails seen in Zoom (not the host) with no decision and no student sign-in match, most recently seen first. */
+    /**
+     * Emails seen in Zoom (not the host), live or only in a participant report, with no staff decision and no student
+     * match by sign-in or registration email, most recently seen first.
+     */
     @Transactional(readOnly = true)
     public List<UnmatchedIdentity> unmatched(CurrentAccount caller, int limit) {
         caller.requireAcademyManager();
         if (limit < 1 || limit > 200) {
             throw new InvalidRequestException("limit must be between 1 and 200");
         }
-        List<UnmatchedIdentity> undecided = jdbc.query("""
-                SELECT e.participant_email AS email,
-                       (array_agg(e.participant_name ORDER BY e.event_ts DESC) FILTER (WHERE e.participant_name IS NOT NULL))[1] AS name,
-                       count(DISTINCT e.occurrence_uuid) AS occurrences, max(e.event_ts) AS last_ts
-                FROM zoom_occurrence_events e
-                WHERE e.academy_id = ? AND e.participant_email IS NOT NULL AND NOT e.host
-                  AND NOT EXISTS (SELECT 1 FROM zoom_identity_links l WHERE l.academy_id = e.academy_id AND l.email = e.participant_email)
-                GROUP BY e.participant_email
-                ORDER BY max(e.event_ts) DESC, e.participant_email
-                """, (row, i) -> new UnmatchedIdentity(row.getString("email"), row.getString("name"), row.getInt("occurrences"),
-                Instant.ofEpochMilli(row.getLong("last_ts"))), caller.academyId());
+        record Seen(UnmatchedIdentity identity, String registrantId, String registrationEmail) {
+        }
+        List<Seen> undecided = jdbc.query("""
+                WITH seen AS (
+                  SELECT e.participant_email AS email, e.participant_name AS name, e.occurrence_uuid AS occurrence,
+                         to_timestamp(e.event_ts / 1000.0) AS at, e.registrant_id AS registrant_id, NULL::varchar AS registration_email
+                  FROM zoom_occurrence_events e
+                  WHERE e.academy_id = ? AND e.participant_email IS NOT NULL AND NOT e.host
+                  UNION ALL
+                  SELECT p.email, p.display_name, p.occurrence_uuid, p.joined_at, p.registrant_id, p.registrant_email
+                  FROM zoom_report_participants p
+                  WHERE p.academy_id = ? AND p.email IS NOT NULL AND NOT p.host
+                )
+                SELECT s.email,
+                       (array_agg(s.name ORDER BY s.at DESC) FILTER (WHERE s.name IS NOT NULL))[1] AS name,
+                       count(DISTINCT s.occurrence) AS occurrences, max(s.at) AS last_at,
+                       max(s.registrant_id) AS registrant_id, max(s.registration_email) AS registration_email
+                FROM seen s
+                WHERE NOT EXISTS (SELECT 1 FROM zoom_identity_links l WHERE l.academy_id = ? AND l.email = s.email)
+                GROUP BY s.email
+                ORDER BY max(s.at) DESC, s.email
+                """, (row, i) -> new Seen(new UnmatchedIdentity(row.getString("email"), row.getString("name"), row.getInt("occurrences"),
+                row.getTimestamp("last_at").toInstant()), row.getString("registrant_id"), row.getString("registration_email")),
+                caller.academyId(), caller.academyId(), caller.academyId());
         List<UnmatchedIdentity> result = new ArrayList<>();
         for (int from = 0; from < undecided.size() && result.size() < limit; from += EMAIL_BATCH) {
-            List<UnmatchedIdentity> batch = undecided.subList(from, Math.min(undecided.size(), from + EMAIL_BATCH));
-            Set<String> students = this.students.bySignInEmails(caller.academyId(),
-                    batch.stream().map(UnmatchedIdentity::email).toList()).keySet();
-            batch.stream().filter(u -> !students.contains(u.email())).limit(limit - result.size()).forEach(result::add);
+            List<Seen> batch = undecided.subList(from, Math.min(undecided.size(), from + EMAIL_BATCH));
+            Map<String, String> registrantIdByEmail = new HashMap<>();
+            Map<String, String> byEmail = new HashMap<>();
+            for (Seen seen : batch) {
+                byEmail.put(seen.identity().email(), seen.registrationEmail());
+                if (seen.registrationEmail() == null && seen.registrantId() != null) {
+                    registrantIdByEmail.put(seen.identity().email(), seen.registrantId());
+                }
+            }
+            registrationEmails(caller.academyId(), registrantIdByEmail).forEach((email, registered) -> byEmail.put(email, registered));
+            Map<String, Resolved> matched = resolveWithRegistration(caller.academyId(), byEmail);
+            batch.stream().map(Seen::identity).filter(u -> !matched.containsKey(u.email())).limit(limit - result.size()).forEach(result::add);
         }
         return result;
     }
@@ -199,7 +223,7 @@ public class ZoomParticipantService {
     /**
      * Records which student a Zoom email belongs to, or with {@code studentId == null} that it
      * is not a student, replacing any earlier decision. The email must have been seen in this
-     * academy's Zoom events.
+     * academy's Zoom events or participant reports.
      */
     @Transactional
     public IdentityDecision decide(CurrentAccount caller, String email, UUID studentId, String reason) {
@@ -213,7 +237,8 @@ public class ZoomParticipantService {
             throw new InvalidRequestException("A reason of 3 to 300 characters is required");
         }
         Integer seen = jdbc.queryForObject("SELECT count(*) FROM (SELECT 1 FROM zoom_occurrence_events WHERE academy_id = ? "
-                + "AND participant_email = ? LIMIT 1) s", Integer.class, caller.academyId(), normalized);
+                + "AND participant_email = ? UNION ALL SELECT 1 FROM zoom_report_participants WHERE academy_id = ? AND email = ? LIMIT 1) s",
+                Integer.class, caller.academyId(), normalized, caller.academyId(), normalized);
         if (seen == null || seen == 0) {
             throw new ResourceNotFoundException("Zoom participant");
         }

@@ -1,0 +1,21 @@
+name: contract
+
+# The OpenAPI contract must list exactly the endpoints the API serves.
+on:
+  pull_request:
+    paths: ['backend/src/main/**', 'contracts/**', 'scripts/check-openapi.py', '.github/workflows/contract.yml']
+  push:
+    branches: [main]
+    paths: ['backend/src/main/**', 'contracts/**', 'scripts/check-openapi.py', '.github/workflows/contract.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  openapi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Contract matches the controllers
+        run: python3 scripts/check-openapi.py

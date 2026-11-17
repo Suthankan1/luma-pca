@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { test, expect } from "@playwright/test";
+import { test, expect, devices, type Browser, type Page } from "@playwright/test";
 
 /**
  * Real stack, real browser: an administrator activates their invitation, enrols an
@@ -12,6 +12,12 @@ const adminEmail = "smoke.admin@example.invalid";
 const adminInvite = process.env.LUMA_REAL_ADMIN_INVITE!;
 const passphrase = process.env.LUMA_REAL_PASSPHRASE!;
 const mailpit = process.env.LUMA_REAL_MAILPIT_URL!;
+
+// The acceptance test below continues from the onboarding test's data and accounts.
+test.describe.configure({ mode: "serial" });
+let adminSecret = "";
+let studentPassword = "";
+let lastAdminStep = 0;
 
 type MailpitList = { messages: { ID: string; Subject: string; To: { Address: string }[] }[] };
 
@@ -60,6 +66,8 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Set up authenticator" })).toBeVisible();
   const secret = (await page.locator("code.mfa-secret").innerText()).replace(/\s/g, "");
+  adminSecret = secret;
+  lastAdminStep = Math.floor(Date.now() / 30_000);
   await page.fill("#code", totp(secret));
   await page.getByRole("button", { name: "Verify and save" }).click();
   await expect(page).toHaveURL(/\/sign-in\/mfa\/recovery-codes/);
@@ -338,6 +346,7 @@ test("an administrator onboards a student end to end on the real stack", async (
 
   // 10. The student forgets their password: the link arrives by real SMTP and works once.
   const newPassphrase = `${passphrase} again`;
+  studentPassword = newPassphrase;
   const resetContext = await browser.newContext();
   const forgetful = await resetContext.newPage();
   await forgetful.goto("/sign-in");
@@ -479,4 +488,137 @@ test("an administrator onboards a student end to end on the real stack", async (
   await finalStudent.close();
   await page.goto("/staff/activity?category=classes");
   await expect(page.getByText("Finalised attendance of “Past real class”").first()).toBeVisible();
+});
+
+/** Signs the administrator in with password and authenticator code. */
+async function signInAdmin(page: Page) {
+  await page.goto("/sign-in");
+  await page.fill("#email", adminEmail);
+  await page.fill("#password", passphrase);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/sign-in\/mfa/);
+  // A code is accepted once: wait for the next 30-second step after the last one used.
+  while (Math.floor(Date.now() / 30_000) <= lastAdminStep) await page.waitForTimeout(1_000);
+  lastAdminStep = Math.floor(Date.now() / 30_000);
+  await page.fill("#code", totp(adminSecret));
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page).toHaveURL(/\/staff$/);
+}
+
+async function signInStudent(browser: Browser, options = {}) {
+  const context = await browser.newContext(options);
+  const page = await context.newPage();
+  await page.goto("/sign-in?portal=student");
+  await page.fill("#email", "real.student@example.invalid");
+  await page.fill("#password", studentPassword);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/student$/);
+  return page;
+}
+
+/** Wall-clock date and minute in Sri Lanka (UTC+05:30), as staff type them. */
+function colombo(offsetMinutes: number) {
+  const t = new Date(Date.now() + offsetMinutes * 60_000 + 330 * 60_000);
+  return { date: t.toISOString().slice(0, 10), time: t.toISOString().slice(11, 16) };
+}
+
+async function noSidewaysScroll(page: Page) {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+}
+
+test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ page, browser }) => {
+  test.setTimeout(150_000);
+  expect(adminSecret, "the onboarding test ran first").toBeTruthy();
+
+  // UAT 11: the student appeals the corrected class; an administrator accepts it as Present.
+  let student = await signInStudent(browser);
+  const record = student.getByRole("region", { name: "MY ATTENDANCE" }).getByRole("listitem", { name: "Attendance Past real class" });
+  await record.getByText("Appeal this").click();
+  await record.getByLabel("What should the academy know?").fill("I was in class for the whole session; the note was for another day.");
+  await record.getByRole("button", { name: "Send appeal" }).click();
+  await expect(record).toContainText("appeal waiting for a decision");
+  await signInAdmin(page);
+  await page.goto("/staff/attendance");
+  const appeal = page.getByRole("region", { name: "APPEALS" }).getByRole("listitem", { name: "Appeal PCA-REAL-001 Past real class" });
+  await expect(appeal).toContainText("the note was for another day");
+  await appeal.getByLabel("Outcome if accepted").selectOption({ label: "Present" });
+  await appeal.getByLabel("Note to the student").fill("Checked against Zoom's report");
+  await appeal.getByRole("button", { name: "Accept" }).click();
+  await expect(appeal).toHaveCount(0);
+  await student.reload();
+  await expect(record.locator(".status")).toHaveText("Present");
+  await expect(record).toContainText("appeal accepted");
+
+  // UAT 12: the owner switches engagement on; the student agrees (named in rankings) and reacts during a running class.
+  const settings = page.getByRole("region", { name: "ENGAGEMENT" });
+  await settings.getByLabel("Engagement is on").check();
+  await settings.getByRole("button", { name: "Save engagement settings" }).click();
+  await expect(page.locator("#engagement-feedback")).toHaveText("Engagement is on. Students are asked for consent in their portal.");
+  const from = colombo(-15), to = colombo(60);
+  await page.goto("/staff/sessions");
+  await page.locator("#schedule-title").fill("Live acceptance class");
+  await page.locator("#schedule-date").fill(from.date);
+  await page.locator("#schedule-start").fill(from.time);
+  if (to.date !== from.date) test.skip(true, "a class across midnight cannot be entered; run again later");
+  await page.locator("#schedule-end").fill(to.time);
+  await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel("REAL-PHY · PAST · Past term", { exact: true }).check();
+  await page.getByRole("button", { name: "Schedule class" }).click();
+  await expect(page.locator("#schedule-feedback")).toHaveText("Live acceptance class scheduled.");
+  await page.getByRole("link", { name: "Open the class →" }).click();
+  await expect(page).toHaveURL(/\/staff\/sessions\/[0-9a-f-]{36}$/);
+  const liveClass = page.url();
+
+  await student.reload();
+  const panel = student.getByRole("region", { name: "REACTIONS AND QUESTIONS" });
+  await panel.getByLabel("Staff may also see my name in engagement rankings").check();
+  await panel.getByRole("button", { name: "I agree" }).click();
+  await expect(panel).toContainText("You take part");
+  await student.getByRole("listitem", { name: "Live acceptance class" }).getByRole("link", { name: "Take part" }).click();
+  await student.getByRole("button", { name: "I understand" }).click();
+  await expect(student.locator("#reaction-feedback")).toHaveText("Sent.");
+  await student.getByRole("button", { name: "Slow down" }).click();
+  await expect(student.locator("#reaction-feedback")).toHaveText("Please wait a few seconds between reactions");
+  const studentClass = student.url();
+
+  // UAT 13: staff open a question for 3 minutes; the student answers once; staff close it early and see the counts.
+  await page.goto(liveClass);
+  const engagement = page.getByRole("region", { name: "ENGAGEMENT" });
+  await expect(engagement.getByRole("listitem").filter({ hasText: "I understand" }).locator("strong")).toHaveText("1");
+  await engagement.getByLabel("Question").fill("Which unit is force measured in?");
+  await engagement.getByLabel("Options, one per line (2 to 5)").fill("Newton\nJoule\nWatt");
+  await engagement.getByLabel("Open for (minutes)").fill("3");
+  await engagement.getByRole("button", { name: "Open question" }).click();
+  const question = engagement.getByRole("listitem", { name: "Question Which unit is force measured in?" });
+  await expect(question.locator(".status").first()).toHaveText("Open");
+  await student.goto(studentClass);
+  await student.getByLabel("Newton").check();
+  await student.getByRole("button", { name: "Send answer" }).click();
+  await expect(student.getByText("You answered “Newton”.")).toBeVisible();
+  await page.reload();
+  await question.getByRole("button", { name: "Close now" }).click();
+  await expect(question.locator(".status").first()).toHaveText("Closed");
+  await expect(question.getByRole("listitem").filter({ hasText: "Newton" }).locator("strong")).toHaveText("1");
+  await expect(question.getByRole("listitem").filter({ hasText: "Joule" }).locator("strong")).toHaveText("0");
+
+  // UAT 15: the batch's top 10 names only the consenting, opted-in student.
+  await page.getByRole("link", { name: "Roster →" }).first().click();
+  const ranking = page.getByRole("region", { name: "ENGAGEMENT RANKING" });
+  await ranking.getByRole("button", { name: "Show ranking" }).click();
+  await expect(ranking.getByRole("listitem", { name: "Rank 1" })).toContainText("PCA-REAL-001 Real Stack Student");
+  await expect(ranking.getByRole("listitem", { name: /^Rank / })).toHaveCount(1);
+  await student.context().close();
+
+  // UAT 17: the portal, Zoom review and appeals pages work on a phone without sideways scrolling.
+  student = await signInStudent(browser, devices["Pixel 7"]);
+  await noSidewaysScroll(student);
+  await student.goto(studentClass);
+  await noSidewaysScroll(student);
+  await student.context().close();
+  const phone = await (await browser.newContext(devices["Pixel 7"])).newPage();
+  await signInAdmin(phone);
+  for (const path of ["/staff/zoom", "/staff/attendance", liveClass.replace(/^https?:\/\/[^/]+/, "")]) {
+    await phone.goto(path);
+    await noSidewaysScroll(phone);
+  }
+  await phone.context().close();
 });
