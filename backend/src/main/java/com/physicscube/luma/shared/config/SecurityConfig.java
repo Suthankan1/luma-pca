@@ -42,10 +42,14 @@ public class SecurityConfig {
                     // Assigned staff may read batches and rosters; services limit them to their assignments.
                     .requestMatchers(HttpMethod.GET, "/api/v1/batches", "/api/v1/batches/*", "/api/v1/batches/*/enrollments")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
+                    // Analysts read the rule and academy-wide totals without student names.
+                    .requestMatchers(HttpMethod.GET, "/api/v1/attendance-policy")
+                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/attendance/summary").hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "ANALYST")
                     .requestMatchers(HttpMethod.GET, "/api/v1/class-sessions", "/api/v1/class-sessions/*",
                             "/api/v1/class-sessions/*/students", "/api/v1/class-sessions/*/attendance",
                             "/api/v1/class-sessions/*/attendance/export", "/api/v1/batches/*/attendance/export",
-                            "/api/v1/attendance-policy")
+                            "/api/v1/batches/*/attendance/summary")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/assignments").hasAnyRole("INSTRUCTOR", "ATTENDANCE_OFFICER")
                     // Corrections: services limit attendance officers to students of their batches.

@@ -2,6 +2,7 @@ package com.physicscube.luma.attendance.web;
 
 import com.physicscube.luma.attendance.AttendanceExportService;
 import com.physicscube.luma.attendance.AttendanceFinalisationService;
+import com.physicscube.luma.attendance.AttendanceSummaryService;
 import com.physicscube.luma.attendance.AttendancePolicyService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -35,13 +36,29 @@ class AttendanceController {
     private final AttendanceExportService exports;
     private final AttendancePolicyService policies;
     private final AttendanceFinalisationService finalisation;
+    private final AttendanceSummaryService summaries;
 
     AttendanceController(ProvisionalAttendanceService attendance, AttendanceExportService exports, AttendancePolicyService policies,
-                         AttendanceFinalisationService finalisation) {
+                         AttendanceFinalisationService finalisation, AttendanceSummaryService summaries) {
         this.attendance = attendance;
         this.exports = exports;
         this.policies = policies;
         this.finalisation = finalisation;
+        this.summaries = summaries;
+    }
+
+    @GetMapping("/api/v1/batches/{batchId}/attendance/summary")
+    AttendanceSummaryService.BatchSummary batchSummary(JwtAuthenticationToken authentication, @PathVariable UUID batchId,
+                                                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return summaries.forBatch(CurrentAccount.from(authentication), batchId, from, to);
+    }
+
+    @GetMapping("/api/v1/attendance/summary")
+    AttendanceSummaryService.AcademySummary academySummary(JwtAuthenticationToken authentication,
+                                                           @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                                           @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return summaries.forAcademy(CurrentAccount.from(authentication), from, to);
     }
 
     record PolicyRequest(@NotNull Integer minConnectedPercent, @NotNull Integer lateAfterMinutes, @NotBlank @Size(max = 500) String description,

@@ -500,6 +500,20 @@ export type MyConsent = { enabled: boolean; consentText: string | null; consentV
 export type PulseView = { id: string; prompt: string; options: string[]; openedAt: string; closesAt: string; open: boolean; counts: number[] | null; myAnswer: number | null };
 export type ClassEngagement = { sessionId: string; enabled: boolean; reactions: Record<string, number>; reactingStudents: number; pulses: PulseView[];
   source: string; classStartsAt: string; classEndsAt: string };
+export type AttendanceCounts = { present: number; late: number; absent: number; excused: number; ratePercent: number | null };
+export type BatchAttendanceSummary = { from: string; to: string; finalClasses: number; classesNotFinal: number; totals: AttendanceCounts;
+  students: { studentId: string; studentNumber: string; fullName: string; counts: AttendanceCounts }[]; method: string };
+export type AcademyAttendanceSummary = { from: string; to: string; method: string;
+  batches: { batchId: string; batchCode: string; batchName: string; courseCode: string; courseTitle: string; finalClasses: number;
+    classesNotFinal: number; totals: AttendanceCounts }[] };
+/** "83 %" or a dash when nothing was counted. */
+export function rateLabel(counts: AttendanceCounts) {
+  return counts.ratePercent == null ? "—" : `${counts.ratePercent}%`;
+}
+/** The first day of the academy month containing an ISO date. */
+export function monthStart(isoDate: string) {
+  return `${isoDate.slice(0, 7)}-01`;
+}
 export type Ranking = { limit: number; classes: number; studentsCounted: number; method: string;
   top: { rank: number; studentId: string; studentNumber: string | null; name: string | null; classes: number; reactions: number; pulseAnswers: number; score: number }[] };
 export const reactionLabels: Record<string, string> = { UNDERSTOOD: "I understand", CONFUSED: "I’m confused", SLOW_DOWN: "Slow down", SPEED_UP: "Speed up" };

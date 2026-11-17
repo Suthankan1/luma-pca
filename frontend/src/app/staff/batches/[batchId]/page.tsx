@@ -7,7 +7,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { AttendanceExportForm } from "@/components/staff/AttendanceExportForm";
-import { academyToday, type Ranking, formatDate, isAcademyManager, staffRoleLabels, uuidOrNull } from "@/lib/staff-forms";
+import { academyToday, type BatchAttendanceSummary, type Ranking, formatDate, isAcademyManager, monthStart, rateLabel, staffRoleLabels, uuidOrNull } from "@/lib/staff-forms";
 
 type Batch = { courseId: string; id: string; code: string; name: string; startsOn: string; endsOn: string | null; active: boolean };
 type Assignment = { id: string; email: string | null; role: string };
@@ -37,6 +37,10 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
     : `/api/v1/batches/${batchId}/engagement-ranking`;
   const rankingQuery = rankFrom && rankTo ? new URLSearchParams({ from: rankFrom, to: rankTo, limit: String(top) }) : null;
   const ranking = manager && rankingQuery ? await staffApi<Ranking>(`${rankingBase}?${rankingQuery}`) : null;
+  const isoDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  const sumFrom = isoDate(query.sumFrom) ?? monthStart(academyToday());
+  const sumTo = isoDate(query.sumTo) ?? academyToday();
+  const summary = await staffApi<BatchAttendanceSummary>(`/api/v1/batches/${batchId}/attendance/summary?${new URLSearchParams({ from: sumFrom, to: sumTo })}`);
   const shell = { active: "courses" as const, crumb: "Academic setup", hasStudentPortal: hasPortal(identity, "student") };
   if (!batch.ok || !roster.ok) {
     return <StaffShell {...shell} title="Batch roster" subtitle="">
@@ -84,6 +88,28 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
         <AssignForm batchId={batchId} />
       </>}
     </section>}
+    <section className="panel panel-gap" aria-labelledby="summary-title">
+      <h2 id="summary-title" className="panel-title">ATTENDANCE SUMMARY</h2>
+      <p className="panel-sub">Each student’s final attendance in this batch’s classes, lowest rate first. Rate = (present + late) ÷
+        (present + late + absent); excused classes are left out.</p>
+      <form method="get" className="export-range" aria-label="Summary range">
+        <label htmlFor="sum-from">From</label>
+        <input id="sum-from" name="sumFrom" type="date" required defaultValue={sumFrom} />
+        <label htmlFor="sum-to">To</label>
+        <input id="sum-to" name="sumTo" type="date" required defaultValue={sumTo} />
+        <button className="action secondary" type="submit">Show summary</button>
+      </form>
+      {!summary.ok ? <p className="session-error" role="alert">{summary.detail ?? "We couldn’t load the summary right now."}</p> : <>
+        <p className="panel-sub">{summary.data.finalClasses} final class{summary.data.finalClasses === 1 ? "" : "es"}
+          {summary.data.classesNotFinal > 0 && ` · ${summary.data.classesNotFinal} ended but not final yet`} · batch rate {rateLabel(summary.data.totals)}</p>
+        <ul className="dir-list">{summary.data.students.map(r => <li key={r.studentId} className="dir-row" aria-label={`Summary ${r.studentNumber}`}>
+          <span><strong>{r.studentNumber}</strong> {r.fullName}</span>
+          <span><strong className="summary-rate">{rateLabel(r.counts)}</strong> <span className="muted">{r.counts.present} present · {r.counts.late} late ·
+            {" "}{r.counts.absent} absent{r.counts.excused ? ` · ${r.counts.excused} excused` : ""}</span></span>
+        </li>)}
+          {summary.data.students.length === 0 && <li className="dir-empty muted">No final attendance in this range yet.</li>}</ul>
+      </>}
+    </section>
     {manager && <section className="panel panel-gap" aria-labelledby="ranking-title">
       <h2 id="ranking-title" className="panel-title">ENGAGEMENT RANKING</h2>
       <p className="panel-sub">Staff only. Students who consented to engagement, scored by portal reactions (at most 10 per class) and

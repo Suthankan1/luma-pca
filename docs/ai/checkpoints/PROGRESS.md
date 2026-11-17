@@ -1914,3 +1914,15 @@ build runs the Next.js default bundler and repeats the smoke test.
 - Branded "Page not found" and "Something went wrong" pages replace Next's defaults (`not-found.tsx`, `error.tsx`).
 - `security-headers.spec`: headers on public, staff, student and unknown pages; no CSP violation while signing in and
   using staff and student pages. Local: Playwright 120 passed.
+
+## Checkpoint FIX-10 — 2026-11-17 — Attendance summaries and the analyst role (re-audit)
+
+- **Branch:** `feat/attendance-summary`.
+- Re-audit found that the PRD's "monthly attendance reports" existed only as raw CSV rows, and that the Analyst role could
+  be granted but reached nothing.
+- **Batch summary:** each student's final present/late/absent/excused and rate over a period, lowest rate first, on the
+  batch page (managers and assigned staff). **Academy report:** totals per batch without names on the Attendance page
+  (owners, administrators, analysts). Rate = (present + late) / (present + late + absent); excused left out; a class's
+  date is its local date; cancelled classes are ignored; ended-but-not-final classes are counted separately.
+- Tests: `AttendanceSummaryIntegrationTest` (counts, order, time zones, two batches, every role, other academy),
+  `attendance-summary.spec` (both projects). Contract: 102 endpoints.

@@ -28,3 +28,8 @@
 **Negative acceptance examples:** student A cannot request student B's record by guessing ID; teacher for Batch A cannot export Batch B; staff cannot access another academy's integration; guest/unregistered users are not blindly counted; a student in two batches sees only classes associated with enrollments.
 
 See `docs/architecture/adr/ADR-0004-multi-course-batch.md`.
+
+**As built (FIX-10, reports):** `GET /api/v1/batches/{id}/attendance/summary` (each student's counts and rate) for Owner,
+Admin and staff assigned to the batch (404 otherwise). `GET /api/v1/attendance/summary` (totals per batch, no student
+numbers, names or emails) for Owner, Admin and Analyst. Analysts may also read the attendance rule; they still have no
+batch, roster, class or student access.

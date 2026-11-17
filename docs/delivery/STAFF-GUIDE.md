@@ -36,6 +36,10 @@ codes). Change your password with **Change password** at the top of every staff 
 - **Correct** a student's outcome (e.g. Excused) with a reason; the original outcome stays in the history. The student
   is emailed. Managers are emailed when a student appeals.
 - **Appeals** from students appear on the Attendance page: accept (choose the outcome) or reject, with a note they see.
+- **Attendance summary** on each batch page: every student's present / late / absent / excused and attendance rate for a
+  period (this month by default), lowest rate first, so students who need a follow-up stand out.
+- **Attendance by batch** on the Attendance page (owners, administrators and analysts): totals and rate per batch for a
+  period, without student names. Analysts see only this and the rule.
 - **Download CSV** on a class page, or for a batch and date range on the batch page. It is personal data: keep it private.
 
 ## Engagement (only if the academy has switched it on)
