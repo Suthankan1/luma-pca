@@ -181,7 +181,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       let changed: Response;
       try {
         changed = await fetch(new URL("/api/v1/auth/password", process.env.API_INTERNAL_URL ?? "http://localhost:8080"), {
-          method: "POST", cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5000),
+          method: "POST", cache: "no-store", redirect: "error", signal: AbortSignal.timeout(15000),
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${access}`, ...(client ? { "X-Forwarded-For": client } : {}) },
           body: JSON.stringify({ currentPassword: current, newPassword: next }),
         });
