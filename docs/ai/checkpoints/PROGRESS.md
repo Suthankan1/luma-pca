@@ -1926,3 +1926,20 @@ build runs the Next.js default bundler and repeats the smoke test.
   date is its local date; cancelled classes are ignored; ended-but-not-final classes are counted separately.
 - Tests: `AttendanceSummaryIntegrationTest` (counts, order, time zones, two batches, every role, other academy),
   `attendance-summary.spec` (both projects). Contract: 102 endpoints.
+
+## Checkpoint FEAT-1 — 2026-11-17 — Less manual work: import from Zoom, finalise queue, automatic finalisation
+
+- **Branch:** `feat/staff-automation`.
+- **Import classes from Zoom:** `GET /api/v1/zoom/upcoming-webinars` lists the academy's upcoming webinars (Zoom
+  `GET /users/{user}/webinars?type=upcoming`, every run of recurring ones, next 120 days), marking runs that already have a
+  class (same webinar, start within 30 minutes). `POST /api/v1/zoom/webinar-imports` re-reads the webinar from Zoom and
+  creates one ordinary class per chosen run for the chosen batches, all or nothing, never twice (audited
+  ZOOM_WEBINAR_IMPORTED). Hosts: `luma.zoom.import.hosts` (default `me`, accepted by Zoom for this server-to-server app).
+  Needs the scope `webinar:read:list_webinars:admin` (Zoom's own error names it; the real account does not have it yet).
+- **Finalise queue:** `GET /api/v1/attendance/pending` (ended, not final, last 60 days; READY / WAITING_FOR_REPORT /
+  NO_ZOOM_RUN) and `POST /api/v1/attendance/finalisations` (every ready class), on the Attendance page.
+- **Automatic finalisation:** owner's switch on the rule (V26 `auto_finalise`, `auto_finalise_by`). A job every 5 minutes
+  finalises ready classes in that owner's name while they are still an active owner; audited `automatic=true`; alarm on
+  "Automatic finalisation failed".
+- Tests: `ZoomImportIntegrationTest`, `AttendanceQueueIntegrationTest`, `staff-automation.spec` (both projects). Real Zoom:
+  `zoom-api-check.sh` now also tries the listing; it reports the missing scope.

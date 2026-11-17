@@ -91,7 +91,9 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
         : `Exported attendance of ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
       detail: [d.scope === "batch" && typeof d.from === "string" && typeof d.to === "string" ? `${formatDate(d.from)} – ${formatDate(d.to)}` : "",
         typeof d.rows === "string" ? `${d.rows} row${d.rows === "1" ? "" : "s"}` : ""].filter(Boolean).join(" · ") || undefined };
-    case "ATTENDANCE_FINALISED": return { summary: `Finalised attendance of ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
+    case "ZOOM_WEBINAR_IMPORTED": return { summary: `Imported ${count(d.created, "class", "classes")} from Zoom webinar ${typeof d.webinar === "string" ? d.webinar : ""}`.trim(),
+      detail: d.alreadyScheduled && d.alreadyScheduled !== "0" ? `${d.alreadyScheduled} already scheduled` : undefined };
+    case "ATTENDANCE_FINALISED": return { summary: `${d.automatic === "true" ? "Automatically finalised" : "Finalised"} attendance of ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
       detail: [`${d.present ?? 0} present`, `${d.late ?? 0} late`, `${d.absent ?? 0} absent`].join(", ") + (typeof d.rule === "string" ? ` (rule ${d.rule})` : "") };
     case "ENGAGEMENT_RANKING_EXPORTED": return { summary: "Downloaded an engagement ranking",
       detail: typeof d.from === "string" && typeof d.to === "string" ? `${formatDate(d.from)} – ${formatDate(d.to)}` : undefined };

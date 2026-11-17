@@ -105,6 +105,14 @@ class ZoomApiCheckCommand implements ApplicationRunner {
                         + " with email; minutes connected per person " + byPerson.values().stream()
                         .map(v -> com.physicscube.luma.zoom.ZoomLookupService.mergedSeconds(v) / 60).sorted().toList());
             }
+            // Import from Zoom: only counts and types are printed, never topics.
+            try {
+                List<ZoomApiClient.ListedWebinar> upcoming = zoom.upcomingWebinars(System.getenv().getOrDefault("LUMA_ZOOM_IMPORT_HOSTS", "me").split(",")[0]);
+                out.println("Upcoming webinars (import from Zoom): " + upcoming.size() + ", types " + upcoming.stream().map(ZoomApiClient.ListedWebinar::type)
+                        .distinct().sorted().toList());
+            } catch (ZoomApiException e) {
+                out.println("Upcoming webinars (import from Zoom): not available: " + e.getMessage());
+            }
             out.println("Zoom API check passed.");
             return 0;
         } catch (ZoomApiException e) {

@@ -60,6 +60,10 @@ attendance. Fixture tests cannot show that.
    scripts/zoom-api-check.sh
    ```
 
+   The read scopes LUMA uses (all read-only): `webinar:read:webinar:admin`, `webinar:read:list_registrants:admin`,
+   `webinar:read:list_past_instances:admin`, `webinar:read:list_past_participants:admin`,
+   `webinar:read:participant:admin`, and for **Import classes from Zoom** `webinar:read:list_webinars:admin`.
+
    It obtains a token with the app's credentials and reads the test webinar: granted scopes,
    webinar facts, registrant counts and, once it has run, join sessions per person (counts only;
    no names or emails). Webinars outside the allow-list are refused before any call.

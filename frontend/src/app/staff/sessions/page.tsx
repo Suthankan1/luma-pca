@@ -80,6 +80,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
       </section>
       {manager && <section className="panel" aria-labelledby="new-class-title">
         <h2 id="new-class-title" className="panel-title">NEW CLASS</h2>
+        <p className="link-row"><Link className="text-link" href="/staff/zoom/import">Import classes from your Zoom webinars →</Link></p>
         <ScheduleForm batches={scheduleOptions} />
         <SeriesForm batches={scheduleOptions} />
       </section>}

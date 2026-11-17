@@ -11,8 +11,12 @@ codes). Change your password with **Change password** at the top of every staff 
 4. **Staff**: add instructors and attendance officers, then assign them to batches. They see only those batches.
 
 ## Timetable and Zoom
-- **Classes**: schedule a class or a weekly series for one or more batches, with the Zoom **webinar ID**. Each student is
-  expected once per class even if in two of its batches.
+- **Import classes from Zoom** (Classes → "Import classes from your Zoom webinars"): LUMA lists the academy's upcoming
+  webinars from Zoom, every date of a recurring one. Tick the dates and the batches, keep or change the title, and press
+  **Create classes**: each becomes a class with its webinar ID, so attendance links and fills in by itself. Dates that are
+  already classes are shown and never created twice. Webinars with no fixed time in Zoom cannot be imported.
+- **Classes**: or schedule a class or a weekly series by hand for one or more batches, with the Zoom **webinar ID**. Each
+  student is expected once per class even if in two of its batches.
 - **Zoom review**: each time a webinar runs it appears here and links itself to the class when exactly one class fits.
   Decide the others. **People in this occurrence** shows who joined; **Zoom accounts to match** lists emails that match no
   student: match them by student number, or mark them "not a student". A decision applies to every future webinar; **Remove** one
@@ -31,6 +35,10 @@ codes). Change your password with **Change password** at the top of every staff 
 - About 15 minutes after the webinar ends, LUMA fetches **Zoom's participant report** (or press "Fetch Zoom's report").
 - The owner records the academy's **attendance rule** on the Attendance page. Then press **Finalise attendance** on the
   class page: present / late / absent from Zoom's report, once per class.
+- **Waiting to be finalised** (Attendance page): every ended class that is not final, with what it waits for (Zoom's
+  report, or a Zoom run to link). **Finalise N ready classes** finalises them all at once.
+- **Automatic finalisation** (owner, on the rule form): once Zoom's report is in, LUMA finalises each class within a few
+  minutes in the owner's name; the activity log says "Automatically finalised". Corrections and recalculation still work.
 - **Recalculate** a final class (with a reason) after a late report, a new Zoom decision or a rule change. Corrected
   outcomes are kept; students enrolled since are added.
 - **Correct** a student's outcome (e.g. Excused) with a reason; the original outcome stays in the history. The student

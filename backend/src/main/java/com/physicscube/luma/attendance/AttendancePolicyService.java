@@ -32,7 +32,8 @@ public class AttendancePolicyService {
         this.audit = audit;
     }
 
-    public record PolicyView(int minConnectedPercent, int lateAfterMinutes, String description, long version, Instant updatedAt) {
+    public record PolicyView(int minConnectedPercent, int lateAfterMinutes, String description, long version, Instant updatedAt,
+                             boolean autoFinalise) {
         public AttendanceRule rule() {
             return new AttendanceRule(minConnectedPercent, lateAfterMinutes);
         }
@@ -48,15 +49,22 @@ public class AttendancePolicyService {
 
     /** For this module: the academy's rule, if one has been recorded. */
     Optional<PolicyView> find(UUID academyId) {
-        List<PolicyView> found = jdbc.query("SELECT min_connected_percent, late_after_minutes, description, version, updated_at "
+        List<PolicyView> found = jdbc.query("SELECT min_connected_percent, late_after_minutes, description, version, updated_at, auto_finalise "
                 + "FROM attendance_policies WHERE academy_id = ?", (row, i) -> new PolicyView(row.getInt(1), row.getInt(2),
-                row.getString(3), row.getLong(4), row.getTimestamp(5).toInstant()), academyId);
+                row.getString(3), row.getLong(4), row.getTimestamp(5).toInstant(), row.getBoolean(6)), academyId);
         return found.stream().findFirst();
     }
 
     /** @param expectedVersion {@code null} when setting the first rule */
     @Transactional
     public PolicyView set(CurrentAccount caller, int minConnectedPercent, int lateAfterMinutes, String description, Long expectedVersion) {
+        return set(caller, minConnectedPercent, lateAfterMinutes, description, expectedVersion, null);
+    }
+
+    /** @param autoFinalise {@code null} keeps the current choice (off for a first rule) */
+    @Transactional
+    public PolicyView set(CurrentAccount caller, int minConnectedPercent, int lateAfterMinutes, String description, Long expectedVersion,
+                          Boolean autoFinalise) {
         if (!caller.hasRole("ACADEMY_OWNER")) {
             throw new AccessDeniedException("Only an academy owner records the attendance rule");
         }
@@ -69,24 +77,29 @@ public class AttendancePolicyService {
         if (text.length() < 3 || text.length() > 500) {
             throw new InvalidRequestException("Describe the approved rule in 3 to 500 characters");
         }
-        Optional<PolicyView> before = jdbc.query("SELECT min_connected_percent, late_after_minutes, description, version, updated_at "
+        Optional<PolicyView> before = jdbc.query("SELECT min_connected_percent, late_after_minutes, description, version, updated_at, auto_finalise "
                 + "FROM attendance_policies WHERE academy_id = ? FOR UPDATE", (row, i) -> new PolicyView(row.getInt(1), row.getInt(2),
-                row.getString(3), row.getLong(4), row.getTimestamp(5).toInstant()), caller.academyId()).stream().findFirst();
+                row.getString(3), row.getLong(4), row.getTimestamp(5).toInstant(), row.getBoolean(6)), caller.academyId()).stream().findFirst();
+        boolean auto = autoFinalise != null ? autoFinalise : before.map(PolicyView::autoFinalise).orElse(false);
         long current = before.map(PolicyView::version).orElse(-1L);
         if ((expectedVersion == null && before.isPresent()) || (expectedVersion != null && expectedVersion != current)) {
             throw new ConflictException("The attendance rule was changed by someone else; reload and try again");
         }
         Instant now = DbTime.now();
         jdbc.update("""
-                INSERT INTO attendance_policies (academy_id, min_connected_percent, late_after_minutes, description, version, updated_by, updated_at)
-                VALUES (?, ?, ?, ?, 0, ?, ?)
+                INSERT INTO attendance_policies (academy_id, min_connected_percent, late_after_minutes, description, version, updated_by, updated_at,
+                  auto_finalise, auto_finalise_by)
+                VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)
                 ON CONFLICT (academy_id) DO UPDATE SET min_connected_percent = EXCLUDED.min_connected_percent,
                   late_after_minutes = EXCLUDED.late_after_minutes, description = EXCLUDED.description,
-                  version = attendance_policies.version + 1, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
-                """, caller.academyId(), minConnectedPercent, lateAfterMinutes, text, caller.accountId(), Timestamp.from(now));
+                  version = attendance_policies.version + 1, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at,
+                  auto_finalise = EXCLUDED.auto_finalise, auto_finalise_by = EXCLUDED.auto_finalise_by
+                """, caller.academyId(), minConnectedPercent, lateAfterMinutes, text, caller.accountId(), Timestamp.from(now), auto,
+                auto ? caller.accountId() : null);
         audit.record(caller.academyId(), caller.accountId(), "ATTENDANCE_POLICY_SET", "ACADEMY", caller.academyId(), Map.of(
                 "minConnectedPercent", String.valueOf(minConnectedPercent), "lateAfterMinutes", String.valueOf(lateAfterMinutes),
-                "previous", before.map(p -> p.minConnectedPercent() + "% / " + p.lateAfterMinutes() + " min").orElse("none")));
+                "previous", before.map(p -> p.minConnectedPercent() + "% / " + p.lateAfterMinutes() + " min").orElse("none"),
+                "autoFinalise", String.valueOf(auto)));
         return find(caller.academyId()).orElseThrow();
     }
 }

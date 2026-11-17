@@ -402,7 +402,7 @@ export const attendanceOutcomes = ["PRESENT", "LATE", "ABSENT", "EXCUSED"] as co
 export function outcomeOrNull(value: FormDataEntryValue | null): AttendanceOutcome | null {
   return typeof value === "string" && (attendanceOutcomes as readonly string[]).includes(value) ? value as AttendanceOutcome : null;
 }
-export type AttendancePolicy = { minConnectedPercent: number; lateAfterMinutes: number; description: string; version: number; updatedAt: string };
+export type AttendancePolicy = { minConnectedPercent: number; lateAfterMinutes: number; description: string; version: number; updatedAt: string; autoFinalise?: boolean };
 export const outcomeLabels: Record<AttendanceOutcome, string> = { PRESENT: "Present", LATE: "Late", ABSENT: "Absent", EXCUSED: "Excused" };
 
 /** The rule's numbers from a form, or an error to show. */
@@ -500,6 +500,14 @@ export type MyConsent = { enabled: boolean; consentText: string | null; consentV
 export type PulseView = { id: string; prompt: string; options: string[]; openedAt: string; closesAt: string; open: boolean; counts: number[] | null; myAnswer: number | null };
 export type ClassEngagement = { sessionId: string; enabled: boolean; reactions: Record<string, number>; reactingStudents: number; pulses: PulseView[];
   source: string; classStartsAt: string; classEndsAt: string };
+export type PendingClass = { sessionId: string; title: string; startsAt: string; endsAt: string; timeZone: string; linkedRuns: number;
+  state: "READY" | "WAITING_FOR_REPORT" | "NO_ZOOM_RUN" };
+export type PendingAttendance = { ruleRecorded: boolean; autoFinalise: boolean; classes: PendingClass[] };
+export const pendingStateLabels: Record<PendingClass["state"], string> = {
+  READY: "Ready to finalise", WAITING_FOR_REPORT: "Waiting for Zoom's report", NO_ZOOM_RUN: "No Zoom run linked" };
+export type UpcomingRun = { occurrenceId: string; startsAt: string; endsAt: string; classId: string | null };
+export type UpcomingWebinar = { webinarId: string; topic: string | null; timeZone: string | null; recurring: boolean; runs: UpcomingRun[];
+  note: string | null; liveEvents?: boolean };
 export type AttendanceCounts = { present: number; late: number; absent: number; excused: number; ratePercent: number | null };
 export type BatchAttendanceSummary = { from: string; to: string; finalClasses: number; classesNotFinal: number; totals: AttendanceCounts;
   students: { studentId: string; studentNumber: string; fullName: string; counts: AttendanceCounts }[]; method: string };

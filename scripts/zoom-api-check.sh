@@ -33,6 +33,6 @@ DB_URL=jdbc:postgresql://localhost:55436/luma DB_USERNAME=luma DB_PASSWORD=$DBPA
   "$JAVA" -jar "$JAR" --spring.main.web-application-type=none --spring.main.banner-mode=off \
   --luma.zoom.processing.enabled=false --luma.rate-limit.enabled=false "--luma.zoom-api-check.webinar-id=$WEBINAR" > "$S/out.log" 2>&1
 code=$?
-grep -E "^(Token|Webinar|Registrants|Past instances|Latest instance|Check-a-webinar view|Zoom API check)" "$S/out.log"
+grep -E "^(Token|Webinar|Registrants|Past instances|Latest instance|Check-a-webinar view|Upcoming webinars|Zoom API check)" "$S/out.log"
 [ $code = 0 ] || grep -E " ERROR |Caused by" "$S/out.log" | grep -v "Zoom API check" | head -3
 exit $code

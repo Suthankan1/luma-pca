@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { correctRecord, finaliseAttendance, recalculateAttendance, resolveAppeal, savePolicy } from "@/app/staff/attendance/actions";
+import { correctRecord, finaliseAllReady, finaliseAttendance, recalculateAttendance, resolveAppeal, savePolicy } from "@/app/staff/attendance/actions";
 import { attendanceOutcomes, outcomeLabels, type AttendanceOutcome, type AttendancePolicy, type FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, id }: { state: FormState; id: string }) {
@@ -23,8 +23,19 @@ export function PolicyForm({ policy }: { policy: AttendancePolicy | null }) {
     <label htmlFor="policy-description">Where this rule was approved</label>
     <input id="policy-description" name="description" maxLength={500} required autoComplete="off"
       defaultValue={values?.description ?? policy?.description ?? ""} placeholder="Approved at the staff meeting on 1 Nov 2026" />
+    <label className="check"><input type="checkbox" name="autoFinalise" defaultChecked={!!policy?.autoFinalise} /> Finalise each class
+      automatically once Zoom’s report is in (in your name; staff can still correct and recalculate)</label>
     <button className="action" type="submit" disabled={pending}>{pending ? "Saving…" : "Save rule"}</button>
     <Feedback state={state} id="policy-feedback" />
+  </form>;
+}
+
+export function FinaliseAllForm({ ready }: { ready: number }) {
+  const [state, action, pending] = useActionState(finaliseAllReady, null);
+  return <form action={action} className="inline-form">
+    <button className="action" type="submit" disabled={pending || ready === 0}>
+      {pending ? "Finalising…" : `Finalise ${ready} ready class${ready === 1 ? "" : "es"}`}</button>
+    <Feedback state={state} id="finalise-all-feedback" />
   </form>;
 }
 

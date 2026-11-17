@@ -19,6 +19,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "luma.zoom.reports.enabled=false",
         // Tests run retention directly.
         "luma.retention.enabled=false",
+        "luma.attendance.auto-finalise.enabled=false",
         // Tests drive the invitation email sender directly.
         "luma.mail.bulk.enabled=false",
         // Every test signs in from this machine; AuthRateLimitIntegrationTest turns limits on with small values.
