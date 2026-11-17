@@ -1,23 +1,29 @@
 # LUMA · Physics Cube Academy
 
-**Status (13 Nov 2026): feature-complete for the pilot and tested; not yet deployed or used with real students.** The
-pilot, cloud deployment and sign-off are the academy's (`docs/delivery/PILOT-PLAN.md`, `GO-LIVE-CHECKLIST.md`).
+**Status (17 Nov 2026): complete and tested end to end for one academy; not yet deployed or used with real students.**
+Deployment, the live pilot and sign-off are the academy's (`docs/delivery/PILOT-PLAN.md`, `GO-LIVE-CHECKLIST.md`). What
+it deliberately does not do: [docs/delivery/KNOWN-LIMITS.md](docs/delivery/KNOWN-LIMITS.md).
 
 A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy. What it does:
 
 - **Accounts and access:** staff and student sign-in (RS256 JWTs, rotating refresh sessions in HttpOnly cookies, TOTP MFA
-  with recovery codes for owners and administrators), invitations and password reset by email, per-visitor rate limits,
-  account lockout; roles scoped to the academy, assigned batches, or the student's own data on every route.
+  with recovery codes for every staff role), invitations, password reset and password change, per-visitor and per-account
+  rate limits, account lockout; roles scoped to the academy, assigned batches, or the student's own data on every route.
 - **Academic data:** courses, batches, students (CSV import), enrolments, staff assignments, classes and weekly series
   shared by several batches, bulk invitation emails, an append-only activity log.
 - **Zoom:** signed webhook receipt (proven with a real test webinar), a retrying worker, automatic linking of each webinar
   occurrence to its class, participants matched to students by Zoom email (or an administrator's audited decision), Zoom's
-  participant report fetched after each webinar; IP/device data is never stored.
+  participant report fetched after each webinar (host marked, registrants matched by their registration email); "Check a
+  webinar" by join link or ID shows any past run, even ones LUMA never received live; IP/device data is never stored.
 - **Attendance:** provisional facts live (time connected with rejoins merged, lateness), then final present/late/absent
-  from Zoom's report by the academy's own recorded rule; corrections with reasons, student appeals, histories, CSV exports.
-- **Engagement (off by default, consent-based):** portal reactions, instructor pulse questions, staff-only top 10/100.
-- **Operations:** Terraform for the AWS design (validated in CI, not applied), backup and tested restore drill, load-test
-  tooling, deploy/rollback/incident runbooks.
+  from Zoom's report by the academy's own recorded rule; corrections with reasons, recalculation after a late report or a
+  rule change, student appeals, email notices to students and managers, histories, CSV exports.
+- **Engagement (off by default, consent-based):** portal reactions, instructor pulse questions, staff-only top 10/100 per class, batch
+  or course, with CSV download.
+- **Privacy:** an owner can erase a student on request (attendance kept, anonymised); a nightly job removes emails from
+  old Zoom event payloads.
+- **Operations:** Terraform for the AWS design with WAF, alarms and daily backups (validated in CI, not applied), tested
+  restore drill, image builds in CI, load-test tooling, deploy/rollback/incident runbooks.
 
 Evidence of every slice (PRs, CI results, test counts) is in [docs/ai/checkpoints/PROGRESS.md](docs/ai/checkpoints/PROGRESS.md).
 Do not onboard real students until the academy's P0 decisions are signed off (`docs/product/OPEN-QUESTIONS.md`).
@@ -35,12 +41,12 @@ Do not onboard real students until the academy's P0 decisions are signed off (`d
 | --- | --- |
 | Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4 (responsive staff/student web) |
 | API/backend | Java 21, Spring Boot 4.1.2, modular monolith; later Spring Modulith tests |
-| Authentication | **Implemented:** first-party RS256 JWTs, account lockout, rotating refresh sessions, Next.js HttpOnly session cookies, TOTP MFA with recovery codes, password reset and invitations by email, per-visitor rate limits, role/academy/batch/ownership checks on every route |
+| Authentication | **Implemented:** first-party RS256 JWTs, account lockout, rotating refresh sessions, Next.js HttpOnly session cookies, TOTP MFA with recovery codes for all staff, password change and reset, invitations by email, per-visitor rate limits, role/academy/batch/ownership checks on every route |
 | Database | PostgreSQL 17, Flyway; schema evolves through reviewed migrations |
 | Zoom | **Implemented:** signed webhooks into an idempotent inbox with a retrying worker, S2S OAuth read-only client, post-webinar participant reports |
-| Async | **Implemented:** database inbox with SKIP LOCKED workers (Zoom receipts, invitation emails, reports). **Planned:** SQS + DLQ worker (queues defined in Terraform) |
-| Updates | **Implemented:** reconciliation with Zoom's report before final attendance. **Planned:** SSE live push (pages recalculate on load) |
-| Production | **As code, not applied:** AWS ECS/Fargate, RDS, SQS, S3, CloudWatch alarms (Terraform validated in CI); needs the academy's budget and account |
+| Async | **Implemented:** database inbox with SKIP LOCKED workers (Zoom receipts, invitation emails, reports, retention); dead letters with audited replay |
+| Updates | **Implemented:** reconciliation with Zoom's report before final attendance; class pages refresh themselves while a class runs |
+| Production | **As code, not applied:** AWS ECS/Fargate, RDS, S3, WAF, CloudWatch alarms, AWS Backup (Terraform validated in CI); needs the academy's budget and account |
 
 ## Prerequisites
 
@@ -68,7 +74,7 @@ npm ci
 npm run dev                            # http://localhost:3000
 ```
 
-The backend exposes `POST /api/v1/auth/login`, `refresh`, `logout`, `logout-all` and `activate`, `GET /api/v1/auth/me` and `GET /.well-known/jwks.json`. The Next.js sign-in, session continuation, sign-out and browser MFA step work against it (`scripts/auth-stack-smoke.sh`). Owners and administrators complete MFA through the Next.js sign-in flow or directly through the API using `POST /api/v1/auth/mfa/enroll` and `POST /api/v1/auth/mfa/verify`. They can reset their own authenticator with `POST /api/v1/auth/mfa/reset`. Create the first academy owner with `scripts/bootstrap-owner.sh "Academy name" owner@example.com` (after `mvn -f backend/pom.xml package`, with the same database settings as the backend); it prints an activation link. Everyone else is invited from the staff screens. The Spring security filter denies other API routes by default until authorized feature slices are built.
+The backend exposes `POST /api/v1/auth/login`, `refresh`, `logout`, `logout-all` and `activate`, `GET /api/v1/auth/me` and `GET /.well-known/jwks.json`. The Next.js sign-in, session continuation, sign-out and browser MFA step work against it (`scripts/auth-stack-smoke.sh`). Every staff member completes MFA through the Next.js sign-in flow or directly through the API using `POST /api/v1/auth/mfa/enroll` and `POST /api/v1/auth/mfa/verify`. They can reset their own authenticator with `POST /api/v1/auth/mfa/reset`. Create the first academy owner with `scripts/bootstrap-owner.sh "Academy name" owner@example.com` (after `mvn -f backend/pom.xml package`, with the same database settings as the backend); it prints an activation link. Everyone else is invited from the staff screens. The Spring security filter denies other API routes by default until authorized feature slices are built.
 
 ## Commands
 
@@ -131,4 +137,4 @@ luma-pca/
 
 ## Licensing
 
-No software license has been selected. See `LICENSE_DECISION_REQUIRED.md` before publishing reusable source code or onboarding external contributors.
+Private repository; no software license has been selected. See `LICENSE_DECISION_REQUIRED.md` before publishing reusable source code or onboarding external contributors.

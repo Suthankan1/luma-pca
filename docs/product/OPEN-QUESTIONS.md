@@ -3,11 +3,11 @@
 | Priority | Question | Why it matters |
 | --- | --- | --- |
 | P0 | How many active students, courses, batches and concurrent webinars? | Capacity/cost estimates and rate limits. **Partly answered 2026-11-12:** one webinar at a time, at most 500 students; capacity target 600 concurrent users. Totals of students, courses and batches still open |
-| P0 | Which Zoom account license, Webinar add-on, report scopes, and registration policies exist? | Technical feasibility and identity mapping |
-| P0 | Will academy mandate individual webinar registration linked to student ID/email? | Reliable matching without display names |
-| P0 | Can staff approve a written attendance threshold and exception policy? | Fair decisions; late join/rejoin handling |
-| P0 | Who owns domains, AWS account, Zoom account and admin access? | Production accountability |
-| P0 | What is budget for hosting, monitoring, backups and maintenance? | Select realistic deployment |
+| P0 | Which Zoom account license, Webinar add-on, report scopes, and registration policies exist? | Technical feasibility and identity mapping | **Status 2026-11-17:** the academy handles its own Zoom, registration and attendance policies; LUMA supports them (registration-email matching, the owner records the rule in the app).
+| P0 | Will academy mandate individual webinar registration linked to student ID/email? | Reliable matching without display names | **Status 2026-11-17:** the academy handles its own Zoom, registration and attendance policies; LUMA supports them (registration-email matching, the owner records the rule in the app).
+| P0 | Can staff approve a written attendance threshold and exception policy? | Fair decisions; late join/rejoin handling | **Status 2026-11-17:** the academy handles its own Zoom, registration and attendance policies; LUMA supports them (registration-email matching, the owner records the rule in the app).
+| P0 | Who owns domains, AWS account, Zoom account and admin access? | Production accountability | **Status 2026-11-17 (project owner):** deployment is not planned yet; the academy decides hosting, budget and ownership. The code is ready for it (Terraform, runbooks).
+| P0 | What is budget for hosting, monitoring, backups and maintenance? | Select realistic deployment | **Status 2026-11-17 (project owner):** deployment is not planned yet; the academy decides hosting, budget and ownership. The code is ready for it (Terraform, runbooks).
 | P0 | Is each student under 18? What consent/privacy/retention policy is applicable? | Legal and ethical handling. **Answered 2026-11-15 by the academy:** age is not a problem; data is collected only for attendance; guardians agree. Retention defaults: raw Zoom names/emails 180 days, erasure on request |
 | P1 | Can one webinar be shared among batches, courses or repeated occurrences? | Session mapping and deduplication |
 | P1 | Can a student enroll in several batches of one course simultaneously? | Enrollment uniqueness rules |

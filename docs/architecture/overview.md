@@ -1,50 +1,61 @@
 # System architecture — authoritative overview
 
-**Status:** Decided architecture; implementation is only an initial scaffold. For the 10,000+ word full specification and research sources, see [the full production blueprint](full-production-blueprint.md). Use [ADRs](adr/) for changed decisions.
+**Status (17 Nov 2026):** built and tested end to end for one academy; not yet deployed. The checkpoint
+([PROGRESS.md](../ai/checkpoints/PROGRESS.md)) holds the evidence for every slice. The
+[full production blueprint](full-production-blueprint.md) is the original proposal; where it differs from this page, this
+page describes what exists. [ADRs](adr/) record decisions.
 
 ## System context
 
-- **Client:** Next.js 16 / TypeScript responsive browser interface; staff desktop and student mobile/PWA views.
-- **BFF:** Next.js server-side endpoints and HttpOnly cookies manage sessions; never expose refresh or access tokens to browser JavaScript.
-- **Backend:** Java 21, Spring Boot 4.1.2, **one modular monolith** with API runtime and future separately scaled worker runtime sharing feature code.
-- **Data:** PostgreSQL/Flyway for academy, courses, batches, people, scoped roles, webinar occurrences, attendance intervals, receipts, engagement, audit and reports.
-- **Zoom:** academy-owned server-to-server OAuth for authorized calls, signed HTTPS webhook ingress, report fetching and post-webinar reconciliation.
-- **Async:** PostgreSQL transactional receipts/inbox/outbox, SQS + dead-letter queue, idempotent handler processing and replay tools. This is **planned**; only local PostgreSQL runs today.
-- **Streaming:** SSE for provisional staff live presence, not an attendance source of truth.
-- **Infrastructure:** propose AWS ECS/Fargate, RDS, SQS, private S3, monitoring and Terraform subject to academy budget and account details.
+- **Browser:** Next.js 16 / TypeScript, staff desktop pages and a mobile-first student portal. Browsers talk only to the
+  Next.js app.
+- **BFF:** Next.js server actions and route handlers hold the session in a sealed HttpOnly cookie and call the API from the
+  server. Access and refresh tokens never reach browser JavaScript or storage.
+- **Backend:** Java 21, Spring Boot 4.1.2, one modular monolith. Background work (Zoom receipts, Zoom reports, invitation
+  emails, retention) runs in the same process on polling workers.
+- **Data:** PostgreSQL 17 with Flyway migrations (V1–V25). The audit log is append-only (a trigger refuses updates).
+- **Zoom:** signed webhooks into a durable inbox; a server-to-server OAuth client (read-only) for webinar details,
+  registrants, past occurrences and participant reports.
+- **Async:** a database queue (`FOR UPDATE SKIP LOCKED`) with retries, backoff, dead letters and an audited replay. There is
+  no message broker; at one academy's volume none is needed.
+- **Live updates:** the staff and student class pages refresh themselves while a class runs; there is no server push (SSE).
+- **Infrastructure as code, not applied:** AWS ECS Fargate, RDS, S3, WAF, CloudWatch alarms, AWS Backup (Terraform,
+  validated in CI). Applying it needs the academy's AWS account and budget.
 
-## Module map
+## Module map (backend packages)
 
-| Package | Owns | Never does |
-| --- | --- | --- |
-| `identity` | Account lifecycle, password policies, MFA, session rotation, JWT | Assume a role implies every batch |
-| `academy` | Org settings, registration and academy policy | Treat future multi-tenant as currently delivered |
-| `courses`, `batches`, `enrollments` | Enrollments, memberships and staff assignments | Copy the same student per batch |
-| `webinars`, `zoom` | Class-occurrence mapping, authorized REST calls, webhook receipts | Infer native reaction identities |
-| `attendance` | Interval union, overrides, reconciliation and final records | Conflate connected time and attention |
-| `engagement` | LUMA portal reactions/pulse checks and attributable Zoom Q&A/polls | Rank unverifiable native webinar emojis |
-| `analytics`, `reports` | Scoped aggregations, exports, fair ranking rates | Read all student data without authorization |
-| `operations`, `shared` | Outbox worker, SQS, safe observability, shared primitives | Turn cross-module entity access into the default |
+| Package | Owns |
+| --- | --- |
+| `identity` | Accounts, passwords (Argon2id), lockout, TOTP MFA for all staff, refresh sessions, JWTs, invitations, resets, email notices |
+| `courses`, `batches`, `enrollments`, `students` | Academic structure, CSV import, staff assignments to batches |
+| `sessions` | Classes and weekly series shared by several batches |
+| `zoom` | Webhook ingress and worker, occurrence linking, participant matching (email, registration email, staff decisions), reports, webinar lookup |
+| `attendance` | Provisional facts, the academy rule, finalisation and recalculation, corrections, appeals, histories, CSV exports |
+| `engagement` | Consent, portal reactions, pulse questions, class / batch / course rankings |
+| `audit` | Append-only activity log |
+| `operations` | First-owner bootstrap, student erasure, retention job |
+| `shared` | Errors, rate limits (per visitor and per account), security configuration |
 
 ## Domain identity invariants
 
-`Academy -> Course -> Batch`; `Student <-> Batch` through `Enrollment`; `ClassSession <-> Batch` through `SessionBatch`. Each class session can serve multiple batches without duplicate attendance for the same student. Each `AttendanceRecord` is uniquely `(class_session_id, student_id)`. Separate Zoom webinar scheduled IDs and instance UUIDs for recurring webinars. Student identity is the academy's stable student ID, never a mutable Zoom display name.
+`Academy -> Course -> Batch`; `Student <-> Batch` through `Enrollment`; `ClassSession <-> Batch` through `SessionBatch`. A
+class serving several batches expects each student once. Each `AttendanceRecord` is unique per `(class_session_id,
+student_id)`. A recurring webinar's ID and each occurrence's UUID are kept apart. A student is identified by the academy's
+student record, never by a Zoom display name.
 
 ## Security design
 
-Students and staff receive first-party short-lived signed JWT **access** tokens after authenticated login. Refresh tokens are random opaque secrets, hashed in DB with rotation and reuse-detection. Roles are assigned at academy/course/batch scope; both role checks and object-level authorization are required on every private operation. Zoom OAuth credentials are **different secrets** unrelated to student JWTs. See [JWT auth](../security/JWT-AUTH.md), [permissions](../security/AUTHORIZATION-MATRIX.md) and [threat model](../security/THREAT-MODEL.md).
+Short-lived RS256 access tokens bound to a rotating refresh session (reuse detection revokes the session). Every staff
+role signs in with TOTP MFA. Roles are scoped to the academy, assigned batches or the student's own records, and checked on
+every route with object-level checks. Zoom credentials are separate secrets. See [JWT auth](../security/JWT-AUTH.md),
+[permissions](../security/AUTHORIZATION-MATRIX.md) and [threat model](../security/THREAT-MODEL.md).
 
-## Critical status map
+## Known limits
 
-- **Implemented in starter:** basic Next app previews, Java Boot REST bootstrap endpoint, Spring default-deny API security, Flyway V1 academy/course tables, deterministic connection interval union with unit tests, Docker PostgreSQL, persistent accounts with academy-level roles and Argon2id password hashing and single-use activation invitations (service layer only, no HTTP route), Next.js BFF session cookies tested against a mock API.
-- **Implemented since:** password sign-in issuing RS256 access tokens, per-request account/auth-version checks, lockout, invitation activation route, public JWKS.
-- **Implemented since (001D):** rotating refresh sessions with reuse detection, logout and logout-all; access tokens are bound to their session.
-- **Implemented since (002A):** academy-scoped course and batch create/read/update API for owners and administrators.
-- **Implemented since (001F):** TOTP MFA for owner/admin sign-in with recovery codes; backend only.
-- **Implemented since (001G–001M, 002B–002C, 003B–003D-1, UI-1–UI-3c):** browser MFA, staff administration and invitations (link or email), students, enrollments, staff assignments, class sessions, audit trail, signed Zoom webhook receipt with a retrying worker and occurrence linking, staff screens for every API area, password reset by email, per-visitor limits on public auth routes, and the first-owner operator command. The repository checkpoint (docs/ai/checkpoints/PROGRESS.md) has the details and evidence.
-- **Not implemented:** real user data, Zoom OAuth and participant identity, attendance persistence/reconciliation, SQS worker, SSE, reports and production infrastructure.
-- **Requires feasibility proof:** Zoom license and scopes; unique student registrations; recurring webinar UUID behavior; Q&A/poll data; native attendee emoji identity. See [Zoom rules](../integration/ZOOM-RULES.md).
+See [KNOWN-LIMITS.md](../delivery/KNOWN-LIMITS.md): webinars only (not meetings), one academy per deployment, and what
+could not be proven without a deployment or more real webinars.
 
 ## Diagrams and contracts
 
-[Context](../diagrams/context.mmd), [domain ERD](../diagrams/domain-erd.mmd), [Zoom sequence](../diagrams/zoom-events.mmd), [auth flow](../diagrams/auth-flow.mmd), [deployment](../diagrams/deployment.mmd); [OpenAPI planning contract](../../contracts/openapi/platform-v1.yaml). Diagram links refer to editable Mermaid source, not validated deployed infrastructure.
+[Context](../diagrams/context.mmd), [domain ERD](../diagrams/domain-erd.mmd), [Zoom sequence](../diagrams/zoom-events.mmd),
+[auth flow](../diagrams/auth-flow.mmd), [deployment](../diagrams/deployment.mmd); [OpenAPI contract](../../contracts/openapi/platform-v1.yaml).
