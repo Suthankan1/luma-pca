@@ -19,7 +19,7 @@ locals {
 
 resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   alarm_name          = "${var.name}-5xx"
-  alarm_description   = "Server errors from the web app or API (runbook: docs/operations/INCIDENT-RESPONSE.md)"
+  alarm_description   = "Server errors from the web app or API (runbook: docs/delivery/runbooks/INCIDENT-RESPONSE.md)"
   namespace           = "AWS/ApplicationELB"
   metric_name         = "HTTPCode_Target_5XX_Count"
   dimensions          = { LoadBalancer = var.alb_arn_suffix }
@@ -78,21 +78,6 @@ resource "aws_cloudwatch_metric_alarm" "db_storage" {
   tags                = var.tags
 }
 
-resource "aws_cloudwatch_metric_alarm" "dlq" {
-  alarm_name          = "${var.name}-zoom-dlq"
-  alarm_description   = "Zoom receipts reached the dead-letter queue"
-  namespace           = "AWS/SQS"
-  metric_name         = "ApproximateNumberOfMessagesVisible"
-  dimensions          = { QueueName = var.dlq_name }
-  statistic           = "Maximum"
-  period              = 300
-  evaluation_periods  = 1
-  threshold           = 0
-  comparison_operator = "GreaterThanThreshold"
-  alarm_actions       = local.actions
-  tags                = var.tags
-}
-
 # The API logs "dead-lettered" when a Zoom receipt gives up (ZoomReceiptProcessor) and
 # "could not be fetched" when a participant report fails (ZoomReportService).
 resource "aws_cloudwatch_log_metric_filter" "zoom_dead" {
@@ -141,6 +126,65 @@ resource "aws_cloudwatch_metric_alarm" "zoom_report_failed" {
   period              = 3600
   evaluation_periods  = 1
   threshold           = 3
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.actions
+  tags                = var.tags
+}
+
+# More fixed log phrases worth a page. AlarmLogPhrasesTest (backend) fails if the API stops
+# writing any phrase listed in this file, so an alarm can never go quiet after a rewording.
+locals {
+  log_alarms = {
+    webhook-signature = {
+      pattern     = "\"Rejected Zoom webhook: signature\""
+      period      = 3600
+      threshold   = 10
+      description = "Many Zoom webhooks fail signature checks: check the secret token and the server clock (WEBHOOK-INCIDENT.md)"
+    }
+    webhook-store = {
+      pattern     = "\"Could not store Zoom webhook\""
+      period      = 300
+      threshold   = 0
+      description = "Zoom webhooks cannot be stored (database trouble); Zoom retries for a while, act quickly"
+    }
+    retention = {
+      pattern     = "\"Retention run failed\""
+      period      = 86400
+      threshold   = 0
+      description = "The nightly privacy retention job failed"
+    }
+    email = {
+      pattern     = "\"email for account\""
+      period      = 3600
+      threshold   = 5
+      description = "Account emails (invitations, resets, notices) are failing: check the mail provider"
+    }
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "phrase" {
+  for_each       = local.log_alarms
+  name           = "${var.name}-${each.key}"
+  log_group_name = var.api_log_group
+  pattern        = each.value.pattern
+  metric_transformation {
+    name      = "LogPhrase-${each.key}"
+    namespace = "LUMA/${var.name}"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "phrase" {
+  for_each            = local.log_alarms
+  alarm_name          = "${var.name}-${each.key}"
+  alarm_description   = each.value.description
+  namespace           = "LUMA/${var.name}"
+  metric_name         = aws_cloudwatch_log_metric_filter.phrase[each.key].metric_transformation[0].name
+  statistic           = "Sum"
+  period              = each.value.period
+  evaluation_periods  = 1
+  threshold           = each.value.threshold
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
   alarm_actions       = local.actions

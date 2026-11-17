@@ -1,0 +1,38 @@
+name: images
+
+# Builds the two container images the deployment runs, so a broken Dockerfile shows up before
+# release. Build only: nothing is pushed to a registry and nothing is deployed (no cloud access).
+on:
+  pull_request:
+    paths: ['backend/**', 'frontend/**', '.github/workflows/images.yml']
+  push:
+    branches: [main]
+    paths: ['backend/**', 'frontend/**', '.github/workflows/images.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        app: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.app }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.app }}
+          push: false
+          load: true
+          tags: luma-${{ matrix.app }}:ci
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+      - name: Image runs as a non-root user
+        run: |
+          user=$(docker image inspect luma-${{ matrix.app }}:ci --format '{{.Config.User}}')
+          echo "User: $user"
+          test -n "$user" && test "$user" != "root" && test "$user" != "0"

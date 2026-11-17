@@ -31,9 +31,10 @@ locals {
 }
 
 module "network" {
-  source       = "../../modules/network"
-  name         = local.name
-  nat_gateways = var.nat_gateways
+  source              = "../../modules/network"
+  name                = local.name
+  nat_gateways        = var.nat_gateways
+  interface_endpoints = var.interface_endpoints
 }
 
 module "storage" {
@@ -41,11 +42,6 @@ module "storage" {
   name                  = local.name
   bucket_suffix         = data.aws_caller_identity.current.account_id
   export_retention_days = var.export_retention_days
-}
-
-module "messaging" {
-  source = "../../modules/messaging"
-  name   = local.name
 }
 
 # Secret containers only; values are put in by an operator (aws secretsmanager put-secret-value),
@@ -65,7 +61,6 @@ module "compute" {
   api_image          = var.api_image
   web_image          = var.web_image
   private_bucket_arn = module.storage.bucket_arn
-  queue_arn          = module.messaging.queue_arn
   api_min_tasks      = var.api_min_tasks
   web_min_tasks      = var.web_min_tasks
   api_environment = {
@@ -111,6 +106,7 @@ module "database" {
   instance_class        = var.db_instance_class
   multi_az              = var.db_multi_az
   backup_retention_days = var.db_backup_retention_days
+  snapshot_keep_days    = var.db_snapshot_keep_days
 }
 
 module "monitoring" {
@@ -120,6 +116,5 @@ module "monitoring" {
   alb_arn_suffix              = module.compute.alb_arn_suffix
   api_target_group_arn_suffix = module.compute.api_target_group_arn_suffix
   db_instance_id              = module.database.instance_id
-  dlq_name                    = module.messaging.dlq_name
   api_log_group               = module.compute.api_log_group
 }

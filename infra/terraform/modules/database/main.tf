@@ -65,3 +65,53 @@ resource "aws_db_instance" "this" {
   enabled_cloudwatch_logs_exports = ["postgresql"]
   tags                            = var.tags
 }
+
+# A second, independent copy: a daily AWS Backup snapshot at 02:00 Colombo (20:30 UTC), kept in
+# its own vault for snapshot_keep_days. RDS automated backups above give point-in-time recovery.
+resource "aws_backup_vault" "this" {
+  name = "${var.name}-db"
+  tags = var.tags
+}
+
+resource "aws_backup_plan" "this" {
+  name = "${var.name}-db-daily"
+  rule {
+    rule_name         = "daily"
+    target_vault_name = aws_backup_vault.this.name
+    schedule          = "cron(30 20 * * ? *)"
+    start_window      = 60
+    completion_window = 240
+    lifecycle {
+      delete_after = var.snapshot_keep_days
+    }
+  }
+  tags = var.tags
+}
+
+data "aws_iam_policy_document" "backup_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["backup.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "backup" {
+  name               = "${var.name}-backup"
+  assume_role_policy = data.aws_iam_policy_document.backup_assume.json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "backup" {
+  role       = aws_iam_role.backup.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
+}
+
+resource "aws_backup_selection" "this" {
+  name         = "${var.name}-db"
+  plan_id      = aws_backup_plan.this.id
+  iam_role_arn = aws_iam_role.backup.arn
+  resources    = [aws_db_instance.this.arn]
+}

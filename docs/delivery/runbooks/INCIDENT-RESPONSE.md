@@ -9,7 +9,13 @@ Alarms go to the on-call addresses through SNS (`infra/terraform/modules/monitor
 | `*-db-cpu`, `*-db-free-storage` | Database under load or filling | Performance Insights / slow-query log (statements over 1 s are logged). Storage autoscales to the configured maximum. |
 | `*-zoom-dead-lettered` | A Zoom event could not be processed after retries | Zoom review → Failed events: read the error, fix the cause, replay with a reason (audited). See `WEBHOOK-INCIDENT.md`. |
 | `*-zoom-report-failed` | Zoom participant reports keep failing | Zoom API credentials/scopes (`scripts/zoom-api-check.sh`), Zoom status page. Fetch again from Zoom review once fixed; attendance stays provisional meanwhile. |
-| `*-zoom-dlq` | Messages in the SQS dead-letter queue (after the worker moves to SQS) | As above; redrive from the DLQ once fixed. |
+| `*-webhook-signature` | More than 10 Zoom webhooks an hour fail the signature check | The Zoom secret token in Secrets Manager matches the app's Features page? Server clock in sync? See `WEBHOOK-INCIDENT.md`. |
+| `*-webhook-store` | A Zoom webhook could not be stored | Database first (as for `api-unhealthy`). Zoom retries failed deliveries for a limited time; anything missed can be recovered from Zoom's report (fetch again in Zoom review). |
+| `*-retention` | The nightly privacy retention job failed | API log for the exception class; it runs again the next night. Data is kept a day longer meanwhile, nothing is lost. |
+| `*-email` | More than 5 account emails failed in an hour | Mail provider status and the `mail` secret (username/password). Invitations retry on their own; people can request a reset again. |
+
+Every log phrase these alarms count is checked by `AlarmLogPhrasesTest` in the backend tests, so rewording a log line
+fails the build instead of silencing an alarm.
 
 ## Severity and communication
 - **SEV1**: sign-in or classes unavailable for everyone, or suspected data exposure → owner and engineering lead at once;

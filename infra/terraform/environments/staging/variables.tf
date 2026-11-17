@@ -46,6 +46,11 @@ variable "nat_gateways" {
   default = 1
 }
 
+variable "interface_endpoints" {
+  type    = bool
+  default = false
+}
+
 variable "api_min_tasks" {
   type    = number
   default = 2
@@ -69,6 +74,12 @@ variable "db_multi_az" {
 variable "db_backup_retention_days" {
   type    = number
   default = 7
+}
+
+variable "db_snapshot_keep_days" {
+  type        = number
+  default     = 35
+  description = "How long the daily AWS Backup copy of the database is kept."
 }
 
 variable "export_retention_days" {

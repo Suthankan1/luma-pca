@@ -46,6 +46,11 @@ variable "backup_retention_days" {
   }
 }
 
+variable "snapshot_keep_days" {
+  type    = number
+  default = 35
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

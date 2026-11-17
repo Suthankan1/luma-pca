@@ -1,6 +1,6 @@
 # Infrastructure as code — validated, NOT APPLIED
 
-`modules/` (network, database, storage, messaging, compute, monitoring) and `environments/staging` describe the proposed AWS
+`modules/` (network, database, storage, compute, monitoring) and `environments/staging` describe the proposed AWS
 design of ADR-0006: private RDS PostgreSQL 17 (encrypted, TLS-only, backups, deletion protection), a private versioned S3
 bucket (KMS, TLS-only, lifecycle), SQS with a DLQ, ECS Fargate for the web app and API behind an HTTPS load balancer (only
 Zoom's webhook path reaches the API directly), secrets from Secrets Manager by ARN, CloudWatch logs and alarms to SNS.

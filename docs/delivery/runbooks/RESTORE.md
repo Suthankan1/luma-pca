@@ -20,6 +20,15 @@
 First drill: 13 Nov 2026 against the Zoom test database — 15 migrations identical, 23 tables and 62 rows
 matching, append-only trigger present (an update of the 6 audit events was refused). PASSED.
 
+## In the proposed AWS design (Terraform, not applied)
+
+- **RDS automated backups** (`db_backup_retention_days`, default 7) give point-in-time recovery to any second in that window.
+- **AWS Backup** takes a daily snapshot at 02:00 Colombo into its own vault, kept `db_snapshot_keep_days` (default 35), an
+  independent copy if the instance or its automated backups are lost.
+- To restore: AWS Backup → the vault → restore to a **new** instance, run `scripts/db-restore-drill.sh` checks against it,
+  then point `DB_URL` at it under an approved change.
+- Schedule `scripts/db-restore-drill.sh` against a restored non-production copy each month and record the result here.
+
 ## Still to decide before production
 
 The academy has not yet answered the RPO, RTO and retention question (OPEN-QUESTIONS P1) or the hosting

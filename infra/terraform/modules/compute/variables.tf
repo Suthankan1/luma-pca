@@ -52,10 +52,6 @@ variable "private_bucket_arn" {
   type = string
 }
 
-variable "queue_arn" {
-  type = string
-}
-
 variable "api_cpu" {
   type    = number
   default = 1024
@@ -94,6 +90,12 @@ variable "web_min_tasks" {
 variable "log_retention_days" {
   type    = number
   default = 30
+}
+
+variable "waf_rate_limit" {
+  type        = number
+  default     = 2000
+  description = "Requests per five minutes from one address before the firewall blocks it. A class behind one school or home network shares an address, so keep this generous."
 }
 
 variable "tags" {

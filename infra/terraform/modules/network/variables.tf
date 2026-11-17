@@ -18,6 +18,12 @@ variable "nat_gateways" {
   }
 }
 
+variable "interface_endpoints" {
+  type        = bool
+  default     = false
+  description = "Private endpoints for ECR, CloudWatch Logs and Secrets Manager (hourly cost per zone)."
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
