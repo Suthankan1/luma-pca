@@ -2010,6 +2010,22 @@ build runs the Next.js default bundler and repeats the smoke test.
   - Next.js 16.4.6 App Router with server-side BFF communicating over HTTPS with Oracle backend (`API_INTERNAL_URL=https://129.225.114.202.sslip.io`).
   - Production security headers, `__Host-luma-access` HttpOnly secure cookies, and cross-tab session synchronization live.
 
+## Checkpoint CI-1 — 2026-11-17 — Automated CI/CD Pipelines for Backend and Frontend
+
+- **PR / Merged commit:** PR #98 (`ci: add automated backend CD workflow for Oracle Cloud VM`).
+- **Backend CD (`.github/workflows/deploy-backend.yml`):**
+  - Triggers on push to `main` (changes to `backend/**`) or manual `workflow_dispatch`.
+  - Uses GitHub Actions secrets (`OCI_HOST`, `OCI_USERNAME`, `OCI_SSH_KEY`).
+  - Packages production Spring Boot JAR with Temurin JDK 21.
+  - Automatically transfers the artifact over SSH to `/opt/luma/luma-backend.jar` on the Oracle Cloud VM.
+  - Restarts the `luma-backend` systemd service.
+  - Verifies public HTTPS health check on `https://129.225.114.202.sslip.io/actuator/health` reporting `"status":"UP"`.
+  - First automated deployment completed successfully in 2m 26s (`run #44071529685`).
+- **Frontend CI/CD:**
+  - **CI:** `.github/workflows/frontend-ci.yml` executes linting, typecheck, unit tests, production build, and Playwright E2E browser tests on every PR and push.
+  - **CD:** Native Vercel GitHub integration automatically deploys preview URLs on PRs and updates `https://luma-pca.vercel.app/` on merge to `main`.
+
+
 
 
 
