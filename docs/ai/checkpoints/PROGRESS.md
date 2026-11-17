@@ -1876,3 +1876,14 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Images workflow:** builds both Dockerfiles on every relevant PR (no push, no deploy) and checks they run as non-root.
 - **Branch protection:** available but off; documented in CONTRIBUTING.md for the owner to enable.
 - Local: `terraform fmt`/`validate` pass (1.9.8), actionlint passes.
+
+## Checkpoint FIX-7 — 2026-11-17 — Documentation brought up to date
+
+- **Branch:** `fix/docs`. Fixes audit items 15–17, 29–30, 36–40 (documentation only).
+- README, START-HERE, architecture overview, ZOOM-RULES status, staff and student guides now describe what is built
+  (MFA for all staff, password change, recalculation, notices, registration matching, host rows, erasure, retention,
+  course rankings, WAF/backups) and drop "planned SQS/SSE".
+- New `docs/delivery/KNOWN-LIMITS.md`: webinars only, one academy per deployment, WN_ links, what needs a deployment or
+  more real webinars (load at 600, multi-occurrence recurring webinars, AWS), the Zoom subscription switch, branch
+  protection, the Notion page, PR #71.
+- LICENSE_DECISION_REQUIRED.md now says private. OPEN-QUESTIONS records the owner's answers of 17 Nov.

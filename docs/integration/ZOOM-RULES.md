@@ -1,6 +1,9 @@
 # Zoom integration — non-negotiable feasibility and reliability rules
 
-**Status:** signed webhook receipt is implemented and tested against fixtures (003B). No real Zoom token, webhook delivery or registered student proof-of-concept exists yet.
+**Status (17 Nov 2026):** all rules below are implemented and tested. Proven with real Zoom: signed webhook delivery
+and endpoint validation, server-to-server OAuth, participant reports, past-occurrence lookup and matching a registered
+student by email (ZOOM-TEST-WEBINAR.md). Not yet proven with real Zoom: a recurring webinar with several occurrences
+(KNOWN-LIMITS.md).
 
 1. Obtain academy-owned Zoom account admin consent and confirm Webinar licensing and report-scopes first. Use internal Server-to-Server OAuth for only the approved account, not an invented public app. No Zoom credentials in Next.js, localStorage or Git.
 2. Validate event subscription availability for the exact `webinar.participant_joined/left` variants and test real webhook payloads. Use Zoom webhook endpoint validation and signature/timestamp verification before accepting events.
