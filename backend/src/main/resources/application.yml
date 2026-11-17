@@ -125,9 +125,9 @@ luma:
     api:
       # Server-to-Server OAuth app (read-only webinar scopes). Off unless all three are set; the
       # secret comes from a secrets manager in production (locally: .env.zoom-test). Never commit them.
-      account-id: ${LUMA_ZOOM_API_ACCOUNT_ID:}
-      client-id: ${LUMA_ZOOM_API_CLIENT_ID:}
-      client-secret: ${LUMA_ZOOM_API_CLIENT_SECRET:}
+      account-id: ${LUMA_ZOOM_API_ACCOUNT_ID:${ZOOM_ACCOUNT_ID:}}
+      client-id: ${LUMA_ZOOM_API_CLIENT_ID:${ZOOM_CLIENT_ID:}}
+      client-secret: ${LUMA_ZOOM_API_CLIENT_SECRET:${ZOOM_CLIENT_SECRET:}}
     processing:
       # Polls stored webhook receipts in this process; safe with several instances.
       enabled: ${LUMA_ZOOM_PROCESSING_ENABLED:true}

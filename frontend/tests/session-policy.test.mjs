@@ -151,3 +151,24 @@ test("a password change needs the current password and a confirmed, different ne
   assert.equal(passwordChangeProblem("a long new passphrase", "a long new passphrase", "a long new passphrase"), "same");
   assert.equal(passwordChangeProblem("old", "a long new passphrase", "a long new passphrase"), null);
 });
+
+test("isGuestPath identifies unauthenticated pages and ignores query fragments and protected routes", async () => {
+  const { isGuestPath } = await import("../src/lib/session-policy.ts");
+  assert.equal(isGuestPath("/"), true);
+  assert.equal(isGuestPath("/sign-in"), true);
+  assert.equal(isGuestPath("/sign-in?error=invalid"), true);
+  assert.equal(isGuestPath("/sign-in/mfa"), true);
+  assert.equal(isGuestPath("/activate"), true);
+  assert.equal(isGuestPath("/activate#token=abc"), true);
+  assert.equal(isGuestPath("/forgot-password"), true);
+  assert.equal(isGuestPath("/reset-password"), true);
+  assert.equal(isGuestPath("/reset-password?error=token#token=abc"), true);
+
+  // Protected or special pages must NOT be considered guest paths
+  assert.equal(isGuestPath("/staff"), false);
+  assert.equal(isGuestPath("/staff/courses"), false);
+  assert.equal(isGuestPath("/student"), false);
+  assert.equal(isGuestPath("/sign-in/mfa/recovery-codes"), false);
+  assert.equal(isGuestPath("/account/password"), false);
+});
+
