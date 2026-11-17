@@ -9,7 +9,7 @@ import { staffApi } from "@/lib/staff-api";
 import { AttendanceExportForm } from "@/components/staff/AttendanceExportForm";
 import { academyToday, type Ranking, formatDate, isAcademyManager, staffRoleLabels, uuidOrNull } from "@/lib/staff-forms";
 
-type Batch = { id: string; code: string; name: string; startsOn: string; endsOn: string | null; active: boolean };
+type Batch = { courseId: string; id: string; code: string; name: string; startsOn: string; endsOn: string | null; active: boolean };
 type Assignment = { id: string; email: string | null; role: string };
 type Enrollment = { id: string; studentId: string; studentNumber: string; studentName: string; enrolledOn: string; withdrawnOn: string | null };
 
@@ -32,9 +32,11 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
   const rankFrom = typeof query.rankFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.rankFrom) ? query.rankFrom : null;
   const rankTo = typeof query.rankTo === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.rankTo) ? query.rankTo : null;
   const top = query.top === "100" ? 100 : 10;
-  const ranking = manager && rankFrom && rankTo
-    ? await staffApi<Ranking>(`/api/v1/batches/${batchId}/engagement-ranking?${new URLSearchParams({ from: rankFrom, to: rankTo, limit: String(top) })}`)
-    : null;
+  const wholeCourse = query.scope === "course";
+  const rankingBase: `/api/v1/${string}` = wholeCourse && batch.ok ? `/api/v1/courses/${batch.data.courseId}/engagement-ranking`
+    : `/api/v1/batches/${batchId}/engagement-ranking`;
+  const rankingQuery = rankFrom && rankTo ? new URLSearchParams({ from: rankFrom, to: rankTo, limit: String(top) }) : null;
+  const ranking = manager && rankingQuery ? await staffApi<Ranking>(`${rankingBase}?${rankingQuery}`) : null;
   const shell = { active: "courses" as const, crumb: "Academic setup", hasStudentPortal: hasPortal(identity, "student") };
   if (!batch.ok || !roster.ok) {
     return <StaffShell {...shell} title="Batch roster" subtitle="">
@@ -93,11 +95,15 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
         <input id="rank-to" name="rankTo" type="date" required defaultValue={rankTo ?? academyToday()} />
         <label htmlFor="rank-top">Show</label>
         <select id="rank-top" name="top" defaultValue={String(top)}><option value="10">Top 10</option><option value="100">Top 100</option></select>
+        <label htmlFor="rank-scope">Over</label>
+        <select id="rank-scope" name="scope" defaultValue={wholeCourse ? "course" : "batch"}><option value="batch">This batch</option><option value="course">The whole course</option></select>
         <button className="action secondary" type="submit">Show ranking</button>
       </form>
       {ranking && (!ranking.ok ? <p className="session-error" role="alert">{ranking.detail ?? "We couldn’t load the ranking right now."}</p>
         : <>
           <p className="panel-sub">{ranking.data.classes} class{ranking.data.classes === 1 ? "" : "es"} · {ranking.data.studentsCounted} consenting student{ranking.data.studentsCounted === 1 ? "" : "s"}</p>
+          {rankingQuery && <p className="link-row"><a className="text-link" download
+            href={`/staff/batches/${batchId}/ranking-export?${new URLSearchParams({ ...Object.fromEntries(rankingQuery), scope: wholeCourse ? "course" : "batch" })}`}>Download CSV</a></p>}
           <ol className="dir-list ranking">{ranking.data.top.map(r => <li key={r.studentId} className="dir-row" aria-label={`Rank ${r.rank}`}>
             <span><strong>{r.rank}.</strong> {r.studentNumber ? `${r.studentNumber} ${r.name ?? ""}` : <span className="muted">Not named (no opt-in)</span>}</span>
             <span className="muted">{r.score} · {r.reactions} reactions, {r.pulseAnswers} answers, {r.classes} classes</span>

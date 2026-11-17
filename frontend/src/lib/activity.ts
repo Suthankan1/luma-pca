@@ -93,6 +93,11 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
         typeof d.rows === "string" ? `${d.rows} row${d.rows === "1" ? "" : "s"}` : ""].filter(Boolean).join(" · ") || undefined };
     case "ATTENDANCE_FINALISED": return { summary: `Finalised attendance of ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
       detail: [`${d.present ?? 0} present`, `${d.late ?? 0} late`, `${d.absent ?? 0} absent`].join(", ") + (typeof d.rule === "string" ? ` (rule ${d.rule})` : "") };
+    case "ENGAGEMENT_RANKING_EXPORTED": return { summary: "Downloaded an engagement ranking",
+      detail: typeof d.from === "string" && typeof d.to === "string" ? `${formatDate(d.from)} – ${formatDate(d.to)}` : undefined };
+    case "PASSWORD_CHANGED": return { summary: "Changed their password" };
+    case "STUDENT_ERASED": return { summary: `Erased a student’s personal data${typeof d.placeholder === "string" ? ` (now ${d.placeholder})` : ""}`,
+      detail: typeof d.reason === "string" ? `Reason: ${d.reason}` : undefined };
     case "ATTENDANCE_RECALCULATED": return { summary: `Recalculated attendance of ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,
       detail: `${d.changed ?? 0} changed, ${d.kept ?? 0} corrected kept, ${d.added ?? 0} added` + (typeof d.reason === "string" ? ` · Reason: ${d.reason}` : "") };
     case "ATTENDANCE_CORRECTED": return { summary: `Corrected attendance in ${event.targetLabel ? `“${event.targetLabel}”` : "a class"}`,

@@ -24,7 +24,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 
-/** Corrections, student history and appeals (004C). */
+/** Corrections, student history and appeals (004C), with notices by email. */
+@org.springframework.test.context.TestPropertySource(properties = {
+    "luma.mail.enabled=true",
+    "luma.mail.from=no-reply@example.invalid",
+    "luma.mail.web-origin=https://luma.example.invalid",
+    "spring.mail.host=localhost"})
+@org.springframework.context.annotation.Import(com.physicscube.luma.identity.CapturedMail.class)
 class AttendanceCorrectionIntegrationTest extends StaffApiIntegrationTest {
     private static final String WEBINAR = "81234567890";
     private static final String OCCURRENCE = "Corr==";
@@ -47,6 +53,7 @@ class AttendanceCorrectionIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     @SuppressWarnings("unchecked")
     void finalisedClass() {
+        com.physicscube.luma.identity.CapturedMail.SENT.clear();
         academyId = academy("Physics Cube Test");
         admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
@@ -162,6 +169,8 @@ class AttendanceCorrectionIntegrationTest extends StaffApiIntegrationTest {
         HttpResponse<String> first = api.post(path, "{\"message\":\"I joined from my phone with my parent's Zoom account.\"}", student);
         assertEquals(201, first.statusCode(), first.body());
         String appeal = (String) HttpApi.parse(first).get("id");
+        assertTrue(notices("A student appealed their attendance").stream().anyMatch(m -> m.link().contains("Optics on 2 Feb 2026")
+                && m.link().contains("https://luma.example.invalid/staff/attendance")), "owners and administrators are told");
         assertEquals(409, api.post(path, "{\"message\":\"A second appeal while one is open.\"}", student).statusCode());
         assertEquals(404, api.post("/api/v1/me/attendance/" + recordB + "/appeals", "{\"message\":\"Not my record at all, but trying.\"}", student)
                 .statusCode(), "only one's own record");
@@ -175,6 +184,10 @@ class AttendanceCorrectionIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(200, accepted.statusCode(), accepted.body());
         assertEquals("ACCEPTED", HttpApi.parse(accepted).get("status"));
         assertEquals("PRESENT", HttpApi.parse(accepted).get("outcome"));
+        java.util.List<com.physicscube.luma.identity.CapturedMail.Mail> updated = notices("Your attendance was updated");
+        assertEquals(1, updated.size());
+        assertEquals("corr.a@example.test", updated.get(0).to());
+        assertTrue(updated.get(0).link().contains("is now Present (it was Absent)"), updated.get(0).link());
         assertEquals(409, resolve(appeal, "REJECT", null, "Too late").statusCode(), "decided once");
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM attendance_corrections WHERE appeal_id = ?::uuid", Integer.class, appeal));
 
@@ -183,10 +196,29 @@ class AttendanceCorrectionIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(201, again.statusCode());
         String second = (String) HttpApi.parse(again).get("id");
         assertEquals(200, resolve(second, "REJECT", null, "Present is the more favourable outcome").statusCode());
+        assertTrue(notices("Your attendance appeal was not accepted").stream()
+                .anyMatch(m -> m.link().contains("Present is the more favourable outcome")));
         Map<String, Object> latest = (Map<String, Object>) HttpApi.parseList(api.get("/api/v1/me/attendance", student)).get(0);
         assertEquals("PRESENT", latest.get("outcome"));
         assertEquals("REJECTED", latest.get("appealStatus"));
         assertTrue(jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE academy_id = ? AND action LIKE 'ATTENDANCE_APPEAL_%'",
                 Integer.class, academyId) == 4);
+    }
+
+    /** Notices sent after commit on the mail queue; waits briefly for them. */
+    private static java.util.List<com.physicscube.luma.identity.CapturedMail.Mail> notices(String subject) {
+        java.util.List<com.physicscube.luma.identity.CapturedMail.Mail> found = new java.util.ArrayList<>();
+        long until = System.currentTimeMillis() + 5000;
+        while (found.isEmpty() && System.currentTimeMillis() < until) {
+            com.physicscube.luma.identity.CapturedMail.SENT.stream().filter(m -> m.kind().equals("notice:" + subject)).forEach(found::add);
+            if (found.isEmpty()) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        return found;
     }
 }

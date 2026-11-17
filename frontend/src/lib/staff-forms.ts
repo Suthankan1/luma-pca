@@ -498,7 +498,8 @@ export function candidateClasses(occurrence: Occurrence, sessions: readonly Clas
 export type EngagementSettings = { enabled: boolean; consentText: string; consentVersion: number; version: number; updatedAt: string };
 export type MyConsent = { enabled: boolean; consentText: string | null; consentVersion: number; granted: boolean | null; leaderboardOptIn: boolean; current: boolean };
 export type PulseView = { id: string; prompt: string; options: string[]; openedAt: string; closesAt: string; open: boolean; counts: number[] | null; myAnswer: number | null };
-export type ClassEngagement = { sessionId: string; enabled: boolean; reactions: Record<string, number>; reactingStudents: number; pulses: PulseView[]; source: string };
+export type ClassEngagement = { sessionId: string; enabled: boolean; reactions: Record<string, number>; reactingStudents: number; pulses: PulseView[];
+  source: string; classStartsAt: string; classEndsAt: string };
 export type Ranking = { limit: number; classes: number; studentsCounted: number; method: string;
   top: { rank: number; studentId: string; studentNumber: string | null; name: string | null; classes: number; reactions: number; pulseAnswers: number; score: number }[] };
 export const reactionLabels: Record<string, string> = { UNDERSTOOD: "I understand", CONFUSED: "I’m confused", SLOW_DOWN: "Slow down", SPEED_UP: "Speed up" };
@@ -524,3 +525,9 @@ export type RunAttendee = { email: string | null; displayName: string | null; jo
   studentNumber: string | null; studentName: string | null };
 export type RunAttendance = { webinarId: string; occurrenceUuid: string; startTime: string | null; endTime: string | null;
   joinSessions: number; linkedSessionId: string | null; attendees: RunAttendee[] };
+
+/** Whether a class is running now or within ten minutes of its start or end (when students may react or answer). */
+export function classOpenForEngagement(startsAt: string, endsAt: string, now = new Date()) {
+  const margin = 10 * 60_000;
+  return Date.parse(startsAt) - margin <= now.getTime() && now.getTime() <= Date.parse(endsAt) + margin;
+}

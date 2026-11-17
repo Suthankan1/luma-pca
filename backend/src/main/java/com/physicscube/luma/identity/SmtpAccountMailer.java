@@ -25,6 +25,11 @@ class SmtpAccountMailer implements AccountMailer {
         send(toAddress, "Reset your LUMA password", resetBody(link, Duration.between(Instant.now(), expiresAt)));
     }
 
+    @Override
+    public void notice(String toAddress, String subject, String text) {
+        send(toAddress, subject, text + "\n\nThis is an automatic message from Physics Cube Academy LUMA.\n");
+    }
+
     private void send(String toAddress, String subject, String text) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);

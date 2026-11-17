@@ -38,6 +38,11 @@ public class CapturedMail {
             public void passwordReset(String to, String link, Instant expiresAt) {
                 SENT.add(new Mail("reset", to, link, expiresAt));
             }
+
+            @Override
+            public void notice(String to, String subject, String text) {
+                SENT.add(new Mail("notice:" + subject, to, text, null));
+            }
         };
     }
 }
