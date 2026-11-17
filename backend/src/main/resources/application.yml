@@ -9,6 +9,11 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/luma}
     username: ${DB_USERNAME:luma_dev}
     password: ${DB_PASSWORD:local-only-change-me}
+    hikari:
+      # Cloud poolers (Supabase / AWS) close idle connections; keep lifetime shorter than the pooler
+      max-lifetime: 180000
+      keepalive-time: 60000
+      connection-timeout: 20000
   jpa:
     open-in-view: false
     hibernate:
