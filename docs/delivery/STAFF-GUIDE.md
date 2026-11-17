@@ -3,6 +3,10 @@
 Every staff account signs in with a password and an authenticator app code (set up at first sign-in; keep the recovery
 codes). Change your password with **Change password** at the top of every staff page; you are signed out everywhere afterwards.
 
+## Every day
+The **Staff portal** home shows today's classes and what needs attention (classes to finalise, appeals, Zoom
+accounts to match, failed Zoom events); each line opens the page where it is handled.
+
 ## Setting up
 1. **Courses & batches**: create each course, then its batches (code, name, start date).
 2. **Students**: add one, or **Import** a CSV (`studentNumber,fullName,email`), optionally enrolling everyone in a batch.

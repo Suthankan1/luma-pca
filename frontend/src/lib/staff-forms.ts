@@ -508,6 +508,10 @@ export const pendingStateLabels: Record<PendingClass["state"], string> = {
 export type UpcomingRun = { occurrenceId: string; startsAt: string; endsAt: string; classId: string | null };
 export type UpcomingWebinar = { webinarId: string; topic: string | null; timeZone: string | null; recurring: boolean; runs: UpcomingRun[];
   note: string | null; liveEvents?: boolean };
+/** Whether a class is still to come, running now, or over, at the moment of the request. */
+export function classPhase(startsAt: string, endsAt: string, now = Date.now()): "upcoming" | "live" | "over" {
+  return now < Date.parse(startsAt) ? "upcoming" : now < Date.parse(endsAt) ? "live" : "over";
+}
 export type AttendanceCounts = { present: number; late: number; absent: number; excused: number; ratePercent: number | null };
 export type BatchAttendanceSummary = { from: string; to: string; finalClasses: number; classesNotFinal: number; totals: AttendanceCounts;
   students: { studentId: string; studentNumber: string; fullName: string; counts: AttendanceCounts }[]; method: string };

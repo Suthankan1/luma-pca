@@ -28,7 +28,7 @@ test("public pages have no serious accessibility problems", async ({ page }) => 
 test("staff pages have no serious accessibility problems", async ({ page }) => {
   await signInAsAdmin(page);
   for (const path of ["/staff", "/staff/courses", "/staff/sessions", "/staff/students", "/staff/team", "/staff/attendance", "/staff/zoom",
-    "/staff/zoom/check", "/staff/activity", "/account/password"]) {
+    "/staff/zoom/check", "/staff/zoom/import", "/staff/activity", "/account/password"]) {
     await page.goto(path);
     await check(page, path);
   }

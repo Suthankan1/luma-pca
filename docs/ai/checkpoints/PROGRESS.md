@@ -1943,3 +1943,11 @@ build runs the Next.js default bundler and repeats the smoke test.
   "Automatic finalisation failed".
 - Tests: `ZoomImportIntegrationTest`, `AttendanceQueueIntegrationTest`, `staff-automation.spec` (both projects). Real Zoom:
   `zoom-api-check.sh` now also tries the listing; it reports the missing scope.
+
+## Checkpoint FEAT-2 — 2026-11-17 — Staff overview: today and what needs attention
+
+- **Branch:** `feat/staff-overview`. The overview still said attendance was "coming next" (stale since 004B).
+- Now: today's classes (live now / ended / upcoming / no webinar ID) and, for owners and administrators, counts that link
+  to where each is handled: classes ready to finalise, ended classes waiting for Zoom, appeals, Zoom accounts to match,
+  failed Zoom events. Instructors and attendance officers see their batches; analysts their report.
+- Tests: `staff-overview.spec` (both projects); the import page joins `accessibility.spec`.
