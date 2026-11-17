@@ -1969,3 +1969,12 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Application config:** Added `spring.config.import` for optional `.env[.properties]` files (root and backend folders) to load local settings without manual shell export. Configured `spring.flyway.baseline-on-migrate: true` and `baseline-version: 0` so Flyway safely initializes and migrates managed PostgreSQL instances (e.g. Supabase, AWS RDS) where cloud routines or extensions exist in schema `public`.
 - **Validation:** Successfully applied all 26 migrations against Supabase pooler, bootstrapped initial academy/owner, and verified system readiness.
 
+## Checkpoint SEC-1 — 2026-11-17 — Production-grade signing and MFA key management
+
+- **Branch:** `feat/production-auth-keys`.
+- **Resilient PEM decoding:** Enhanced `SigningKeys.der()` to normalize escaped newlines (`\n`), allowing single-line escaped PEM blocks in environment variables and secret stores without breaking Base64 decoding.
+- **Key generation tooling:** Added `scripts/generate-auth-keys.sh` to generate 2048-bit PKCS#8 RSA keypairs and 32-byte AES-256 Base64 keys with mode 600 permissions and optional `.env` injection.
+- **Production enforcement:** Configured persistent keys with `LUMA_AUTH_EPHEMERAL_SIGNING_KEY=false`, verifying that ephemeral warning logs are eliminated and the application boots strictly with authenticated persistent keys.
+- **Tests:** `SigningKeysTest` (including `supportsEscapedNewlinesInPemString`).
+
+

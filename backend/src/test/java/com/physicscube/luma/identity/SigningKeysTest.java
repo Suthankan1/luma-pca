@@ -143,6 +143,15 @@ class SigningKeysTest {
     }
 
     @Test
+    void supportsEscapedNewlinesInPemString() {
+        String escapedPrivate = privatePem(newPair).replace("\n", "\\n");
+        String escapedPublic = publicPem(oldPair).replace("\n", "\\n");
+
+        SigningKeys keys = SigningKeys.fromPem(escapedPrivate, List.of(escapedPublic));
+        assertEquals(2, ((List<?>) keys.publicJwks().get("keys")).size());
+    }
+
+    @Test
     void accessTokenLifetimeIsBounded() {
         for (long minutes : new long[] {0, 16, 60 * 24}) {
             assertThrows(IllegalArgumentException.class, () -> new AuthProperties(ISSUER, AUDIENCE,

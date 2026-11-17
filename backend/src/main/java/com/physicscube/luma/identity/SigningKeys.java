@@ -92,11 +92,15 @@ public final class SigningKeys {
     }
 
     private static byte[] der(String pem, String type) {
-        if (pem == null || !pem.contains("-----BEGIN " + type + "-----")) {
+        if (pem == null) {
+            throw new IllegalArgumentException("Expected a PEM block of type " + type);
+        }
+        String normalized = pem.replace("\\n", "\n").replace("\\r", "\r");
+        if (!normalized.contains("-----BEGIN " + type + "-----")) {
             throw new IllegalArgumentException("Expected a PEM block of type " + type);
         }
         try {
-            return Base64.getMimeDecoder().decode(pem.replaceAll("-----[A-Z ]+-----", "").replaceAll("\\s", ""));
+            return Base64.getMimeDecoder().decode(normalized.replaceAll("-----[A-Z ]+-----", "").replaceAll("\\s", ""));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("PEM block of type " + type + " is not valid Base64");
         }
