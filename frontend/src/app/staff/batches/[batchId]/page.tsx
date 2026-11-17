@@ -20,27 +20,33 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
   const identity = await requirePortal("staff");
   const batchId = uuidOrNull((await params).batchId);
   if (!batchId) notFound();
-  const [batch, roster] = await Promise.all([
-    staffApi<Batch>(`/api/v1/batches/${batchId}`),
-    staffApi<Enrollment[]>(`/api/v1/batches/${batchId}/enrollments`),
-  ]);
-  // The API answers 404 for batches outside the caller's academy or assignments, and 403 for roles with no batch access.
-  if (!batch.ok && (batch.status === 404 || batch.status === 403)) notFound();
+
   const manager = isAcademyManager(identity.roles);
-  const assignments = manager ? await staffApi<Assignment[]>(`/api/v1/batches/${batchId}/assignments`) : null;
   const query = await searchParams;
+  const isoDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  const sumFrom = isoDate(query.sumFrom) ?? monthStart(academyToday());
+  const sumTo = isoDate(query.sumTo) ?? academyToday();
+
   const rankFrom = typeof query.rankFrom === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.rankFrom) ? query.rankFrom : null;
   const rankTo = typeof query.rankTo === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.rankTo) ? query.rankTo : null;
   const top = query.top === "100" ? 100 : 10;
   const wholeCourse = query.scope === "course";
+  const rankingQuery = rankFrom && rankTo ? new URLSearchParams({ from: rankFrom, to: rankTo, limit: String(top) }) : null;
+
+  // Single round of parallel requests instead of 4 sequential rounds
+  const [batch, roster, assignments, summary] = await Promise.all([
+    staffApi<Batch>(`/api/v1/batches/${batchId}`),
+    staffApi<Enrollment[]>(`/api/v1/batches/${batchId}/enrollments`),
+    manager ? staffApi<Assignment[]>(`/api/v1/batches/${batchId}/assignments`) : Promise.resolve(null),
+    staffApi<BatchAttendanceSummary>(`/api/v1/batches/${batchId}/attendance/summary?${new URLSearchParams({ from: sumFrom, to: sumTo })}`),
+  ]);
+
+  // The API answers 404 for batches outside the caller's academy or assignments, and 403 for roles with no batch access.
+  if (!batch.ok && (batch.status === 404 || batch.status === 403)) notFound();
+
   const rankingBase: `/api/v1/${string}` = wholeCourse && batch.ok ? `/api/v1/courses/${batch.data.courseId}/engagement-ranking`
     : `/api/v1/batches/${batchId}/engagement-ranking`;
-  const rankingQuery = rankFrom && rankTo ? new URLSearchParams({ from: rankFrom, to: rankTo, limit: String(top) }) : null;
   const ranking = manager && rankingQuery ? await staffApi<Ranking>(`${rankingBase}?${rankingQuery}`) : null;
-  const isoDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
-  const sumFrom = isoDate(query.sumFrom) ?? monthStart(academyToday());
-  const sumTo = isoDate(query.sumTo) ?? academyToday();
-  const summary = await staffApi<BatchAttendanceSummary>(`/api/v1/batches/${batchId}/attendance/summary?${new URLSearchParams({ from: sumFrom, to: sumTo })}`);
   const shell = { active: "courses" as const, crumb: "Academic setup", hasStudentPortal: hasPortal(identity, "student") };
   if (!batch.ok || !roster.ok) {
     return <StaffShell {...shell} title="Batch roster" subtitle="">

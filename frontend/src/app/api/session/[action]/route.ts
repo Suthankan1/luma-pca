@@ -24,6 +24,7 @@ import {
   sealMfa,
   sealRecovery,
   sessionCookie,
+  type Identity,
   type MfaChallengeState,
   type RecoveryCodesState,
 } from "@/lib/session-policy";
@@ -145,8 +146,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
 
       const verified = await readMfaVerification(verifyResult);
       let destination: string;
+      let identity: Identity | null = null;
       try {
-        const identity = await readIdentity(verified.accessToken);
+        identity = await readIdentity(verified.accessToken);
         destination = identity ? portalPath(identity, mfaState.portal) : errorPath("expired");
       } catch {
         destination = errorPath("unavailable");
@@ -154,7 +156,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
 
       const hasRecoveryCodes = Array.isArray(verified.recoveryCodes) && verified.recoveryCodes.length > 0;
       const response = go(hasRecoveryCodes ? "/sign-in/mfa/recovery-codes" : destination);
-      response.cookies.set(names.access, sealAccess(verified.accessToken, key), sessionCookie(secure, verified.expiresIn));
+      response.cookies.set(names.access, sealAccess({ token: verified.accessToken, identity }, key), sessionCookie(secure, verified.expiresIn));
       response.cookies.set(names.refresh, verified.refreshToken, sessionCookie(secure, verified.refreshExpiresIn));
       response.cookies.set(names.mfa, "", sessionCookie(secure, 0));
 
@@ -295,15 +297,16 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     if (!tokens) throw new Error("Invalid session response");
 
     let destination: string;
+    let identity: Identity | null = null;
     try {
-      const identity = await readIdentity(tokens.accessToken);
+      identity = await readIdentity(tokens.accessToken);
       destination = identity ? portalPath(identity, safePreferred) : errorPath("expired");
     } catch {
       destination = errorPath("unavailable");
     }
 
     const response = go(destination);
-    response.cookies.set(names.access, sealAccess(tokens.accessToken, key), sessionCookie(secure, tokens.expiresIn));
+    response.cookies.set(names.access, sealAccess({ token: tokens.accessToken, identity }, key), sessionCookie(secure, tokens.expiresIn));
     response.cookies.set(names.refresh, tokens.refreshToken, sessionCookie(secure, tokens.refreshExpiresIn));
     if (request.cookies.has(names.mfa)) response.cookies.set(names.mfa, "", sessionCookie(secure, 0));
     if (request.cookies.has(names.recovery)) response.cookies.set(names.recovery, "", sessionCookie(secure, 0));

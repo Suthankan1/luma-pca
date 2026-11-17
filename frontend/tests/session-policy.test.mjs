@@ -6,6 +6,7 @@ import {
   hasPortal,
   isSameOrigin,
   openAccess,
+  openAccessSession,
   openMfa,
   openRecovery,
   portalPath,
@@ -42,6 +43,13 @@ test("access cookie encryption rejects tampering and cross-environment keys", ()
   assert.notEqual(cookie, sealAccess(jwt, key));
   assert.equal(cookie.includes(jwt), false);
   assert.equal(openAccess(cookie, key), jwt);
+  assert.deepEqual(openAccessSession(cookie, key), { token: jwt, identity: null });
+
+  const identity = { accountId: "acc-1", academyId: "acad-1", roles: ["ACADEMY_OWNER"] };
+  const sessionCookieVal = sealAccess({ token: jwt, identity }, key);
+  assert.equal(openAccess(sessionCookieVal, key), jwt);
+  assert.deepEqual(openAccessSession(sessionCookieVal, key), { token: jwt, identity });
+
   assert.equal(openAccess(cookie, randomBytes(32)), null);
   const bytes = Buffer.from(cookie, "base64url");
   bytes[30] ^= 1;

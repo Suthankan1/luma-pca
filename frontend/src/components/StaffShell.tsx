@@ -27,17 +27,17 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, c
     <aside className="aside staff-rail" aria-label="Staff navigation">
       <Link href="/staff" className="brand"><span className="brand-dot" aria-hidden /> luma</Link>
       <nav className="staff-nav">
-        {staffNav.map((item, index) => <Link key={item.key} href={item.href} prefetch={false}
+        {staffNav.map((item, index) => <Link key={item.key} href={item.href}
           className={`staff-navitem ${item.key === active ? "active" : ""}`} aria-current={item.key === active ? "page" : undefined}>
           <span className="staff-navnum" aria-hidden>{String(index + 1).padStart(2, "0")}</span>{item.label}
         </Link>)}
-        {hasStudentPortal && <Link href="/student" prefetch={false} className="staff-navitem">
+        {hasStudentPortal && <Link href="/student" className="staff-navitem">
           <span className="staff-navnum" aria-hidden>↗</span>Student portal
         </Link>}
       </nav>
       <div className="staff-railfoot">
         <p className="staff-academy">PHYSICS CUBE ACADEMY</p>
-        <Link href="/account/password" prefetch={false} className="staff-signout staff-password">Change password</Link>
+        <Link href="/account/password" className="staff-signout staff-password">Change password</Link>
         <form method="post" action="/api/session/logout">
           <button className="staff-signout" type="submit">Sign out</button>
         </form>

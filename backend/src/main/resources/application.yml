@@ -1,4 +1,7 @@
 spring:
+  threads:
+    virtual:
+      enabled: true
   application:
     name: luma-backend
   config:
@@ -10,12 +13,12 @@ spring:
     username: ${DB_USERNAME:luma_dev}
     password: ${DB_PASSWORD:local-only-change-me}
     hikari:
-      # Cloud poolers (Supabase / AWS) close idle connections; keep lifetime shorter than the pooler
-      max-lifetime: 60000
-      idle-timeout: 30000
-      keepalive-time: 30000
-      minimum-idle: 5
-      maximum-pool-size: 15
+      # Keep connections warm to Supabase pooler without recycling constantly
+      max-lifetime: 1800000
+      idle-timeout: 600000
+      keepalive-time: 120000
+      minimum-idle: 3
+      maximum-pool-size: 8
       connection-timeout: 20000
       validation-timeout: 3000
   jpa:
@@ -88,7 +91,7 @@ luma:
     # to stay inside the mail provider's sending limit. Failed sends retry with back-off.
     bulk:
       enabled: ${LUMA_MAIL_BULK_ENABLED:true}
-      poll-interval: ${LUMA_MAIL_BULK_POLL_INTERVAL:PT5S}
+      poll-interval: ${LUMA_MAIL_BULK_POLL_INTERVAL:PT30S}
       batch-size: ${LUMA_MAIL_BULK_BATCH_SIZE:20}
       max-attempts: ${LUMA_MAIL_BULK_MAX_ATTEMPTS:5}
   password-reset:
@@ -131,7 +134,7 @@ luma:
     processing:
       # Polls stored webhook receipts in this process; safe with several instances.
       enabled: ${LUMA_ZOOM_PROCESSING_ENABLED:true}
-      poll-interval: ${LUMA_ZOOM_PROCESSING_POLL_INTERVAL:PT5S}
+      poll-interval: ${LUMA_ZOOM_PROCESSING_POLL_INTERVAL:PT15S}
       # Receipts handled per poll (1 to 500); with the interval this sets the drain rate per instance.
       batch-size: ${LUMA_ZOOM_PROCESSING_BATCH_SIZE:50}
     reports:

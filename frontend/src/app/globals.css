@@ -133,3 +133,17 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .series-preview li { padding: 2px 0; }
 
 .attention { color: var(--pca-blue, #1f5fbf); font-size: 1.1rem; }
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.skeleton {
+  background: #e6edf5;
+  border-radius: 8px;
+  animation: pulse-subtle 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.skeleton-line { height: 14px; margin-bottom: 8px; }
+.skeleton-title { height: 24px; width: 40%; margin-bottom: 12px; }
+.skeleton-card { height: 120px; }
+

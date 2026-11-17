@@ -98,17 +98,26 @@ class RefreshSessions {
     @Transactional
     void revokeByToken(String presentedToken) {
         if (OpaqueToken.plausible(presentedToken)) {
+            UUID accountId = jdbc.query("""
+                    SELECT account_id FROM refresh_sessions
+                    WHERE id = (SELECT session_id FROM refresh_tokens WHERE token_hash = ?)
+                    """, rs -> rs.next() ? rs.getObject(1, UUID.class) : null, OpaqueToken.digest(presentedToken));
             jdbc.update("""
                     UPDATE refresh_sessions SET revoked_at = ?, revoke_reason = 'LOGOUT'
                     WHERE revoked_at IS NULL AND id = (SELECT session_id FROM refresh_tokens WHERE token_hash = ?)
                     """, Timestamp.from(Instant.now()), OpaqueToken.digest(presentedToken));
+            if (accountId != null) {
+                AccountJwtAuthenticationConverter.evictAccount(accountId);
+            }
         }
     }
 
     @Transactional
     int revokeAll(UUID accountId) {
-        return jdbc.update("UPDATE refresh_sessions SET revoked_at = ?, revoke_reason = 'LOGOUT_ALL' "
+        int updated = jdbc.update("UPDATE refresh_sessions SET revoked_at = ?, revoke_reason = 'LOGOUT_ALL' "
                 + "WHERE account_id = ? AND revoked_at IS NULL", Timestamp.from(Instant.now()), accountId);
+        AccountJwtAuthenticationConverter.evictAccount(accountId);
+        return updated;
     }
 
     /** @return whether the current account's live session passed MFA, or {@code null} when the session is invalid */
