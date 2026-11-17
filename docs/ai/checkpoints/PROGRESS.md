@@ -1904,3 +1904,13 @@ build runs the Next.js default bundler and repeats the smoke test.
   - Diagrams, schema plan, webhook runbook, JWT-AUTH and two package docs described old states (SQS, "planned",
     owner/admin-only MFA, no password recovery); rewritten to what is built.
   - KNOWN-LIMITS: attendees without an email in Zoom's data cannot be matched (keep registration required).
+
+## Checkpoint FIX-9 — 2026-11-17 — Web hardening (re-audit)
+
+- **Branch:** `fix/web-hardening`.
+- The web app sent no security headers. Every response now carries a same-origin Content-Security-Policy (no frames,
+  no objects, no eval in production), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: same-origin`, a
+  Permissions-Policy, COOP and HSTS (`next.config.ts`).
+- Branded "Page not found" and "Something went wrong" pages replace Next's defaults (`not-found.tsx`, `error.tsx`).
+- `security-headers.spec`: headers on public, staff, student and unknown pages; no CSP violation while signing in and
+  using staff and student pages. Local: Playwright 120 passed.
