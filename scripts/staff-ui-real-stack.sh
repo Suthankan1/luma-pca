@@ -56,6 +56,23 @@ INSERT INTO zoom_webhook_receipts (id, academy_id, event_type, event_ts, body_sh
 INSERT INTO zoom_occurrence_events (id, academy_id, receipt_id, webinar_id, occurrence_uuid, event_type, event_ts, created_at) VALUES
   ('77777777-7777-7777-7777-000000000001', '$ACADEMY_ID', '66666666-6666-6666-6666-000000000001', '81234567890', 'realAuto/AAAAAAAAAAAA==', 'webinar.started', 1799844600000, NOW()),
   ('77777777-7777-7777-7777-000000000002', '$ACADEMY_ID', '66666666-6666-6666-6666-000000000002', '55500011101', 'realManual+AAAAAAAAAA==', 'webinar.started', 1799812800000, NOW());
+-- A past run (9 Mar 2026, 18:00–20:00 Colombo) on webinar 833 0001 1100 for the attendance step: live joins of the test
+-- student and a guest, and Zoom's participant report as the report fetcher stores it (test identities only).
+INSERT INTO zoom_webhook_receipts (id, academy_id, event_type, event_ts, body_sha256, payload, received_at, processing_status, attempts, processed_at) VALUES
+  ('66666666-6666-6666-6666-000000000011', '$ACADEMY_ID', 'webinar.started', 1773059700000, repeat('4', 64), '{}', NOW(), 'PROCESSED', 1, NOW()),
+  ('66666666-6666-6666-6666-000000000012', '$ACADEMY_ID', 'webinar.participant_joined', 1773059760000, repeat('5', 64), '{}', NOW(), 'PROCESSED', 1, NOW()),
+  ('66666666-6666-6666-6666-000000000013', '$ACADEMY_ID', 'webinar.participant_joined', 1773063600000, repeat('6', 64), '{}', NOW(), 'PROCESSED', 1, NOW()),
+  ('66666666-6666-6666-6666-000000000014', '$ACADEMY_ID', 'webinar.ended', 1773066600000, repeat('7', 64), '{}', NOW(), 'PROCESSED', 1, NOW());
+INSERT INTO zoom_occurrence_events (id, academy_id, receipt_id, webinar_id, occurrence_uuid, event_type, event_ts, created_at, visit_key, participant_email, participant_name) VALUES
+  ('77777777-7777-7777-7777-000000000011', '$ACADEMY_ID', '66666666-6666-6666-6666-000000000011', '83300011100', 'realPast/AAAAAAAAAAAA==', 'webinar.started', 1773059700000, NOW(), NULL, NULL, NULL),
+  ('77777777-7777-7777-7777-000000000012', '$ACADEMY_ID', '66666666-6666-6666-6666-000000000012', '83300011100', 'realPast/AAAAAAAAAAAA==', 'webinar.participant_joined', 1773059760000, NOW(), 'v-student', 'real.student@example.invalid', 'Real Student'),
+  ('77777777-7777-7777-7777-000000000013', '$ACADEMY_ID', '66666666-6666-6666-6666-000000000013', '83300011100', 'realPast/AAAAAAAAAAAA==', 'webinar.participant_joined', 1773063600000, NOW(), 'v-guest', 'real.guest@example.invalid', 'Visiting Guest'),
+  ('77777777-7777-7777-7777-000000000014', '$ACADEMY_ID', '66666666-6666-6666-6666-000000000014', '83300011100', 'realPast/AAAAAAAAAAAA==', 'webinar.ended', 1773066600000, NOW(), NULL, NULL, NULL);
+INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, fetched_at, join_sessions, webinar_id) VALUES
+  ('$ACADEMY_ID', 'realPast/AAAAAAAAAAAA==', 'FETCHED', 1, NOW(), 2, '83300011100');
+INSERT INTO zoom_report_participants (id, academy_id, occurrence_uuid, email, display_name, joined_at, left_at, duration_seconds) VALUES
+  ('88888888-8888-8888-8888-000000000001', '$ACADEMY_ID', 'realPast/AAAAAAAAAAAA==', 'real.student@example.invalid', 'Real Student', '2026-03-09T12:36:00Z', '2026-03-09T14:25:00Z', 6540),
+  ('88888888-8888-8888-8888-000000000002', '$ACADEMY_ID', 'realPast/AAAAAAAAAAAA==', 'real.guest@example.invalid', 'Visiting Guest', '2026-03-09T13:40:00Z', '2026-03-09T14:25:00Z', 2700);
 SQL
 
 cd "$ROOT/frontend"

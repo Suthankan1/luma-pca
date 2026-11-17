@@ -1,5 +1,5 @@
 @import "tailwindcss";
-:root { --pca-navy: #22206a; --pca-blue: #1b65a2; --pca-cyan: #22b5e2; --pca-bg: #f2f8fd; --pca-ink: #1e2c67; --pca-muted: #587695; }
+:root { --pca-navy: #22206a; --pca-blue: #1b65a2; --pca-cyan: #22b5e2; --pca-bg: #f2f8fd; --pca-ink: #1e2c67; --pca-muted: #4a6684; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { background: var(--pca-bg); color: var(--pca-ink); font-family: Arial, Helvetica, sans-serif; }

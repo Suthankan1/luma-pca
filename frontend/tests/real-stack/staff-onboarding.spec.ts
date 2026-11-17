@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 
 /**
@@ -267,7 +268,8 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(auto.locator(".status")).toHaveText("Linked automatically");
   await expect(manual.locator(".status")).toHaveText("Needs review");
   await page.getByRole("button", { name: "Run automatic linking" }).click();
-  await expect(page.locator(".autolink-feedback")).toHaveText("Linked 0 occurrences; 1 still needs review.");
+  // The other one waiting is the seeded past run (9 Mar 2026), which step 12 links by scheduling its class.
+  await expect(page.locator(".autolink-feedback")).toHaveText("Linked 0 occurrences; 2 still need review.");
   await expect(auto.locator(".status")).toHaveText("Linked automatically");
   await expect(auto.getByRole("link", { name: /^Real stack class, Wed 13 Jan 2027/ })).toBeVisible();
   await manual.getByLabel("Class").selectOption({ label: "Wed 13 Jan 2027 · 18:00–20:30 · Real stack class" });
@@ -395,4 +397,86 @@ test("an administrator onboards a student end to end on the real stack", async (
   };
   expect(await askFrom("203.0.113.7")).toEqual(["?sent=1", "?sent=1", "?sent=1", "?error=limited"]);
   expect((await askFrom("203.0.113.8")).slice(0, 3)).toEqual(["?sent=1", "?sent=1", "?sent=1"]);
+
+  // 12. Attendance end to end on the real API, from the seeded past run of webinar 833 0001 1100 (9 Mar 2026).
+  await page.goto("/staff/courses");
+  await page.locator("#batch-course").selectOption({ label: "REAL-PHY · A/L Physics (real stack)" });
+  await page.locator("#batch-code").fill("past");
+  await page.locator("#batch-name").fill("Past term");
+  await page.locator("#batch-starts").fill("2026-01-01");
+  await page.getByRole("button", { name: "Create batch" }).click();
+  await expect(page.locator("#batch-feedback")).toHaveText("Batch PAST created.");
+  await page.goto("/staff/students?q=PCA-REAL-001");
+  await page.getByRole("link", { name: /PCA-REAL-001/ }).first().click();
+  await page.locator("#enroll-batch").selectOption({ label: "REAL-PHY · PAST · Past term" });
+  await page.locator("#enroll-date").fill("2026-01-05");
+  await page.getByRole("button", { name: "Enrol", exact: true }).click();
+  await expect(page.locator("#enroll-feedback")).toHaveText("Enrolled.");
+  const studentRecord = page.url();
+
+  await page.goto("/staff/sessions");
+  await page.locator("#schedule-title").fill("Past real class");
+  await page.locator("#schedule-date").fill("2026-03-09");
+  await page.locator("#schedule-start").fill("18:00");
+  await page.locator("#schedule-end").fill("20:00");
+  await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel("REAL-PHY · PAST · Past term", { exact: true }).check();
+  await page.locator("#schedule-webinar").fill("833 0001 1100");
+  await page.getByRole("button", { name: "Schedule class" }).click();
+  await expect(page.locator("#schedule-feedback")).toHaveText("Past real class scheduled.");
+  await page.getByRole("link", { name: "Open the class →" }).click();
+  await expect(page).toHaveURL(/\/staff\/sessions\/[0-9a-f-]{36}$/);
+  const pastClass = page.url();
+
+  // The run linked itself; its people are matched by sign-in email; the guest waits for review.
+  const linkedRuns = page.getByRole("region", { name: "Zoom occurrences linked" });
+  await expect(linkedRuns.getByRole("listitem").locator(".status")).toHaveText(["Linked automatically"]);
+  await linkedRuns.getByRole("link", { name: "people" }).click();
+  const people = page.getByRole("region", { name: "PEOPLE IN THIS OCCURRENCE" });
+  await expect(people.getByRole("listitem", { name: /PCA-REAL-001/ }).locator(".status")).toHaveText("Student (sign-in email)");
+  await expect(people.getByRole("listitem", { name: "real.guest@example.invalid" }).locator(".status")).toHaveText("Not matched");
+
+  // The owner records the rule; the class is final from Zoom's report: 6 540 s of 7 200 s, first join 18:06 → present.
+  await page.goto("/staff/attendance");
+  await page.locator("#policy-percent").fill("75");
+  await page.locator("#policy-late").fill("10");
+  await page.locator("#policy-description").fill("Approved for the real-stack run");
+  await page.getByRole("button", { name: "Save rule" }).click();
+  await expect(page.locator("#policy-feedback")).toHaveText("Attendance rule saved.");
+  await page.goto(pastClass);
+  const fromReport = page.getByRole("region", { name: "ATTENDANCE FROM ZOOM’S REPORT" });
+  await expect(fromReport.getByRole("listitem", { name: /Attendance PCA-REAL-001/ })).toContainText("1 h 49 min connected");
+  await page.getByRole("button", { name: "Finalise attendance" }).click();
+  const finalAttendance = page.getByRole("region", { name: "FINAL ATTENDANCE" });
+  const pastRow = finalAttendance.getByRole("listitem", { name: /Attendance PCA-REAL-001/ });
+  await expect(pastRow.locator(".status")).toHaveText("Present");
+
+  // A correction reaches the student by real SMTP; the CSV and the student's portal agree.
+  await pastRow.getByText("Correct", { exact: true }).click();
+  await pastRow.getByLabel("Corrected outcome").selectOption({ label: "Excused" });
+  await pastRow.getByLabel(/^Reason/).fill("Medical note received");
+  await pastRow.getByRole("button", { name: "Save correction" }).click();
+  await expect(pastRow.locator(".status")).toHaveText("Excused");
+  const notice = await newestEmailTo("real.student@example.invalid");
+  expect(notice.subject).toBe("Your attendance was updated");
+  expect(notice.text).toContain("Past real class on 9 Mar 2026 is now Excused (it was Present)");
+  const csvDownload = page.waitForEvent("download");
+  await finalAttendance.getByRole("link", { name: "Download CSV" }).click();
+  const csvText = readFileSync(await (await csvDownload).path(), "utf8");
+  expect(csvText).toContain(",PCA-REAL-001,");
+  expect(csvText.trim().split("\r\n").find((l: string) => l.includes(",PCA-REAL-001,"))).toMatch(/,EXCUSED$/);
+  await page.goto(studentRecord);
+  await expect(page.getByRole("region", { name: "ATTENDANCE HISTORY" })).toContainText("corrected from present");
+
+  const finalStudent = await browser.newContext();
+  const portalAgain = await finalStudent.newPage();
+  await portalAgain.goto("/sign-in?portal=student");
+  await portalAgain.fill("#email", "real.student@example.invalid");
+  await portalAgain.fill("#password", newPassphrase);
+  await portalAgain.getByRole("button", { name: "Sign in" }).click();
+  await expect(portalAgain).toHaveURL(/\/student$/);
+  await expect(portalAgain.getByRole("region", { name: "MY ATTENDANCE" }).getByRole("listitem", { name: "Attendance Past real class" })
+    .locator(".status")).toHaveText("Excused");
+  await finalStudent.close();
+  await page.goto("/staff/activity?category=classes");
+  await expect(page.getByText("Finalised attendance of “Past real class”").first()).toBeVisible();
 });
