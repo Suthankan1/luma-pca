@@ -26,7 +26,7 @@ export async function savePolicy(_previous: FormState, form: FormData): Promise<
 export async function finaliseAllReady(): Promise<FormState> {
   await requireSameOriginAction();
   const result = await staffApi<{ finalised: number; notReady: number; problems: string[] }>("/api/v1/attendance/finalisations",
-    { method: "POST", body: {} });
+    { method: "POST", body: {} }, 30000);
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
   revalidatePath("/staff/attendance");
   const { finalised, problems } = result.data;
