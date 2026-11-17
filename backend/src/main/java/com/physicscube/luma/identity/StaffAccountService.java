@@ -123,6 +123,7 @@ public class StaffAccountService {
         }
         target.replaceRoles(roles);
         Account saved = accounts.saveAndFlush(target);
+        AccountJwtAuthenticationConverter.evictAccount(target.getId());
         audit.record(caller.academyId(), me.getId(), "STAFF_ROLES_CHANGED", "ACCOUNT", target.getId(),
                 Map.of("before", names(before), "after", names(roles)));
         return view(saved);

@@ -83,12 +83,37 @@ function openWithPurpose(cookie: string, key: Buffer, aad: Buffer) {
   }
 }
 
-export function sealAccess(accessToken: string, key: Buffer) {
-  return sealWithPurpose(accessToken, key, purpose);
+export interface AccessSession {
+  token: string;
+  identity?: Identity | null;
 }
 
-export function openAccess(cookie: string, key: Buffer) {
-  return openWithPurpose(cookie, key, purpose);
+export function sealAccess(accessTokenOrSession: string | AccessSession, key: Buffer) {
+  const payload = typeof accessTokenOrSession === "string"
+    ? accessTokenOrSession
+    : JSON.stringify(accessTokenOrSession);
+  return sealWithPurpose(payload, key, purpose);
+}
+
+export function openAccessSession(cookie: string, key: Buffer): AccessSession | null {
+  const plain = openWithPurpose(cookie, key, purpose);
+  if (!plain) return null;
+  if (plain.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(plain);
+      if (typeof parsed?.token === "string") {
+        return { token: parsed.token, identity: parsed.identity ?? null };
+      }
+    } catch {
+      // not JSON, fallback to plain token string
+    }
+  }
+  return { token: plain, identity: null };
+}
+
+export function openAccess(cookie: string, key: Buffer): string | null {
+  const session = openAccessSession(cookie, key);
+  return session ? session.token : null;
 }
 
 export function sealMfa(state: MfaChallengeState, key: Buffer) {

@@ -2025,6 +2025,23 @@ build runs the Next.js default bundler and repeats the smoke test.
   - **CI:** `.github/workflows/frontend-ci.yml` executes linting, typecheck, unit tests, production build, and Playwright E2E browser tests on every PR and push.
   - **CD:** Native Vercel GitHub integration automatically deploys preview URLs on PRs and updates `https://luma-pca.vercel.app/` on merge to `main`.
 
+## Checkpoint PERF-2 — 2026-11-17 — Performance plan implementation & optimizations
+
+- **Implementation Source:** `docs/delivery/performance-plan.html`.
+- **Backend (Oracle Cloud VM & Spring Boot 4.1.2):**
+  - **Virtual Threads:** Enabled `spring.threads.virtual.enabled: true` in `application.yml` for non-blocking I/O on cross-region DB calls.
+  - **Hikari Pool:** Tuned `max-lifetime: 1800000` (30m), `idle-timeout: 600000` (10m), `keepalive-time: 120000` (2m), `maximum-pool-size: 8`, `minimum-idle: 3`.
+  - **Background Worker Throttling:** Adjusted idle poll intervals for mail (`PT30S`) and Zoom webhook processing (`PT15S`) to reduce idle DB load.
+  - **JVM Tuning:** Configured systemd unit with `-XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=128m` for low memory footprint on 1-core VPS.
+  - **Security Cache Invalidation (Step 6):** Added instant `evictAccount(UUID)` and `evictAll()` to `AccountJwtAuthenticationConverter`, hooked into logout, password change, MFA reset, and staff account disable/enable/role changes. Tested with `AccountJwtAuthenticationConverterTest`.
+- **Frontend (Next.js 16 App Router on Vercel):**
+  - **Sealed Identity Cookie (Step 2):** Extended `sealAccess` and `openAccessSession` to persist authenticated identity inside encrypted HttpOnly session cookie, eliminating the `GET /api/v1/auth/me` network round trip (~460ms) on every page click.
+  - **Instant Skeleton Feedback (Step 1):** Added `loading.tsx` routes to `/staff`, `/staff/courses`, `/staff/sessions`, `/staff/students`, `/staff/attendance`, `/staff/zoom`, and `/student`.
+  - **Link Prefetching (Step 1):** Removed `prefetch={false}` on navigation links to allow instant client transitions.
+  - **Parallelized Rounds (Step 3):** Parallelized sequential fetch chains in `batches/[batchId]/page.tsx` and `students/page.tsx` into unified `Promise.all` calls.
+- **Tests:** 92 backend unit tests passed; 56 frontend unit tests passed; `tsc` and `next build` passed.
+
+
 
 
 

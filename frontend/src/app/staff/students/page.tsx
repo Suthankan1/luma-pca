@@ -35,8 +35,10 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
     </StaffShell>;
   }
 
-  const failures = await staffApi<FailedInvitation[]>("/api/v1/student-invitations/failures");
-  const result = await staffApi<Page>(`/api/v1/students?limit=50${filter.query}${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}${search ? `&q=${encodeURIComponent(search)}` : ""}`);
+  const [failures, result] = await Promise.all([
+    staffApi<FailedInvitation[]>("/api/v1/student-invitations/failures"),
+    staffApi<Page>(`/api/v1/students?limit=50${filter.query}${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}${search ? `&q=${encodeURIComponent(search)}` : ""}`),
+  ]);
   return <StaffShell {...shell}>
     <div className="staff-grid">
       <section className="panel" aria-labelledby="students-title">

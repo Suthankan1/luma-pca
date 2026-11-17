@@ -5,6 +5,7 @@ import {
   cookieNames,
   hasPortal,
   openAccess,
+  openAccessSession,
   openMfa,
   openRecovery,
   portalPath,
@@ -81,9 +82,10 @@ export async function currentSession() {
   try {
     const { names, key } = config();
     const sealed = cookieJar.get(names.access)?.value;
-    const access = sealed && openAccess(sealed, key);
+    const session = sealed ? openAccessSession(sealed, key) : null;
+    const identity = session?.identity ?? (session?.token ? await readIdentity(session.token) : null);
     return {
-      identity: access ? await readIdentity(access) : null,
+      identity,
       canRefresh: cookieJar.has(names.refresh),
       unavailable: false,
     };

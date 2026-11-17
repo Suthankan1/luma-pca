@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class AccountJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
     private static final long CACHE_TTL_MS = 15_000;
+    private static volatile AccountJwtAuthenticationConverter instance;
     private final AccountService accounts;
     private final RefreshSessions sessions;
     private final ConcurrentMap<CacheKey, CacheEntry> authCache = new ConcurrentHashMap<>();
@@ -34,6 +35,24 @@ public class AccountJwtAuthenticationConverter implements Converter<Jwt, Abstrac
     AccountJwtAuthenticationConverter(AccountService accounts, RefreshSessions sessions) {
         this.accounts = accounts;
         this.sessions = sessions;
+        instance = this;
+    }
+
+    public static void evictAccount(UUID accountId) {
+        AccountJwtAuthenticationConverter current = instance;
+        if (current != null && accountId != null) {
+            current.evict(accountId);
+        }
+    }
+
+    public void evict(UUID accountId) {
+        if (accountId != null) {
+            authCache.keySet().removeIf(key -> accountId.equals(key.accountId()));
+        }
+    }
+
+    public void evictAll() {
+        authCache.clear();
     }
 
     @Override
