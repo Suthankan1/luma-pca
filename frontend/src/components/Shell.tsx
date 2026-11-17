@@ -21,7 +21,7 @@ export function Shell({ children, active, otherPortal }: {
         </Link>}
       </> : <Link className={`navitem ${active === "home" ? "active" : ""}`} href="/"
         aria-current={active === "home" ? "page" : undefined}>Platform home</Link>}
-      <Image className="brandtile" src="/physics-cube-academy-logo.jpg" alt="Physics Cube Academy" width={560} height={300} />
+      <Image className="brandtile" src="/physics-cube-academy-logo.jpg" alt="Physics Cube Academy" width={560} height={300} priority />
     </aside>
     <main className="content">{children}</main>
   </div>;
