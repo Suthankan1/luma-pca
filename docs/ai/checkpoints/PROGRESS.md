@@ -1887,3 +1887,20 @@ build runs the Next.js default bundler and repeats the smoke test.
   more real webinars (load at 600, multi-occurrence recurring webinars, AWS), the Zoom subscription switch, branch
   protection, the Notion page, PR #71.
 - LICENSE_DECISION_REQUIRED.md now says private. OPEN-QUESTIONS records the owner's answers of 17 Nov.
+
+## Checkpoint FIX-8 — 2026-11-17 — UAT, simulated pilot, re-audit fixes
+
+- **Branch:** `fix/uat-reaudit`.
+- **UAT (developer run):** 17/17 passed on the real local stack and the real Zoom account (`docs/delivery/UAT-RESULTS.md`).
+  New real-stack test 2 covers appeals, engagement on/consent/reactions (rate limit), a 3-minute question, the batch
+  ranking and phone layouts. Real Zoom API check and a restore drill (25 migrations, 37 tables) passed the same day.
+- **Simulated pilot:** `PilotSimulationIntegrationTest`, one batch for two weeks against a hand-written register:
+  189/189 records, 0 differences (`docs/delivery/PILOT-SIMULATION.md`).
+- **Re-audit fixes:**
+  - Zoom review now lists and accepts decisions for emails seen only in Zoom's report (found by the pilot rehearsal), and
+    leaves out people matched by registration email.
+  - The OpenAPI contract lacked five endpoints from the fix series; `scripts/check-openapi.py` and the `contract` workflow
+    now fail on any difference (100 endpoints).
+  - Diagrams, schema plan, webhook runbook, JWT-AUTH and two package docs described old states (SQS, "planned",
+    owner/admin-only MFA, no password recovery); rewritten to what is built.
+  - KNOWN-LIMITS: attendees without an email in Zoom's data cannot be matched (keep registration required).

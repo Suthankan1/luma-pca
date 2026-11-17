@@ -4,7 +4,7 @@ sequenceDiagram
   participant Client as Staff API client
   participant API as Spring Identity API
   participant DB as PostgreSQL
-  alt Browser sign-in for an account without MFA
+  alt Student sign-in (no MFA unless the student set one up)
     User->>BFF: Login credentials over HTTPS
     BFF->>API: POST /auth/login
     API->>DB: Check password, account status and lockout
@@ -13,7 +13,7 @@ sequenceDiagram
     User->>BFF: Protected request with session cookie
     Note over User,BFF: BFF checks Origin on mutations
     BFF->>API: Bearer JWT on server-side request
-  else Owner or administrator sign-in through the browser (001G)
+  else Staff sign-in, every staff role (001G; all roles since FIX-3)
     User->>BFF: Login credentials over HTTPS
     BFF->>API: POST /auth/login
     API->>DB: Check password and store challenge digest

@@ -1,17 +1,17 @@
 flowchart TB
-  browser[Staff + Student browsers] --> tls[TLS/CDN]
-  tls --> vercel[Next.js host / Vercel or AWS]
-  vercel -->|Private server API calls| alb[Public API ALB / protected endpoints]
-  zoom[Zoom Webinars] -->|Signed HTTPS webhooks| alb
-  subgraph VPC[Proposed AWS VPC - NOT DEPLOYED]
-    alb --> api[ECS Fargate Spring API]
-    api --> rds[(Private RDS PostgreSQL)]
-    api --> q[SQS + DLQ]
-    q --> worker[ECS Fargate Spring Worker]
-    worker --> rds
-    worker --> s3[Private S3 export bucket]
+  browser[Staff + student browsers] --> waf[AWS WAF]
+  zoom[Zoom Webinars] -->|signed HTTPS webhooks| waf
+  waf --> alb[Application Load Balancer, HTTPS]
+  subgraph VPC[Proposed AWS VPC - Terraform, NOT APPLIED]
+    alb -->|everything else| web[ECS Fargate: Next.js web]
+    alb -->|/api/v1/zoom/webhooks| api[ECS Fargate: Spring API + workers]
+    web -->|private service discovery| api
+    api --> rds[(RDS PostgreSQL, private)]
+    api --> s3[Private S3 exports]
     api --> sm[Secrets Manager]
-    worker --> sm
+    web --> sm
+    rds --> backup[AWS Backup daily vault]
   end
-  api --> cw[CloudWatch/Tracing]
-  worker --> cw
+  api -->|NAT| zoomapi[Zoom API]
+  api -->|NAT| smtp[Mail provider]
+  api --> cw[CloudWatch logs + alarms -> SNS email]
