@@ -1996,5 +1996,20 @@ build runs the Next.js default bundler and repeats the smoke test.
   - Added `isGuestPath` in `frontend/src/lib/session-policy.ts` with unit test coverage.
 - **Tests:** `ZoomApiClientTest` (8 tests), `ZoomWebhookSignatureTest` (6 tests), `ZoomProcessingPropertiesTest` (3 tests), live `ZoomApiCheckCommand`, and frontend unit tests (56 tests).
 
+## Checkpoint DEPLOY-1 — 2026-11-17 — Split Cloud Deployment (Oracle Cloud VM Backend + Vercel Frontend)
+
+- **Architecture:** Modular monolith backend deployed to Oracle Cloud Infrastructure (OCI); frontend Next.js BFF deployed to Vercel.
+- **Oracle Cloud VM Backend:**
+  - Shape: `VM.Standard.E2.1.Micro` (Ubuntu 20.04 LTS, x86_64, 1 GB RAM, 3 GB configured swapfile).
+  - Runtime: Eclipse Temurin 21 JRE (`21.0.13`), Spring Boot 4.1.2 managed via systemd (`luma-backend.service`) with G1GC memory tuning (`-Xms256m -Xmx512m`).
+  - Reverse Proxy: Caddy v2.8.4 terminating TLS with auto-renewing Let's Encrypt certificates on `https://129.225.114.202.sslip.io`.
+  - Database: Connected to Supabase managed PostgreSQL pooler; all 27 Flyway migrations verified.
+  - Zoom Webhooks: Configured `https://129.225.114.202.sslip.io/api/v1/zoom/webhooks` with HMAC SHA-256 signature validation. Live events (`webinar.participant_joined`) confirmed receiving and storing.
+- **Vercel Frontend:**
+  - Deployed at `https://luma-pca.vercel.app/`.
+  - Next.js 16.4.6 App Router with server-side BFF communicating over HTTPS with Oracle backend (`API_INTERNAL_URL=https://129.225.114.202.sslip.io`).
+  - Production security headers, `__Host-luma-access` HttpOnly secure cookies, and cross-tab session synchronization live.
+
+
 
 
