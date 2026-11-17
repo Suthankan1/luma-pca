@@ -36,7 +36,7 @@ public class SecurityConfig {
                             // Zoom signs each request; the signature over the raw body is the credential.
                             "/api/v1/zoom/webhooks").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all", "/api/v1/auth/mfa/reset").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all", "/api/v1/auth/mfa/reset", "/api/v1/auth/password").authenticated()
                     // First gate only. Services repeat the role check and bind every query to
                     // the caller's academy; later slices add course and batch scope there.
                     // Assigned staff may read batches and rosters; services limit them to their assignments.

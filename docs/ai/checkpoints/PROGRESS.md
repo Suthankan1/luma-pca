@@ -1818,3 +1818,22 @@ build runs the Next.js default bundler and repeats the smoke test.
   outcome (facts refreshed); students expected now without a record get one. UI: "Recalculate from Zoom's report" on a final
   class. Tests: `AttendanceFinalisationIntegrationTest` (recalculation keeps a correction, changes an uncorrected record,
   refusals); Playwright in `attendance-rule.spec`.
+
+## Checkpoint FIX-3 — 2026-11-15 — Security and privacy fixes from the gap audit
+
+- **Branch:** `fix/security`. Fixes audit items 18–22.
+- **Two-step sign-in for every staff role** (instructors, attendance officers, analysts as well as owners/admins): a staff
+  role on a session without MFA is refused. Tests and the real-stack flow updated (the instructor enrols an authenticator).
+- **Change password** (`POST /api/v1/auth/password`, signed in, current password re-checked with lockout, policy applied,
+  every session ended, audited `PASSWORD_CHANGED`; limited like sign-in). Page `/account/password` for staff and students.
+- **Per-account limits** on heavy actions (exports, Zoom lookups/report fetches, rankings): 60 per 10 minutes by default,
+  429 with Retry-After (`luma.rate-limit.heavy-staff`).
+- **Erasure on request** (`POST /api/v1/students/{id}/erasure`, owners, number typed again, audited without personal data):
+  student anonymised, sign-in disabled and email replaced, MFA/invitations/resets removed, Zoom names/emails/registrations
+  for all the student's known emails cleared, reactions/answers/consent deleted, appeal texts replaced. Attendance figures
+  stay. The append-only audit log keeps Zoom emails only for identity decisions (documented).
+- **Retention** nightly (02:30 Colombo): processed raw Zoom payloads lose names/emails after 180 days (`luma.retention.*`);
+  failed events keep them for replay; engagement deletion configurable (0 keeps).
+- **Academy decisions recorded (15 Nov):** student ages are not an issue; data is collected only for attendance; guardians agree.
+- **Tests:** `PrivacyIntegrationTest` (3), `AccountRateLimitIntegrationTest`, updated auth/MFA/staff tests (all pass locally);
+  Playwright `account-privacy.spec` and instructor MFA in 7 specs; unit 53, Playwright 100.

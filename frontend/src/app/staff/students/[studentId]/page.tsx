@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
 import { InviteForm } from "@/components/staff/InviteForm";
-import { EnrollForm, EnrollmentAction, StudentDetailsForm } from "@/components/staff/StudentForms";
+import { EnrollForm, EnrollmentAction, EraseStudentForm, StudentDetailsForm } from "@/components/staff/StudentForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
@@ -74,6 +74,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
           ? <InviteForm accountId={s.accountId} who="student" email={s.email ?? "the student’s address"} />
           : <p className="panel-sub">{s.accountStatus === "ACTIVE" ? "The student has activated their sign-in." : "The student’s sign-in is disabled."}</p>}
         <StudentDetailsForm id={s.id} version={s.version} fullName={s.fullName} active={s.active} />
+        {identity.roles.includes("ACADEMY_OWNER") && !s.studentNumber.startsWith("ERASED-") && <EraseStudentForm studentId={s.id} />}
       </section>
     </div>
     <section className="panel panel-gap" aria-labelledby="history-title">

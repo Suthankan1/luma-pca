@@ -255,9 +255,9 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
         assertEquals(academyId.toString(), identity.get("academyId"));
         assertEquals(List.of("STUDENT"), identity.get("roles"));
 
+        // Roles are read from the database, not from the token: a staff role added now needs a session that passed MFA.
         jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'ANALYST')", studentId);
-        assertEquals(List.of("ANALYST", "STUDENT"), HttpApi.parse(api.get("/api/v1/auth/me", token)).get("roles"),
-                "roles are read from the database, not from the token");
+        assertEquals(401, api.get("/api/v1/auth/me", token).statusCode());
     }
 
     @Test
@@ -360,10 +360,10 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void elevatedAccountsNeverReceiveTokensFromThePasswordStepAlone() {
-        for (Role role : List.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN)) {
+    void staffAccountsNeverReceiveTokensFromThePasswordStepAlone() {
+        for (Role role : List.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN, Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST)) {
             String email = role.name().toLowerCase().replace('_', '.') + "@example.invalid";
-            accounts.setPassword(accounts.register(academyId, email, Set.of(role, Role.INSTRUCTOR)).id(), PASSPHRASE);
+            accounts.setPassword(accounts.register(academyId, email, Set.of(role)).id(), PASSPHRASE);
 
             HttpResponse<String> response = login(email, PASSPHRASE);
 

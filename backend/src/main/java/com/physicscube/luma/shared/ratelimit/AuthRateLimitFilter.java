@@ -40,7 +40,9 @@ class AuthRateLimitFilter extends OncePerRequestFilter {
                 "/api/v1/auth/mfa/verify", mfa,
                 "/api/v1/auth/activate", links,
                 "/api/v1/auth/password-reset/confirm", links,
-                "/api/v1/auth/password-reset/request", reset);
+                "/api/v1/auth/password-reset/request", reset,
+                // Changing a password re-checks the current one: limited like sign-in.
+                "/api/v1/auth/password", signIn);
     }
 
     @Override

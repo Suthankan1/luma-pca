@@ -35,10 +35,15 @@ public class AuthService {
     private final TransactionTemplate transaction;
     /** Verified when there is nothing real to verify, so response time does not reveal whether an account exists. */
     private final String decoyHash;
+    private final AccountService accountService;
+    private final com.physicscube.luma.audit.AuditLog audit;
 
     AuthService(AccountRepository accounts, PasswordHasher hasher, AccessTokenIssuer issuer,
                 RefreshSessions sessions, MfaService mfa, AuthProperties properties,
-                PlatformTransactionManager transactionManager) {
+                PlatformTransactionManager transactionManager, AccountService accountService,
+                com.physicscube.luma.audit.AuditLog audit) {
+        this.accountService = accountService;
+        this.audit = audit;
         this.sessions = sessions;
         this.mfa = mfa;
         this.accounts = accounts;
@@ -76,8 +81,12 @@ public class AuthService {
         }
     }
 
+    /**
+     * Every staff role needs a second factor: owners and administrators manage the academy, and
+     * instructors, attendance officers and analysts can see students' data. Students do not.
+     */
     static boolean isElevated(Set<Role> roles) {
-        return roles.contains(Role.ACADEMY_OWNER) || roles.contains(Role.ACADEMY_ADMIN);
+        return roles.stream().anyMatch(role -> role != Role.STUDENT);
     }
 
     /**
@@ -146,6 +155,29 @@ public class AuthService {
             throw new InvalidMfaException();
         }
         return outcome;
+    }
+
+    /**
+     * Changes the signed-in person's password after re-checking the current one (a failed check
+     * counts towards the lockout like a failed sign-in), then ends every session on every device.
+     *
+     * @throws com.physicscube.luma.shared.api.InvalidRequestException if the current password is wrong
+     */
+    public void changePassword(UUID accountId, String currentPassword, String newPassword) {
+        Account account = accounts.findById(accountId).orElseThrow(InvalidCredentialsException::new);
+        Instant now = DbTime.now();
+        Instant attemptLockUntil = DbTime.truncate(now.plus(properties.lockDuration()));
+        if (currentPassword == null || currentPassword.length() > PasswordPolicy.MAX_LENGTH * 2 || account.getPasswordHash() == null
+                || accounts.reserveLoginAttempt(accountId, properties.maxFailedLogins(), now, attemptLockUntil) != 1
+                || !hasher.matches(currentPassword, account.getPasswordHash())) {
+            throw new com.physicscube.luma.shared.api.InvalidRequestException("The current password is not correct");
+        }
+        transaction.executeWithoutResult(status -> {
+            accounts.recordLoginSuccess(accountId, account.getAuthVersion(), DbTime.now(), attemptLockUntil);
+            accountService.setPassword(accountId, newPassword);
+            sessions.revokeAll(accountId);
+            audit.record(account.getAcademyId(), accountId, "PASSWORD_CHANGED", "ACCOUNT", accountId, java.util.Map.of());
+        });
     }
 
     /**

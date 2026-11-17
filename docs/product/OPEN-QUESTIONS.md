@@ -8,7 +8,7 @@
 | P0 | Can staff approve a written attendance threshold and exception policy? | Fair decisions; late join/rejoin handling |
 | P0 | Who owns domains, AWS account, Zoom account and admin access? | Production accountability |
 | P0 | What is budget for hosting, monitoring, backups and maintenance? | Select realistic deployment |
-| P0 | Is each student under 18? What consent/privacy/retention policy is applicable? | Legal and ethical handling |
+| P0 | Is each student under 18? What consent/privacy/retention policy is applicable? | Legal and ethical handling. **Answered 2026-11-15 by the academy:** age is not a problem; data is collected only for attendance; guardians agree. Retention defaults: raw Zoom names/emails 180 days, erasure on request |
 | P1 | Can one webinar be shared among batches, courses or repeated occurrences? | Session mapping and deduplication |
 | P1 | Can a student enroll in several batches of one course simultaneously? | Enrollment uniqueness rules |
 | P1 | Would students use a separate portal for reactions? | The only reliably attributable emoji counts planned |

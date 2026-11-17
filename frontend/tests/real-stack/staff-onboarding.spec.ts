@@ -287,7 +287,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   // Processing is off for this run, so the replayed event waits in the queue.
   await expect(failed).toContainText("1 event is waiting to be processed.");
 
-  // 8. The instructor activates, signs in without MFA (not an elevated role) and sees only their batch.
+  // 8. The instructor activates, signs in with an authenticator (every staff role needs one) and sees only their batch.
   const instructorContext = await browser.newContext();
   const instructor = await instructorContext.newPage();
   await instructor.goto(instructorInvite!);
@@ -298,6 +298,13 @@ test("an administrator onboards a student end to end on the real stack", async (
   await instructor.fill("#email", "real.instructor@example.invalid");
   await instructor.fill("#password", passphrase);
   await instructor.getByRole("button", { name: "Sign in" }).click();
+  await expect(instructor.getByRole("heading", { name: "Set up authenticator" })).toBeVisible();
+  const instructorSecret = (await instructor.locator("code.mfa-secret").innerText()).replace(/\s/g, "");
+  await instructor.fill("#code", totp(instructorSecret));
+  await instructor.getByRole("button", { name: "Verify and save" }).click();
+  await expect(instructor).toHaveURL(/\/sign-in\/mfa\/recovery-codes/);
+  await instructor.getByLabel("I have safely saved or written down these recovery codes").check();
+  await instructor.getByRole("button", { name: "Continue to staff portal" }).click();
   await expect(instructor).toHaveURL(/\/staff$/);
   await instructor.goto("/staff/courses");
   const mine = instructor.getByRole("region", { name: "YOUR BATCHES" });

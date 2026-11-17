@@ -142,3 +142,12 @@ test("recovery codes cookie seals and opens state, rejecting tampering and expir
   const sealedEmpty = sealRecovery(emptyCodes, key);
   assert.equal(openRecovery(sealedEmpty, key), null);
 });
+
+test("a password change needs the current password and a confirmed, different new one of 12 to 128 characters", async () => {
+  const { passwordChangeProblem } = await import("../src/lib/session-policy.ts");
+  assert.equal(passwordChangeProblem("", "a long new passphrase", "a long new passphrase"), "current");
+  assert.equal(passwordChangeProblem("old", "a long new passphrase", "a long new passphrasf"), "mismatch");
+  assert.equal(passwordChangeProblem("old", "short", "short"), "weak");
+  assert.equal(passwordChangeProblem("a long new passphrase", "a long new passphrase", "a long new passphrase"), "same");
+  assert.equal(passwordChangeProblem("old", "a long new passphrase", "a long new passphrase"), null);
+});

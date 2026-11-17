@@ -22,6 +22,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
     private static final String PASSPHRASE = "quiet river under bridge";
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
+    private static final Map<String, byte[]> SECRETS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<String, Long> LAST_STEP = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Autowired
     protected AccountService accounts;
@@ -80,10 +82,14 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
 
     /**
      * Signs in and returns an access token. For accounts that need MFA this enrols an
-     * authenticator on first use, so call it once per such account: a second sign-in
-     * inside the same 30 seconds would be refused as a replayed code.
+     * authenticator on first use and reuses it afterwards, each time with a later time step.
      */
     protected String login(String email) {
+        return (String) loginSession(email).get("accessToken");
+    }
+
+    /** As {@link #login}, returning the whole session response (access and refresh tokens). */
+    protected Map<String, Object> loginSession(String email) {
         Map<String, String> body = new LinkedHashMap<>();
         body.put("email", email);
         body.put("password", PASSPHRASE);
@@ -92,16 +98,24 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
         Map<String, Object> result = HttpApi.parse(response);
         if (Boolean.TRUE.equals(result.get("mfaRequired"))) {
             String challenge = (String) result.get("mfaToken");
-            HttpResponse<String> enrolment = api.post("/api/v1/auth/mfa/enroll", HttpApi.json(Map.of("mfaToken", challenge)));
-            assertEquals(200, enrolment.statusCode(), enrolment.body());
-            byte[] secret = Base32.decode((String) HttpApi.parse(enrolment).get("secret"));
+            byte[] secret = Boolean.TRUE.equals(result.get("mfaEnrolled")) ? SECRETS.get(email) : null;
+            if (secret == null) {
+                LAST_STEP.remove(email);
+                HttpResponse<String> enrolment = api.post("/api/v1/auth/mfa/enroll", HttpApi.json(Map.of("mfaToken", challenge)));
+                assertEquals(200, enrolment.statusCode(), enrolment.body());
+                secret = Base32.decode((String) HttpApi.parse(enrolment).get("secret"));
+                SECRETS.put(email, secret);
+            }
+            // Each sign-in uses a later time step than the last (codes cannot be replayed; one step of drift is accepted).
+            long step = Math.max(Totp.step(Instant.now()), LAST_STEP.getOrDefault(email, Long.MIN_VALUE) + 1);
+            LAST_STEP.put(email, step);
             Map<String, String> verification = new LinkedHashMap<>();
             verification.put("mfaToken", challenge);
-            verification.put("code", Totp.code(secret, Totp.step(Instant.now())));
+            verification.put("code", Totp.code(secret, step));
             response = api.post("/api/v1/auth/mfa/verify", HttpApi.json(verification));
             assertEquals(200, response.statusCode(), response.body());
             result = HttpApi.parse(response);
         }
-        return (String) result.get("accessToken");
+        return result;
     }
 }

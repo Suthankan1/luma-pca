@@ -38,7 +38,8 @@ const backend = createServer(async (req, res) => {
         roles = ["STUDENT"];
         studentHasEnrolments = body.email === "student@example.invalid";
       } else if (body.email === "instructor@example.invalid") {
-        roles = ["INSTRUCTOR"];
+        // Every staff role signs in with a second factor, as the API requires.
+        return send(200, { mfaRequired: true, mfaToken: "challenge-token-instructor", mfaExpiresIn: 300, mfaEnrolled: true });
       } else if (body.email === "admin-unenrolled@example.invalid") {
         return send(200, {
           mfaRequired: true,
@@ -59,6 +60,13 @@ const backend = createServer(async (req, res) => {
         return send(401);
       }
       break;
+
+    case "/api/v1/auth/password":
+      // As the API: the current password is re-checked; success ends every session.
+      if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+      if (body.currentPassword !== "correct-password") return send(400, { detail: "The current password is not correct" });
+      if ([...String(body.newPassword ?? "")].length < 12) return send(422, { detail: "Password too short" });
+      return send(204);
 
     case "/api/v1/auth/mfa/enroll":
       if (body.mfaToken === "challenge-token-unenrolled") {
@@ -82,6 +90,12 @@ const backend = createServer(async (req, res) => {
           refreshExpiresIn: 600,
           recoveryCodes: ["rec-1111", "rec-2222", "rec-3333", "rec-4444"],
         });
+      }
+      if (body.mfaToken === "challenge-token-instructor") {
+        if (body.code !== "rec-recovery") return send(401);
+        roles = ["INSTRUCTOR"];
+        latestRefresh = `fake-opaque-refresh-${++rotation}`;
+        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
       }
       if (body.mfaToken === "challenge-token-owner") {
         if (body.code !== "rec-recovery") return send(401);
@@ -809,6 +823,16 @@ function academicApi(req, body, send) {
 
   if (collection === "student-invitations") return studentInvitations(req, body, send, id);
 
+  if (collection === "students" && sub === "erasure" && req.method === "POST") {
+    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner erases a student's data" });
+    const student = students.find(s => s.id === id);
+    if (!student) return send(404, { detail: "Student not found" });
+    if (String(body.confirmStudentNumber ?? "").trim().toUpperCase() !== student.studentNumber) return send(400, { detail: "Type the student's number to confirm" });
+    const placeholder = `ERASED-${student.id.slice(0, 8).toUpperCase()}`;
+    Object.assign(student, { studentNumber: placeholder, fullName: "Erased student", email: `erased-${student.accountId}@erased.invalid`, active: false, accountStatus: "DISABLED" });
+    audit("STUDENT_ERASED", "STUDENT", student.id, null, { placeholder, reason: String(body.reason ?? "") });
+    return send(200, { studentId: student.id, placeholderNumber: placeholder, zoomRowsCleared: 0 });
+  }
   if (collection === "students" && sub === "attendance" && req.method === "GET") {
     return send(200, attendanceRecords.filter(r => r.studentId === id).map(r => {
       const session = classSessions.find(c => c.id === r.sessionId);

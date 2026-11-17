@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { createStudent, enroll, updateEnrollment, updateStudent } from "@/app/staff/students/actions";
+import { createStudent, enroll, eraseStudent, updateEnrollment, updateStudent } from "@/app/staff/students/actions";
 import type { FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, id }: { state: FormState; id: string }) {
@@ -86,4 +86,22 @@ export function EnrollmentAction({ studentId, enrollment, today }: {
     </button>
     {state && !state.ok && <span className="inline-error" role="alert">{state.message}</span>}
   </form>;
+}
+
+/** Owners only: erase a student's personal data on request. The record stays, anonymised, for attendance figures. */
+export function EraseStudentForm({ studentId }: { studentId: string }) {
+  const [state, action, pending] = useActionState(eraseStudent, null);
+  const values = state && !state.ok ? state.values : undefined;
+  return <details className="decision erase"><summary>Erase this student’s personal data</summary>
+    <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
+      <input type="hidden" name="studentId" value={studentId} />
+      <p className="panel-sub">Removes their name, number, sign-in, Zoom names and emails, reactions and appeal texts. Attendance figures stay,
+        anonymised. This cannot be undone.</p>
+      <label htmlFor="erase-confirm">Type the student number to confirm</label>
+      <input id="erase-confirm" name="confirm" autoComplete="off" required maxLength={60} />
+      <label htmlFor="erase-reason">Reason <span className="muted">(recorded)</span></label>
+      <input id="erase-reason" name="reason" maxLength={300} required autoComplete="off" defaultValue={values?.reason} />
+      <button className="action danger" type="submit" disabled={pending}>{pending ? "Erasing…" : "Erase personal data"}</button>
+      {state && <p id="erase-feedback" className={state.ok ? "form-ok" : "session-error"} role={state.ok ? "status" : "alert"}>{state.message}</p>}
+    </form></details>;
 }

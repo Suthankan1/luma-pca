@@ -101,6 +101,16 @@ class AuthController {
                 tokens.refreshExpiresInSeconds(), outcome.recoveryCodes());
     }
 
+    record PasswordChangeRequest(@NotBlank @Size(max = 256) String currentPassword, @NotBlank @Size(max = 512) String newPassword) {
+    }
+
+    /** Changes the caller's password (current one required) and signs them out everywhere. */
+    @PostMapping("/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void changePassword(JwtAuthenticationToken authentication, @Valid @RequestBody PasswordChangeRequest request) {
+        auth.changePassword(UUID.fromString(authentication.getName()), request.currentPassword(), request.newPassword());
+    }
+
     /** Removes the caller's authenticator; requires their password again and signs them out everywhere. */
     @PostMapping("/mfa/reset")
     @ResponseStatus(HttpStatus.NO_CONTENT)
