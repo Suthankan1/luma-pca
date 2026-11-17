@@ -1850,3 +1850,16 @@ build runs the Next.js default bundler and repeats the smoke test.
   (`…/engagement-ranking/export`, audited `ENGAGEMENT_RANKING_EXPORTED`, formula-safe, unnamed rows stay unnamed).
 - **Tests:** notice assertions in `AttendanceCorrectionIntegrationTest`; course ranking and CSV in `EngagementIntegrationTest`;
   unit tests for the take-part window and wording; Playwright engagement/portal specs. Unit 55, Playwright 100.
+
+## Checkpoint FIX-5 — 2026-11-17 — Testing gaps closed
+
+- **Branch:** `fix/test-gaps`. Fixes audit items 24–28.
+- **Real stack covers attendance** (`scripts/staff-ui-real-stack.sh` seeds a past run with live events and Zoom's report):
+  scheduling the class links the run, participants match by sign-in email, the owner records the rule, the class is
+  finalised from the report, a correction reaches the student **by real SMTP**, the CSV and the student portal agree, and the
+  activity log shows it. Passed locally end to end on the real backend, database, web app and mail server.
+- **Mock isolation:** each Playwright project (desktop, phone) runs its own mock backend and web server, so no test depends on
+  another project's data.
+- **Accessibility:** `accessibility.spec` runs axe (WCAG 2.1 A/AA) on public, staff and student pages; serious or critical
+  issues fail. It found low-contrast muted text (4.42:1 on the page background); `--pca-muted` is now #4a6684 (5.57:1).
+- Local: Playwright 106 (incl. accessibility on both projects), real-stack 1/1.
