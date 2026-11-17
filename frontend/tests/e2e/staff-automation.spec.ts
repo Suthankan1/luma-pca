@@ -34,10 +34,20 @@ test.describe("Less manual work for staff", () => {
     await page.goto("/staff/sessions");
     await page.getByRole("link", { name: "Import classes from your Zoom webinars →" }).click();
     await expect(page).toHaveURL(/\/staff\/zoom\/import$/);
+    const list = page.getByRole("region", { name: "UPCOMING WEBINARS" });
+    await expect(list.getByRole("listitem", { name: "Webinar 844 0000 0001" })).toContainText("Not in LUMA yet");
+    await expect(list.getByRole("listitem", { name: "Webinar 844 0000 0002" })).toContainText("no fixed time");
+    await page.getByRole("search", { name: "Find a webinar" }).getByLabel("Find a webinar").fill("office");
+    await page.getByRole("search", { name: "Find a webinar" }).getByRole("button", { name: "Search" }).click();
+    await expect(list.getByRole("listitem", { name: /^Webinar / })).toHaveCount(1);
+    await list.getByRole("link", { name: "Office hours" }).click();
+    const office = page.getByRole("region", { name: "Webinar 844 0000 0002" });
+    await expect(office).toContainText("no fixed time");
+    await expect(office).toContainText("not on the server’s webhook allow-list");
+    await page.getByRole("link", { name: "← All upcoming webinars" }).click();
+    await list.getByRole("link", { name: "A/L Physics weekly" }).click();
     const weekly = page.getByRole("region", { name: "Webinar 844 0000 0001" });
     await expect(weekly).toContainText("recurring");
-    await expect(page.getByRole("region", { name: "Webinar 844 0000 0002" })).toContainText("no fixed time");
-    await expect(page.getByRole("region", { name: "Webinar 844 0000 0002" })).toContainText("not on the server’s webhook allow-list");
     await expect(weekly).not.toContainText("allow-list");
 
     await weekly.getByRole("button", { name: "Create classes" }).click();
@@ -50,6 +60,9 @@ test.describe("Less manual work for staff", () => {
     await expect(weekly.getByLabel("Mon 1 Feb 2027 · 18:00–20:00 · already a class")).toBeDisabled();
     await expect(weekly.getByLabel("Mon 15 Feb 2027 · 18:00–20:00")).toBeEnabled();
 
+    await page.goto("/staff/zoom/import");
+    await expect(page.getByRole("region", { name: "UPCOMING WEBINARS" }).getByRole("listitem", { name: "Webinar 844 0000 0001" }))
+      .toContainText("2 classes in LUMA");
     await page.goto("/staff/sessions?from=2027-02-01");
     await expect(page.getByRole("link", { name: /A\/L Physics \(imported\)/ })).toHaveCount(2);
     await page.goto("/staff/activity?category=zoom");

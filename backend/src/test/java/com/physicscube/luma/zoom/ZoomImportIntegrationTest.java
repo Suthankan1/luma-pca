@@ -48,7 +48,8 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
                 body = "{\"access_token\":\"fixture-access\",\"token_type\":\"bearer\",\"expires_in\":3600,\"scope\":\"webinar:read:list_webinars:admin\"}";
             } else if (target.equals("GET /v2/users/me/webinars") && query != null && query.contains("type=upcoming")) {
                 status = 200;
-                body = "{\"next_page_token\":\"\",\"webinars\":[" + listed(WEEKLY, 9) + "," + listed(SINGLE, 5) + "," + listed(FLOATING, 6) + "]}";
+                body = "{\"next_page_token\":\"\",\"webinars\":[" + listed(WEEKLY, 9, "A/L Physics weekly", BASE.plus(1, ChronoUnit.DAYS)) + ","
+                        + listed(SINGLE, 5, "Revision day", BASE) + "," + listed(FLOATING, 6, "Office hours", null) + "]}";
             } else if (target.equals("GET /v2/webinars/" + SINGLE)) {
                 status = 200;
                 body = "{\"id\":" + SINGLE + ",\"topic\":\"Revision day\",\"type\":5,\"start_time\":\"" + BASE + "\",\"duration\":90,"
@@ -75,8 +76,9 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
         ZOOM.start();
     }
 
-    private static String listed(String id, int type) {
-        return "{\"id\":" + id + ",\"topic\":\"Listed\",\"type\":" + type + ",\"start_time\":\"" + BASE + "\",\"duration\":60}";
+    private static String listed(String id, int type, String topic, Instant start) {
+        return "{\"id\":" + id + ",\"topic\":\"" + topic + "\",\"type\":" + type + (start == null ? "" : ",\"start_time\":\"" + start + "\"")
+                + ",\"duration\":60,\"timezone\":\"Asia/Colombo\"}";
     }
 
     private static String occurrence(String id, Instant start, String status) {
@@ -106,8 +108,14 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> webinar(List<Object> upcoming, String id) {
+    private Map<String, Object> listedWebinar(List<Object> upcoming, String id) {
         return upcoming.stream().map(o -> (Map<String, Object>) o).filter(w -> id.equals(w.get("webinarId"))).findFirst().orElseThrow();
+    }
+
+    private Map<String, Object> webinar(String id) {
+        HttpResponse<String> response = api.get("/api/v1/zoom/upcoming-webinars/" + id, admin);
+        assertEquals(200, response.statusCode(), response.body());
+        return HttpApi.parse(response);
     }
 
     @SuppressWarnings("unchecked")
@@ -131,9 +139,18 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
         HttpResponse<String> response = api.get("/api/v1/zoom/upcoming-webinars", admin);
         assertEquals(200, response.statusCode(), response.body());
         List<Object> upcoming = HttpApi.parseList(response);
-        assertEquals(3, upcoming.size());
+        assertEquals(List.of(SINGLE, WEEKLY, FLOATING), upcoming.stream().map(o -> ((Map<?, ?>) o).get("webinarId")).toList(),
+                "one listing call, soonest first; no next date last");
+        Map<String, Object> summary = listedWebinar(upcoming, WEEKLY);
+        assertEquals(true, summary.get("recurring"));
+        assertEquals(1, summary.get("upcomingClasses"), "the class scheduled by hand");
+        assertEquals(List.of(WEEKLY), HttpApi.parseList(api.get("/api/v1/zoom/upcoming-webinars?q=PHYSICS", admin)).stream()
+                .map(o -> ((Map<?, ?>) o).get("webinarId")).toList(), "search by topic");
+        assertEquals(List.of(SINGLE), HttpApi.parseList(api.get("/api/v1/zoom/upcoming-webinars?q=838%200000%200001", admin)).stream()
+                .map(o -> ((Map<?, ?>) o).get("webinarId")).toList(), "search by ID");
+        assertEquals(400, api.get("/api/v1/zoom/upcoming-webinars/not-an-id", admin).statusCode());
 
-        Map<String, Object> weekly = webinar(upcoming, WEEKLY);
+        Map<String, Object> weekly = webinar(WEEKLY);
         assertEquals("A/L Physics weekly", weekly.get("topic"));
         assertEquals(true, weekly.get("recurring"));
         assertEquals(true, weekly.get("liveEvents"), "no allow-list: every webinar's live events are kept");
@@ -142,14 +159,13 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(manualId, runs(weekly).get(0).get("classId"));
         assertNull(runs(weekly).get(1).get("classId"));
 
-        Map<String, Object> single = webinar(upcoming, SINGLE);
+        Map<String, Object> single = webinar(SINGLE);
         assertEquals(1, runs(single).size());
         assertEquals(BASE.plus(90, ChronoUnit.MINUTES).toString(), runs(single).get(0).get("endsAt"));
 
-        Map<String, Object> floating = webinar(upcoming, FLOATING);
+        Map<String, Object> floating = webinar(FLOATING);
         assertTrue(runs(floating).isEmpty());
         assertTrue(((String) floating.get("note")).contains("no fixed time"));
-        assertEquals(SINGLE, ((Map<String, Object>) upcoming.get(0)).get("webinarId"), "soonest first");
     }
 
     @Test
@@ -179,7 +195,7 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM session_batches WHERE batch_id = ?::uuid", Integer.class, batch));
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE academy_id = ? AND action = 'ZOOM_WEBINAR_IMPORTED'",
                 Integer.class, academyId));
-        Map<String, Object> listed = webinar(HttpApi.parseList(api.get("/api/v1/zoom/upcoming-webinars", admin)), WEEKLY);
+        Map<String, Object> listed = webinar(WEEKLY);
         assertTrue(runs(listed).stream().allMatch(r -> r.get("classId") != null), "every run is now a class");
     }
 
