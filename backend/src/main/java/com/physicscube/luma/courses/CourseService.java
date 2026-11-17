@@ -17,6 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class CourseService {
+    private static final long CACHE_TTL_MS = 60_000;
+    record CacheKey(UUID academyId, Boolean active) {}
+    record CacheEntry(List<CourseView> courses, long expiresAt) {}
+    private final java.util.concurrent.ConcurrentMap<CacheKey, CacheEntry> courseCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     private final CourseRepository courses;
 
     CourseService(CourseRepository courses) {
@@ -27,9 +32,17 @@ public class CourseService {
     @Transactional(readOnly = true)
     public List<CourseView> list(CurrentAccount caller, Boolean active) {
         caller.requireAcademyManager();
+        CacheKey key = new CacheKey(caller.academyId(), active);
+        long now = System.currentTimeMillis();
+        CacheEntry cached = courseCache.get(key);
+        if (cached != null && now < cached.expiresAt()) {
+            return cached.courses();
+        }
         List<Course> found = active == null ? courses.findByAcademyIdOrderByCode(caller.academyId())
                 : courses.findByAcademyIdAndActiveOrderByCode(caller.academyId(), active);
-        return found.stream().map(CourseView::of).toList();
+        List<CourseView> views = found.stream().map(CourseView::of).toList();
+        courseCache.put(key, new CacheEntry(views, now + CACHE_TTL_MS));
+        return views;
     }
 
     @Transactional(readOnly = true)
@@ -46,7 +59,9 @@ public class CourseService {
             throw duplicateCode();
         }
         try {
-            return CourseView.of(courses.saveAndFlush(new Course(caller.academyId(), normalized, title.strip())));
+            CourseView created = CourseView.of(courses.saveAndFlush(new Course(caller.academyId(), normalized, title.strip())));
+            evict(caller.academyId());
+            return created;
         } catch (DataIntegrityViolationException e) {
             throw translate(e);
         }
@@ -63,10 +78,16 @@ public class CourseService {
         }
         course.update(Codes.normalize(code), title.strip(), active);
         try {
-            return CourseView.of(courses.saveAndFlush(course));
+            CourseView updated = CourseView.of(courses.saveAndFlush(course));
+            evict(caller.academyId());
+            return updated;
         } catch (DataIntegrityViolationException e) {
             throw translate(e);
         }
+    }
+
+    private void evict(UUID academyId) {
+        courseCache.keySet().removeIf(k -> k.academyId().equals(academyId));
     }
 
     /**

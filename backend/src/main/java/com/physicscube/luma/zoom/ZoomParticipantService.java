@@ -325,18 +325,21 @@ public class ZoomParticipantService {
         Map<String, Instant> ended = new HashMap<>();
         Map<String, Map<String, Visit>> visitsByOccurrence = new LinkedHashMap<>();
         Set<String> hosts = new HashSet<>();
-        for (String occurrence : occurrences) {
-            Map<String, Visit> visits = visitsByOccurrence.computeIfAbsent(occurrence, o -> new LinkedHashMap<>());
-            Instant[] first = new Instant[1];
+        Set<String> reported = new HashSet<>();
+        if (!occurrences.isEmpty()) {
+            String[] occArray = occurrences.toArray(String[]::new);
+            Map<String, Instant> firstEvents = new HashMap<>();
             jdbc.query("""
-                    SELECT event_type, event_ts, visit_key, participant_email, host, registrant_id FROM zoom_occurrence_events
-                    WHERE academy_id = ? AND occurrence_uuid = ? ORDER BY event_ts, id LIMIT ?
+                    SELECT occurrence_uuid, event_type, event_ts, visit_key, participant_email, host, registrant_id
+                    FROM zoom_occurrence_events
+                    WHERE academy_id = ? AND occurrence_uuid = ANY (?)
+                    ORDER BY occurrence_uuid, event_ts, id
                     """, row -> {
+                String occurrence = row.getString("occurrence_uuid");
+                Map<String, Visit> visits = visitsByOccurrence.computeIfAbsent(occurrence, o -> new LinkedHashMap<>());
                 String type = row.getString("event_type");
                 Instant at = Instant.ofEpochMilli(row.getLong("event_ts"));
-                if (first[0] == null) {
-                    first[0] = at;
-                }
+                firstEvents.putIfAbsent(occurrence, at);
                 if ("webinar.started".equals(type)) {
                     started.putIfAbsent(occurrence, at);
                 } else if ("webinar.ended".equals(type)) {
@@ -360,29 +363,33 @@ public class ZoomParticipantService {
                 } else if (visit.joined == null) {
                     visit.joined = at;
                 }
-            }, academyId, occurrence, MAX_EVENTS_PER_OCCURRENCE);
-            if (first[0] != null) {
-                started.putIfAbsent(occurrence, first[0]);
-            }
-        }
-        // Where Zoom's participant report has been fetched, it replaces the live visits (004B).
-        Set<String> reported = new HashSet<>(jdbc.queryForList("SELECT occurrence_uuid FROM zoom_report_fetches WHERE academy_id = ? "
-                + "AND status = 'FETCHED' AND occurrence_uuid = ANY (?)", String.class, academyId, occurrences.toArray(String[]::new)));
-        for (String occurrence : reported) {
-            Map<String, Visit> visits = new LinkedHashMap<>();
-            jdbc.query("SELECT id, email, joined_at, left_at, host, registrant_email FROM zoom_report_participants WHERE academy_id = ? "
-                    + "AND occurrence_uuid = ? AND email IS NOT NULL ORDER BY joined_at, id", row -> {
-                if (row.getBoolean("host")) {
-                    hosts.add(row.getString("email"));
-                    return;
+            }, academyId, occArray);
+            firstEvents.forEach((occ, at) -> started.putIfAbsent(occ, at));
+
+            // Where Zoom's participant report has been fetched, it replaces the live visits (004B).
+            reported.addAll(jdbc.queryForList("SELECT occurrence_uuid FROM zoom_report_fetches WHERE academy_id = ? "
+                    + "AND status = 'FETCHED' AND occurrence_uuid = ANY (?)", String.class, academyId, occArray));
+            if (!reported.isEmpty()) {
+                String[] repArray = reported.toArray(String[]::new);
+                for (String occurrence : reported) {
+                    visitsByOccurrence.put(occurrence, new LinkedHashMap<>());
                 }
-                Visit visit = new Visit(row.getString("email"));
-                visit.joined = row.getTimestamp("joined_at").toInstant();
-                visit.left = row.getTimestamp("left_at").toInstant();
-                visit.registrationEmail = row.getString("registrant_email");
-                visits.put(row.getString("id"), visit);
-            }, academyId, occurrence);
-            visitsByOccurrence.put(occurrence, visits);
+                jdbc.query("SELECT occurrence_uuid, id, email, joined_at, left_at, host, registrant_email "
+                        + "FROM zoom_report_participants WHERE academy_id = ? "
+                        + "AND occurrence_uuid = ANY (?) AND email IS NOT NULL ORDER BY occurrence_uuid, joined_at, id", row -> {
+                    String occurrence = row.getString("occurrence_uuid");
+                    Map<String, Visit> visits = visitsByOccurrence.get(occurrence);
+                    if (row.getBoolean("host")) {
+                        hosts.add(row.getString("email"));
+                        return;
+                    }
+                    Visit visit = new Visit(row.getString("email"));
+                    visit.joined = row.getTimestamp("joined_at").toInstant();
+                    visit.left = row.getTimestamp("left_at").toInstant();
+                    visit.registrationEmail = row.getString("registrant_email");
+                    visits.put(row.getString("id"), visit);
+                }, academyId, repArray);
+            }
         }
         // Registration emails: stored with report rows, or looked up from registrants for live visits.
         Map<String, String> registrantIdByEmail = new HashMap<>();

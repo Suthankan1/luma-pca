@@ -3,8 +3,6 @@ package com.physicscube.luma.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.physicscube.luma.identity.domain.AccountStatus;
@@ -54,8 +52,8 @@ class AccountJwtAuthenticationConverterTest {
     }
 
     @Test
-    @DisplayName("Caches converted authentication and evicts immediately on demand")
-    void cachesAndEvictsImmediately() {
+    @DisplayName("Converts valid active account token to JwtAuthenticationToken")
+    void convertsValidToken() {
         Jwt jwt = mockJwt();
         AccountSummary activeAccount = new AccountSummary(
                 accountId, academyId, "user@test.com", AccountStatus.ACTIVE,
@@ -65,29 +63,25 @@ class AccountJwtAuthenticationConverterTest {
         when(accountService.findById(accountId)).thenReturn(Optional.of(activeAccount));
         when(refreshSessions.mfaStateIfActive(sessionId, accountId, (int) authVersion)).thenReturn(true);
 
-        // First call populates cache
-        Authentication auth1 = converter.convert(jwt);
-        assertThat(auth1).isNotNull();
-        assertThat(auth1.getName()).isEqualTo(accountId.toString());
-        verify(accountService, times(1)).findById(accountId);
+        Authentication auth = converter.convert(jwt);
+        assertThat(auth).isNotNull();
+        assertThat(auth.getName()).isEqualTo(accountId.toString());
+        assertThat(auth.getAuthorities()).hasSize(1);
+    }
 
-        // Second call hits cache (no new DB query)
-        Authentication auth2 = converter.convert(jwt);
-        assertThat(auth2).isNotNull();
-        verify(accountService, times(1)).findById(accountId);
-
-        // Evict account from cache
-        converter.evict(accountId);
-
-        // If account is disabled in DB, next call immediately rejects the token
+    @Test
+    @DisplayName("Rejects token when account is disabled")
+    void rejectsDisabledAccount() {
+        Jwt jwt = mockJwt();
         AccountSummary disabledAccount = new AccountSummary(
                 accountId, academyId, "user@test.com", AccountStatus.DISABLED,
                 Set.of(Role.INSTRUCTOR), (int) authVersion
         );
+
         when(accountService.findById(accountId)).thenReturn(Optional.of(disabledAccount));
+        when(refreshSessions.mfaStateIfActive(sessionId, accountId, (int) authVersion)).thenReturn(true);
 
         assertThatThrownBy(() -> converter.convert(jwt))
                 .isInstanceOf(InvalidBearerTokenException.class);
-        verify(accountService, times(2)).findById(accountId);
     }
 }

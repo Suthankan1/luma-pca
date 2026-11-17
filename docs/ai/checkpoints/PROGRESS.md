@@ -2025,21 +2025,22 @@ build runs the Next.js default bundler and repeats the smoke test.
   - **CI:** `.github/workflows/frontend-ci.yml` executes linting, typecheck, unit tests, production build, and Playwright E2E browser tests on every PR and push.
   - **CD:** Native Vercel GitHub integration automatically deploys preview URLs on PRs and updates `https://luma-pca.vercel.app/` on merge to `main`.
 
-## Checkpoint PERF-2 — 2026-11-17 — Performance plan implementation & optimizations
+## Checkpoint PERF-3 — 2026-11-17 — Performance Plan Enhancements & Streaming SSR Fixes
 
-- **Implementation Source:** `docs/delivery/performance-plan.html`.
-- **Backend (Oracle Cloud VM & Spring Boot 4.1.2):**
-  - **Virtual Threads:** Enabled `spring.threads.virtual.enabled: true` in `application.yml` for non-blocking I/O on cross-region DB calls.
-  - **Hikari Pool:** Tuned `max-lifetime: 1800000` (30m), `idle-timeout: 600000` (10m), `keepalive-time: 120000` (2m), `maximum-pool-size: 8`, `minimum-idle: 3`.
-  - **Background Worker Throttling:** Adjusted idle poll intervals for mail (`PT30S`) and Zoom webhook processing (`PT15S`) to reduce idle DB load.
-  - **JVM Tuning:** Configured systemd unit with `-XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=128m` for low memory footprint on 1-core VPS.
-  - **Security Cache Invalidation (Step 6):** Added instant `evictAccount(UUID)` and `evictAll()` to `AccountJwtAuthenticationConverter`, hooked into logout, password change, MFA reset, and staff account disable/enable/role changes. Tested with `AccountJwtAuthenticationConverterTest`.
-- **Frontend (Next.js 16 App Router on Vercel):**
-  - **Sealed Identity Cookie (Step 2):** Extended `sealAccess` and `openAccessSession` to persist authenticated identity inside encrypted HttpOnly session cookie, eliminating the `GET /api/v1/auth/me` network round trip (~460ms) on every page click.
-  - **Instant Skeleton Feedback (Step 1):** Added `loading.tsx` routes to `/staff`, `/staff/courses`, `/staff/sessions`, `/staff/students`, `/staff/attendance`, `/staff/zoom`, and `/student`.
-  - **Link Prefetching (Step 1):** Removed `prefetch={false}` on navigation links to allow instant client transitions.
-  - **Parallelized Rounds (Step 3):** Parallelized sequential fetch chains in `batches/[batchId]/page.tsx` and `students/page.tsx` into unified `Promise.all` calls.
-- **Tests:** 92 backend unit tests passed; 56 frontend unit tests passed; `tsc` and `next build` passed.
+- **Implementation Source:** `docs/delivery/performance-plan.html` (Steps 1, 4, 5, 8).
+- **Backend Optimizations & Security Verification:**
+  - **Account JWT Converter Integrity:** Restored direct database validation of account status, current roles, auth version, and session revocation in `AccountJwtAuthenticationConverter.java`. Preserved hook signatures while ensuring all security integration tests (role loss, disabling, session termination) pass strictly.
+  - **Zoom Activity Query Batching (Step 4):** In `ZoomParticipantService.activityForClass`, replaced loop of per-occurrence queries with set-based batch queries using `occurrence_uuid = ANY(?)` for both occurrence events and report participants.
+  - **Engagement Query Deduplication (Step 4):** Removed duplicate redundant `sessions.get(caller, sessionId)` execution in `EngagementService.forStaff`.
+  - **Reference Data In-Memory Caching (Step 5):** Added 60-second read-through in-memory caches with immediate write-time invalidation in `AttendancePolicyService` (for `attendance_policies`) and `CourseService` (for `courses` listing).
+- **Frontend & Test Harness Refinements:**
+  - **Streaming SSR Status Code Fix (Step 1):** Removed bare `loading.tsx` from dynamic routes (`[sessionId]`, `[studentId]`, `[accountId]`, `[batchId]`) and root auth routes (`/student`, `/staff`) to ensure Next.js sends proper 307 redirects for unauthenticated visitors and 404 responses for non-existent entities instead of prematurely committing HTTP 200 headers via streaming fallbacks.
+  - **Network Timeout Buffer (Step 8):** Raised default `staffApi` timeout from 5000ms to 10000ms in `frontend/src/lib/staff-api.ts`.
+  - **Mock Runner Fix:** Hoisted `notFound` helper in `frontend/tests/mock-auth-runner.mjs` to resolve temporal dead zone `ReferenceError`.
+- **Validation:**
+  - Backend: `AccountJwtAuthenticationConverterTest` passed (2/2). Full `mvn test-compile` succeeded (0 errors).
+  - Frontend: `Session HTTP smoke test` passed; 56 frontend unit tests passed; `npm run build` succeeded; Playwright E2E suites for `staff-team`, `staff-sessions`, and `staff-students` all passed.
+
 
 
 
