@@ -920,8 +920,8 @@ function academicApi(req, body, send) {
     audit("ATTENDANCE_EXPORTED", "BATCH", batch.id, batch.code, { scope: "batch", from: params.get("from"), to: params.get("to"), rows: "0" });
     return send.csv(`attendance-${batch.code.toLowerCase()}-${params.get("from")}-to-${params.get("to")}.csv`, header);
   }
-  const stale = () => send(409, { detail: "The record was changed by someone else; reload and retry" });
-  const notFound = () => send(404, { detail: "Not found" });
+  function stale() { return send(409, { detail: "The record was changed by someone else; reload and retry" }); }
+  function notFound() { return send(404, { detail: "Not found" }); }
 
   if (collection === "student-invitations") return studentInvitations(req, body, send, id);
 

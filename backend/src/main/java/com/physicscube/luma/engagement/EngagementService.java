@@ -293,7 +293,7 @@ public class EngagementService {
     /** Counts for staff who see the class: reactions by kind, how many students reacted, every question's answer counts. */
     @Transactional(readOnly = true)
     public ClassEngagement forStaff(CurrentAccount caller, UUID sessionId) {
-        sessions.get(caller, sessionId);
+        SessionView view = sessions.get(caller, sessionId);
         boolean enabled = find(caller.academyId()).map(Settings::enabled).orElse(false);
         Map<String, Integer> reactions = new LinkedHashMap<>();
         for (String kind : List.of("UNDERSTOOD", "CONFUSED", "SLOW_DOWN", "SPEED_UP")) {
@@ -303,7 +303,6 @@ public class EngagementService {
                 row -> { reactions.put(row.getString(1), row.getInt(2)); }, caller.academyId(), sessionId);
         Integer reacting = jdbc.queryForObject("SELECT count(DISTINCT student_id) FROM portal_reactions WHERE academy_id = ? AND class_session_id = ?",
                 Integer.class, caller.academyId(), sessionId);
-        SessionView view = sessions.get(caller, sessionId);
         return new ClassEngagement(sessionId, enabled, reactions, reacting == null ? 0 : reacting, pulses(caller.academyId(), sessionId, null),
                 "PORTAL_REACTION, PORTAL_PULSE", view.startsAt(), view.endsAt());
     }

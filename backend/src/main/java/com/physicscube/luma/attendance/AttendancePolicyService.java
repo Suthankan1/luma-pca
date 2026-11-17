@@ -24,8 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class AttendancePolicyService {
+    private static final long CACHE_TTL_MS = 60_000;
     private final JdbcTemplate jdbc;
     private final AuditLog audit;
+    private record CacheEntry(Optional<PolicyView> policy, long expiresAt) {}
+    private final java.util.concurrent.ConcurrentMap<UUID, CacheEntry> policyCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     AttendancePolicyService(JdbcTemplate jdbc, AuditLog audit) {
         this.jdbc = jdbc;
@@ -49,10 +52,17 @@ public class AttendancePolicyService {
 
     /** For this module: the academy's rule, if one has been recorded. */
     Optional<PolicyView> find(UUID academyId) {
+        long now = System.currentTimeMillis();
+        CacheEntry cached = policyCache.get(academyId);
+        if (cached != null && now < cached.expiresAt()) {
+            return cached.policy();
+        }
         List<PolicyView> found = jdbc.query("SELECT min_connected_percent, late_after_minutes, description, version, updated_at, auto_finalise "
                 + "FROM attendance_policies WHERE academy_id = ?", (row, i) -> new PolicyView(row.getInt(1), row.getInt(2),
                 row.getString(3), row.getLong(4), row.getTimestamp(5).toInstant(), row.getBoolean(6)), academyId);
-        return found.stream().findFirst();
+        Optional<PolicyView> result = found.stream().findFirst();
+        policyCache.put(academyId, new CacheEntry(result, now + CACHE_TTL_MS));
+        return result;
     }
 
     /** @param expectedVersion {@code null} when setting the first rule */
@@ -96,6 +106,7 @@ public class AttendancePolicyService {
                   auto_finalise = EXCLUDED.auto_finalise, auto_finalise_by = EXCLUDED.auto_finalise_by
                 """, caller.academyId(), minConnectedPercent, lateAfterMinutes, text, caller.accountId(), Timestamp.from(now), auto,
                 auto ? caller.accountId() : null);
+        policyCache.remove(caller.academyId());
         audit.record(caller.academyId(), caller.accountId(), "ATTENDANCE_POLICY_SET", "ACADEMY", caller.academyId(), Map.of(
                 "minConnectedPercent", String.valueOf(minConnectedPercent), "lateAfterMinutes", String.valueOf(lateAfterMinutes),
                 "previous", before.map(p -> p.minConnectedPercent() + "% / " + p.lateAfterMinutes() + " min").orElse("none"),

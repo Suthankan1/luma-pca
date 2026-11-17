@@ -22,17 +22,17 @@ async function accessToken(portal: "staff" | "student") {
 
 /** @param timeoutMs longer only for bulk requests such as a student import */
 export function staffApi<T>(path: `/api/v1/${string}`,
-                            init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }, timeoutMs = 5000): Promise<ApiResult<T>> {
+                            init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }, timeoutMs = 10000): Promise<ApiResult<T>> {
   return callApi<T>("staff", path, init, timeoutMs);
 }
 
 /** The student portal reaches only the signed-in student's own records (`/api/v1/me/...`), such as an appeal. */
-export function studentApi<T>(path: `/api/v1/me/${string}`, init?: { method: "POST" | "PUT"; body: unknown }): Promise<ApiResult<T>> {
-  return callApi<T>("student", path, init);
+export function studentApi<T>(path: `/api/v1/me/${string}`, init?: { method: "POST" | "PUT"; body: unknown }, timeoutMs = 10000): Promise<ApiResult<T>> {
+  return callApi<T>("student", path, init, timeoutMs);
 }
 
 async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`,
-                          init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }, timeoutMs = 5000): Promise<ApiResult<T>> {
+                          init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }, timeoutMs = 10000): Promise<ApiResult<T>> {
   const requestBody = init && "body" in init ? JSON.stringify(init.body) : undefined;
   const access = await accessToken(portal);
   let response: Response;
