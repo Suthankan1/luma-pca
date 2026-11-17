@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   authRequest,
   config,
+  currentSession,
   readIdentity,
   readMfaChallenge,
   readMfaEnrollment,
@@ -28,6 +29,21 @@ import {
 } from "@/lib/session-policy";
 
 const noStore = { "Cache-Control": "no-store" };
+
+export async function GET(request: NextRequest, context: { params: Promise<{ action: string }> }) {
+  const { action } = await context.params;
+  if (action === "status") {
+    const { identity } = await currentSession();
+    return NextResponse.json(
+      {
+        authenticated: Boolean(identity),
+        destination: identity ? portalPath(identity) : null,
+      },
+      { headers: noStore }
+    );
+  }
+  return new NextResponse(null, { status: 404, headers: noStore });
+}
 
 export async function POST(request: NextRequest, context: { params: Promise<{ action: string }> }) {
   const { action } = await context.params;

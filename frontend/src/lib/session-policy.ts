@@ -201,3 +201,17 @@ export function passwordChangeProblem(current: string, next: string, confirm: st
   if (next === current) return "same";
   return null;
 }
+
+/** Paths where an unauthenticated or guest visitor sits, which should redirect once another tab signs in. */
+export function isGuestPath(pathname: string): boolean {
+  const clean = pathname.split(/[?#]/)[0];
+  return (
+    clean === "/" ||
+    clean === "/sign-in" ||
+    clean === "/sign-in/mfa" ||
+    clean === "/activate" ||
+    clean === "/forgot-password" ||
+    clean === "/reset-password"
+  );
+}
+
