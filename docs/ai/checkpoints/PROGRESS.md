@@ -1977,4 +1977,24 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Production enforcement:** Configured persistent keys with `LUMA_AUTH_EPHEMERAL_SIGNING_KEY=false`, verifying that ephemeral warning logs are eliminated and the application boots strictly with authenticated persistent keys.
 - **Tests:** `SigningKeysTest` (including `supportsEscapedNewlinesInPemString`).
 
+## Checkpoint PERF-1 — 2026-11-17 — Auth caching, pool tuning, and RSC deduplication
+
+- **PR / Branch:** PR #93 (`perf/auth-caching-and-pool-tuning`).
+- **In-memory token auth cache:** Added 15-second TTL in-memory cache to `AccountJwtAuthenticationConverter` to prevent redundant SQL queries (`accounts.findById`, `sessions.mfaStateIfActive`) on every incoming request when rendering multi-request RSC pages across physical cross-region latency.
+- **Hikari pool warming:** Configured `minimum-idle: 5` and tuned `max-lifetime: 60000`, `idle-timeout: 30000`, and `keepalive-time: 30000` to prevent Supabase pooler disconnections.
+- **Next.js RSC cache deduplication:** Wrapped `readIdentity` with `React.cache()` in `frontend/src/lib/auth-server.ts`.
+
+## Checkpoint FEAT-4 — 2026-11-17 — Zoom configuration & cross-tab session synchronization
+
+- **PR / Branch:** PR #94 (`feat/zoom-config-and-cross-tab-session-sync`).
+- **Zoom API & Webhooks configuration:** Updated `backend/src/main/resources/application.yml` to support fallbacks for `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, and `ZOOM_CLIENT_SECRET`. Loaded credentials and webhook tokens into `.env`. Verified with real Zoom API: listed 93 upcoming webinars in 721 ms, resolving "The Zoom API is not configured for this academy".
+- **Cross-tab session synchronization:**
+  - Added `frontend/src/components/SessionSync.tsx` coordinating session events across all open browser tabs via `BroadcastChannel` and `storage` events.
+  - Automatically redirects all open tabs sitting on guest/sign-in pages (`/sign-in`, `/sign-in/mfa`, `/activate`, `/`, etc.) to the overview page (`/staff` or `/student`) upon sign-in in any tab.
+  - Automatically handles sign-out propagation across tabs to `/sign-in?signedOut=1`.
+  - Added `GET /api/session/status` for instantaneous re-validation when background tabs regain visibility/focus.
+  - Added `isGuestPath` in `frontend/src/lib/session-policy.ts` with unit test coverage.
+- **Tests:** `ZoomApiClientTest` (8 tests), `ZoomWebhookSignatureTest` (6 tests), `ZoomProcessingPropertiesTest` (3 tests), live `ZoomApiCheckCommand`, and frontend unit tests (56 tests).
+
+
 
