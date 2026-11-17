@@ -38,6 +38,10 @@ public class ZoomApiClient {
                           Integer approvalType, Integer registrationType, List<Occurrence> occurrences, String hostId) {
     }
 
+    /** One webinar from a host's list; recurring webinars (type 6 or 9) list their first run only. */
+    public record ListedWebinar(long id, String topic, Instant startTime, int duration, String timezone, int type) {
+    }
+
     public record PastInstance(String uuid, Instant startTime) {
     }
 
@@ -101,6 +105,17 @@ public class ZoomApiClient {
                 instant(json.get("start_time")), number(json.get("duration")), text(json.get("timezone")), number(json.get("type")),
                 settings.get("approval_type") instanceof Number n ? n.intValue() : null,
                 settings.get("registration_type") instanceof Number n ? n.intValue() : null, occurrences, text(json.get("host_id")));
+    }
+
+    /** A host's upcoming webinars. {@code userId} is a Zoom user ID or email, or "me" for the app's own user. */
+    public List<ListedWebinar> upcomingWebinars(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("A Zoom user is required");
+        }
+        String user = URLEncoder.encode(userId.strip(), StandardCharsets.UTF_8);
+        return pages("list webinars", "/users/" + user + "/webinars", Map.of("type", "upcoming"), "webinars",
+                w -> new ListedWebinar(((Number) w.get("id")).longValue(), text(w.get("topic")), instant(w.get("start_time")),
+                        number(w.get("duration")), text(w.get("timezone")), number(w.get("type"))));
     }
 
     public List<PastInstance> pastInstances(String webinarId) {

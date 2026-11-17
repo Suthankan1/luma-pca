@@ -154,6 +154,12 @@ locals {
       threshold   = 0
       description = "The nightly privacy retention job failed"
     }
+    auto-finalise = {
+      pattern     = "\"Automatic finalisation failed\""
+      period      = 3600
+      threshold   = 0
+      description = "Automatic finalisation of classes failed; staff can still finalise from the Attendance page"
+    }
     email = {
       pattern     = "\"email for account\""
       period      = 3600

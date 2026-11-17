@@ -1672,6 +1672,7 @@ paths:
                 lateAfterMinutes: {type: integer, minimum: 0, maximum: 240}
                 description: {type: string, maxLength: 500, description: Where the rule was approved}
                 version: {type: integer, nullable: true, description: null for the first rule; otherwise the version read}
+                autoFinalise: {type: boolean, nullable: true, description: "Finalise classes automatically once Zoom's report is in; null keeps the current choice"}
       responses:
         '200':
           description: The saved rule
@@ -1843,6 +1844,14 @@ paths:
     get: {summary: "Each enrolled student's final attendance in a batch over a period, lowest rate first (managers, assigned staff)", operationId: batchAttendanceSummary, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: path, name: batchId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}], responses: {'200': {description: "finalClasses, classesNotFinal, totals, students[] (counts with ratePercent), method"}, '400': {description: Bad range (at most 366 days)}, '404': {description: Not a batch the caller may read}}}
   /api/v1/attendance/summary:
     get: {summary: "Final attendance totals per batch over a period, without student names (owners, administrators, analysts)", operationId: academyAttendanceSummary, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}], responses: {'200': {description: "batches[] with finalClasses, classesNotFinal, totals; method"}, '403': {description: Not an owner, administrator or analyst}}}
+  /api/v1/zoom/upcoming-webinars:
+    get: {summary: "The academy's upcoming webinars from Zoom, every run of recurring ones (next 120 days), marking runs that already have a class (owners/admins)", operationId: upcomingWebinars, tags: [Zoom], security: [{bearerAuth: []}], responses: {'200': {description: "webinarId, topic, timeZone, recurring, runs[] (occurrenceId, startsAt, endsAt, classId), note"}, '409': {description: "Zoom API not configured, scope missing, or unreachable"}}}
+  /api/v1/zoom/webinar-imports:
+    post: {summary: "Create a class for each chosen upcoming run of a webinar for the chosen batches; times re-read from Zoom; all or nothing (audited)", operationId: importWebinarRuns, tags: [Zoom], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [webinarId, batchIds], properties: {webinarId: {type: string}, batchIds: {type: array, items: {type: string, format: uuid}}, occurrenceIds: {type: array, items: {type: string}, description: "Empty or absent: every upcoming run"}, title: {type: string, maxLength: 200}}}}}}, responses: {'201': {description: "webinarId, created, alreadyScheduled, classIds"}, '400': {description: No batch, bad ID or no upcoming runs}, '404': {description: Not a webinar in the academy's Zoom account}}}
+  /api/v1/attendance/pending:
+    get: {summary: "Ended classes of the last 60 days that are not final, each READY, WAITING_FOR_REPORT or NO_ZOOM_RUN (owners/admins)", operationId: pendingAttendance, tags: [Attendance], security: [{bearerAuth: []}], responses: {'200': {description: "ruleRecorded, autoFinalise, classes[]"}}}
+  /api/v1/attendance/finalisations:
+    post: {summary: "Finalise every READY class by the academy's rule, each as its own finalisation (owners/admins)", operationId: finaliseReadyClasses, tags: [Attendance], security: [{bearerAuth: []}], responses: {'200': {description: "finalised, notReady, problems[]"}, '409': {description: No rule recorded}}}
   /api/v1/zoom/webinar-lookup:
     get: {summary: "Find a webinar by join link or ID and list its past runs (implemented; owners/admins; read-only Zoom calls)", operationId: lookupWebinar, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: query, name: webinar, required: true, description: "Join link (/j/, /w/, /s/, /wc/join/) or ID; registration links (WN_…) are refused with guidance", schema: {type: string, maxLength: 500}}], responses: {'200': {description: "webinarId, topic, durationMinutes, timezone, runs[] (occurrenceUuid, startTime, reported, linkedSessionId), newest first"}, '400': {description: Not a join link or ID}, '404': {description: Not in the academy's Zoom account}, '409': {description: Zoom API not configured or unreachable}}}
   /api/v1/zoom/webinar-lookup/reports:
@@ -1898,6 +1907,7 @@ components:
         description: {type: string}
         version: {type: integer}
         updatedAt: {type: string, format: date-time}
+        autoFinalise: {type: boolean}
     ZoomIdentityDecision:
       type: object
       required: [email, reason, linkedAt]

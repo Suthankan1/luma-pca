@@ -37,9 +37,12 @@ class AttendanceController {
     private final AttendancePolicyService policies;
     private final AttendanceFinalisationService finalisation;
     private final AttendanceSummaryService summaries;
+    private final com.physicscube.luma.attendance.AttendanceQueueService queue;
 
     AttendanceController(ProvisionalAttendanceService attendance, AttendanceExportService exports, AttendancePolicyService policies,
-                         AttendanceFinalisationService finalisation, AttendanceSummaryService summaries) {
+                         AttendanceFinalisationService finalisation, AttendanceSummaryService summaries,
+                         com.physicscube.luma.attendance.AttendanceQueueService queue) {
+        this.queue = queue;
         this.attendance = attendance;
         this.exports = exports;
         this.policies = policies;
@@ -54,6 +57,16 @@ class AttendanceController {
         return summaries.forBatch(CurrentAccount.from(authentication), batchId, from, to);
     }
 
+    @GetMapping("/api/v1/attendance/pending")
+    com.physicscube.luma.attendance.AttendanceQueueService.Pending pending(JwtAuthenticationToken authentication) {
+        return queue.pending(CurrentAccount.from(authentication));
+    }
+
+    @PostMapping("/api/v1/attendance/finalisations")
+    com.physicscube.luma.attendance.AttendanceQueueService.BulkResult finaliseReady(JwtAuthenticationToken authentication) {
+        return queue.finaliseReady(CurrentAccount.from(authentication));
+    }
+
     @GetMapping("/api/v1/attendance/summary")
     AttendanceSummaryService.AcademySummary academySummary(JwtAuthenticationToken authentication,
                                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -62,7 +75,7 @@ class AttendanceController {
     }
 
     record PolicyRequest(@NotNull Integer minConnectedPercent, @NotNull Integer lateAfterMinutes, @NotBlank @Size(max = 500) String description,
-                         Long version) {
+                         Long version, Boolean autoFinalise) {
     }
 
     /** 204 while the academy has not recorded a rule. */
@@ -75,7 +88,7 @@ class AttendanceController {
     @PutMapping("/api/v1/attendance-policy")
     AttendancePolicyService.PolicyView setPolicy(JwtAuthenticationToken authentication, @Valid @RequestBody PolicyRequest request) {
         return policies.set(CurrentAccount.from(authentication), request.minConnectedPercent(), request.lateAfterMinutes(),
-                request.description(), request.version());
+                request.description(), request.version(), request.autoFinalise());
     }
 
     record RecalculationRequest(@NotBlank @Size(max = 300) String reason) {

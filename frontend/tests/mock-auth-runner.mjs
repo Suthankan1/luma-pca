@@ -401,6 +401,31 @@ function reviseLinks(webinarIds) {
 
 function zoomApi(req, body, send, parts, query) {
   const [, , , , resource, id, action] = parts;
+  // Upcoming webinars from the academy's Zoom account: one weekly webinar with three dates in Feb 2027.
+  const upcomingRuns = ["2027-02-01", "2027-02-08", "2027-02-15"].map((d, i) => ({ occurrenceId: `16${i}`, startsAt: `${d}T12:30:00.000Z`,
+    endsAt: `${d}T14:30:00.000Z` }));
+  const scheduledFor = run => classSessions.find(c => c.zoomWebinarId === "84400000001" && c.status === "SCHEDULED"
+    && Math.abs(Date.parse(c.startsAt) - Date.parse(run.startsAt)) <= 30 * 60_000)?.id ?? null;
+  if (req.method === "GET" && resource === "upcoming-webinars") {
+    return send(200, [{ webinarId: "84400000001", topic: "A/L Physics weekly", timeZone: "Asia/Colombo", recurring: true, note: null, liveEvents: true,
+      runs: upcomingRuns.map(r => ({ ...r, classId: scheduledFor(r) })) },
+    { webinarId: "84400000002", topic: "Office hours", timeZone: "Asia/Colombo", recurring: true, runs: [], liveEvents: false,
+      note: "A recurring webinar with no fixed time has no dates to import" }]);
+  }
+  if (req.method === "POST" && resource === "webinar-imports") {
+    if (body.webinarId !== "84400000001") return send(404, { detail: "Zoom webinar not found" });
+    if (!Array.isArray(body.batchIds) || body.batchIds.length === 0) return send(400, { detail: "Choose at least one batch" });
+    if (body.batchIds.some(b => !batches.some(x => x.id === b))) return send(404, { detail: "Batch not found" });
+    let created = 0, existing = 0;
+    for (const run of upcomingRuns.filter(r => !body.occurrenceIds?.length || body.occurrenceIds.includes(r.occurrenceId))) {
+      if (scheduledFor(run)) { existing++; continue; }
+      classSessions.push({ id: uuid(), title: body.title || "A/L Physics weekly", startsAt: run.startsAt, endsAt: run.endsAt,
+        timeZone: "Asia/Colombo", status: "SCHEDULED", zoomWebinarId: "84400000001", batchIds: [...body.batchIds], version: 0 });
+      created++;
+    }
+    audit("ZOOM_WEBINAR_IMPORTED", "ZOOM_WEBINAR", null, null, { webinar: "84400000001", created: String(created), alreadyScheduled: String(existing) });
+    return send(201, { webinarId: "84400000001", created, alreadyScheduled: existing, classIds: [] });
+  }
   if (req.method === "GET" && resource === "occurrences") {
     const decided = new URLSearchParams(query).get("decided");
     const sessionId = new URLSearchParams(query).get("sessionId");
@@ -808,6 +833,7 @@ function academicApi(req, body, send) {
     if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner records the attendance rule" });
     if ((attendancePolicy?.version ?? null) !== (body.version ?? null)) return send(409, { detail: "The attendance rule was changed by someone else" });
     attendancePolicy = { minConnectedPercent: body.minConnectedPercent, lateAfterMinutes: body.lateAfterMinutes, description: body.description,
+      autoFinalise: typeof body.autoFinalise === "boolean" ? body.autoFinalise : !!attendancePolicy?.autoFinalise,
       version: attendancePolicy ? attendancePolicy.version + 1 : 0, updatedAt: new Date().toISOString() };
     audit("ATTENDANCE_POLICY_SET", "ACADEMY", null, null, { minConnectedPercent: String(body.minConnectedPercent), lateAfterMinutes: String(body.lateAfterMinutes) });
     return send(200, attendancePolicy);
@@ -816,6 +842,28 @@ function academicApi(req, body, send) {
   const summaryMethod = "Final attendance only. Rate = (present + late) / (present + late + absent); excused classes are left out.";
   const counts = (present, late, absent, excused) => ({ present, late, absent, excused,
     ratePercent: present + late + absent === 0 ? null : Math.round(100 * (present + late) / (present + late + absent)) });
+  // Ended classes that are not final: with a webinar ID they count as ready (the mock has no report data), without one not linked.
+  if (collection === "attendance" && (id === "pending" || id === "finalisations")) {
+    if (!manager) return send(403, { detail: "Forbidden" });
+    const now = Date.now();
+    const waiting = classSessions.filter(c => c.status === "SCHEDULED" && Date.parse(c.endsAt) <= now && Date.parse(c.endsAt) > now - 60 * 86_400_000
+      && !finalisedClasses.has(c.id)).sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .map(c => ({ sessionId: c.id, title: c.title, startsAt: c.startsAt, endsAt: c.endsAt, timeZone: c.timeZone,
+        linkedRuns: c.zoomWebinarId ? 1 : 0, state: c.zoomWebinarId ? "READY" : "NO_ZOOM_RUN" }));
+    if (id === "pending" && req.method === "GET") {
+      return send(200, { ruleRecorded: !!attendancePolicy, autoFinalise: !!attendancePolicy?.autoFinalise, classes: waiting });
+    }
+    if (id === "finalisations" && req.method === "POST") {
+      if (!attendancePolicy) return send(409, { detail: "The academy has not recorded its attendance rule yet" });
+      const ready = waiting.filter(c => c.state === "READY");
+      for (const c of ready) {
+        finalisedClasses.set(c.sessionId, { at: new Date().toISOString() });
+        audit("ATTENDANCE_FINALISED", "CLASS_SESSION", c.sessionId, c.title, { present: "0", late: "0", absent: "0", automatic: "false" });
+      }
+      return send(200, { finalised: ready.length, notReady: waiting.length - ready.length, problems: [] });
+    }
+    return send(405);
+  }
   if (collection === "attendance" && id === "summary" && req.method === "GET") {
     if (!manager && !roles.includes("ANALYST")) return send(403, { detail: "Owner, administrator or analyst role required" });
     const params = new URLSearchParams(query);

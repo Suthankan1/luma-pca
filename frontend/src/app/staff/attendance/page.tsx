@@ -1,11 +1,11 @@
 import { StaffShell } from "@/components/StaffShell";
-import { AppealDecisionForm, PolicyForm } from "@/components/staff/AttendanceForms";
+import { AppealDecisionForm, FinaliseAllForm, PolicyForm } from "@/components/staff/AttendanceForms";
 import { EngagementSettingsForm } from "@/components/staff/EngagementForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import Link from "next/link";
-import { academyToday, formatInstant, isAcademyManager, monthStart, outcomeLabels, rateLabel, type AcademyAttendanceSummary, type AttendanceAppeal, type AttendancePolicy, type EngagementSettings } from "@/lib/staff-forms";
+import { academyToday, formatInstant, isAcademyManager, monthStart, outcomeLabels, rateLabel, type AcademyAttendanceSummary, type AttendanceAppeal, type PendingAttendance, pendingStateLabels, type AttendancePolicy, type EngagementSettings } from "@/lib/staff-forms";
 
 export const metadata = { title: "Attendance · LUMA" };
 
@@ -22,12 +22,13 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
   const isoDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
   const reportFrom = isoDate(query.from) ?? monthStart(academyToday());
   const reportTo = isoDate(query.to) ?? academyToday();
-  const [policy, appeals, engagement, report] = await Promise.all([
+  const [policy, appeals, engagement, report, pending] = await Promise.all([
     staffApi<AttendancePolicy | null>("/api/v1/attendance-policy"),
     manager ? staffApi<AttendanceAppeal[]>("/api/v1/attendance-appeals?status=OPEN") : Promise.resolve(null),
     manager ? staffApi<EngagementSettings | null>("/api/v1/engagement-settings") : Promise.resolve(null),
     reports ? staffApi<AcademyAttendanceSummary>(`/api/v1/attendance/summary?${new URLSearchParams({ from: reportFrom, to: reportTo })}`)
       : Promise.resolve(null),
+    manager ? staffApi<PendingAttendance>("/api/v1/attendance/pending") : Promise.resolve(null),
   ]);
   if (!policy.ok) {
     return <StaffShell {...shell}><p className="session-error" role="alert">
@@ -45,6 +46,24 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       </> : <p className="banner">No rule has been recorded yet, so no class can be finalised. The rule is the academy’s decision; LUMA only applies it.</p>}
       {owner ? <PolicyForm policy={rule} /> : <p className="panel-sub">Only an academy owner can record or change the rule.</p>}
     </section>
+    {pending && <section className="panel panel-gap" aria-labelledby="pending-title">
+      <h2 id="pending-title" className="panel-title">WAITING TO BE FINALISED</h2>
+      {!pending.ok ? <p className="session-error" role="alert">We couldn’t load the classes waiting to be finalised.</p> : <>
+        <p className="panel-sub">Classes of the last 60 days that have ended but are not final.
+          {pending.data.autoFinalise ? " Automatic finalisation is on: ready classes are finalised within a few minutes."
+            : " Finalise every ready class at once, or open a class to check it first."}</p>
+        <ul className="dir-list">{pending.data.classes.map(c => <li key={c.sessionId} className="dir-row" aria-label={`Pending ${c.title}`}>
+          <span><Link className="text-link" href={`/staff/sessions/${c.sessionId}`}><strong>{c.title}</strong></Link>
+            {" "}<span className="muted">{formatInstant(c.startsAt, c.timeZone)}</span></span>
+          <span className={`status ${c.state === "READY" ? "on" : "off"}`}>{pendingStateLabels[c.state]}</span>
+        </li>)}
+          {pending.data.classes.length === 0 && <li className="dir-empty muted">Every ended class is final.</li>}</ul>
+        {pending.data.classes.some(c => c.state === "NO_ZOOM_RUN") && <p className="panel-sub">A class with no Zoom run: link its run in
+          {" "}<Link className="text-link" href="/staff/zoom">Zoom review</Link> or with “Check a webinar”.</p>}
+        {pending.data.ruleRecorded ? <FinaliseAllForm ready={pending.data.classes.filter(c => c.state === "READY").length} />
+          : <p className="panel-sub">Record the attendance rule first.</p>}
+      </>}
+    </section>}
     {report && <section className="panel panel-gap" aria-labelledby="report-title">
       <h2 id="report-title" className="panel-title">ATTENDANCE BY BATCH</h2>
       <p className="panel-sub">Final attendance totals per batch, without student names. Rate = (present + late) ÷ (present + late + absent);

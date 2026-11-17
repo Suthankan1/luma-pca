@@ -133,6 +133,16 @@ public class AttendanceFinalisationService {
 
     @Transactional
     public FinalisationResult finalise(CurrentAccount caller, UUID sessionId) {
+        return finalise(caller, sessionId, false);
+    }
+
+    /** As {@link #finalise}, by the automatic job in the name of the owner who switched it on; audited as automatic. */
+    @Transactional
+    public FinalisationResult finaliseAutomatically(CurrentAccount owner, UUID sessionId) {
+        return finalise(owner, sessionId, true);
+    }
+
+    private FinalisationResult finalise(CurrentAccount caller, UUID sessionId, boolean automatic) {
         caller.requireAcademyManager();
         SessionView session = sessions.get(caller, sessionId);
         // One finalisation per class, even if two administrators press at once.
@@ -180,7 +190,7 @@ public class AttendanceFinalisationService {
                 counts.getOrDefault(AttendanceRule.Outcome.LATE, 0), counts.getOrDefault(AttendanceRule.Outcome.ABSENT, 0));
         audit.record(caller.academyId(), caller.accountId(), "ATTENDANCE_FINALISED", "CLASS_SESSION", sessionId, Map.of(
                 "present", String.valueOf(result.present()), "late", String.valueOf(result.late()), "absent", String.valueOf(result.absent()),
-                "rule", policy.minConnectedPercent() + "% / " + policy.lateAfterMinutes() + " min"));
+                "rule", policy.minConnectedPercent() + "% / " + policy.lateAfterMinutes() + " min", "automatic", String.valueOf(automatic)));
         return result;
     }
 }
