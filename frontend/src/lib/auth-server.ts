@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
@@ -61,7 +62,7 @@ export async function authRequest(
   });
 }
 
-export async function readIdentity(access: string): Promise<Identity | null> {
+export const readIdentity = cache(async (access: string): Promise<Identity | null> => {
   const result = await authRequest("me", { access });
   if (result.status === 401 || result.status === 403) return null;
   if (!result.ok) throw new Error("Identity service unavailable");
@@ -71,7 +72,7 @@ export async function readIdentity(access: string): Promise<Identity | null> {
     throw new Error("Invalid identity response");
   }
   return data;
-}
+});
 
 export async function currentSession() {
   const cookieJar = await cookies();
