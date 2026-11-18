@@ -2160,3 +2160,22 @@ build runs the Next.js default bundler and repeats the smoke test.
     58%, 3 rejoins, filters, the student's own view, 403/404 isolation and the 92-day limit.
   - Unit tests: `insights.test.mjs`.
   - Playwright `attendance-dashboard.spec.ts` (4 × 2 projects). Full suite 144 passed, 2 skipped by design.
+
+## Checkpoint PROD-ENV — 2026-11-18 — Synchronized Production Environment Configurations
+
+- **Context:** Updated environment configuration in production to include read-only Academy payment database connection properties.
+- **Backend Environment on Oracle Cloud VM (`/opt/luma/.env`):**
+  - Updated `/opt/luma/.env` with the newly defined parameters:
+    - `LUMA_ACADEMY_PAYMENTS_ENABLED`
+    - `LUMA_ACADEMY_PAYMENTS_JDBC_URL`
+    - `LUMA_ACADEMY_PAYMENTS_USERNAME`
+    - `LUMA_ACADEMY_PAYMENTS_PASSWORD`
+    - `LUMA_ACADEMY_STUDENT_TABLE`
+  - Preserved `LUMA_AUTH_ISSUER=https://129.225.114.202.sslip.io` to ensure asymmetric JWT issuance parity.
+  - Set file permissions to `0600` owned by `ubuntu:ubuntu` and created `/opt/luma/.env.bak`.
+  - Restarted `luma-backend` systemd service: verified logs confirmed `academy-payments-readonly` Hikari connection pool initialized and started cleanly.
+  - Verified public actuator health endpoint: `https://129.225.114.202.sslip.io/actuator/health` reporting `"status":"UP"`.
+- **Frontend Verification:**
+  - Verified `https://luma-pca.vercel.app/` responding HTTP 200 with CSP and security headers.
+  - Confirmed `/staff` 307 unauthenticated redirects functional.
+
