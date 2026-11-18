@@ -29,6 +29,8 @@ export default async function StaffPage() {
   ] : [];
   return <StaffShell active="overview" crumb="Operations" title="Staff portal"
     subtitle="You’re signed in to Physics Cube Academy." hasStudentPortal={hasPortal(identity, "student")}>
+    {!identity.roles.every(r => r === "ANALYST") && <p className="link-row">
+      <Link className="action" href="/staff/dashboard">Open the attendance dashboard →</Link></p>}
     <div className="staff-grid">
       <section className="panel" aria-labelledby="today-title">
         <h2 id="today-title" className="panel-title">TODAY’S CLASSES</h2>

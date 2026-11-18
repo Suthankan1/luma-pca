@@ -42,3 +42,9 @@ column-limited read-only role; nothing is written to it.
 **As built (ACAD-2, student ID sign-in):** see `docs/security/STUDENT-ID-LOGIN.md`. The session it opens is an
 ordinary student session: the same "own data only" rules and the same 403s on staff routes apply. Accounts holding
 any role other than STUDENT are refused.
+
+**As built (ATT-DASH, attendance dashboards):** `GET /api/v1/attendance/dashboard` for Owner, Admin, Instructor and
+Attendance Officer; the class list and expected students are limited to the caller's batches, so assigned staff see
+only their batches' students. `GET /api/v1/students/{id}/attendance-overview` for Owner and Admin (404 outside the
+academy). `GET /api/v1/me/attendance-overview` for Students, resolved from the token only; students get 403 on the
+staff routes.

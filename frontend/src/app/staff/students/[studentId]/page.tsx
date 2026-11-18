@@ -79,6 +79,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
     </div>
     <section className="panel panel-gap" aria-labelledby="history-title">
       <h2 id="history-title" className="panel-title">ATTENDANCE HISTORY</h2>
+      <p className="link-row"><Link className="text-link" href={`/staff/students/${studentId}/attendance`}>Time in every class, with each leave and rejoin →</Link></p>
       {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load attendance right now.</p>
         : <ul className="dir-list">
           {attendance.data.map(r => <li key={r.id} className="dir-row dir-course" aria-label={`History ${r.classTitle}`}>

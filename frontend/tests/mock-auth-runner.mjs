@@ -25,6 +25,10 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
+  if (req.url.startsWith("/api/v1/attendance/dashboard") || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
+    return insightsApi(req, send);
+  }
+
   if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
@@ -192,6 +196,7 @@ function studentApi(req, send, body) {
   const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
   const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
   const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
+  if (url.pathname === "/api/v1/me/attendance-overview") return send(200, insightsOverview(INSIGHT_STUDENTS[0]));
   if (url.pathname === "/api/v1/me/student") {
     return send(200, { id: "00000000-0000-4000-8000-0000000000a1", studentNumber: "PCA001", fullName: "Amaya Perera" });
   }
@@ -797,6 +802,80 @@ function mockAttendance(session) {
   return { sessionId: session.id, status: linked.length > 0 && reported === linked.length ? "RECONCILED" : "PROVISIONAL",
     classStartsAt: session.startsAt, classEndsAt: session.endsAt, linkedOccurrences: linked.length, reportedOccurrences: reported,
     webinarEnded: linked.length > 0, unmatchedPeople, calculatedAt: new Date().toISOString(), students: rows, finalisedAt: final?.at ?? null };
+}
+
+// Attendance dashboards: two finished classes, three students. The Academy's example: Amaya joins three times in the
+// first class (25 + 25 + 20 minutes = 70 of 120).
+const insightDay = days => { const d = new Date(Date.now() - days * 86400_000); d.setUTCHours(3, 30, 0, 0); return d; };
+const INSIGHT_CLASSES = [
+  { id: "00000000-0000-4000-8000-0000000000c1", title: "Waves and oscillations", start: insightDay(8), minutes: 120, state: "REPORT" },
+  { id: "00000000-0000-4000-8000-0000000000c2", title: "Electric fields", start: insightDay(3), minutes: 120, state: "FINAL" },
+];
+const INSIGHT_STUDENTS = [
+  { id: "00000000-0000-4000-8000-0000000000b1", number: "PCA101", name: "Amaya Perera", visits: [[[0, 25], [35, 60], [70, 90]], [[0, 120]]], outcomes: [null, "PRESENT"] },
+  { id: "00000000-0000-4000-8000-0000000000b2", number: "PCA102", name: "Kavin Silva", visits: [[[10, 50]], [[0, 30], [40, 60]]], outcomes: [null, "ABSENT"] },
+  { id: "00000000-0000-4000-8000-0000000000b3", number: "PCA103", name: "Nila Fernando", visits: [[], []], outcomes: [null, "ABSENT"] },
+];
+const iso = (start, minute) => new Date(start.getTime() + minute * 60_000).toISOString();
+const insightCell = (student, i) => {
+  const seconds = student.visits[i].reduce((sum, [a, b]) => sum + (b - a) * 60, 0);
+  return { connectedSeconds: seconds, percent: Math.round(seconds / (INSIGHT_CLASSES[i].minutes * 60) * 100), visits: student.visits[i].length,
+    outcome: student.outcomes[i], connectedNow: false };
+};
+function insightsOverview(student) {
+  const classes = INSIGHT_CLASSES.map((c, i) => {
+    const cell = insightCell(student, i);
+    return { id: c.id, title: c.title, startsAt: c.start.toISOString(), endsAt: iso(c.start, c.minutes), timeZone: "Asia/Colombo", batchCodes: ["MON"],
+      classSeconds: c.minutes * 60, state: c.state, connectedSeconds: cell.connectedSeconds, percent: cell.percent, visits: cell.visits,
+      rejoins: Math.max(0, cell.visits - 1), connectedNow: false, firstJoinAt: student.visits[i][0] ? iso(c.start, student.visits[i][0][0]) : null,
+      secondsAfterStart: student.visits[i][0] ? student.visits[i][0][0] * 60 : null, outcome: cell.outcome,
+      timeline: student.visits[i].map(([a, b]) => ({ joinedAt: iso(c.start, a), leftAt: iso(c.start, b), open: false, secondsInClass: (b - a) * 60 })) };
+  }).reverse();
+  const connected = classes.reduce((s, c) => s + c.connectedSeconds, 0);
+  const total = classes.reduce((s, c) => s + c.classSeconds, 0);
+  const totals = { batchId: "00000000-0000-4000-8000-0000000000d1", batchCode: "MON", courseCode: "PHY-2026", classes: classes.length,
+    joined: classes.filter(c => c.visits).length, connectedSeconds: connected, classSeconds: total, percent: Math.round(connected / total * 100),
+    present: classes.filter(c => c.outcome === "PRESENT").length, late: 0, absent: classes.filter(c => c.outcome === "ABSENT").length, excused: 0,
+    rejoins: classes.reduce((s, c) => s + c.rejoins, 0) };
+  return { studentId: student.id, studentNumber: student.number, fullName: student.name, from: "2026-01-01", to: "2026-12-31", minPercent: 75,
+    overall: { ...totals, batchId: null, batchCode: null, courseCode: null }, byBatch: [totals],
+    enrolments: [{ batchId: totals.batchId, batchCode: "MON", batchName: "Monday evening", courseId: "00000000-0000-4000-8000-0000000000e1",
+      courseCode: "PHY-2026", courseTitle: "A/L Physics 2026", enrolledOn: "2026-01-05", withdrawnOn: null, status: "ENROLLED" }],
+    classes };
+}
+function insightsApi(req, send) {
+  if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+  const url = new URL(req.url, "http://mock");
+  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  if (url.pathname !== "/api/v1/attendance/dashboard") {
+    if (!manager) return send(403);
+    const student = INSIGHT_STUDENTS.find(s => url.pathname.includes(s.id));
+    return student ? send(200, insightsOverview(student)) : send(404);
+  }
+  if (!manager && !roles.some(r => r === "INSTRUCTOR" || r === "ATTENDANCE_OFFICER")) return send(403);
+  const from = url.searchParams.get("from"), to = url.searchParams.get("to");
+  if (from && to && (Date.parse(to) - Date.parse(from)) / 86400_000 > 91) return send(400, { detail: "from must not be after to, and the range is at most 92 days" });
+  const empty = url.searchParams.get("batchId") === "00000000-0000-4000-8000-0000000000d2";
+  const classes = empty ? [] : INSIGHT_CLASSES.filter(c => !from || c.start.toISOString().slice(0, 10) >= from).map((c, i) => {
+    const cells = INSIGHT_STUDENTS.map(s => insightCell(s, i));
+    return { id: c.id, title: c.title, startsAt: c.start.toISOString(), endsAt: iso(c.start, c.minutes), timeZone: "Asia/Colombo", batchCodes: ["MON"],
+      classSeconds: c.minutes * 60, state: c.state, expected: 3, joined: cells.filter(x => x.visits).length,
+      averagePercent: Math.round(cells.reduce((s, x) => s + x.percent, 0) / 3) };
+  });
+  const indexes = classes.map(c => INSIGHT_CLASSES.findIndex(x => x.id === c.id));
+  const students = classes.length === 0 ? [] : INSIGHT_STUDENTS.map(s => {
+    const cells = indexes.map(i => insightCell(s, i));
+    const connected = cells.reduce((sum, x) => sum + x.connectedSeconds, 0);
+    const total = classes.reduce((sum, c) => sum + c.classSeconds, 0);
+    return { studentId: s.id, studentNumber: s.number, fullName: s.name, batchCodes: ["MON"], classes: cells.length, joined: cells.filter(x => x.visits).length,
+      connectedSeconds: connected, classSeconds: total, percent: Math.round(connected / total * 100),
+      present: cells.filter(x => x.outcome === "PRESENT").length, late: 0, absent: cells.filter(x => x.outcome === "ABSENT").length, excused: 0,
+      rejoins: cells.reduce((sum, x) => sum + Math.max(0, x.visits - 1), 0), cells };
+  });
+  const average = students.length ? Math.round(students.reduce((sum, x) => sum + x.percent, 0) / students.length) : 0;
+  return send(200, { from, to, courseId: url.searchParams.get("courseId"), batchId: url.searchParams.get("batchId"), truncated: false,
+    totals: { classes: classes.length, students: students.length, averagePercent: average, classSeconds: classes.reduce((sum, c) => sum + c.classSeconds, 0),
+      belowThreshold: students.filter(x => x.percent < 75).length, minPercent: 75, connectedNow: 0 }, classes, students });
 }
 
 // The Academy's own records (read-only in the real API): classes from payment rows, students by Academy ID.
