@@ -141,6 +141,87 @@ public class ProvisionalAttendanceService {
                 finalisedAt[0]);
     }
 
+    /**
+     * One connection of a student to a class's webinar, as seen in Zoom: a leave followed by a join is a rejoin.
+     *
+     * @param joinedAt when the connection started (the webinar's start when only the leave arrived)
+     * @param leftAt when it ended; for an open connection the webinar's end, or now while it runs
+     * @param open no leave has arrived (still connected, or the leave was missed)
+     * @param secondsInClass this connection's time inside the class time (connections can overlap; the class total
+     *                       merges them and never counts any moment twice)
+     */
+    public record Visit(Instant joinedAt, Instant leftAt, boolean open, long secondsInClass) {
+    }
+
+    /** One student's facts for one class, with every connection. {@code connectedSeconds} never exceeds the class length. */
+    public record StudentFacts(boolean seen, int visits, int openVisits, long connectedSeconds, Instant firstJoinAt,
+                               Long secondsAfterStart, List<Visit> timeline) {
+    }
+
+    /**
+     * @param state FINAL (finalised against the academy's rule), REPORT (Zoom's participant report, not yet finalised),
+     *              ENDED (live events only, webinar over), LIVE (running now) or NO_WEBINAR (no Zoom webinar linked)
+     * @param finals per student: the final record's outcome and its officially recorded connected seconds
+     */
+    public record ClassFacts(String state, Map<UUID, StudentFacts> students, Map<UUID, FinalOutcome> finals) {
+    }
+
+    public record FinalOutcome(String outcome, long connectedSeconds) {
+    }
+
+    /**
+     * For other services in this module: attendance facts of every matched student of one class. No access check: the
+     * caller has checked the class and filters the students it may show.
+     */
+    ClassFacts factsFor(UUID academyId, UUID sessionId, Instant startsAt, Instant endsAt) {
+        ClassActivity activity = zoom.activityForClass(academyId, sessionId);
+        Map<UUID, FinalOutcome> finals = new java.util.HashMap<>();
+        jdbc.query("SELECT student_id, outcome, connected_seconds FROM attendance_records WHERE academy_id = ? AND class_session_id = ?",
+                (org.springframework.jdbc.core.RowCallbackHandler) r -> finals.put((UUID) r.getObject(1),
+                        new FinalOutcome(r.getString(2), r.getLong(3))), academyId, sessionId);
+        Instant now = DbTime.now();
+        Map<UUID, List<StudentVisit>> byStudent = activity.visits().stream().collect(Collectors.groupingBy(StudentVisit::studentId));
+        Map<UUID, StudentFacts> facts = new java.util.HashMap<>();
+        byStudent.forEach((id, visits) -> facts.put(id, facts(visits, activity, startsAt, endsAt, now)));
+        boolean reconciled = !activity.occurrences().isEmpty() && activity.reportedOccurrences().containsAll(activity.occurrences());
+        boolean ended = !activity.occurrences().isEmpty() && activity.occurrences().stream()
+                .allMatch(o -> activity.endedAt().containsKey(o) || activity.reportedOccurrences().contains(o));
+        String state = !finals.isEmpty() ? "FINAL" : activity.occurrences().isEmpty() ? "NO_WEBINAR" : reconciled ? "REPORT"
+                : ended || now.isAfter(endsAt.plus(Duration.ofHours(2))) ? "ENDED" : "LIVE";
+        return new ClassFacts(state, facts, finals);
+    }
+
+    private static StudentFacts facts(List<StudentVisit> visits, ClassActivity activity, Instant startsAt, Instant endsAt, Instant now) {
+        List<Visit> timeline = new ArrayList<>();
+        List<ConnectionInterval> intervals = new ArrayList<>();
+        Instant firstJoin = null;
+        int open = 0;
+        for (StudentVisit visit : visits) {
+            Instant joined = visit.joinedAt() != null ? visit.joinedAt() : activity.startedAt().get(visit.occurrenceUuid());
+            Instant left = visit.leftAt();
+            boolean isOpen = left == null;
+            if (isOpen) {
+                open++;
+                Instant end = activity.endedAt().get(visit.occurrenceUuid());
+                left = end != null ? end : now;
+            }
+            if (joined == null) {
+                continue;
+            }
+            firstJoin = firstJoin == null || joined.isBefore(firstJoin) ? joined : firstJoin;
+            long inClass = 0;
+            if (left.isAfter(joined)) {
+                intervals.add(new ConnectionInterval(joined, left));
+                inClass = AttendanceDurationCalculator.connectedDuration(startsAt, endsAt, List.of(new ConnectionInterval(joined, left))).toSeconds();
+            }
+            timeline.add(new Visit(joined, left, isOpen, inClass));
+        }
+        timeline.sort(Comparator.comparing(Visit::joinedAt));
+        long connected = intervals.isEmpty() ? 0 : AttendanceDurationCalculator.connectedDuration(startsAt, endsAt, intervals).toSeconds();
+        Long after = firstJoin == null ? null : Math.max(0, Duration.between(startsAt, firstJoin).toSeconds());
+        return new StudentFacts(true, visits.size(), open, connected, firstJoin, after, List.copyOf(timeline));
+    }
+
     private static StudentAttendance row(UUID id, String number, String name, boolean expected, List<StudentVisit> visits,
                                          ClassActivity activity, SessionView session, Instant now) {
         List<ConnectionInterval> intervals = new ArrayList<>();

@@ -99,12 +99,29 @@ public class ClassSessionService {
         if (!to.isAfter(from) || Duration.between(from, to).compareTo(MAX_WINDOW) > 0) {
             throw new InvalidRequestException("to must be after from and at most " + MAX_WINDOW.toDays() + " days later");
         }
-        List<com.physicscube.luma.enrollments.EnrollmentView> enrolled = enrollments.mine(caller);
+        return classesFor(caller.academyId(), from, to, enrollments.mine(caller));
+    }
+
+    /**
+     * A student's classes starting in [from, to), by the same rule as {@link #mine}: for owners and administrators looking
+     * at one student's attendance.
+     */
+    @Transactional(readOnly = true)
+    public List<StudentClassView> forStudent(CurrentAccount caller, UUID studentId, Instant from, Instant to) {
+        caller.requireAcademyManager();
+        if (!to.isAfter(from) || Duration.between(from, to).compareTo(MAX_WINDOW) > 0) {
+            throw new InvalidRequestException("to must be after from and at most " + MAX_WINDOW.toDays() + " days later");
+        }
+        return classesFor(caller.academyId(), from, to, enrollments.forStudent(caller, studentId));
+    }
+
+    private List<StudentClassView> classesFor(UUID academyId, Instant from, Instant to,
+                                              List<com.physicscube.luma.enrollments.EnrollmentView> enrolled) {
         Set<UUID> batchIds = enrolled.stream().map(com.physicscube.luma.enrollments.EnrollmentView::batchId).collect(Collectors.toSet());
         if (batchIds.isEmpty()) {
             return List.of();
         }
-        return sessions.inWindowForBatches(caller.academyId(), from, to, batchIds).stream()
+        return sessions.inWindowForBatches(academyId, from, to, batchIds).stream()
                 .map(session -> {
                     java.time.LocalDate day = session.localDate();
                     List<StudentClassView.Batch> mine = enrolled.stream()
