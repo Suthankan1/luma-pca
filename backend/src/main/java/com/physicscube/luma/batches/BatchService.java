@@ -38,6 +38,30 @@ public class BatchService {
     }
 
     /** @param courseId {@code null} for every batch the caller may see */
+    /** Managers' batch lists per academy and course filter: the same for every owner and administrator. */
+    private record ListKey(UUID academyId, UUID courseId) {
+    }
+
+    private record Cached(List<BatchView> batches, long expiresAt) {
+    }
+
+    private static final long LIST_TTL_MS = 60_000;
+    private final java.util.concurrent.ConcurrentMap<ListKey, Cached> managerLists = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Clears the academy's cached lists now and again once the change is committed, so no reader keeps the old list. */
+    private void evictListsAfterCommit(UUID academyId) {
+        managerLists.keySet().removeIf(key -> key.academyId().equals(academyId));
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            managerLists.keySet().removeIf(key -> key.academyId().equals(academyId));
+                        }
+                    });
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<BatchView> list(CurrentAccount caller, UUID courseId) {
         if (courseId != null) {
@@ -45,8 +69,18 @@ public class BatchService {
         }
         List<Batch> found;
         if (caller.isAcademyManager()) {
+            // Cached for a minute and cleared by any batch change; instructors' lists depend on assignments and are not.
+            ListKey key = new ListKey(caller.academyId(), courseId);
+            Cached cached = managerLists.get(key);
+            long now = System.currentTimeMillis();
+            if (cached != null && now < cached.expiresAt()) {
+                return cached.batches();
+            }
             found = courseId == null ? batches.findByAcademyIdOrderByStartsOnDescCodeAsc(caller.academyId())
                     : batches.findByAcademyIdAndCourseIdOrderByStartsOnDescCodeAsc(caller.academyId(), courseId);
+            List<BatchView> views = found.stream().map(BatchView::of).toList();
+            managerLists.put(key, new Cached(views, now + LIST_TTL_MS));
+            return views;
         } else {
             found = batches.findByAcademyIdAndIdIn(caller.academyId(), assignedBatchIds(caller)).stream()
                     .filter(batch -> courseId == null || courseId.equals(batch.getCourseId()))
@@ -113,6 +147,7 @@ public class BatchService {
             throw duplicateCode();
         }
         try {
+            evictListsAfterCommit(caller.academyId());
             return BatchView.of(batches.saveAndFlush(
                     new Batch(caller.academyId(), courseId, normalized, name.strip(), startsOn, endsOn)));
         } catch (DataIntegrityViolationException e) {
@@ -130,6 +165,7 @@ public class BatchService {
         }
         batch.update(Codes.normalize(code), name.strip(), startsOn, endsOn, active);
         try {
+            evictListsAfterCommit(caller.academyId());
             return BatchView.of(batches.saveAndFlush(batch));
         } catch (DataIntegrityViolationException e) {
             throw translate(e);

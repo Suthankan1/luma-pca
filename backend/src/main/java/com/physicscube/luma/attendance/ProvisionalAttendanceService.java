@@ -80,11 +80,31 @@ public class ProvisionalAttendanceService {
                                         Instant calculatedAt, List<StudentAttendance> students, Instant finalisedAt) {
     }
 
+    private record FinalRecords(Map<UUID, Object[]> records, Instant finalisedAt) {
+    }
+
+    /** The class's final records by student (id, outcome, version), once it is finalised. */
+    private FinalRecords finalRecords(UUID academyId, UUID sessionId) {
+        Map<UUID, Object[]> records = new java.util.HashMap<>();
+        Instant[] finalisedAt = new Instant[1];
+        jdbc.query("SELECT id, student_id, outcome, finalised_at, version FROM attendance_records WHERE academy_id = ? AND class_session_id = ?",
+                (org.springframework.jdbc.core.RowCallbackHandler) row -> {
+                    records.put((UUID) row.getObject("student_id"), new Object[] {row.getObject("id"), row.getString("outcome"), row.getLong("version")});
+                    finalisedAt[0] = row.getTimestamp("finalised_at").toInstant();
+                }, academyId, sessionId);
+        return new FinalRecords(records, finalisedAt[0]);
+    }
+
     @Transactional(readOnly = true)
     public ProvisionalAttendance forClass(CurrentAccount caller, UUID sessionId) {
+        // Zoom activity and final records are read at the same time as the class (they need only the academy and class
+        // IDs); nothing they return is used unless the access check below passes.
+        UUID academyId = caller.academyId();
+        var activityTask = com.physicscube.luma.shared.concurrent.Parallel.start(() -> zoom.activityForClass(academyId, sessionId));
+        var recordsTask = com.physicscube.luma.shared.concurrent.Parallel.start(() -> finalRecords(academyId, sessionId));
         SessionView session = sessions.get(caller, sessionId); // access check: batch-scoped staff see their classes only
-        List<ExpectedStudent> expected = sessions.expectedStudents(caller, sessionId);
-        ClassActivity activity = zoom.activityForClass(caller.academyId(), sessionId);
+        List<ExpectedStudent> expected = sessions.expectedStudents(caller, session);
+        ClassActivity activity = com.physicscube.luma.shared.concurrent.Parallel.join(activityTask);
         Instant now = DbTime.now();
 
         Map<UUID, List<StudentVisit>> byStudent = activity.visits().stream().collect(Collectors.groupingBy(StudentVisit::studentId));
@@ -111,13 +131,9 @@ public class ProvisionalAttendanceService {
         boolean ended = !activity.occurrences().isEmpty() && activity.occurrences().stream()
                 .allMatch(o -> activity.endedAt().containsKey(o) || activity.reportedOccurrences().contains(o));
         // Final records, once the class is finalised (004B); corrections change the outcome in force (004C).
-        Map<UUID, Object[]> records = new java.util.HashMap<>();
-        Instant[] finalisedAt = new Instant[1];
-        jdbc.query("SELECT id, student_id, outcome, finalised_at, version FROM attendance_records WHERE academy_id = ? AND class_session_id = ?",
-                row -> {
-                    records.put((UUID) row.getObject("student_id"), new Object[] {row.getObject("id"), row.getString("outcome"), row.getLong("version")});
-                    finalisedAt[0] = row.getTimestamp("finalised_at").toInstant();
-                }, caller.academyId(), sessionId);
+        FinalRecords finals = com.physicscube.luma.shared.concurrent.Parallel.join(recordsTask);
+        Map<UUID, Object[]> records = finals.records();
+        Instant[] finalisedAt = {finals.finalisedAt()};
         List<StudentAttendance> withRecords = rows.stream().map(r -> records.containsKey(r.studentId())
                 ? r.withRecord((UUID) records.get(r.studentId())[0], (String) records.get(r.studentId())[1], (Long) records.get(r.studentId())[2]) : r).toList();
         return new ProvisionalAttendance(sessionId, reconciled ? "RECONCILED" : "PROVISIONAL", session.startsAt(), session.endsAt(),

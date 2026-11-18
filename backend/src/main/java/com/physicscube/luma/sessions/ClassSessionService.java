@@ -126,6 +126,16 @@ public class ClassSessionService {
         return views(caller, List.of(readable(caller, sessionId, scope)), scope).get(0);
     }
 
+    /**
+     * As {@link #expectedStudents(CurrentAccount, UUID)} for a class the caller already read with {@link #get}: that view
+     * lists only the batches the caller may see, so the class is not read again (one round trip fewer).
+     */
+    @Transactional(readOnly = true)
+    public List<ExpectedStudent> expectedStudents(CurrentAccount caller, SessionView readByCaller) {
+        Set<UUID> visible = readByCaller.batches().stream().map(SessionView.Batch::batchId).collect(Collectors.toSet());
+        return enrollments.expectedOn(caller.academyId(), visible, readByCaller.localDate());
+    }
+
     /** Students expected at the class, each once, limited to the batches the caller may see. */
     @Transactional(readOnly = true)
     public List<ExpectedStudent> expectedStudents(CurrentAccount caller, UUID sessionId) {

@@ -30,7 +30,7 @@ spring:
       idle-timeout: 600000
       keepalive-time: 120000
       minimum-idle: 3
-      maximum-pool-size: 8
+      maximum-pool-size: ${DB_POOL_MAX:12}
       connection-timeout: 20000
       validation-timeout: 3000
   jpa:

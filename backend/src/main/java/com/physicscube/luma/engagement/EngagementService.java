@@ -293,18 +293,35 @@ public class EngagementService {
     /** Counts for staff who see the class: reactions by kind, how many students reacted, every question's answer counts. */
     @Transactional(readOnly = true)
     public ClassEngagement forStaff(CurrentAccount caller, UUID sessionId) {
+        // Settings, reactions and questions are read at the same time as the class; none is returned unless the access
+        // check (sessions.get) passes.
+        UUID academyId = caller.academyId();
+        var enabledTask = com.physicscube.luma.shared.concurrent.Parallel.start(() -> find(academyId).map(Settings::enabled).orElse(false));
+        var pulsesTask = com.physicscube.luma.shared.concurrent.Parallel.start(() -> pulses(academyId, sessionId, null));
+        var reactionsTask = com.physicscube.luma.shared.concurrent.Parallel.start(() -> {
+            Map<String, Integer> counts = new LinkedHashMap<>();
+            for (String kind : List.of("UNDERSTOOD", "CONFUSED", "SLOW_DOWN", "SPEED_UP")) {
+                counts.put(kind, 0);
+            }
+            int[] reacting = new int[1];
+            // One round trip: counts per kind, and the number of students who reacted (repeated on each row).
+            jdbc.query("""
+                    SELECT kind, count(*) AS n,
+                           (SELECT count(DISTINCT student_id) FROM portal_reactions WHERE academy_id = ? AND class_session_id = ?) AS students
+                    FROM portal_reactions WHERE academy_id = ? AND class_session_id = ? GROUP BY kind
+                    """, (org.springframework.jdbc.core.RowCallbackHandler) row -> {
+                counts.put(row.getString("kind"), row.getInt("n"));
+                reacting[0] = row.getInt("students");
+            }, academyId, sessionId, academyId, sessionId);
+            return new Object[] {counts, reacting[0]};
+        });
         SessionView view = sessions.get(caller, sessionId);
-        boolean enabled = find(caller.academyId()).map(Settings::enabled).orElse(false);
-        Map<String, Integer> reactions = new LinkedHashMap<>();
-        for (String kind : List.of("UNDERSTOOD", "CONFUSED", "SLOW_DOWN", "SPEED_UP")) {
-            reactions.put(kind, 0);
-        }
-        jdbc.query("SELECT kind, count(*) FROM portal_reactions WHERE academy_id = ? AND class_session_id = ? GROUP BY kind",
-                row -> { reactions.put(row.getString(1), row.getInt(2)); }, caller.academyId(), sessionId);
-        Integer reacting = jdbc.queryForObject("SELECT count(DISTINCT student_id) FROM portal_reactions WHERE academy_id = ? AND class_session_id = ?",
-                Integer.class, caller.academyId(), sessionId);
-        return new ClassEngagement(sessionId, enabled, reactions, reacting == null ? 0 : reacting, pulses(caller.academyId(), sessionId, null),
-                "PORTAL_REACTION, PORTAL_PULSE", view.startsAt(), view.endsAt());
+        boolean enabled = com.physicscube.luma.shared.concurrent.Parallel.join(enabledTask);
+        Object[] reacted = com.physicscube.luma.shared.concurrent.Parallel.join(reactionsTask);
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> reactions = (Map<String, Integer>) reacted[0];
+        return new ClassEngagement(sessionId, enabled, reactions, (Integer) reacted[1],
+                com.physicscube.luma.shared.concurrent.Parallel.join(pulsesTask), "PORTAL_REACTION, PORTAL_PULSE", view.startsAt(), view.endsAt());
     }
 
     // ---- 006C rankings (staff only) ----------------------------------------------------------
