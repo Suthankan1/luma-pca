@@ -29,7 +29,7 @@ export default async function SignIn({ searchParams }: {
     : unavailable ? messages.unavailable : undefined;
 
   return <Shell>
-    <section className="panel session-panel">
+    <section className={`panel session-panel ${studentIdLoginEnabled() && portal !== "staff" && !identity && !canRefresh ? "session-panel-wide" : ""}`}>
       <h1 className="heading">Sign in to LUMA</h1>
       {message && <p className="session-error" role="alert">{message}</p>}
       {signedOut === "1" && <p className="sub" role="status">You’re signed out.</p>}
@@ -52,7 +52,7 @@ export default async function SignIn({ searchParams }: {
             <button className="action secondary" type="submit">Cancel and restart</button>
           </form>
         </div>
-      </> : <>
+      </> : <div className={studentIdLoginEnabled() && portal !== "staff" ? "signin-cards" : undefined}>
       {studentIdLoginEnabled() && portal !== "staff" && <form method="post" action="/api/session/student-login" className="session-form"
         aria-labelledby="student-sign-in">
         <h2 id="student-sign-in" className="eyebrow">Students</h2>
@@ -76,7 +76,7 @@ export default async function SignIn({ searchParams }: {
         <button className="action" type="submit">Sign in</button>
         <p className="sub"><Link href="/forgot-password">Forgot your password?</Link></p>
       </form>
-      </>}
+      </div>}
     </section>
   </Shell>;
 }

@@ -21,7 +21,7 @@ export default async function MyAttendancePage({ searchParams }: { searchParams:
   if (from > to) [from, to] = [to, from];
   const result = await studentApi<StudentOverview>(withParams("/api/v1/me/attendance-overview", { from, to }) as `/api/v1/me/${string}`,
     undefined, 30000);
-  return <Shell active="student" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
+  return <Shell active="student" studentSection="attendance" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
     <p className="link-row"><Link className="text-link" href="/student">← Student portal</Link></p>
     <h1 className="heading">My attendance</h1>
     {result.ok && <p className="sub"><strong>{result.data.fullName}</strong> · student ID <strong>{result.data.studentNumber}</strong></p>}

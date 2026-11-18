@@ -257,3 +257,62 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .insights-grid .dir-meta { flex-wrap:wrap; }
 .class-card-body p { font-size:13px; margin-top:10px; }
 @media (max-width: 1180px) { .insights-grid { grid-template-columns:1fr; } }
+
+/* Redesign (UI-2): grouped sticky menu, compact page header, student home */
+.staff-rail { position:sticky; top:0; height:100vh; overflow-y:auto; gap:18px; }
+.staff-nav { gap:14px; }
+.staff-navgroup { display:flex; flex-direction:column; gap:2px; }
+.staff-navlabel { font-size:10px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:#8ea3d6; padding:0 12px 4px; }
+.staff-navitem { padding:9px 12px; gap:12px; min-height:40px; }
+.staff-navicon { width:18px; text-align:center; color:#8ec9ec; font-size:13px; }
+.staff-navitem.active .staff-navicon { color:var(--pca-navy); }
+.staff-content { padding-top:26px; }
+.page-head { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:16px; padding-bottom:18px; margin-bottom:20px; border-bottom:1px solid #d7e5f2; }
+.page-head .crumbs { border:0; padding:0; margin:0; text-transform:uppercase; }
+.page-head .staff-heading { font-size:clamp(26px, 3vw, 36px); letter-spacing:-.8px; margin:6px 0 6px; }
+.page-sub { margin:0; font-size:14px; }
+.page-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.side-stack { display:flex; flex-direction:column; gap:20px; }
+.next-class { margin:0 0 20px; border-radius:20px; padding:20px 24px; background:linear-gradient(135deg, #22206a, #1b65a2); color:#fff; }
+.next-class.is-live { background:linear-gradient(135deg, #0d5132, #1f9d63); }
+.next-class-label { font-size:12px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:#bfe6f8; }
+.next-class.is-live .next-class-label::before { content:"● "; color:#9ff0c6; }
+.next-class-body { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px; margin-top:6px; }
+.next-class-title { font-size:22px; font-weight:800; }
+.next-class-when { color:#d9eefa; font-size:14px; margin-top:4px; }
+.next-class-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.next-class .action.join { background:#fff; color:var(--pca-navy); }
+.next-class .action.secondary { background:rgba(255,255,255,.16); color:#fff; }
+@media (max-width: 960px) {
+  .staff-rail { position:static; height:auto; overflow:visible; flex-direction:column; align-items:stretch; gap:10px; }
+  .staff-nav { flex-direction:row; flex-wrap:nowrap; overflow-x:auto; gap:4px; padding-bottom:4px; scrollbar-width:thin; }
+  .staff-navgroup { flex-direction:row; gap:4px; }
+  .staff-navlabel { display:none; }
+  .staff-navitem { white-space:nowrap; flex:0 0 auto; }
+  .staff-railfoot { display:flex; flex-wrap:wrap; align-items:center; gap:14px; }
+  .staff-academy { display:none; }
+  .staff-content { padding-top:18px; }
+}
+.quick-links { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.entry-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px; margin-top:28px; max-width:820px; }
+.entry-card { display:flex; flex-direction:column; gap:8px; padding:24px; background:#fff; border:1px solid #d7e5f2; border-radius:20px;
+  color:var(--pca-ink); box-shadow:0 6px 24px rgba(34,32,106,.05); transition:transform .15s ease, box-shadow .15s ease; }
+.entry-card:hover, .entry-card:focus-visible { transform:translateY(-2px); box-shadow:0 10px 28px rgba(34,32,106,.12); }
+.entry-card strong { font-size:20px; }
+.entry-card span { color:var(--pca-muted); line-height:1.6; font-size:14px; }
+.entry-icon { display:inline-grid; place-items:center; width:42px; height:42px; border-radius:12px; background:#e6f3fc; color:var(--pca-blue) !important; font-size:18px; }
+.entry-go { color:var(--pca-blue) !important; font-weight:700; margin-top:auto; }
+@media (prefers-reduced-motion: reduce) { .entry-card { transition:none; } .entry-card:hover { transform:none; } }
+.signin-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px; align-items:start; max-width:880px; }
+.signin-cards .session-form { background:#fff; border:1px solid #d7e5f2; border-radius:20px; padding:22px; margin:0; }
+.signin-cards h2 { font-size:13px; }
+.session-panel-wide { max-width: 920px; }
+@media (max-width: 580px) {
+  .kpis { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
+  .kpi { padding:12px 14px; }
+  .kpi-value { font-size:20px; }
+  .kpi-label { font-size:11px; }
+  .next-class { padding:16px 18px; }
+  .next-class-title { font-size:18px; }
+  .page-head { align-items:flex-start; }
+}

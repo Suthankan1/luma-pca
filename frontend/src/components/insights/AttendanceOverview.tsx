@@ -30,7 +30,7 @@ export function AttendanceOverview({ overview, self }: { overview: StudentOvervi
         <ul className="class-cards">
           {overview.classes.map(c => <li key={c.id}>
             <details className="class-card">
-              <summary aria-label={`${c.title}, ${formatDay(c.startsAt, c.timeZone)}`}>
+              <summary>
                 <span className="class-card-main">
                   <strong>{c.title}</strong>
                   <span className="muted"> {formatDay(c.startsAt, c.timeZone)} · {formatClock(c.startsAt, c.timeZone)}–{formatClock(c.endsAt, c.timeZone)}
