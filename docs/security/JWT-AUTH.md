@@ -45,3 +45,20 @@
 
 ## Definition of done for auth release
 Test invite expiry, hash verification, login failures, disabled users, refresh rotation and replay, logout-all, key rotation/unknown key, exp/iss/aud mismatch, CSRF, BFF cookie flags, staff batch-scoping, student self-only data, admin MFA, audit trails and no token leakage. No production deployment before these pass.
+
+## Staying signed in (SESSION-2, 2026-11-18)
+
+Reported problem: people were "signed out" after about 10 minutes. The access token (and the web app's access cookie)
+lasts 10 minutes by design, and nothing renewed it, so every page after that sent people to the sign-in page.
+
+- **Silent renewal:** the web app's proxy (`frontend/src/proxy.ts`) runs before every page. When the access cookie has
+  expired but the refresh cookie is still there, it renews the session with the API and continues the same request with
+  the new cookies. People stay signed in for as long as the refresh session lasts (refresh token 7 days of idleness,
+  session at most 30 days): always at least the requested 2 hours.
+- **Parallel page loads:** a page and its prefetches share one renewal in the proxy. Across server instances, the API
+  accepts a just-used refresh token for 30 seconds (`RefreshSessions.CONCURRENT_GRACE`) and issues a new token in the same
+  session (V28 allows more than one current token per session). Presenting a used token after 30 seconds is still treated
+  as theft and revokes the whole session.
+- **Sign out is immediate:** it revokes the session in the API and clears both cookies; the API checks the session on
+  every request, so even an unexpired access token stops working at once (`RefreshSessionHttpIntegrationTest`).
+- Access tokens stay short (10 minutes, at most 15), as this document requires.

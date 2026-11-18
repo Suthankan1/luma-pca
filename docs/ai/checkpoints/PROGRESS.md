@@ -2206,3 +2206,24 @@ build runs the Next.js default bundler and repeats the smoke test.
   - Playwright: 148 passed, 2 skipped by design. New: student next-class/join and home-page tests.
   - Axe now also checks `/`, the dashboard views, Academy classes, the student attendance pages and My attendance.
   - Unit tests and lint pass.
+
+## Checkpoint SESSION-2 — 2026-11-18 — No more automatic sign-out; sign out still immediate
+
+- **Branch:** `fix/session-stays-signed-in`.
+- **Cause:** the 10-minute access cookie expired and nothing renewed it, so pages sent people to sign-in. Parallel
+  renewals were also treated as token theft, which revoked the whole session.
+- **Fix:**
+  - The proxy silently renews on every page (one shared renewal per token).
+  - The API gives a 30-second grace to a just-used refresh token, issuing a new token in the same session.
+  - Migration V28 drops the one-current-token-per-session index.
+  - Details in `docs/security/JWT-AUTH.md`.
+- **Tests:**
+  - Identity backend suite (153), including:
+    - parallel renewals all succeed and keep the session;
+    - a replay after the grace period revokes;
+    - signing out kills an unexpired access token at once.
+  - `silent-refresh.test.mjs`.
+  - Playwright `session-persistence.spec.ts`: an expired access cookie keeps the person signed in, and Sign out ends it.
+  - Full desktop Playwright run passed (77).
+  - One full desktop + mobile run had `student-search` fail in both projects. It passes on its own and in the desktop-only
+    run; the repeat run was stopped, so CI is the check.

@@ -132,6 +132,8 @@ class RefreshSessionHttpIntegrationTest extends PostgresIntegrationTest {
         Pair first = login(EMAIL);
         Pair second = pair(refresh(first.refresh()));
         Pair otherDevice = login(EMAIL);
+        // Long after it was exchanged (not a parallel page load): theft.
+        jdbc.update("UPDATE refresh_tokens SET used_at = used_at - interval '1 minute' WHERE used_at IS NOT NULL");
 
         HttpResponse<String> replay = refresh(first.refresh());
 
@@ -146,7 +148,7 @@ class RefreshSessionHttpIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void concurrentRefreshesOfOneTokenYieldOneWinnerThenRevokeTheSession() throws Exception {
+    void concurrentRefreshesOfOneTokenAllSucceedAndKeepTheSession() throws Exception {
         Pair issued = login(EMAIL);
         int threads = 8;
         CyclicBarrier start = new CyclicBarrier(threads);
@@ -166,18 +168,41 @@ class RefreshSessionHttpIntegrationTest extends PostgresIntegrationTest {
             pool.shutdownNow();
         }
 
-        List<HttpResponse<String>> winners = responses.stream().filter(r -> r.statusCode() == 200).toList();
-        assertEquals(1, winners.size());
-        assertEquals(threads - 1, responses.stream().filter(r -> r.statusCode() == 401).count());
-        assertEquals("REUSE_DETECTED", revokeReason(sessionId(issued.access())));
-        assertEquals(401, refresh(pair(winners.get(0)).refresh()).statusCode());
-        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM refresh_tokens", Integer.class));
+        // Parallel page loads in one browser must not sign the person out: each gets a working token in the same session.
+        assertEquals(threads, responses.stream().filter(r -> r.statusCode() == 200).count());
+        assertEquals(null, revokeReason(sessionId(issued.access())));
+        for (HttpResponse<String> response : responses) {
+            Pair next = pair(response);
+            assertEquals(sessionId(issued.access()), sessionId(next.access()));
+            assertEquals(200, me(next.access()));
+        }
+        assertEquals(1 + threads, jdbc.queryForObject("SELECT count(*) FROM refresh_tokens", Integer.class));
+    }
+
+    @Test
+    void aReplayWithinTheGracePeriodIsAParallelPageLoadAndKeepsTheSession() {
+        Pair first = login(EMAIL);
+        Pair second = pair(refresh(first.refresh()));
+        Pair parallel = pair(refresh(first.refresh()));
+        assertEquals(null, revokeReason(sessionId(first.access())));
+        assertEquals(200, refresh(second.refresh()).statusCode());
+        assertEquals(200, refresh(parallel.refresh()).statusCode());
+    }
+
+    @Test
+    void signingOutEndsTheSessionAtOnceEvenForAnUnexpiredAccessToken() {
+        Pair issued = login(EMAIL);
+        assertEquals(200, me(issued.access()));
+        assertEquals(204, api.post("/api/v1/auth/logout", HttpApi.json(java.util.Map.of("refreshToken", issued.refresh()))).statusCode());
+        assertEquals(401, me(issued.access()), "the access token stops working immediately, not when it expires");
+        assertEquals(401, refresh(issued.refresh()).statusCode());
     }
 
     @Test
     void allRefreshFailuresLookIdentical() {
         Pair used = login(EMAIL);
         refresh(used.refresh());
+        jdbc.update("UPDATE refresh_tokens SET used_at = used_at - interval '1 minute' WHERE used_at IS NOT NULL");
         Pair expired = login(EMAIL);
         jdbc.update("UPDATE refresh_tokens SET created_at = NOW() - INTERVAL '8 days', "
                 + "expires_at = NOW() - INTERVAL '1 second' WHERE used_at IS NULL AND session_id = ?::uuid", sessionId(expired.access()));
@@ -296,8 +321,10 @@ class RefreshSessionHttpIntegrationTest extends PostgresIntegrationTest {
         String insertToken = "INSERT INTO refresh_tokens (id, session_id, token_hash, created_at, expires_at) "
                 + "VALUES (?, ?::uuid, ?, NOW(), NOW() + INTERVAL '1 hour')";
 
+        // A second current token is allowed since V28 (parallel page loads); a duplicate token hash never is.
+        jdbc.update(insertToken, UUID.randomUUID(), session, "cd".repeat(32));
         assertThrows(DataIntegrityViolationException.class,
-                () -> jdbc.update(insertToken, UUID.randomUUID(), session, "cd".repeat(32)), "second current token");
+                () -> jdbc.update(insertToken, UUID.randomUUID(), session, "cd".repeat(32)), "same token twice");
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
                 "UPDATE refresh_sessions SET revoked_at = NOW() WHERE id = ?::uuid", session), "revocation needs a reason");
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(

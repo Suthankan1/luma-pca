@@ -4,6 +4,9 @@ import { randomBytes } from "node:crypto";
 
 let rotation = 0;
 let latestRefresh = "";
+// Like the API: each issued refresh token, and when it was used. A used token still works for 30 s (parallel page loads).
+const refreshTokens = new Map();
+const issueRefresh = () => { const token = `fake-opaque-refresh-${++rotation}`; refreshTokens.set(token, null); return token; };
 const jwt = "fake-access-token.for-bff.e2e-test";
 let roles = [];
 let studentHasEnrolments = true;
@@ -97,7 +100,7 @@ const backend = createServer(async (req, res) => {
       if (body.mfaToken === "challenge-token-unenrolled") {
         if (body.code !== "123456") return send(401);
         roles = ["ACADEMY_ADMIN"];
-        latestRefresh = `fake-opaque-refresh-${++rotation}`;
+        latestRefresh = issueRefresh();
         return send(200, {
           accessToken: jwt,
           tokenType: "Bearer",
@@ -110,25 +113,25 @@ const backend = createServer(async (req, res) => {
       if (body.mfaToken === "challenge-token-analyst") {
         if (body.code !== "rec-recovery") return send(401);
         roles = ["ANALYST"];
-        latestRefresh = `fake-opaque-refresh-${++rotation}`;
+        latestRefresh = issueRefresh();
         return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
       }
       if (body.mfaToken === "challenge-token-instructor") {
         if (body.code !== "rec-recovery") return send(401);
         roles = ["INSTRUCTOR"];
-        latestRefresh = `fake-opaque-refresh-${++rotation}`;
+        latestRefresh = issueRefresh();
         return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
       }
       if (body.mfaToken === "challenge-token-owner") {
         if (body.code !== "rec-recovery") return send(401);
         roles = ["ACADEMY_OWNER"];
-        latestRefresh = `fake-opaque-refresh-${++rotation}`;
+        latestRefresh = issueRefresh();
         return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
       }
       if (body.mfaToken === "challenge-token-enrolled") {
         if (body.code !== "654321" && body.code !== "rec-recovery") return send(401);
         roles = ["ACADEMY_ADMIN"];
-        latestRefresh = `fake-opaque-refresh-${++rotation}`;
+        latestRefresh = issueRefresh();
         return send(200, {
           accessToken: jwt,
           tokenType: "Bearer",
@@ -167,7 +170,11 @@ const backend = createServer(async (req, res) => {
       return send(400, { detail: "This reset link is invalid, already used or expired. Ask for a new one." });
 
     case "/api/v1/auth/refresh":
-      if (body.refreshToken !== latestRefresh) return send(401);
+      {
+        const usedAt = refreshTokens.get(body.refreshToken);
+        if (usedAt === undefined || (usedAt !== null && Date.now() - usedAt > 30_000)) return send(401);
+        if (usedAt === null) refreshTokens.set(body.refreshToken, Date.now());
+      }
       break;
 
     case "/api/v1/auth/me":
@@ -175,14 +182,14 @@ const backend = createServer(async (req, res) => {
       return send(200, { accountId: SELF_ID, academyId: "test-academy", roles });
 
     case "/api/v1/auth/logout":
-      if (body.refreshToken === latestRefresh) latestRefresh = "";
+      if (refreshTokens.has(body.refreshToken)) { refreshTokens.delete(body.refreshToken); if (body.refreshToken === latestRefresh) latestRefresh = ""; }
       return send(204);
 
     default:
       return send(404);
   }
 
-  latestRefresh = `fake-opaque-refresh-${++rotation}`;
+  latestRefresh = issueRefresh();
   return send(200, { accessToken: jwt, refreshToken: latestRefresh, expiresIn: 300, refreshExpiresIn: 600 });
 });
 

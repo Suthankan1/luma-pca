@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 class RefreshSessions {
     private static final Logger log = LoggerFactory.getLogger(RefreshSessions.class);
+    /** How long after a rotation a second presentation of the same token counts as a parallel request, not reuse. */
+    static final java.time.Duration CONCURRENT_GRACE = java.time.Duration.ofSeconds(30);
 
     record Issued(UUID sessionId, UUID accountId, String refreshToken, long refreshExpiresInSeconds) {
     }
@@ -74,9 +76,16 @@ class RefreshSessions {
         // The session lock is held, so this conditional update is the single-use authority.
         if (jdbc.update("UPDATE refresh_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL",
                 Timestamp.from(now), row.get("token_id")) != 1) {
-            revoke(sessionId, "REUSE_DETECTED", now);
-            log.warn("Refresh token reuse detected; session {} of account {} revoked", sessionId, accountId);
-            return null;
+            // A browser opening several pages at once presents the same token in parallel: the first rotates it and the
+            // others arrive moments later. Within the grace period each of those gets its own new token in the same session
+            // (so no page load signs the person out); presenting a used token after the grace period is treated as theft
+            // and ends the session.
+            Timestamp usedAt = jdbc.queryForObject("SELECT used_at FROM refresh_tokens WHERE id = ?", Timestamp.class, row.get("token_id"));
+            if (usedAt == null || usedAt.toInstant().plus(CONCURRENT_GRACE).isBefore(now)) {
+                revoke(sessionId, "REUSE_DETECTED", now);
+                log.warn("Refresh token reuse detected; session {} of account {} revoked", sessionId, accountId);
+                return null;
+            }
         }
         // Like bearer authentication, refreshing cannot continue a password-only
         // session once its account has been promoted to an elevated role.
