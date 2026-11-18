@@ -43,6 +43,8 @@ public class ClassSessionService {
     private final EnrollmentService enrollments;
     private final org.springframework.context.ApplicationEventPublisher events;
     private final com.physicscube.luma.audit.AuditLog audit;
+    @org.springframework.beans.factory.annotation.Autowired
+    private ManualScheduling manualScheduling;
 
     ClassSessionService(ClassSessionRepository sessions, BatchService batches, EnrollmentService enrollments,
                         org.springframework.context.ApplicationEventPublisher events, com.physicscube.luma.audit.AuditLog audit) {
@@ -167,6 +169,7 @@ public class ClassSessionService {
     public SessionView create(CurrentAccount caller, String title, Instant startsAt, Instant endsAt, String timeZone,
                               List<UUID> batchIds, String zoomWebinarId) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         ZoneId zone = zone(timeZone);
         checkTimes(startsAt, endsAt);
         Set<UUID> wanted = checkBatches(caller, batchIds, Set.of());
@@ -195,6 +198,7 @@ public class ClassSessionService {
                                      String timeZone, List<UUID> batchIds, String zoomWebinarId, List<java.time.LocalDate> skipDates,
                                      boolean dryRun) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         ZoneId zone = zone(timeZone);
         if (lastDate.isBefore(firstDate) || java.time.temporal.ChronoUnit.DAYS.between(firstDate, lastDate) > MAX_SERIES_SPAN_DAYS) {
             throw new InvalidRequestException("lastDate must be on or after firstDate and at most " + MAX_SERIES_SPAN_DAYS + " days later");
@@ -276,6 +280,7 @@ public class ClassSessionService {
                                            java.time.LocalTime startTime, java.time.LocalTime endTime, String zoomWebinarId,
                                            boolean clearWebinar, boolean dryRun) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         String newTitle = title == null || title.isBlank() ? null : title.strip();
         if (newTitle != null && newTitle.length() > 200) {
             throw new InvalidRequestException("title must be at most 200 characters");
@@ -370,6 +375,7 @@ public class ClassSessionService {
     @Transactional
     public int cancelSeriesFrom(CurrentAccount caller, UUID seriesId, java.time.LocalDate fromDate) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         List<ClassSession> series = sessions.findByAcademyIdAndSeriesIdOrderByStartsAt(caller.academyId(), seriesId);
         if (series.isEmpty()) {
             throw new ResourceNotFoundException("Class series");
@@ -391,6 +397,7 @@ public class ClassSessionService {
                               String timeZone, List<UUID> batchIds, String status, String zoomWebinarId,
                               long expectedVersion) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         ZoneId zone = zone(timeZone);
         checkTimes(startsAt, endsAt);
         if (!STATUSES.contains(status)) {
