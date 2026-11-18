@@ -49,7 +49,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/class-sessions", "/api/v1/class-sessions/*",
                             "/api/v1/class-sessions/*/students", "/api/v1/class-sessions/*/attendance",
                             "/api/v1/class-sessions/*/attendance/export", "/api/v1/batches/*/attendance/export",
-                            "/api/v1/batches/*/attendance/summary")
+                            "/api/v1/batches/*/attendance/summary", "/api/v1/attendance/dashboard")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/assignments").hasAnyRole("INSTRUCTOR", "ATTENDANCE_OFFICER")
                     // Corrections: services limit attendance officers to students of their batches.
@@ -79,7 +79,7 @@ public class SecurityConfig {
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
                     // A student's own data; services resolve "own" from the token, never from input.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments", "/api/v1/me/class-sessions",
-                            "/api/v1/me/attendance").hasRole("STUDENT")
+                            "/api/v1/me/attendance", "/api/v1/me/attendance-overview").hasRole("STUDENT")
                     .requestMatchers(HttpMethod.POST, "/api/v1/me/attendance/*/appeals").hasRole("STUDENT")
                     // Engagement (006): a student's own consent, reactions and answers; services check consent and class.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/engagement-consent", "/api/v1/me/class-sessions/*/engagement").hasRole("STUDENT")
