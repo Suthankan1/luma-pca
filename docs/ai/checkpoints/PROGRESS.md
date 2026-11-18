@@ -2067,3 +2067,18 @@ build runs the Next.js default bundler and repeats the smoke test.
   nothing arriving it looks for due retries once a minute instead of every 15 s.
 - **Email (E1):** STARTTLS and 10-second SMTP timeouts in `application.yml`; SMTP login switches on whenever a username is set
   (`MailConfig`, `MailConfigTest`). Gmail steps in `runbooks/DEPLOY.md` and `.env.example`.
+
+## Checkpoint PERF-5 — 2026-11-18 — Independent lookups in parallel, batch list cache, slow-call log
+
+- **Branch:** `perf/parallel-queries-caching`.
+- **Parallel lookups:** `shared/concurrent/Parallel` runs a request's independent reads at the same time on virtual threads.
+  Class attendance reads Zoom activity and final records while it checks access and loads the class; engagement reads
+  settings, reactions (one query instead of two) and questions while it checks the class. Nothing read in parallel is
+  returned unless the access check passes. The class is no longer read twice for its expected students.
+- **Batch list cache:** managers' batch lists cached per academy for 60 s, cleared at once and again after commit by any
+  batch change; instructors' lists (assignment-dependent) are never cached. Pool cap 8 → 12 (`DB_POOL_MAX`).
+- **Measured** with 100 ms added to every statement (≈ the Tokyo distance), main → branch: class attendance 1,699 → 1,048 ms,
+  engagement 949 → 529 ms, batches 320 → 215 ms. The class page waits for its slowest call: ~1.7 s → ~1.05 s.
+- **Slow-call log:** the web app logs backend calls over `LUMA_SLOW_API_MS` (800 ms) as
+  `[luma] slow api GET /api/v1/class-sessions/:id/attendance 200 1235 ms` (IDs masked, no query string) to Vercel's logs.
+- Local: backend full suite, Playwright 128, unit tests 58.

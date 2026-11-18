@@ -2,6 +2,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { config } from "./auth-server";
 import { isSameOrigin, openAccess } from "./session-policy";
+import { logIfSlow } from "./slow-log";
 
 /**
  * Server-side calls from staff screens to the LUMA API, as the signed-in person.
@@ -35,6 +36,7 @@ async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`
                           init?: { method: "POST" | "PUT"; body: unknown } | { method: "DELETE" }, timeoutMs = 10000): Promise<ApiResult<T>> {
   const requestBody = init && "body" in init ? JSON.stringify(init.body) : undefined;
   const access = await accessToken(portal);
+  const started = performance.now();
   let response: Response;
   try {
     response = await fetch(new URL(path, process.env.API_INTERNAL_URL ?? "http://localhost:8080"), {
@@ -50,6 +52,7 @@ async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`
   }
   if (response.status === 401) redirect(`/sign-in?portal=${portal}&error=expired`);
   const body = response.status === 204 ? null : await response.json().catch(() => null);
+  logIfSlow(init?.method ?? "GET", path, response.status, performance.now() - started);
   if (!response.ok) {
     const detail = typeof body?.detail === "string" ? body.detail.slice(0, 300) : undefined;
     return { ok: false, status: response.status, detail };
