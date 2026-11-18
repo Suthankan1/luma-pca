@@ -118,6 +118,37 @@ class WebinarRunTracker {
         return true;
     }
 
+    /**
+     * Zoom's participant report for a run arrived (inside its storing transaction). A run still marked live missed its
+     * webinar.ended: it ends at the last leave in the report, and a start Zoom never sent becomes the first join. Known
+     * times are never changed; an ended run is left as it is.
+     */
+    void reportStored(UUID academyId, String occurrenceUuid) {
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", academyId + "/" + occurrenceUuid);
+        List<Map<String, Object>> found = jdbc.queryForList("""
+                SELECT r.class_session_id, r.first_seen_at, r.actual_started_at, r.state,
+                       (SELECT min(p.joined_at) FROM zoom_report_participants p WHERE p.academy_id = r.academy_id AND p.occurrence_uuid = r.occurrence_uuid) AS first_join,
+                       (SELECT max(p.left_at) FROM zoom_report_participants p WHERE p.academy_id = r.academy_id AND p.occurrence_uuid = r.occurrence_uuid) AS last_leave
+                FROM zoom_webinar_runs r WHERE r.academy_id = ? AND r.occurrence_uuid = ?
+                """, academyId, occurrenceUuid);
+        if (found.isEmpty() || !"LIVE".equals(found.get(0).get("state")) || found.get(0).get("last_leave") == null) {
+            return;
+        }
+        Map<String, Object> run = found.get(0);
+        Instant started = run.get("actual_started_at") != null ? ((Timestamp) run.get("actual_started_at")).toInstant()
+                : ((Timestamp) run.get("first_join")).toInstant();
+        Instant ended = ((Timestamp) run.get("last_leave")).toInstant();
+        if (ended.isBefore(started)) {
+            ended = started;
+        }
+        jdbc.update("""
+                UPDATE zoom_webinar_runs SET actual_started_at = ?, actual_ended_at = ?, state = 'ENDED', updated_at = ?
+                WHERE academy_id = ? AND occurrence_uuid = ?
+                """, Timestamp.from(started), Timestamp.from(ended), Timestamp.from(DbTime.now()), academyId, occurrenceUuid);
+        runSessions.retime(academyId, (UUID) run.get("class_session_id"), started, ended);
+        log.info("Zoom webinar run closed from Zoom's participant report (its end event was missed)");
+    }
+
     /** Zoom's ISO time in the event, else {@code fallback}. */
     static Instant time(Object value, Instant fallback) {
         if (value instanceof String text && !text.isBlank()) {

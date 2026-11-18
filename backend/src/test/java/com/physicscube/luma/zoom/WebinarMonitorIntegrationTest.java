@@ -47,6 +47,8 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
     private static final Instant SCHEDULED_AT = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).plus(18, ChronoUnit.HOURS);
     private static final AtomicReference<String> SCHEDULED_TOPIC = new AtomicReference<>(PHYSICS);
     private static final AtomicReference<Instant> SCHEDULED_START = new AtomicReference<>(SCHEDULED_AT);
+    /** A run that started 14 hours ago (longer than any class) and whose end Zoom never sent. */
+    private static final Instant REPORT_START = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(14, ChronoUnit.HOURS);
     private static final HttpServer ZOOM;
     private static JdbcTemplate source;
 
@@ -67,6 +69,11 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
                 status = 200;
                 body = "{\"id\":" + SCHEDULED + ",\"topic\":\"" + SCHEDULED_TOPIC.get() + "\",\"type\":5,\"start_time\":\"" + SCHEDULED_START.get()
                         + "\",\"duration\":60,\"timezone\":\"Asia/Colombo\",\"host_id\":\"host\"}";
+            } else if (target.startsWith("GET /v2/past_webinars/") && target.endsWith("/participants")) {
+                status = 200;
+                body = "{\"next_page_token\":\"\",\"participants\":[{\"id\":\"p1\",\"user_id\":\"u1\",\"name\":\"Amaya\","
+                        + "\"user_email\":\"amaya@example.test\",\"join_time\":\"" + REPORT_START.plus(5, ChronoUnit.MINUTES)
+                        + "\",\"leave_time\":\"" + REPORT_START.plus(65, ChronoUnit.MINUTES) + "\",\"duration\":3600,\"status\":\"in_meeting\"}]}";
             } else if (target.equals("GET /v2/webinars/" + UNSCHEDULED)) {
                 status = 200;
                 body = "{\"id\":" + UNSCHEDULED + ",\"topic\":\"Office hours\",\"type\":6,\"duration\":60,\"timezone\":\"Asia/Colombo\",\"host_id\":\"host\"}";
@@ -128,6 +135,8 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
 
     @Autowired
     ZoomReceiptProcessor processor;
+    @Autowired
+    ZoomReportService reports;
     @Autowired
     ApplicationContext context;
 
@@ -397,5 +406,34 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(404, api.put("/api/v1/zoom/monitors/" + monitor.get("id") + "/academy-class", HttpApi.json(body), admin).statusCode());
         assertNotEquals(null, decided.get("academyClassName"));
         assertFalse(((List<?>) decided.get("runs")).isEmpty());
+    }
+
+    @Test
+    void aRunWhoseEndWasMissedIsClosedByZoomsReportAndAnEndedRunKeepsItsTimes() {
+        add(SCHEDULED);
+        started(SCHEDULED, "MissedEnd==", REPORT_START);
+        visit(SCHEDULED, "MissedEnd==", "amaya@example.test", "r1", REPORT_START.plus(5, ChronoUnit.MINUTES), null);
+        Instant endedStart = Instant.now().truncatedTo(ChronoUnit.MINUTES).minus(3, ChronoUnit.HOURS);
+        started(SCHEDULED, "Ended==", endedStart);
+        ended(SCHEDULED, "Ended==", endedStart, endedStart.plus(90, ChronoUnit.MINUTES));
+        process();
+        assertEquals("LIVE", run("MissedEnd==").get("state"));
+
+        reports.runOnce();
+
+        Map<String, Object> closed = run("MissedEnd==");
+        assertEquals("ENDED", closed.get("state"), "closed from Zoom's report");
+        assertEquals(REPORT_START, ((Timestamp) closed.get("actual_started_at")).toInstant());
+        assertEquals(REPORT_START.plus(65, ChronoUnit.MINUTES), ((Timestamp) closed.get("actual_ended_at")).toInstant());
+        assertEquals(REPORT_START.plus(65, ChronoUnit.MINUTES), jdbc.queryForObject("SELECT ends_at FROM class_sessions WHERE id = ?",
+                Timestamp.class, closed.get("class_session_id")).toInstant());
+        assertEquals("FETCHED", jdbc.queryForObject("SELECT status FROM zoom_report_fetches WHERE academy_id = ? AND occurrence_uuid = 'MissedEnd=='",
+                String.class, academyId));
+
+        Map<String, Object> ended = run("Ended==");
+        assertEquals(endedStart.plus(90, ChronoUnit.MINUTES), ((Timestamp) ended.get("actual_ended_at")).toInstant(),
+                "Zoom's own end event is kept when the report arrives");
+        assertEquals("FETCHED", jdbc.queryForObject("SELECT status FROM zoom_report_fetches WHERE academy_id = ? AND occurrence_uuid = 'Ended=='",
+                String.class, academyId));
     }
 }

@@ -41,8 +41,11 @@ public class ZoomReportService {
     private final AuditLog audit;
     private final Duration delayAfterEnd;
 
+    private final WebinarRunTracker runs;
+
     ZoomReportService(JdbcTemplate jdbc, TransactionTemplate transactions, ObjectProvider<ZoomApiClient> api, AuditLog audit,
-                      @Value("${luma.zoom.reports.delay-after-end:PT15M}") Duration delayAfterEnd) {
+                      @Value("${luma.zoom.reports.delay-after-end:PT15M}") Duration delayAfterEnd, WebinarRunTracker runs) {
+        this.runs = runs;
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.api = api;
@@ -93,18 +96,28 @@ public class ZoomReportService {
             return 0;
         }
         Instant now = DbTime.now();
+        // Ended occurrences linked to a class, and runs of monitored webinars Zoom never reported as ended (a missed
+        // webinar.ended): those are fetched once they are older than the longest a class may last.
         List<Map<String, Object>> due = jdbc.queryForList("""
-                SELECT l.academy_id, l.occurrence_uuid
-                FROM zoom_occurrence_links l
-                JOIN (SELECT academy_id, occurrence_uuid, max(event_ts) AS ended_ts FROM zoom_occurrence_events
-                      WHERE event_type = 'webinar.ended' GROUP BY academy_id, occurrence_uuid) e
-                  ON e.academy_id = l.academy_id AND e.occurrence_uuid = l.occurrence_uuid
-                LEFT JOIN zoom_report_fetches f ON f.academy_id = l.academy_id AND f.occurrence_uuid = l.occurrence_uuid
-                WHERE l.class_session_id IS NOT NULL AND e.ended_ts <= ?
-                  AND (f.occurrence_uuid IS NULL OR (f.status = 'FAILED' AND f.attempts < ? AND f.next_attempt_at <= ?))
-                ORDER BY e.ended_ts
+                SELECT c.academy_id, c.occurrence_uuid
+                FROM (
+                  SELECT l.academy_id, l.occurrence_uuid, e.ended_ts AS due_ts
+                  FROM zoom_occurrence_links l
+                  JOIN (SELECT academy_id, occurrence_uuid, max(event_ts) AS ended_ts FROM zoom_occurrence_events
+                        WHERE event_type = 'webinar.ended' GROUP BY academy_id, occurrence_uuid) e
+                    ON e.academy_id = l.academy_id AND e.occurrence_uuid = l.occurrence_uuid
+                  WHERE l.class_session_id IS NOT NULL AND e.ended_ts <= ?
+                  UNION
+                  SELECT r.academy_id, r.occurrence_uuid, (extract(epoch FROM r.first_seen_at) * 1000)::bigint
+                  FROM zoom_webinar_runs r WHERE r.state = 'LIVE' AND r.first_seen_at <= ?
+                ) c
+                LEFT JOIN zoom_report_fetches f ON f.academy_id = c.academy_id AND f.occurrence_uuid = c.occurrence_uuid
+                WHERE f.occurrence_uuid IS NULL OR (f.status = 'FAILED' AND f.attempts < ? AND f.next_attempt_at <= ?)
+                ORDER BY c.due_ts
                 LIMIT ?
-                """, now.minus(delayAfterEnd).toEpochMilli(), MAX_ATTEMPTS, Timestamp.from(now), BATCH);
+                """, now.minus(delayAfterEnd).toEpochMilli(),
+                Timestamp.from(now.minus(com.physicscube.luma.sessions.ZoomRunSessions.LIVE_SPAN).minus(delayAfterEnd)),
+                MAX_ATTEMPTS, Timestamp.from(now), BATCH);
         for (Map<String, Object> row : due) {
             fetch((UUID) row.get("academy_id"), (String) row.get("occurrence_uuid"));
         }
@@ -190,6 +203,7 @@ public class ZoomReportService {
                         ON CONFLICT (academy_id, webinar_id, registrant_id) DO UPDATE SET email = EXCLUDED.email, fetched_at = EXCLUDED.fetched_at
                         """, registrants);
             }
+            runs.reportStored(academyId, occurrenceUuid);
         });
         log.info("Zoom participant report stored for an occurrence: {} join sessions", rows.size());
         return new FetchResult(occurrenceUuid, "FETCHED", rows.size(), null);

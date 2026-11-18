@@ -161,7 +161,7 @@ public class AttendanceInsightsService {
         for (int index = 0; index < selected.size(); index++) {
             Selected item = selected.get(index);
             SessionView session = item.session();
-            long classSeconds = Duration.between(session.startsAt(), session.endsAt()).toSeconds();
+            long classSeconds = heldSeconds(session.startsAt(), session.endsAt(), now);
             Map<UUID, String> batchCode = session.batches().stream()
                     .collect(Collectors.toMap(SessionView.Batch::batchId, SessionView.Batch::code, (a, b) -> a));
             int joined = 0;
@@ -198,6 +198,13 @@ public class AttendanceInsightsService {
         int visits = seen == null ? 0 : seen.visits();
         boolean now = seen != null && "LIVE".equals(classFacts.state()) && seen.openVisits() > 0;
         return new Cell(connected, percent(connected, classSeconds), visits, finalOutcome == null ? null : finalOutcome.outcome(), now);
+    }
+
+    /** How much of a class has been held: all of it once over, the elapsed part while it runs (a live Zoom run's class ends
+     * at the longest a class may last until Zoom says it ended, so its full length would understate everyone). */
+    static long heldSeconds(Instant startsAt, Instant endsAt, Instant now) {
+        Instant end = now.isBefore(endsAt) ? now : endsAt;
+        return Math.max(1, Duration.between(startsAt, end).toSeconds());
     }
 
     static int percent(long connected, long total) {
@@ -314,7 +321,7 @@ public class AttendanceInsightsService {
         for (int i = 0; i < classes.size(); i++) {
             StudentClassView c = classes.get(i);
             ClassFacts classFacts = Parallel.join(tasks.get(i));
-            long classSeconds = Duration.between(c.startsAt(), c.endsAt()).toSeconds();
+            long classSeconds = heldSeconds(c.startsAt(), c.endsAt(), now);
             StudentFacts seen = classFacts.students().get(studentId);
             FinalOutcome finalOutcome = classFacts.finals().get(studentId);
             long connected = finalOutcome != null ? finalOutcome.connectedSeconds() : seen == null ? 0 : seen.connectedSeconds();
