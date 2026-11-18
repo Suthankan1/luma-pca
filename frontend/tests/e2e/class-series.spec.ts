@@ -15,7 +15,7 @@ test.describe("Weekly class series", () => {
   // The mock backend is shared across projects and specs: codes are unique per project.
   let p = "sd";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "sm" : "sd";
+    p = (testInfo.project.name === "mobile" ? "sm" : "sd") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator previews a series, resolves an overlap, creates it and cancels the rest", async ({ page }) => {

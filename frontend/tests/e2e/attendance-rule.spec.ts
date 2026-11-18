@@ -16,7 +16,7 @@ test.describe("Attendance rule and final attendance", () => {
   let p = "fd";
   let n = "1";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "fm" : "fd";
+    p = (testInfo.project.name === "mobile" ? "fm" : "fd") + (testInfo.retry ? String(testInfo.retry) : "");
     n = p === "fm" ? "2" : "1";
   });
 

@@ -15,7 +15,7 @@ test.describe("Bulk invitation emails", () => {
   // The mock backend is shared across projects and specs: codes are unique per project.
   let p = "bd";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "bm" : "bd";
+    p = (testInfo.project.name === "mobile" ? "bm" : "bd") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator emails a batch's students, sees progress, and resends only on purpose", async ({ page }) => {

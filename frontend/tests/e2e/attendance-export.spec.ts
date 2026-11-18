@@ -16,7 +16,7 @@ test.describe("Attendance export", () => {
   // The mock backend is shared across projects and specs: codes are unique per project.
   let p = "xd";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "xm" : "xd";
+    p = (testInfo.project.name === "mobile" ? "xm" : "xd") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator downloads a class's and a batch's attendance as CSV, and each export is logged", async ({ page }) => {

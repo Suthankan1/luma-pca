@@ -30,7 +30,7 @@ test("A student changes their password with the current one and is signed out", 
 });
 
 test("An owner erases a student's personal data after typing the number again", async ({ page }, testInfo) => {
-  const p = testInfo.project.name === "mobile" ? "EM" : "ED";
+  const p = (testInfo.project.name === "mobile" ? "EM" : "ED") + (testInfo.retry ? String(testInfo.retry) : "");
   await page.goto("/sign-in");
   await page.fill("#email", "owner-enrolled@example.invalid");
   await page.fill("#password", "correct-password");

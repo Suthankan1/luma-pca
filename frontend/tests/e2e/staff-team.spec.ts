@@ -23,7 +23,7 @@ test.describe("Staff accounts and batch assignments", () => {
   // Shared mock backend: emails and codes are unique per browser project and spec.
   let p = "d";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "m" : "d";
+    p = (testInfo.project.name === "mobile" ? "m" : "d") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator adds staff, changes roles, invites and disables, within the role rules", async ({ page }) => {

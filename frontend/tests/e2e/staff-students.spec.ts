@@ -39,7 +39,7 @@ test.describe("Staff students and enrolments", () => {
   // so codes here are unique per project and differ from the courses spec's.
   let p = "d";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "m" : "d";
+    p = (testInfo.project.name === "mobile" ? "m" : "d") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator adds a student, invites them, enrols, withdraws and re-enrols", async ({ page, context }) => {

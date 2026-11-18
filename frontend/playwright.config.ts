@@ -15,7 +15,8 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: {
-    trace: "on-first-retry",
+    // On CI keep the trace of every failed attempt, including the first (often the only informative one).
+    trace: process.env.CI ? "retain-on-failure" : "on-first-retry",
   },
   projects: [
     {

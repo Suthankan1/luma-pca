@@ -15,7 +15,7 @@ async function signInStaff(page: Page, email: string) {
 test.describe("Less manual work for staff", () => {
   let p = "ad";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "am" : "ad";
+    p = (testInfo.project.name === "mobile" ? "am" : "ad") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("Upcoming Zoom webinars become classes in one step, never twice", async ({ page }) => {

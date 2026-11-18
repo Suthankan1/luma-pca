@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("An administrator checks a past webinar run from its link and links it to the class", async ({ page }, testInfo) => {
-  const p = testInfo.project.name === "mobile" ? "wm" : "wd";
+  const p = (testInfo.project.name === "mobile" ? "wm" : "wd") + (testInfo.retry ? String(testInfo.retry) : "");
   await page.goto("/sign-in");
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
