@@ -166,9 +166,26 @@ try {
   assert.equal(html.includes(latestRefresh), false);
 
   // 2. Refresh rotation
+  // 2a. The short access cookie expired: the proxy renews the session quietly and the page opens (no sign-in page).
   jar.delete("__Host-luma-access");
-  location(await call("/student"), "/sign-in");
+  const beforeRenewal = jar.get("__Host-luma-refresh");
+  down = true;
+  location(await call("/student"), "/sign-in"); // the API is down: nothing to renew with, nothing changed
+  assert.equal(jar.get("__Host-luma-refresh"), beforeRenewal);
   assert.match(await (await call("/sign-in")).text(), /Continue session/);
+  down = false;
+  const renewed = await call("/student");
+  assert.equal(renewed.status, 200);
+  recordCookies(renewed);
+  assert.equal(jar.has("__Host-luma-access"), true);
+  assert.notEqual(jar.get("__Host-luma-refresh"), beforeRenewal);
+  const renewedHtml = await renewed.text();
+  assert.match(renewedHtml, /Student portal/);
+  assert.equal(renewedHtml.includes(jwt), false);
+  assert.equal(renewedHtml.includes(latestRefresh), false);
+
+  // 2b. The "Continue session" action still works when renewal could not happen on its own.
+  jar.delete("__Host-luma-access");
   const oldRefresh = jar.get("__Host-luma-refresh");
   down = true;
   const failedRefresh = await post("refresh", { portal: "student" });

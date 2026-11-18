@@ -49,8 +49,12 @@ export async function proxy(request: NextRequest) {
   if (!renewal) {
     renewal = renew(presented, clientAddressFrom(request.headers.get("x-forwarded-for"), trustedProxyHops()), key);
     inFlight.set(presented, renewal);
-    // Kept briefly so requests a moment behind reuse the result too.
-    renewal.finally(() => setTimeout(() => inFlight.delete(presented), 5000));
+    // A success is kept briefly so requests a moment behind reuse it; a failure (for example the API briefly down) is
+    // forgotten at once so the next page load tries again.
+    renewal.then(result => {
+      if (result) setTimeout(() => inFlight.delete(presented), 5000);
+      else inFlight.delete(presented);
+    });
   }
   const renewed = await renewal;
   // Refused (expired or signed out): leave the cookies alone; the page shows the sign-in page.
