@@ -34,7 +34,15 @@ class AcademyPaymentsConfiguration {
         pool.setValidationTimeout(2_000);
         pool.setInitializationFailTimeout(-1);
         HikariDataSource dataSource = new HikariDataSource(pool);
-        return new AcademyPaymentsCatalog(new JdbcTemplate(dataSource), dataSource);
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.setQueryTimeout(20);
+        try {
+            return new AcademyPaymentsCatalog(jdbc, dataSource, properties.paymentTable(), properties.studentTable(),
+                    properties.classPaymentType());
+        } catch (RuntimeException e) {
+            dataSource.close();
+            throw e;
+        }
     }
 
     private static boolean isBlank(String value) {
