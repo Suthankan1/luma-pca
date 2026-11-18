@@ -1898,6 +1898,15 @@ paths:
         '413': {description: Body over 64 KiB}
         '415': {description: Not application/json}
         '503': {description: Receipt could not be stored; Zoom retries 5xx}
+  /api/v1/auth/student-id-login:
+    get: {summary: "Whether the Academy-requested student ID sign-in is switched on (ACAD-2)", operationId: studentIdLoginAvailability, tags: [Identity], responses: {'200': {description: "enabled"}}}
+    post: {summary: "Academy-requested student sign-in: the student ID is username and password. Weak by design; off unless LUMA_STUDENT_ID_LOGIN_ENABLED; students only (ACAD-2)", operationId: studentIdLogin, tags: [Identity], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [studentId, password], properties: {studentId: {type: string, maxLength: 60}, password: {type: string, maxLength: 60, writeOnly: true}}}}}}, responses: {'200': {description: "Tokens (as /auth/login), or an MFA challenge when the student added an authenticator"}, '400': {description: Malformed request}, '401': {description: "Refused. Identical for unknown ID, wrong password, deactivated student, staff account and another academy"}, '404': {description: Switched off}, '429': {description: Too many attempts from this client}}}
+  /api/v1/academy/classes:
+    get: {summary: "The Academy's classes from its own database (read-only): distinct-student counts and the linked LUMA batch (managers; ACAD-1)", operationId: listAcademyClasses, tags: [Academy], security: [{bearerAuth: []}], responses: {'200': {description: "className, studentCount, batch (null until linked)"}, '403': {description: Not an owner or administrator}, '503': {description: The Academy database is not connected or unreachable}}}
+  /api/v1/academy/classes/link:
+    put: {summary: "Link an Academy class to an active batch of the academy; one class per batch (managers; audited)", operationId: linkAcademyClass, tags: [Academy], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [className, batchId], properties: {className: {type: string, maxLength: 200}, batchId: {type: string, format: uuid}}}}}}, responses: {'200': {description: The class with its batch}, '404': {description: No such Academy class or batch}, '409': {description: Batch inactive or linked to another class}}}
+  /api/v1/academy/classes/sync:
+    post: {summary: "Bring the linked batch's enrolments in step with the Academy class: create missing students, enrol; never withdraws (managers; audited with counts only)", operationId: syncAcademyClass, tags: [Academy], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [className], properties: {className: {type: string, maxLength: 200}}}}}}, responses: {'200': {description: "academyStudents, created, enrolled, alreadyEnrolled, withoutName, withoutEmail, withdrawnInLuma, inactiveInLuma, invalidIds, notInAcademyClass"}, '404': {description: Not linked}, '503': {description: The Academy database is not connected or unreachable}}}
 components:
   schemas:
     AttendancePolicy:

@@ -73,6 +73,8 @@ public class InvitationEmailQueue {
                         WHERE a.academy_id = ? AND a.id = ANY (?) AND a.status = 'PENDING_ACTIVATION'
                           AND EXISTS (SELECT 1 FROM account_roles r WHERE r.account_id = a.id AND r.role = 'STUDENT')
                           AND NOT EXISTS (SELECT 1 FROM account_roles r WHERE r.account_id = a.id AND r.role <> 'STUDENT')
+                          -- Placeholders given to Academy students without a usable email (AcademyClassService): never mailed.
+                          AND a.email NOT LIKE '%@students.academy.invalid'
                         ORDER BY a.email
                         """);
                 Array ids = connection.createArrayOf("uuid", accountIds.toArray());

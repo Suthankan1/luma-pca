@@ -74,6 +74,8 @@ export default async function CoursesPage() {
       </section>
       <section className="panel" aria-labelledby="add-title">
         <h2 id="add-title" className="panel-title">ADD</h2>
+        <p className="panel-sub academy-hint">Academy classes get their batch automatically under{" "}
+          <Link className="text-link" href="/staff/academy">Academy classes →</Link></p>
         <p className="panel-sub">Codes are stored in capitals and must be unique.</p>
         <CourseForm />
         <BatchForm courses={activeCourses.map(({ id, code, title }) => ({ id, code, title }))} />

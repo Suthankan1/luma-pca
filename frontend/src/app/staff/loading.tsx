@@ -6,6 +6,7 @@ import type { StaffSection } from "@/components/StaffShell";
 
 const sections: Record<string, { active: StaffSection; crumb: string; title: string }> = {
   "": { active: "overview", crumb: "Operations", title: "Staff portal" },
+  academy: { active: "academy", crumb: "Academy database", title: "Academy classes" },
   courses: { active: "courses", crumb: "Academic setup", title: "Courses & batches" },
   batches: { active: "courses", crumb: "Academic setup", title: "Batch" },
   sessions: { active: "sessions", crumb: "Timetable", title: "Classes" },

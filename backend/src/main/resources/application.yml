@@ -81,6 +81,11 @@ luma:
     jdbc-url: ${LUMA_ACADEMY_PAYMENTS_JDBC_URL:}
     username: ${LUMA_ACADEMY_PAYMENTS_USERNAME:}
     password: ${LUMA_ACADEMY_PAYMENTS_PASSWORD:}
+    # The Academy's table of payment rows; a row with type 'class' makes the student a member of class_type.
+    payment-table: ${LUMA_ACADEMY_PAYMENTS_TABLE:public.payment}
+    # Student details (pcaid, name, mail only). Empty: students appear by Academy ID alone.
+    student-table: ${LUMA_ACADEMY_STUDENT_TABLE:}
+    class-payment-type: ${LUMA_ACADEMY_CLASS_PAYMENT_TYPE:class}
   auth:
     issuer: ${LUMA_AUTH_ISSUER:http://localhost:8080}
     audience: ${LUMA_AUTH_AUDIENCE:luma-api}
@@ -113,6 +118,11 @@ luma:
       poll-interval: ${LUMA_MAIL_BULK_POLL_INTERVAL:PT30S}
       batch-size: ${LUMA_MAIL_BULK_BATCH_SIZE:20}
       max-attempts: ${LUMA_MAIL_BULK_MAX_ATTEMPTS:5}
+  # Academy-requested student sign-in: the student ID is both username and password. Guessable by design; keep off
+  # until the Academy has accepted the risk in writing. Only accounts whose sole role is STUDENT can sign in this way.
+  student-id-login:
+    enabled: ${LUMA_STUDENT_ID_LOGIN_ENABLED:false}
+    academy-id: ${LUMA_STUDENT_ID_LOGIN_ACADEMY_ID:${LUMA_ZOOM_WEBHOOK_ACADEMY_ID:}}
   password-reset:
     ttl: ${LUMA_PASSWORD_RESET_TTL:PT30M}
     max-requests-per-hour: ${LUMA_PASSWORD_RESET_MAX_REQUESTS_PER_HOUR:3}

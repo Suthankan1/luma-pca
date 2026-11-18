@@ -30,6 +30,7 @@ const backend = createServer(async (req, res) => {
   }
 
   if (req.url.startsWith("/api/v1/me/")) return studentApi(req, send, body);
+  if (req.url.startsWith("/api/v1/academy/")) return academyApi(req, body, send);
 
   switch (req.url) {
     case "/api/v1/auth/login":
@@ -62,6 +63,15 @@ const backend = createServer(async (req, res) => {
         return send(401);
       }
       break;
+
+    case "/api/v1/auth/student-id-login": {
+      // As the API: the Academy student ID is both username and password, letter case ignored.
+      const id = String(body.studentId ?? "").trim().toUpperCase();
+      if (id !== "PCA001" || String(body.password ?? "").trim().toUpperCase() !== id) return send(401);
+      roles = ["STUDENT"];
+      studentHasEnrolments = true;
+      break;
+    }
 
     case "/api/v1/auth/password":
       // As the API: the current password is re-checked; success ends every session.
@@ -182,6 +192,9 @@ function studentApi(req, send, body) {
   const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
   const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
   const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
+  if (url.pathname === "/api/v1/me/student") {
+    return send(200, { id: "00000000-0000-4000-8000-0000000000a1", studentNumber: "PCA001", fullName: "Amaya Perera" });
+  }
   if (url.pathname === "/api/v1/me/engagement-consent") {
     const settings = engagementSettings;
     const view = () => ({ enabled: !!settings?.enabled, consentText: settings?.consentText ?? null, consentVersion: settings?.consentVersion ?? 0,
@@ -786,6 +799,60 @@ function mockAttendance(session) {
     webinarEnded: linked.length > 0, unmatchedPeople, calculatedAt: new Date().toISOString(), students: rows, finalisedAt: final?.at ?? null };
 }
 
+// The Academy's own records (read-only in the real API): classes from payment rows, students by Academy ID.
+const academySource = {
+  "A/L Physics 2027": [["PCA101", "Amaya Perera", "amaya@example.invalid"], ["PCA102", "Kavin Silva", null], ["PCA103", null, null]],
+  "Admission": [["PCA104", "Nila Fernando", "nila@example.invalid"]],
+};
+const academyLinks = new Map();
+
+function academyApi(req, body, send) {
+  if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+  if (!roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN")) return send(403, { detail: "Forbidden" });
+  if (req.url === "/api/v1/academy/classes" && req.method === "GET") {
+    return send(200, Object.entries(academySource).sort(([a], [b]) => a.localeCompare(b)).map(([className, rows]) => {
+      const link = academyLinks.get(className);
+      const batch = link && batches.find(b => b.id === link.batchId);
+      return { className, studentCount: rows.length, batch: batch ? { id: batch.id, courseId: batch.courseId, code: batch.code,
+        name: batch.name, active: batch.active, lastSyncedAt: link.lastSyncedAt, lastSyncedStudents: link.lastSyncedStudents } : null };
+    }));
+  }
+  if (req.url === "/api/v1/academy/classes/link" && req.method === "PUT") {
+    if (!academySource[body.className]) return send(404, { detail: "Academy class not found" });
+    const batch = batches.find(b => b.id === body.batchId);
+    if (!batch) return send(404, { detail: "Batch not found" });
+    for (const [name, link] of academyLinks) {
+      if (name !== body.className && link.batchId === batch.id) return send(409, { detail: "That batch is already linked to another Academy class" });
+    }
+    academyLinks.set(body.className, { batchId: batch.id, lastSyncedAt: null, lastSyncedStudents: null });
+    return send(200, {});
+  }
+  if (req.url === "/api/v1/academy/classes/sync" && req.method === "POST") {
+    const link = academyLinks.get(body.className);
+    if (!link) return send(404, { detail: "Link for this Academy class not found" });
+    let created = 0, enrolled = 0, alreadyEnrolled = 0, withoutEmail = 0;
+    for (const [number, name, email] of academySource[body.className]) {
+      let student = students.find(s => s.studentNumber === number);
+      if (!student) {
+        const usable = email && !students.some(s => s.email === email);
+        if (!usable) withoutEmail++;
+        student = { id: uuid(), studentNumber: number, fullName: name ?? number, email: usable ? email : `${number.toLowerCase()}@students.academy.invalid`,
+          accountId: uuid(), accountStatus: "PENDING_ACTIVATION", active: true, version: 0 };
+        students.push(student);
+        created++;
+      }
+      if (enrollments.some(e => e.batchId === link.batchId && e.studentId === student.id)) { alreadyEnrolled++; continue; }
+      enrollments.push({ id: uuid(), batchId: link.batchId, studentId: student.id, enrolledOn: new Date().toISOString().slice(0, 10), withdrawnOn: null, version: 0 });
+      enrolled++;
+    }
+    const rows = academySource[body.className];
+    Object.assign(link, { lastSyncedAt: new Date().toISOString(), lastSyncedStudents: rows.length });
+    return send(200, { academyStudents: rows.length, created, enrolled, alreadyEnrolled, withoutName: rows.filter(r => !r[1]).length,
+      withoutEmail, withdrawnInLuma: [], inactiveInLuma: [], invalidIds: [], notInAcademyClass: [] });
+  }
+  return send(404);
+}
+
 function academicApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const [path, query = ""] = req.url.split("?");
@@ -1249,6 +1316,7 @@ const nextApp = spawn(
       LUMA_WEB_ORIGIN: webOrigin,
       LUMA_SESSION_KEY: randomBytes(32).toString("base64url"),
       API_INTERNAL_URL: `http://127.0.0.1:${backendPort}`,
+      LUMA_STUDENT_ID_LOGIN_ENABLED: "true",
     },
   }
 );

@@ -36,6 +36,8 @@ class AuthRateLimitFilter extends OncePerRequestFilter {
         Bucket reset = new Bucket("reset-request", properties.resetRequest());
         this.routes = Map.of(
                 "/api/v1/auth/login", signIn,
+                // Shares the sign-in allowance: one client cannot try IDs on both routes at twice the rate.
+                "/api/v1/auth/student-id-login", signIn,
                 "/api/v1/auth/mfa/enroll", mfa,
                 "/api/v1/auth/mfa/verify", mfa,
                 "/api/v1/auth/activate", links,
