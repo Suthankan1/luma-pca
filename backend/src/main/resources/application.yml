@@ -74,6 +74,13 @@ management:
         readiness:
           include: readinessState,db
 luma:
+  # Independent, optional, read-only connection to the Academy's existing payments table.
+  # Never use as LUMA's Spring/Flyway datasource.
+  academy-payments:
+    enabled: ${LUMA_ACADEMY_PAYMENTS_ENABLED:false}
+    jdbc-url: ${LUMA_ACADEMY_PAYMENTS_JDBC_URL:}
+    username: ${LUMA_ACADEMY_PAYMENTS_USERNAME:}
+    password: ${LUMA_ACADEMY_PAYMENTS_PASSWORD:}
   auth:
     issuer: ${LUMA_AUTH_ISSUER:http://localhost:8080}
     audience: ${LUMA_AUTH_AUDIENCE:luma-api}
