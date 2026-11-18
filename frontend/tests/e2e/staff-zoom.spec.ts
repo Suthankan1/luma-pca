@@ -16,7 +16,7 @@ test.describe("Zoom review", () => {
   let p = "d";
   let n = "1";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "m" : "d";
+    p = (testInfo.project.name === "mobile" ? "m" : "d") + (testInfo.retry ? String(testInfo.retry) : "");
     n = p === "m" ? "2" : "1";
   });
 

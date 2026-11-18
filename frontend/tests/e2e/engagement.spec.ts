@@ -23,7 +23,7 @@ async function signInStudent(page: Page) {
 test.describe("Engagement with consent", () => {
   let p = "gd";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "gm" : "gd";
+    p = (testInfo.project.name === "mobile" ? "gm" : "gd") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An owner switches engagement on; a student consents and reacts; staff open and close a question", async ({ page }) => {

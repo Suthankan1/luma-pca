@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("A running class's page updates itself, and staff can pause it", async ({ page }, testInfo) => {
-  const p = testInfo.project.name === "mobile" ? "lm" : "ld";
+  const p = (testInfo.project.name === "mobile" ? "lm" : "ld") + (testInfo.retry ? String(testInfo.retry) : "");
   // Colombo is UTC+05:30; a class from 30 minutes ago to 90 minutes from now, on today's Colombo date.
   const colombo = (offsetMinutes: number) => new Date(Date.now() + (330 + offsetMinutes) * 60_000).toISOString();
   const start = colombo(-30), end = colombo(90);

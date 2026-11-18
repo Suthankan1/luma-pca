@@ -15,7 +15,7 @@ test.describe("Activity log", () => {
   // The mock backend is shared across projects and specs: the person is unique per project.
   let p = "ad";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "am" : "ad";
+    p = (testInfo.project.name === "mobile" ? "am" : "ad") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator reads one staff member's history, newest first, and filters by area", async ({ page }) => {

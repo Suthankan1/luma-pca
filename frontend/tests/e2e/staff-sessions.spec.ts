@@ -50,7 +50,7 @@ async function fillClass(page: Page, fields: { title: string; date: string; star
 test.describe("Classes", () => {
   let p = "d";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "m" : "d";
+    p = (testInfo.project.name === "mobile" ? "m" : "d") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator schedules a class for two batches, edits, cancels and restores it", async ({ page }) => {

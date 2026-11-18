@@ -15,7 +15,7 @@ async function signInStaff(page: Page, email: string) {
 test.describe("Attendance summaries", () => {
   let p = "sd";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "sm" : "sd";
+    p = (testInfo.project.name === "mobile" ? "sm" : "sd") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("Staff see each student's rate in a batch; analysts see batch totals without names", async ({ page }) => {

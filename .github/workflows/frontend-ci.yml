@@ -49,3 +49,12 @@ jobs:
         run: npm --prefix frontend run build
       - name: End-to-end browser tests
         run: npm --prefix frontend run test:e2e
+      # Traces, screenshots and page snapshots of failed attempts (mock data only), to diagnose flaky runs.
+      - name: Keep traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: frontend/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

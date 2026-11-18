@@ -17,7 +17,7 @@ test.describe("Student import from CSV", () => {
   // The mock backend is shared across projects and specs: codes are unique per project.
   let p = "id";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "im" : "id";
+    p = (testInfo.project.name === "mobile" ? "im" : "id") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator checks a file, fixes it and imports students into a batch", async ({ page }) => {
