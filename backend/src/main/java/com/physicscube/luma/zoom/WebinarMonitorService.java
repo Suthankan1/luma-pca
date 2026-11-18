@@ -46,9 +46,11 @@ public class WebinarMonitorService {
     private final AcademyClassService academyClasses;
     private final MonitoredWebinars monitored;
     private final AuditLog audit;
+    private final com.physicscube.luma.sessions.ClassSessionService sessions;
 
     WebinarMonitorService(ObjectProvider<ZoomApiClient> api, JdbcTemplate jdbc, AcademyClassService academyClasses,
-                          MonitoredWebinars monitored, AuditLog audit) {
+                          MonitoredWebinars monitored, AuditLog audit, com.physicscube.luma.sessions.ClassSessionService sessions) {
+        this.sessions = sessions;
         this.api = api;
         this.jdbc = jdbc;
         this.academyClasses = academyClasses;
@@ -80,6 +82,36 @@ public class WebinarMonitorService {
                               Integer durationMinutes, boolean recurring, List<ZoomOccurrence> occurrences, String syncStatus,
                               Instant syncedAt, String syncError, String academyClassName, String classSource, boolean classResolved,
                               UUID classBatchId, boolean active, Instant addedAt, RunView live, List<RunView> runs, long version) {
+    }
+
+    /**
+     * The Zoom run behind a class, for its page: Zoom's schedule (display only) beside the actual start and end.
+     *
+     * @param scheduledStartAt Zoom's scheduled start of the webinar when it has one (never the run's start)
+     */
+    public record ClassRun(String webinarId, String topic, String occurrenceUuid, String state, Instant firstSeenAt,
+                           Instant actualStartedAt, Instant actualEndedAt, Instant scheduledStartAt, Integer scheduledDurationMinutes,
+                           String timeZone, boolean reported, int connectedNow, int people, String academyClassName, boolean classResolved) {
+    }
+
+    /** Anyone who may open the class (the session read checks that); empty for classes not created by a Zoom run. */
+    @Transactional(readOnly = true)
+    public Optional<ClassRun> runForClass(CurrentAccount caller, UUID sessionId) {
+        sessions.get(caller, sessionId);
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT monitor_id, occurrence_uuid FROM zoom_webinar_runs "
+                + "WHERE academy_id = ? AND class_session_id = ?", caller.academyId(), sessionId);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        UUID monitorId = (UUID) rows.get(0).get("monitor_id");
+        String uuid = (String) rows.get(0).get("occurrence_uuid");
+        MonitorView monitor = view(caller.academyId(), monitorId);
+        RunView run = monitor.runs().stream().filter(r -> r.occurrenceUuid().equals(uuid)).findFirst()
+                .orElseGet(() -> runs(caller.academyId(), monitorId, Integer.MAX_VALUE).stream()
+                        .filter(r -> r.occurrenceUuid().equals(uuid)).findFirst().orElseThrow());
+        return Optional.of(new ClassRun(monitor.webinarId(), monitor.topic(), uuid, run.state(), run.firstSeenAt(), run.actualStartedAt(),
+                run.actualEndedAt(), monitor.scheduledStartAt(), monitor.durationMinutes(), monitor.timeZone(), run.reported(),
+                run.connectedNow(), run.people(), monitor.academyClassName(), monitor.classResolved()));
     }
 
     /** Owners and administrators add a webinar by ID or join link. Adding one already monitored returns it. Audited. */
@@ -293,7 +325,18 @@ public class WebinarMonitorService {
 
     private MonitorView view(UUID academyId, UUID id) {
         Map<String, Object> m = jdbc.queryForMap("SELECT * FROM zoom_webinar_monitors WHERE id = ? AND academy_id = ?", id, academyId);
-        List<RunView> runs = jdbc.query("""
+        List<RunView> runs = runs(academyId, id, RUNS_LISTED);
+        RunView live = runs.stream().filter(r -> "LIVE".equals(r.state())).findFirst().orElse(null);
+        String className = (String) m.get("academy_class_name");
+        return new MonitorView(id, (String) m.get("webinar_id"), (String) m.get("topic"), (String) m.get("time_zone"),
+                instant((Timestamp) m.get("scheduled_start_at")), (Integer) m.get("duration_minutes"), (Boolean) m.get("recurring"),
+                occurrences(m.get("occurrences")), (String) m.get("sync_status"), instant((Timestamp) m.get("synced_at")),
+                (String) m.get("sync_error"), className, (String) m.get("class_source"), className != null,
+                academyClasses.linkedBatch(academyId, className).orElse(null), (Boolean) m.get("active"), instant((Timestamp) m.get("added_at")), live, runs, ((Number) m.get("version")).longValue());
+    }
+
+    private List<RunView> runs(UUID academyId, UUID monitorId, int limit) {
+        return jdbc.query("""
                 SELECT r.occurrence_uuid, r.class_session_id, r.state, r.first_seen_at, r.actual_started_at, r.actual_ended_at,
                        EXISTS (SELECT 1 FROM zoom_report_fetches f WHERE f.academy_id = r.academy_id AND f.occurrence_uuid = r.occurrence_uuid
                                AND f.status = 'FETCHED') AS reported,
@@ -314,14 +357,7 @@ public class WebinarMonitorService {
                 row.getString("state"), instant(row.getTimestamp("first_seen_at")), instant(row.getTimestamp("actual_started_at")),
                 instant(row.getTimestamp("actual_ended_at")), row.getBoolean("reported"),
                 "LIVE".equals(row.getString("state")) ? row.getInt("connected_now") : 0, row.getInt("people")),
-                academyId, id, RUNS_LISTED);
-        RunView live = runs.stream().filter(r -> "LIVE".equals(r.state())).findFirst().orElse(null);
-        String className = (String) m.get("academy_class_name");
-        return new MonitorView(id, (String) m.get("webinar_id"), (String) m.get("topic"), (String) m.get("time_zone"),
-                instant((Timestamp) m.get("scheduled_start_at")), (Integer) m.get("duration_minutes"), (Boolean) m.get("recurring"),
-                occurrences(m.get("occurrences")), (String) m.get("sync_status"), instant((Timestamp) m.get("synced_at")),
-                (String) m.get("sync_error"), className, (String) m.get("class_source"), className != null,
-                academyClasses.linkedBatch(academyId, className).orElse(null), (Boolean) m.get("active"), instant((Timestamp) m.get("added_at")), live, runs, ((Number) m.get("version")).longValue());
+                academyId, monitorId, limit);
     }
 
     @SuppressWarnings("unchecked")

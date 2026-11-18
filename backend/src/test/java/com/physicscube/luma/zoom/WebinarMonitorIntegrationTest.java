@@ -272,6 +272,12 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(true, kavin.get("expected"));
         assertEquals(0, ((Number) kavin.get("connectedSeconds")).intValue());
 
+        Map<String, Object> classRun = HttpApi.parse(api.get("/api/v1/class-sessions/" + session + "/zoom-run", admin));
+        assertEquals("LIVE", classRun.get("state"));
+        assertEquals(actual, Instant.parse((String) classRun.get("actualStartedAt")), "actual start 16:00");
+        assertEquals(SCHEDULED_AT, Instant.parse((String) classRun.get("scheduledStartAt")), "Zoom's 18:00 shown separately");
+        assertEquals(403, api.get("/api/v1/class-sessions/" + session + "/zoom-run", tokenFor(academyId, Role.STUDENT)).statusCode());
+
         Map<String, Object> listed = HttpApi.parseList(api.get("/api/v1/zoom/monitors", admin)).stream().map(o -> (Map<String, Object>) o)
                 .filter(m -> SCHEDULED.equals(m.get("webinarId"))).findFirst().orElseThrow();
         @SuppressWarnings("unchecked")

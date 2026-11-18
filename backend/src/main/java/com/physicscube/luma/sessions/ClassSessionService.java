@@ -535,6 +535,6 @@ public class ClassSessionService {
                         .map(b -> new SessionView.Batch(b.id(), b.courseId(), b.code(), b.name()))
                         .sorted(Comparator.comparing(SessionView.Batch::code).thenComparing(SessionView.Batch::batchId))
                         .toList(),
-                s.getVersion(), s.getCreatedAt(), s.getUpdatedAt())).toList();
+                s.getVersion(), s.getCreatedAt(), s.getUpdatedAt(), s.getOrigin())).toList();
     }
 }
