@@ -247,6 +247,7 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         Map<String, Object> monitor = add(SCHEDULED);
         assertEquals(PHYSICS, monitor.get("academyClassName"), "the Zoom title names exactly one Academy class");
         assertEquals("EXACT_TITLE", monitor.get("classSource"));
+        assertEquals(batch, monitor.get("classBatchId"));
 
         Instant actual = SCHEDULED_AT.minus(2, ChronoUnit.HOURS); // 16:00 for an 18:00 webinar
         started(SCHEDULED, "Run-A==", actual);
@@ -397,11 +398,14 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM session_batches WHERE session_id = ?", Integer.class, session),
                 "no expected students, so nobody can be marked absent");
 
+        linkAcademyClass();
         Map<String, Object> body = new java.util.HashMap<>();
-        body.put("academyClassName", "Physics revision");
+        body.put("academyClassName", PHYSICS);
         Map<String, Object> decided = HttpApi.parse(api.put("/api/v1/zoom/monitors/" + monitor.get("id") + "/academy-class",
                 HttpApi.json(body), admin));
         assertEquals("ADMIN", decided.get("classSource"));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM session_batches WHERE session_id = ?", Integer.class, session),
+                "the run going on now gets the decided class's students");
         body.put("academyClassName", "Not an Academy class");
         assertEquals(404, api.put("/api/v1/zoom/monitors/" + monitor.get("id") + "/academy-class", HttpApi.json(body), admin).statusCode());
         assertNotEquals(null, decided.get("academyClassName"));

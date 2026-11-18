@@ -73,11 +73,13 @@ public class WebinarMonitorService {
     /**
      * @param scheduledStartAt Zoom's scheduled start; {@code null} when Zoom has none ("No Zoom schedule")
      * @param classResolved whether the Academy class is known for certain; when not, runs have no expected students
+     * @param classBatchId the LUMA batch the Academy class is set up as (Academy classes page); {@code null} when it is
+     *                     not set up yet, so runs still have no expected students
      */
     public record MonitorView(UUID id, String webinarId, String topic, String timeZone, Instant scheduledStartAt,
                               Integer durationMinutes, boolean recurring, List<ZoomOccurrence> occurrences, String syncStatus,
                               Instant syncedAt, String syncError, String academyClassName, String classSource, boolean classResolved,
-                              boolean active, Instant addedAt, RunView live, List<RunView> runs, long version) {
+                              UUID classBatchId, boolean active, Instant addedAt, RunView live, List<RunView> runs, long version) {
     }
 
     /** Owners and administrators add a webinar by ID or join link. Adding one already monitored returns it. Audited. */
@@ -157,6 +159,13 @@ public class WebinarMonitorService {
         }
         jdbc.update("UPDATE zoom_webinar_monitors SET academy_class_name = ?, class_source = ?, version = version + 1 WHERE id = ?",
                 name, name == null ? null : "ADMIN", monitorId);
+        // A run going on now gets the class's students as well (only when it has none yet; ended runs are history).
+        academyClasses.linkedBatch(caller.academyId(), name).ifPresent(batchId -> jdbc.update("""
+                INSERT INTO session_batches (session_id, batch_id, academy_id)
+                SELECT r.class_session_id, ?, r.academy_id FROM zoom_webinar_runs r
+                WHERE r.academy_id = ? AND r.monitor_id = ? AND r.state = 'LIVE'
+                  AND NOT EXISTS (SELECT 1 FROM session_batches b WHERE b.session_id = r.class_session_id)
+                """, batchId, caller.academyId(), monitorId));
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("academyClass", name == null ? "unresolved" : name);
         audit.record(caller.academyId(), caller.accountId(), "ZOOM_WEBINAR_CLASS_SET", "ZOOM_WEBINAR_MONITOR", monitorId, details);
@@ -312,7 +321,7 @@ public class WebinarMonitorService {
                 instant((Timestamp) m.get("scheduled_start_at")), (Integer) m.get("duration_minutes"), (Boolean) m.get("recurring"),
                 occurrences(m.get("occurrences")), (String) m.get("sync_status"), instant((Timestamp) m.get("synced_at")),
                 (String) m.get("sync_error"), className, (String) m.get("class_source"), className != null,
-                (Boolean) m.get("active"), instant((Timestamp) m.get("added_at")), live, runs, ((Number) m.get("version")).longValue());
+                academyClasses.linkedBatch(academyId, className).orElse(null), (Boolean) m.get("active"), instant((Timestamp) m.get("added_at")), live, runs, ((Number) m.get("version")).longValue());
     }
 
     @SuppressWarnings("unchecked")
