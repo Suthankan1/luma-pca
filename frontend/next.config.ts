@@ -31,6 +31,11 @@ export const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  experimental: {
+    // Pages already seen stay in the browser for 30 s, so going back or switching sections again is instant. Any save
+    // refreshes the page it changed (server actions call revalidatePath), and live class pages refresh themselves.
+    staleTimes: { dynamic: 30, static: 180 },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

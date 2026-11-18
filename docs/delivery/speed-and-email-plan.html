@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LUMA Speed and Email Plan</title>
+<style>
+  :root {
+    --bg: #f4f7fb; --card: #ffffff; --ink: #1c2541; --muted: #4f5d75; --line: #d8e0ec;
+    --navy: #22206a; --blue: #1b65a2; --cyan: #22b5e2; --good: #1f7a4d; --warn: #9a5b00; --bad: #b42318;
+    --good-bg: #e6f4ec; --warn-bg: #fdf3e2; --bad-bg: #fde8e7; --code-bg: #eef2f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1424; --card: #171d33; --ink: #e6ebf5; --muted: #a9b4cc; --line: #2b3452;
+      --navy: #c9cdfb; --blue: #7fb8ec; --cyan: #5fd0f2; --good: #6fd39c; --warn: #f2bf6b; --bad: #ff8a80;
+      --good-bg: #16302a; --warn-bg: #352a14; --bad-bg: #3a1c1c; --code-bg: #20283f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1424; --card: #171d33; --ink: #e6ebf5; --muted: #a9b4cc; --line: #2b3452;
+    --navy: #c9cdfb; --blue: #7fb8ec; --cyan: #5fd0f2; --good: #6fd39c; --warn: #f2bf6b; --bad: #ff8a80;
+    --good-bg: #16302a; --warn-bg: #352a14; --bad-bg: #3a1c1c; --code-bg: #20283f;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { color: var(--navy); font-size: 1.9rem; line-height: 1.25; margin: 0 0 6px; }
+  h2 { color: var(--navy); font-size: 1.35rem; margin: 40px 0 12px; }
+  h3 { font-size: 1.05rem; margin: 22px 0 8px; }
+  p, li { color: var(--ink); }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin: 14px 0; }
+  .lead { font-size: 1.08rem; }
+  .path { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 4px; }
+  .hop { background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: .92rem; }
+  .hop strong { display: block; color: var(--navy); }
+  .arrow { color: var(--muted); }
+  .note { color: var(--muted); font-size: .92rem; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .93rem; min-width: 560px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 6px; font-size: .88em; }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: .8rem; font-weight: 600; white-space: nowrap; }
+  .p-high { background: var(--bad-bg); color: var(--bad); }
+  .p-med { background: var(--warn-bg); color: var(--warn); }
+  .p-low { background: var(--good-bg); color: var(--good); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .stat .v { font-size: 1.6rem; font-weight: 700; color: var(--navy); }
+  .stat .l { color: var(--muted); font-size: .88rem; }
+  .step { border-left: 4px solid var(--blue); padding: 6px 0 6px 16px; margin: 18px 0; }
+  .step h3 { margin-top: 0; }
+  .step .meta { color: var(--muted); font-size: .88rem; margin: 2px 0 8px; }
+  .formula { background: var(--code-bg); border-radius: 10px; padding: 12px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9rem; overflow-x: auto; }
+  .out { border: 1px dashed var(--line); border-radius: 12px; padding: 12px 16px; color: var(--muted); }
+  footer { color: var(--muted); font-size: .85rem; margin-top: 40px; }
+</style>
+
+</head>
+<body>
+<main>
+  <h1>LUMA speed, caching and email: the full implementation plan</h1>
+  <p class="sub">Physics Cube Academy · 18 Nov 2026 · for the current hosting (Vercel, Oracle VM in Hyderabad, Supabase in Tokyo), unchanged</p>
+
+  <section class="card lead">
+    <p><strong>Where things stand.</strong> PRs #100 and #101 did real work: identity now comes from the session cookie,
+    queries are batched in Zoom matching, some reference data is cached, Java uses virtual threads, and the connection pool
+    stays warm. Two of those changes also undid speed, though:</p>
+    <ul>
+      <li><strong>9 of the 12 loading screens were removed</strong> (to keep redirect and 404 status codes exact). In Next.js 16 a
+        dynamic page without a loading screen gets no instant feedback <em>and is never prefetched</em>. So most clicks are
+        blank again until the page is ready.</li>
+      <li><strong>The sign-in check cache was removed</strong> (to close the 15-second security gap). The gap is closed, but every
+        backend call now pays two extra database queries to Tokyo (~0.25 s).</li>
+    </ul>
+    <p>Both can be restored safely; tracks A and B below show how.</p>
+  </section>
+
+  <h2>Fresh measurements (18 Nov)</h2>
+  <div class="stats">
+    <div class="stat"><div class="v">0.46 s</div><div class="l">to reach the page function at all (a redirect with no data), every click</div></div>
+    <div class="stat"><div class="v">3 of 12</div><div class="l">pages still have a loading screen (Attendance, Courses, Zoom review)</div></div>
+    <div class="stat"><div class="v">+2</div><div class="l">database queries to Tokyo on every backend call (sign-in check, no cache)</div></div>
+    <div class="stat"><div class="v">313 KB</div><div class="l">JavaScript, compressed and cached for a year: not a problem</div></div>
+  </div>
+  <div class="card">
+    <div class="formula">one click ≈ 0.46 s (reach Washington) + rounds of backend calls × ~0.5 s + longest query chain × ~0.115 s</div>
+    <p class="note">Measured with <code>curl</code> from Colombo: <code>/staff</code> redirect 0.43–0.52 s over 6 runs; page functions still run in
+      <code>iad1</code> (header <code>x-vercel-id: bom1::iad1</code>); backend status 0.26–0.28 s. Query counts from the local probe
+      (class attendance 20, engagement 9, roster 6). The first term can't change without moving hosting. The plan shrinks the other
+      two and hides what's left behind instant feedback and caching.</p>
+  </div>
+
+  <h2>The plan at a glance</h2>
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>Track</th><th>What it does</th><th>Effort</th><th>Users feel</th></tr></thead>
+      <tbody>
+        <tr><td>A · Instant feedback</td><td>Loading screens back (with correct redirects), link pending states, prefetching on, client cache for 30 s</td><td class="num">1 day</td><td>Every click reacts in under 0.1 s; back/forward and revisits are instant</td></tr>
+        <tr><td>B · Caching, four layers</td><td>Browser cache, Vercel server cache for reference data, backend memory cache (sign-in check, reference data, final attendance), fewer database trips</td><td class="num">3 days</td><td>Most pages need 1 backend call that answers from memory</td></tr>
+        <tr><td>C · One call per page</td><td>Page endpoints for class, batch, staff home and student home; attendance 20 → 4 queries</td><td class="num">3 days</td><td>Class page ~3.5 s → ~1.2 s on first open</td></tr>
+        <tr><td>D · The small VM</td><td>Quieter background workers, memory flags, no swapping</td><td class="num">½ day</td><td>Fewer random slow moments</td></tr>
+        <tr><td>E · Email via Gmail</td><td>STARTTLS and timeouts in code; Gmail app password in the VM's environment</td><td class="num">½ day</td><td>Invitations, resets and notices arrive</td></tr>
+        <tr><td>F · Measure and guard</td><td>Server-Timing, a test account for live checks, speed tests in CI</td><td class="num">1 day</td><td>Slowness can't creep back unnoticed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Track A — Instant feedback (do first)</h2>
+  <div class="step">
+    <h3>A1. Bring the loading screens back without breaking redirects</h3>
+    <p class="meta">frontend · fixes the blank-click problem and re-enables prefetching for dynamic pages</p>
+    <ul>
+      <li>Move <code>requirePortal</code> into <code>app/staff/layout.tsx</code> and <code>app/student/layout.tsx</code>. Identity comes from the
+        cookie now, so this costs no backend call, and a layout redirect runs before any streaming starts. Signed-out
+        visitors get a real 307 again.</li>
+      <li>Check the ID format (<code>uuidOrNull</code>) in the layout of each <code>[id]</code> segment and call <code>notFound()</code> there, so
+        malformed links still get a real 404.</li>
+      <li>Then put <code>loading.tsx</code> back on every section (<code>StaffSkeleton</code> already exists). Only a well-formed ID that
+        doesn't exist renders "Page not found" with status 200, because it's discovered while streaming. Update the two
+        tests that assert 404 for that case to check the page text instead.</li>
+    </ul>
+  </div>
+  <div class="step">
+    <h3>A2. Show that a click was registered</h3>
+    <p class="meta">frontend · small</p>
+    <ul>
+      <li>Navigation links use <code>useLinkStatus()</code> (built into Next.js 16) to show a subtle pending state on the clicked item.</li>
+      <li>A thin progress bar at the top of the page during any navigation or form submission.</li>
+      <li>Buttons say "Saving…" and are disabled while a form submits (most already do; make it universal).</li>
+    </ul>
+  </div>
+  <div class="step">
+    <h3>A3. Let the browser keep pages it has seen</h3>
+    <p class="meta">frontend · <code>next.config.ts</code></p>
+    <ul>
+      <li><code>experimental.staleTimes = { dynamic: 30, static: 180 }</code>. Going back to a page seen in the last 30 s is instant,
+        with no server trip. Server actions that change data already call <code>revalidatePath</code>, which clears that page.</li>
+      <li>Keep prefetching on for the main navigation (it prefetches the loading screen, which is cheap). Turn it off only for
+        long lists of links, such as rosters, to avoid flooding.</li>
+    </ul>
+  </div>
+
+  <h2>Track B — Caching, layer by layer</h2>
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>Layer</th><th>Where</th><th>What is cached</th><th>How long</th><th>Cleared when</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Browser</td><td>Next.js client cache</td><td>Rendered pages already visited</td><td class="num">30 s</td><td>Any save on that page (<code>revalidatePath</code>)</td></tr>
+        <tr><td>2 · Vercel</td><td>Next.js <code>'use cache'</code> + <code>cacheTag</code></td><td>Reference data shown to managers: courses, batches, the attendance rule, engagement settings, staff names</td><td class="num">5 min</td><td>The server action that changes it calls <code>updateTag('academy:{id}:courses')</code> and similar</td></tr>
+        <tr><td>3 · Backend memory</td><td>Caffeine caches (one VM, so invalidation is exact)</td><td>Sign-in check, reference data, final attendance per class</td><td class="num">60 s / until changed</td><td>Events: sign-out, disable, role or password change; course or batch edits; correction, recalculation, appeal decision</td></tr>
+        <tr><td>4 · Database</td><td>Fewer round trips</td><td>Set-based queries instead of one per row</td><td class="num">—</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Rules for every layer. Cache keys always include the academy, and the account where results depend on
+      assignments (instructors see only their batches). Student personal data is never shared between people, and no cache sits
+      in front of a write. A cache that can't be cleared on the event that changes the data has no place in sign-in or attendance.</p>
+  </div>
+  <div class="step">
+    <h3>B1. The sign-in check cache, done safely</h3>
+    <p class="meta">backend · saves ~0.25 s on every backend call</p>
+    <ul>
+      <li>Restore the per-session cache (account, roles, session state) for 60 s, and clear it through one
+        <code>AuthCacheEvictor</code> called from sign-out, sign-out everywhere, disable, role change, password change, password
+        reset and refresh-token reuse.</li>
+      <li>Tests for each event: the very next request after it is refused (the tests from #100 already cover the cases).</li>
+    </ul>
+  </div>
+  <div class="step">
+    <h3>B2. Reference data</h3>
+    <p class="meta">backend and frontend</p>
+    <ul>
+      <li>Backend: extend the existing 60 s caches (courses, rule) to batches, engagement settings and staff names, with the same
+        write-time clearing.</li>
+      <li>Frontend: wrap the reference-data fetches used by forms (batch pickers, course lists) in <code>'use cache'</code> keyed by academy
+        and role. Pages then skip that backend call entirely. This needs <code>cacheComponents: true</code>; adopt it page by page.</li>
+    </ul>
+  </div>
+  <div class="step">
+    <h3>B3. Final attendance</h3>
+    <p class="meta">backend</p>
+    <ul>
+      <li>A final class's attendance only changes by correction, recalculation or an appeal decision. Cache the computed view per
+        class until one of those happens. Exports, batch summaries and the student portal then answer from memory.</li>
+      <li>Provisional (live) attendance: a 10-second cache, so a full class of refreshing screens costs one computation.</li>
+    </ul>
+  </div>
+
+  <h2>Track C — One backend call per page</h2>
+  <div class="step">
+    <h3>C1. Page endpoints</h3>
+    <p class="meta">backend and frontend · class page 7 calls → 1</p>
+    <ul>
+      <li><code>GET /api/v1/pages/class/{id}</code>: class, expected students, attendance, engagement, linked runs.</li>
+      <li><code>GET /api/v1/pages/batch/{id}?from&amp;to</code>: batch, roster, assignments, summary.</li>
+      <li><code>GET /api/v1/pages/staff-home</code> and <code>GET /api/v1/me/home</code>: today's classes and counts; the student's classes,
+        attendance and consent.</li>
+      <li>Each calls the existing services, so every access rule stays where it is. Added to the OpenAPI contract and its check.</li>
+    </ul>
+  </div>
+  <div class="step">
+    <h3>C2. The chattiest requests</h3>
+    <p class="meta">backend · each with a test that pins its query count</p>
+    <ul>
+      <li>Class attendance 20 → 4, engagement 9 → 2, roster 6 → 2, Zoom matching (partly done in #101) → 2.</li>
+      <li>Method: load related rows together (<code>= ANY(?)</code>, joins, <code>json_agg</code>), not one query per step.</li>
+    </ul>
+  </div>
+
+  <h2>Track D — The small VM</h2>
+  <div class="step">
+    <ul>
+      <li>Zoom receipt worker: poll every 5 s only while receipts are arriving, 60 s when idle (the mail worker is already 30 s).</li>
+      <li>JVM flags for 1 GB RAM: <code>-XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=128m -Xmx400m</code>. Check with
+        <code>free -m</code> and <code>vmstat 1</code> that swap stays unused while a page loads.</li>
+    </ul>
+  </div>
+
+  <h2>Track E — Email through Gmail</h2>
+  <div class="card">
+    <h3>E1. The code change (needed: Gmail requires STARTTLS)</h3>
+    <p>The backend has no SMTP TLS settings today. On port 587, Gmail refuses mail unless the connection is upgraded with STARTTLS,
+      so sending fails even with correct credentials. Add to <code>application.yml</code>:</p>
+    <div class="formula">spring.mail.properties.mail.smtp.auth: true<br>
+spring.mail.properties.mail.smtp.starttls.enable: true<br>
+spring.mail.properties.mail.smtp.starttls.required: true<br>
+spring.mail.properties.mail.smtp.connectiontimeout: 10000<br>
+spring.mail.properties.mail.smtp.timeout: 10000<br>
+spring.mail.properties.mail.smtp.writetimeout: 10000</div>
+    <p class="note">The timeouts keep a slow mail server from tying up the VM's two mail threads.</p>
+
+    <h3>E2. The Gmail account</h3>
+    <ol>
+      <li>Use a dedicated academy Gmail account for sending, not a personal one.</li>
+      <li>Turn on 2-Step Verification, then create an <strong>App password</strong> (Google Account → Security → App passwords). It is a
+        16-character code; the normal password does not work for SMTP.</li>
+    </ol>
+
+    <h3>E3. The environment (on the Oracle VM: the backend sends the mail, not Vercel)</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td><code>LUMA_MAIL_ENABLED</code></td><td><code>true</code></td></tr>
+        <tr><td><code>SPRING_MAIL_HOST</code></td><td><code>smtp.gmail.com</code></td></tr>
+        <tr><td><code>SPRING_MAIL_PORT</code></td><td><code>587</code></td></tr>
+        <tr><td><code>SPRING_MAIL_USERNAME</code></td><td>the sending Gmail address</td></tr>
+        <tr><td><code>SPRING_MAIL_PASSWORD</code></td><td>the 16-character app password (no spaces)</td></tr>
+        <tr><td><code>LUMA_MAIL_FROM</code></td><td>the same Gmail address (Gmail rewrites any other sender unless it is a verified "Send mail as" alias)</td></tr>
+        <tr><td><code>LUMA_MAIL_WEB_ORIGIN</code></td><td><code>https://luma-pca.vercel.app</code> (where emailed links open)</td></tr>
+        <tr><td><code>LUMA_MAIL_BULK_BATCH_SIZE</code> · <code>LUMA_MAIL_BULK_POLL_INTERVAL</code></td><td><code>10</code> · <code>PT60S</code> (stays well under Gmail's daily cap)</td></tr>
+      </tbody>
+    </table></div>
+    <p>Put these in the environment file the <code>luma-backend</code> systemd service loads on the VM, then
+      <code>sudo systemctl restart luma-backend</code>. Keep the file readable only by the service user (<code>chmod 600</code>). The app
+      password goes on the VM and nowhere else: never in Git, chat or Vercel. Enter it yourself; it is a credential.</p>
+
+    <h3>E4. Limits to plan around</h3>
+    <ul>
+      <li>A personal Gmail account sends to about <strong>500 recipients a day</strong>; Google Workspace about <strong>2,000</strong>. Over the limit,
+        Gmail answers "Daily sending quota exceeded" (550 5.4.5) for a day. Inviting all 500 students at once would use a whole
+        day's quota: invite batch by batch, or use Workspace.</li>
+      <li>Failed sends already retry with back-off and show up under "failed invitations"; the backend log says "email for account … failed" (search it with <code>journalctl -u luma-backend | grep "email for account"</code>).</li>
+    </ul>
+
+    <h3>E5. Check it works</h3>
+    <ol>
+      <li><code>journalctl -u luma-backend -n 50</code> after the restart: no mail configuration errors.</li>
+      <li>Sign-in page → "Forgot your password" for a staff account you control. The email arrives within a minute; the link opens
+        <code>luma-pca.vercel.app</code> and works once.</li>
+      <li>Invite one test student from their record, then check the inbox and spam folder (mark "not spam" once).</li>
+    </ol>
+  </div>
+
+  <h2>Track F — Measure and guard</h2>
+  <div class="step">
+    <ul>
+      <li>The web app sends a <code>Server-Timing</code> header (time per backend call), visible in the browser's network panel.</li>
+      <li>A dedicated test staff account (an instructor on a test batch, no real students) so pages can be timed from outside. The
+        same probe runs before and after every step.</li>
+      <li>CI: query-count tests for the page endpoints, and a test that fails if a page makes more than one backend round.</li>
+      <li>Targets: feedback after a click under 0.1 s; revisited pages instant; first open of the class page p95 under 1.5 s.</li>
+    </ul>
+  </div>
+
+  <h2>Order of work and expected effect</h2>
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>Order</th><th>Steps</th><th>Class page, first open</th><th>Any click</th></tr></thead>
+      <tbody>
+        <tr><td>Today</td><td>—</td><td class="num">~3.5 s</td><td>Blank until ready on most pages</td></tr>
+        <tr><td>1</td><td>A1–A3, E1–E5</td><td class="num">~3.5 s, skeleton at once</td><td>Reacts &lt; 0.1 s; revisits instant; email works</td></tr>
+        <tr><td>2</td><td>B1, D</td><td class="num">~2.5 s</td><td>Every backend call 0.25 s faster</td></tr>
+        <tr><td>3</td><td>C1, C2</td><td class="num">~1.2 s</td><td>One backend round per page</td></tr>
+        <tr><td>4</td><td>B2, B3, F</td><td class="num">~0.8–1.0 s (cached data ~0.6 s)</td><td>Measured and guarded</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Estimates from the cost model, to be replaced by Track F's measurements. About 0.5 s per first open stays with the
+      current hosting (reaching the Washington function); prefetching and the client cache hide most of it for pages people move between.</p>
+  </div>
+
+  <footer>LUMA · Physics Cube Academy · plan prepared from live measurements of luma-pca.vercel.app and its backend, the
+    repository at main (6e63496), and the Next.js 16.4.6 documentation shipped with the app.</footer>
+</main>
+</body>
+</html>

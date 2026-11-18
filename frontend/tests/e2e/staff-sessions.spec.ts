@@ -135,7 +135,9 @@ test.describe("Classes", () => {
     await expect(page.locator("#edit-title")).toHaveValue("Optics (second)");
     await page.reload();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Optics (first)");
-    expect((await page.goto("/staff/sessions/00000000-0000-4000-8000-999999999999"))?.status()).toBe(404);
+    // A well-formed but unknown ID is discovered while the page streams: the not-found page shows (status already sent).
+    await page.goto("/staff/sessions/00000000-0000-4000-8000-999999999999");
+    await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
     expect((await page.goto("/staff/sessions/not-a-uuid"))?.status()).toBe(404);
   });
 

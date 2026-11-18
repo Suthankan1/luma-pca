@@ -2049,3 +2049,21 @@ build runs the Next.js default bundler and repeats the smoke test.
 
 
 
+
+## Checkpoint PERF-4 — 2026-11-18 — Instant feedback, one-trip sign-in check, fewer queries, Gmail-ready email
+
+- **Branch:** `perf/instant-feedback-cache-email`. Plan: `docs/delivery/speed-and-email-plan.html`.
+- **Instant feedback (Track A):** the sign-in check moves to `app/staff/layout.tsx` and `app/student/layout.tsx` (cookie
+  identity, no backend call), so loading screens are back on every page while signed-out visitors still get a real 307;
+  `src/proxy.ts` gives malformed record IDs a real 404 before rendering. One address-aware loading screen per portal,
+  a pending dot on the clicked menu item (`useLinkStatus`), and a 30-second browser cache (`staleTimes`). In Next.js 16 a
+  dynamic page without a loading screen is never prefetched, so this also brings prefetching back.
+- **Sign-in check in one round trip (B1):** account, roles and session read with one SQL statement on every request (was 3);
+  nothing cached, so sign-out, disabling and role changes still apply to the very next request.
+- **Fewer queries (C2):** student views, sign-in-email matching and decided-student lookups are single joined queries.
+  Round trips per request (local probe, pilot data): class attendance 22 → 16, roster 8 → 6, class students 8 → 6, Zoom
+  accounts to match 9 → 5, plus the sign-in check 3 → 1 on every call.
+- **Idle backend (D):** a stored Zoom webhook wakes the receipt worker at once (2-second check, no query when idle); with
+  nothing arriving it looks for due retries once a minute instead of every 15 s.
+- **Email (E1):** STARTTLS and 10-second SMTP timeouts in `application.yml`; SMTP login switches on whenever a username is set
+  (`MailConfig`, `MailConfigTest`). Gmail steps in `runbooks/DEPLOY.md` and `.env.example`.

@@ -137,10 +137,14 @@ test.describe("Staff students and enrolments", () => {
 
   test("Unknown or malformed ids show not found, and the student page fits a phone", async ({ page }, testInfo) => {
     await signInAsAdmin(page);
-    for (const path of ["/staff/students/not-a-uuid", "/staff/students/00000000-0000-4000-8000-999999999999",
-      "/staff/batches/not-a-uuid", "/staff/batches/00000000-0000-4000-8000-999999999999"]) {
-      const response = await page.goto(path);
-      expect(response?.status(), path).toBe(404);
+    for (const path of ["/staff/students/not-a-uuid", "/staff/batches/not-a-uuid"]) {
+      expect((await page.goto(path))?.status(), path).toBe(404);
+      await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+    }
+    // Well-formed but unknown: found out while the page streams, so the not-found page shows with the status already sent.
+    for (const path of ["/staff/students/00000000-0000-4000-8000-999999999999", "/staff/batches/00000000-0000-4000-8000-999999999999"]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { name: "Page not found" }), path).toBeVisible();
     }
     if (testInfo.project.name !== "mobile") return;
     await addStudent(page, "pca-m-phone", "Phone Layout", "phone.m@example.invalid");

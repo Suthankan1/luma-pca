@@ -147,3 +147,9 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .skeleton-title { height: 24px; width: 40%; margin-bottom: 12px; }
 .skeleton-card { height: 120px; }
 
+
+/* A click on a navigation link shows at once, before the next page arrives. */
+.link-pending { display: inline-block; width: 6px; height: 6px; margin-left: 8px; border-radius: 50%; background: transparent; vertical-align: middle; }
+.link-pending.is-pending { background: var(--pca-cyan); animation: link-pulse 0.8s ease-in-out infinite alternate; }
+@keyframes link-pulse { from { opacity: .35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .link-pending.is-pending { animation: none; } }
