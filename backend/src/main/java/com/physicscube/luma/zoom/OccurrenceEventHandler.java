@@ -16,17 +16,20 @@ import org.springframework.stereotype.Component;
  * showed: the visit ({@code participant_uuid}, else {@code user_id}; both new on every
  * rejoin), {@code registrant_id}, the email and display name, and whether it was the host
  * ({@code participant.id} equals {@code object.host_id}). Missing participant fields are
- * stored as unknown rather than failing the event. IP addresses are never copied. The
- * occurrence is then linked to its class session when that is unambiguous.
+ * stored as unknown rather than failing the event. IP addresses are never copied. For a monitored webinar the event then
+ * creates or updates the run of its occurrence ({@link WebinarRunTracker}); otherwise the occurrence is linked to a class
+ * staff scheduled when that is unambiguous.
  */
 @Component
 class OccurrenceEventHandler implements ReceiptHandler {
     private final JdbcTemplate jdbc;
     private final OccurrenceLinker linker;
+    private final WebinarRunTracker runs;
 
-    OccurrenceEventHandler(JdbcTemplate jdbc, OccurrenceLinker linker) {
+    OccurrenceEventHandler(JdbcTemplate jdbc, OccurrenceLinker linker, WebinarRunTracker runs) {
         this.jdbc = jdbc;
         this.linker = linker;
+        this.runs = runs;
     }
 
     @Override
@@ -61,7 +64,11 @@ class OccurrenceEventHandler implements ReceiptHandler {
                 """, UUID.randomUUID(), receipt.academyId(), receipt.id(), webinarId, occurrence, receipt.eventType(),
                 receipt.eventTs(), Timestamp.from(DbTime.now()), visit, text(participant.get("registrant_id"), 100),
                 email == null ? null : email.toLowerCase(Locale.ROOT), text(participant.get("user_name"), 200), host);
-        linker.tryLink(receipt.academyId(), occurrence, webinarId, java.time.Instant.ofEpochMilli(receipt.eventTs()));
+        // A monitored webinar's runs come from Zoom's actual events (Academy decision 2026-11-18); other webinars keep the
+        // older match to a class staff scheduled.
+        if (!runs.onEvent(receipt.academyId(), webinarId, occurrence, receipt.eventType(), receipt.eventTs(), object)) {
+            linker.tryLink(receipt.academyId(), occurrence, webinarId, java.time.Instant.ofEpochMilli(receipt.eventTs()));
+        }
     }
 
     /** Trimmed text, or {@code null} when absent, blank or longer than {@code maxLength}. */

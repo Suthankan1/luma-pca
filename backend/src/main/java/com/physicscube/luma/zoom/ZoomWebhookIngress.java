@@ -40,8 +40,11 @@ public class ZoomWebhookIngress {
     private final ZoomWebhookSignature signature;
 
     private final ZoomReceiptSignal signal;
+    private final MonitoredWebinars monitored;
 
-    ZoomWebhookIngress(ZoomWebhookProperties properties, ZoomWebhookReceipts receipts, ZoomReceiptSignal signal) {
+    ZoomWebhookIngress(ZoomWebhookProperties properties, ZoomWebhookReceipts receipts, ZoomReceiptSignal signal,
+                       MonitoredWebinars monitored) {
+        this.monitored = monitored;
         this.signal = signal;
         this.properties = properties;
         this.receipts = receipts;
@@ -54,6 +57,15 @@ public class ZoomWebhookIngress {
 
     public int maxBodyBytes() {
         return properties.maxBodyBytes();
+    }
+
+    /** A webinar the academy chose to monitor is collected even when the deployment's allow-list does not name it. */
+    private boolean monitoredWebinar(String webinarId) {
+        try {
+            return monitored.isMonitored(properties.academyId(), webinarId);
+        } catch (DataAccessException e) {
+            return false;
+        }
     }
 
     /** payload.object.id, which Zoom documents as a string; a number is accepted too. */
@@ -100,7 +112,8 @@ public class ZoomWebhookIngress {
             log.info("Acknowledged Zoom webhook of unused type {}", event.replaceAll("[^A-Za-z0-9._]", "?"));
             return new Outcome(200, null);
         }
-        if (!properties.webinarAllowList().isEmpty() && !properties.webinarAllowList().contains(webinarId(json))) {
+        if (!properties.webinarAllowList().isEmpty() && !properties.webinarAllowList().contains(webinarId(json))
+                && !monitoredWebinar(webinarId(json))) {
             // Not stored and the payload is not inspected further: it may describe people
             // attending a class this deployment is not allowed to collect.
             log.info("Acknowledged Zoom webhook {} for a webinar outside the allow-list; not stored", event);

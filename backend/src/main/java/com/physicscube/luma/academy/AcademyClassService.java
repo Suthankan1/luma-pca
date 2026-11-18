@@ -95,6 +95,33 @@ public class AcademyClassService {
     private record Link(UUID id, String className, UUID batchId, Instant lastSyncedAt, Integer lastSyncedStudents) {
     }
 
+    /**
+     * For other modules: the Academy's class names, or empty when the Academy database is not connected or not reachable
+     * (callers must then treat every class association as unresolved). No role check.
+     */
+    public java.util.Optional<List<String>> classNames() {
+        AcademyPaymentsCatalog source = catalog.getIfAvailable();
+        if (source == null) {
+            return java.util.Optional.empty();
+        }
+        try {
+            return java.util.Optional.of(source.listClasses().stream().map(AcademyPaymentClass::className).toList());
+        } catch (DataAccessException e) {
+            org.slf4j.LoggerFactory.getLogger(AcademyClassService.class)
+                    .warn("Academy database query failed: {}", e.getClass().getSimpleName());
+            return java.util.Optional.empty();
+        }
+    }
+
+    /** For other modules: the LUMA batch an Academy class is linked to, if any. No role check. */
+    public java.util.Optional<UUID> linkedBatch(UUID academyId, String className) {
+        if (className == null) {
+            return java.util.Optional.empty();
+        }
+        Link link = links(academyId).get(className);
+        return link == null ? java.util.Optional.empty() : java.util.Optional.of(link.batchId());
+    }
+
     /** Every Academy class with its distinct-student count and, when linked, its LUMA batch. Managers only. */
     @Transactional(readOnly = true)
     public List<AcademyClassView> classes(CurrentAccount caller) {
