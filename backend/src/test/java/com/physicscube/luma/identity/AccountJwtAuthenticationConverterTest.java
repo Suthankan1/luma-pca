@@ -9,7 +9,6 @@ import com.physicscube.luma.identity.domain.AccountStatus;
 import com.physicscube.luma.identity.domain.Role;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,8 +18,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 
+/** The per-request check, read in one query (RefreshSessions.requestAuth); the integration tests cover the SQL itself. */
 class AccountJwtAuthenticationConverterTest {
-    private AccountService accountService;
     private RefreshSessions refreshSessions;
     private AccountJwtAuthenticationConverter converter;
 
@@ -31,57 +30,52 @@ class AccountJwtAuthenticationConverterTest {
 
     @BeforeEach
     void setUp() {
-        accountService = mock(AccountService.class);
         refreshSessions = mock(RefreshSessions.class);
-        converter = new AccountJwtAuthenticationConverter(accountService, refreshSessions);
+        converter = new AccountJwtAuthenticationConverter(mock(AccountService.class), refreshSessions);
     }
 
-    private Jwt mockJwt() {
-        return new Jwt(
-                "token-value",
-                Instant.now(),
-                Instant.now().plusSeconds(600),
-                Map.of("alg", "RS256"),
-                Map.of(
-                        "sub", accountId.toString(),
-                        AccessTokenIssuer.SESSION_CLAIM, sessionId.toString(),
-                        AccessTokenIssuer.AUTH_VERSION_CLAIM, authVersion,
-                        AccessTokenIssuer.ACADEMY_CLAIM, academyId.toString()
-                )
-        );
+    private Jwt jwt(long version, UUID academy) {
+        return new Jwt("token-value", Instant.now(), Instant.now().plusSeconds(600), Map.of("alg", "RS256"), Map.of(
+                "sub", accountId.toString(),
+                AccessTokenIssuer.SESSION_CLAIM, sessionId.toString(),
+                AccessTokenIssuer.AUTH_VERSION_CLAIM, version,
+                AccessTokenIssuer.ACADEMY_CLAIM, academy.toString()));
+    }
+
+    private void found(AccountStatus status, Set<Role> roles, boolean mfa) {
+        when(refreshSessions.requestAuth(sessionId, accountId))
+                .thenReturn(new RefreshSessions.RequestAuth(academyId, status, (int) authVersion, roles, mfa));
     }
 
     @Test
-    @DisplayName("Converts valid active account token to JwtAuthenticationToken")
+    @DisplayName("A valid token for an active account gets the roles stored now")
     void convertsValidToken() {
-        Jwt jwt = mockJwt();
-        AccountSummary activeAccount = new AccountSummary(
-                accountId, academyId, "user@test.com", AccountStatus.ACTIVE,
-                Set.of(Role.INSTRUCTOR), (int) authVersion
-        );
-
-        when(accountService.findById(accountId)).thenReturn(Optional.of(activeAccount));
-        when(refreshSessions.mfaStateIfActive(sessionId, accountId, (int) authVersion)).thenReturn(true);
-
-        Authentication auth = converter.convert(jwt);
-        assertThat(auth).isNotNull();
+        found(AccountStatus.ACTIVE, Set.of(Role.INSTRUCTOR), true);
+        Authentication auth = converter.convert(jwt(authVersion, academyId));
         assertThat(auth.getName()).isEqualTo(accountId.toString());
-        assertThat(auth.getAuthorities()).hasSize(1);
+        assertThat(auth.getAuthorities()).extracting(Object::toString).containsExactly("ROLE_INSTRUCTOR");
     }
 
     @Test
-    @DisplayName("Rejects token when account is disabled")
-    void rejectsDisabledAccount() {
-        Jwt jwt = mockJwt();
-        AccountSummary disabledAccount = new AccountSummary(
-                accountId, academyId, "user@test.com", AccountStatus.DISABLED,
-                Set.of(Role.INSTRUCTOR), (int) authVersion
-        );
+    @DisplayName("Disabled accounts, ended sessions, old auth versions and other academies are refused")
+    void refusals() {
+        found(AccountStatus.DISABLED, Set.of(Role.INSTRUCTOR), true);
+        assertThatThrownBy(() -> converter.convert(jwt(authVersion, academyId))).isInstanceOf(InvalidBearerTokenException.class);
 
-        when(accountService.findById(accountId)).thenReturn(Optional.of(disabledAccount));
-        when(refreshSessions.mfaStateIfActive(sessionId, accountId, (int) authVersion)).thenReturn(true);
+        when(refreshSessions.requestAuth(sessionId, accountId)).thenReturn(null); // revoked, expired, or account gone
+        assertThatThrownBy(() -> converter.convert(jwt(authVersion, academyId))).isInstanceOf(InvalidBearerTokenException.class);
 
-        assertThatThrownBy(() -> converter.convert(jwt))
-                .isInstanceOf(InvalidBearerTokenException.class);
+        found(AccountStatus.ACTIVE, Set.of(Role.INSTRUCTOR), true);
+        assertThatThrownBy(() -> converter.convert(jwt(authVersion + 1, academyId))).isInstanceOf(InvalidBearerTokenException.class);
+        assertThatThrownBy(() -> converter.convert(jwt(authVersion, UUID.randomUUID()))).isInstanceOf(InvalidBearerTokenException.class);
+    }
+
+    @Test
+    @DisplayName("Owners and administrators need a session that passed MFA")
+    void elevatedNeedsMfa() {
+        found(AccountStatus.ACTIVE, Set.of(Role.ACADEMY_ADMIN), false);
+        assertThatThrownBy(() -> converter.convert(jwt(authVersion, academyId))).isInstanceOf(InvalidBearerTokenException.class);
+        found(AccountStatus.ACTIVE, Set.of(Role.ACADEMY_ADMIN), true);
+        assertThat(converter.convert(jwt(authVersion, academyId)).getAuthorities()).hasSize(1);
     }
 }

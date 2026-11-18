@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LinkPending } from "./LinkPending";
 import type { ReactNode } from "react";
 
 export const staffNav = [
@@ -29,7 +30,7 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, c
       <nav className="staff-nav">
         {staffNav.map((item, index) => <Link key={item.key} href={item.href}
           className={`staff-navitem ${item.key === active ? "active" : ""}`} aria-current={item.key === active ? "page" : undefined}>
-          <span className="staff-navnum" aria-hidden>{String(index + 1).padStart(2, "0")}</span>{item.label}
+          <span className="staff-navnum" aria-hidden>{String(index + 1).padStart(2, "0")}</span>{item.label}<LinkPending />
         </Link>)}
         {hasStudentPortal && <Link href="/student" className="staff-navitem">
           <span className="staff-navnum" aria-hidden>↗</span>Student portal

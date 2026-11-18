@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import {
   cookieNames,
   hasPortal,
-  openAccess,
   openAccessSession,
   openMfa,
   openRecovery,

@@ -8,6 +8,18 @@ spring:
     import:
       - optional:file:.env[.properties]
       - optional:file:../.env[.properties]
+  # SMTP for account emails. Host, port, username and password come from SPRING_MAIL_HOST, SPRING_MAIL_PORT,
+  # SPRING_MAIL_USERNAME and SPRING_MAIL_PASSWORD (login is switched on whenever a username is set, MailConfig).
+  # Gmail (smtp.gmail.com:587) needs STARTTLS and an app password; set
+  # LUMA_MAIL_STARTTLS_REQUIRED=true in production so mail is never sent unencrypted. Timeouts keep a slow mail
+  # server from tying up the two mail threads.
+  mail:
+    properties:
+      mail.smtp.starttls.enable: ${LUMA_MAIL_STARTTLS:true}
+      mail.smtp.starttls.required: ${LUMA_MAIL_STARTTLS_REQUIRED:false}
+      mail.smtp.connectiontimeout: ${LUMA_MAIL_CONNECT_TIMEOUT_MS:10000}
+      mail.smtp.timeout: ${LUMA_MAIL_READ_TIMEOUT_MS:10000}
+      mail.smtp.writetimeout: ${LUMA_MAIL_WRITE_TIMEOUT_MS:10000}
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/luma}
     username: ${DB_USERNAME:luma_dev}
@@ -134,7 +146,10 @@ luma:
     processing:
       # Polls stored webhook receipts in this process; safe with several instances.
       enabled: ${LUMA_ZOOM_PROCESSING_ENABLED:true}
-      poll-interval: ${LUMA_ZOOM_PROCESSING_POLL_INTERVAL:PT15S}
+      # A stored webhook wakes the worker at once (checked every poll-interval, no database query when idle);
+      # otherwise it looks for due retries once per idle-interval.
+      poll-interval: ${LUMA_ZOOM_PROCESSING_POLL_INTERVAL:PT2S}
+      idle-interval: ${LUMA_ZOOM_PROCESSING_IDLE_INTERVAL:PT60S}
       # Receipts handled per poll (1 to 500); with the interval this sets the drain rate per instance.
       batch-size: ${LUMA_ZOOM_PROCESSING_BATCH_SIZE:50}
     reports:

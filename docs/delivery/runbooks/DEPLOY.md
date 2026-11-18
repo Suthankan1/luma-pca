@@ -43,3 +43,31 @@ Then `aws ecs update-service --force-new-deployment` for `api` and `web`, wait f
 3. Feature switches for a fast, reversible stop: `LUMA_ZOOM_PROCESSING_ENABLED=false` (stop processing; receipts still
    stored), `LUMA_ZOOM_REPORTS_ENABLED=false`, `LUMA_MAIL_BULK_ENABLED=false`, engagement off in the Attendance page, and
    removing the Zoom webhook secret (the endpoint then answers 404 and Zoom retries later).
+
+## Email through Gmail (Oracle VM)
+
+The backend sends every email (invitations, password resets, attendance notices), so the settings go in the backend's
+environment file on the VM (the one `luma-backend.service` loads), never in Vercel or Git.
+
+1. In the academy's sending Gmail account: turn on 2-Step Verification, then Google Account → Security → App passwords →
+   create one for "LUMA". Copy the 16-character code (no spaces).
+2. On the VM, add to the environment file (keep it `chmod 600`, owned by the service user):
+   ```
+   LUMA_MAIL_ENABLED=true
+   SPRING_MAIL_HOST=smtp.gmail.com
+   SPRING_MAIL_PORT=587
+   SPRING_MAIL_USERNAME=<the Gmail address>
+   SPRING_MAIL_PASSWORD=<the app password>
+   LUMA_MAIL_FROM=<the same Gmail address>
+   LUMA_MAIL_WEB_ORIGIN=https://luma-pca.vercel.app
+   LUMA_MAIL_STARTTLS_REQUIRED=true
+   LUMA_MAIL_BULK_BATCH_SIZE=10
+   LUMA_MAIL_BULK_POLL_INTERVAL=PT60S
+   ```
+3. `sudo systemctl restart luma-backend`, then `journalctl -u luma-backend -n 50`: no mail errors at startup.
+4. Check: Sign-in → "Forgot your password" for an account you control; the email arrives within a minute and its link
+   opens the web app once. Then invite one test student and check the inbox (and spam, once).
+
+STARTTLS and 10-second timeouts are set in `application.yml`; SMTP login is switched on automatically when a username is
+set. Gmail allows roughly 500 recipients a day on a personal account (about 2,000 on Google Workspace): invite batch by
+batch. Failures are logged as "… email for account … failed" and listed under failed invitations; they retry on their own.

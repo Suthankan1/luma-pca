@@ -32,8 +32,10 @@ public class StudentService {
 
     private final StudentRepository students;
     private final AccountService accounts;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    StudentService(StudentRepository students, AccountService accounts) {
+    StudentService(StudentRepository students, AccountService accounts, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.students = students;
         this.accounts = accounts;
     }
@@ -185,7 +187,11 @@ public class StudentService {
     /** For other modules: views of those students that belong to the academy. No role check. */
     @Transactional(readOnly = true)
     public Map<UUID, StudentView> viewsInAcademy(UUID academyId, Collection<UUID> studentIds) {
-        return views(students.findByAcademyIdAndIdIn(academyId, studentIds)).stream()
+        if (studentIds.isEmpty()) {
+            return Map.of();
+        }
+        // One round trip: student and sign-in account together (the database may be far away).
+        return joinedViews("s.id = ANY (?)", academyId, studentIds.stream().distinct().toArray(UUID[]::new)).stream()
                 .collect(Collectors.toMap(StudentView::id, Function.identity()));
     }
 
@@ -202,10 +208,23 @@ public class StudentService {
     /** For other modules: the academy's students whose sign-in email is one of these normalised emails, by email. No role check. */
     @Transactional(readOnly = true)
     public Map<String, StudentView> bySignInEmails(UUID academyId, Collection<String> normalizedEmails) {
-        Map<String, AccountSummary> found = accounts.findInAcademyByEmails(academyId, normalizedEmails);
-        Map<UUID, StudentView> byAccount = byAccountIds(academyId, found.values().stream().map(AccountSummary::id).toList());
-        return found.entrySet().stream().filter(entry -> byAccount.containsKey(entry.getValue().id()))
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> byAccount.get(entry.getValue().id())));
+        if (normalizedEmails.isEmpty()) {
+            return Map.of();
+        }
+        return joinedViews("a.email = ANY (?)", academyId, normalizedEmails.stream().distinct().toArray(String[]::new)).stream()
+                .collect(Collectors.toMap(StudentView::email, Function.identity()));
+    }
+
+    /** Students of the academy with their sign-in account's email and status, in one query; {@code where} filters them. */
+    private List<StudentView> joinedViews(String where, UUID academyId, Object[] values) {
+        return jdbc.query("""
+                SELECT s.id, s.student_number, s.full_name, a.email, s.account_id, a.status, s.active, s.version,
+                       s.created_at, s.updated_at
+                FROM students s JOIN accounts a ON a.id = s.account_id AND a.academy_id = s.academy_id
+                WHERE s.academy_id = ? AND\s""" + where, (row, i) -> new StudentView((UUID) row.getObject("id"),
+                row.getString("student_number"), row.getString("full_name"), row.getString("email"), (UUID) row.getObject("account_id"),
+                row.getString("status"), row.getBoolean("active"), row.getLong("version"), row.getTimestamp("created_at").toInstant(),
+                row.getTimestamp("updated_at").toInstant()), academyId, values);
     }
 
     /** For other modules: sign-in account ids of the academy's active students, or of those among {@code studentIds}. No role check. */
@@ -226,8 +245,21 @@ public class StudentService {
     }
 
     private List<StudentView> views(List<Student> page) {
-        Map<UUID, AccountSummary> linked = accounts.findByIds(page.stream().map(Student::getAccountId).toList());
-        return page.stream().map(student -> StudentView.of(student, linked.get(student.getAccountId()))).toList();
+        if (page.isEmpty()) {
+            return List.of();
+        }
+        // Only the email and status are shown, so one plain query instead of loading each account with its roles.
+        Map<UUID, String[]> linked = new java.util.HashMap<>();
+        jdbc.query("SELECT id, email, status FROM accounts WHERE id = ANY (?)",
+                (org.springframework.jdbc.core.RowCallbackHandler) row -> linked.put((UUID) row.getObject("id"),
+                        new String[] {row.getString("email"), row.getString("status")}),
+                (Object) page.stream().map(Student::getAccountId).distinct().toArray(UUID[]::new));
+        return page.stream().map(student -> {
+            String[] account = linked.get(student.getAccountId());
+            return new StudentView(student.getId(), student.getStudentNumber(), student.getFullName(), account == null ? null : account[0],
+                    student.getAccountId(), account == null ? null : account[1], student.isActive(), student.getVersion(),
+                    student.getCreatedAt(), student.getUpdatedAt());
+        }).toList();
     }
 
     private static ConflictException duplicateNumber() {

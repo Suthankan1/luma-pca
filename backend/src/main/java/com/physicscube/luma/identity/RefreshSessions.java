@@ -122,6 +122,37 @@ class RefreshSessions {
 
     /** @return whether the current account's live session passed MFA, or {@code null} when the session is invalid */
     @Transactional(readOnly = true)
+    /** What every API request needs to know about its token's account and session, read in one database round trip. */
+    record RequestAuth(UUID academyId, com.physicscube.luma.identity.domain.AccountStatus status, int authVersion,
+                       java.util.Set<com.physicscube.luma.identity.domain.Role> roles, boolean mfaVerified) {
+    }
+
+    /**
+     * The account and its session together, or {@code null} when the account is gone or the session is revoked, expired or
+     * from an older auth version. Same rules as {@link AccountService#findById} plus {@link #mfaStateIfActive}, in one query.
+     */
+    RequestAuth requestAuth(UUID sessionId, UUID accountId) {
+        return jdbc.query("""
+                SELECT a.academy_id, a.status, a.auth_version, s.mfa_verified,
+                       ARRAY(SELECT r.role FROM account_roles r WHERE r.account_id = a.id) AS roles
+                FROM accounts a
+                JOIN refresh_sessions s ON s.account_id = a.id AND s.id = ? AND s.auth_version = a.auth_version
+                                       AND s.revoked_at IS NULL AND s.expires_at > ?
+                WHERE a.id = ?
+                """, results -> {
+            if (!results.next()) {
+                return null;
+            }
+            java.util.Set<com.physicscube.luma.identity.domain.Role> roles = java.util.EnumSet.noneOf(com.physicscube.luma.identity.domain.Role.class);
+            for (String role : (String[]) results.getArray("roles").getArray()) {
+                roles.add(com.physicscube.luma.identity.domain.Role.valueOf(role));
+            }
+            return new RequestAuth((UUID) results.getObject("academy_id"),
+                    com.physicscube.luma.identity.domain.AccountStatus.valueOf(results.getString("status")),
+                    results.getInt("auth_version"), roles, results.getBoolean("mfa_verified"));
+        }, sessionId, Timestamp.from(Instant.now()), accountId);
+    }
+
     Boolean mfaStateIfActive(UUID sessionId, UUID accountId, int authVersion) {
         return jdbc.query("SELECT mfa_verified FROM refresh_sessions "
                         + "WHERE id = ? AND account_id = ? AND auth_version = ? AND revoked_at IS NULL AND expires_at > ?",

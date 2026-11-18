@@ -43,27 +43,25 @@ public class AccountJwtAuthenticationConverter implements Converter<Jwt, Abstrac
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
-        AccountSummary account;
-        Boolean sessionMfa;
+        RefreshSessions.RequestAuth auth;
+        UUID accountId;
         try {
-            account = accounts.findById(UUID.fromString(jwt.getSubject())).orElse(null);
-            sessionMfa = account == null ? null : sessions.mfaStateIfActive(
-                    UUID.fromString(String.valueOf(jwt.getClaimAsString(AccessTokenIssuer.SESSION_CLAIM))),
-                    account.id(), account.authVersion());
+            accountId = UUID.fromString(jwt.getSubject());
+            // One round trip: account, roles and session together (the database may be far away).
+            auth = sessions.requestAuth(UUID.fromString(String.valueOf(jwt.getClaimAsString(AccessTokenIssuer.SESSION_CLAIM))), accountId);
         } catch (IllegalArgumentException e) {
-            account = null;
-            sessionMfa = null;
-        }
-        if (account == null || sessionMfa == null || account.status() != AccountStatus.ACTIVE
-                || !(jwt.getClaim(AccessTokenIssuer.AUTH_VERSION_CLAIM) instanceof Number version)
-                || version.longValue() != account.authVersion()
-                || !account.academyId().toString().equals(jwt.getClaimAsString(AccessTokenIssuer.ACADEMY_CLAIM))
-                // An account promoted to owner/admin after signing in without MFA must sign in again.
-                || (AuthService.isElevated(account.roles()) && !sessionMfa)) {
             throw new InvalidBearerTokenException("Token is no longer valid");
         }
-        List<SimpleGrantedAuthority> authorities = account.roles().stream()
+        if (auth == null || auth.status() != AccountStatus.ACTIVE
+                || !(jwt.getClaim(AccessTokenIssuer.AUTH_VERSION_CLAIM) instanceof Number version)
+                || version.longValue() != auth.authVersion()
+                || !auth.academyId().toString().equals(jwt.getClaimAsString(AccessTokenIssuer.ACADEMY_CLAIM))
+                // An account promoted to owner/admin after signing in without MFA must sign in again.
+                || (AuthService.isElevated(auth.roles()) && !auth.mfaVerified())) {
+            throw new InvalidBearerTokenException("Token is no longer valid");
+        }
+        List<SimpleGrantedAuthority> authorities = auth.roles().stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name())).toList();
-        return new JwtAuthenticationToken(jwt, authorities, account.id().toString());
+        return new JwtAuthenticationToken(jwt, authorities, accountId.toString());
     }
 }

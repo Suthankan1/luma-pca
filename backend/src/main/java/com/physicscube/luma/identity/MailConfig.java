@@ -9,6 +9,25 @@ import org.springframework.mail.MailSender;
 @Configuration
 @EnableConfigurationProperties({MailProperties.class, PasswordResetProperties.class})
 class MailConfig {
+    /**
+     * SMTP login whenever a username is configured (Gmail and most providers require it), and none otherwise (a local test
+     * server): JavaMail refuses to connect when login is on but no password is given.
+     */
+    @Bean
+    static org.springframework.beans.factory.config.BeanPostProcessor smtpLogin() {
+        return new org.springframework.beans.factory.config.BeanPostProcessor() {
+            @Override
+            public Object postProcessAfterInitialization(Object bean, String name) {
+                if (bean instanceof org.springframework.mail.javamail.JavaMailSenderImpl mail
+                        && !mail.getJavaMailProperties().containsKey("mail.smtp.auth")) {
+                    boolean login = mail.getUsername() != null && !mail.getUsername().isBlank();
+                    mail.getJavaMailProperties().setProperty("mail.smtp.auth", String.valueOf(login));
+                }
+                return bean;
+            }
+        };
+    }
+
     /** Fails at startup when email is enabled without an SMTP server, rather than on the first message. */
     @Bean
     AccountMailer accountMailer(MailProperties properties, ObjectProvider<MailSender> sender) {

@@ -119,7 +119,8 @@ test.describe("Staff accounts and batch assignments", () => {
     await page.goto("/staff/team/00000000-0000-4000-8000-0000000000bb");
     await expect(page.getByText("Only an owner can change an owner’s or administrator’s roles.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Disable account" })).toHaveCount(0);
-    expect((await page.goto("/staff/team/00000000-0000-4000-8000-999999999999"))?.status()).toBe(404);
+    await page.goto("/staff/team/00000000-0000-4000-8000-999999999999");
+    await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
     expect((await page.goto("/staff/team/not-a-uuid"))?.status()).toBe(404);
   });
 

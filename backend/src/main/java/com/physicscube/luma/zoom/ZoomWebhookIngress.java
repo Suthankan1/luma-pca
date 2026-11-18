@@ -39,7 +39,10 @@ public class ZoomWebhookIngress {
     private final ZoomWebhookReceipts receipts;
     private final ZoomWebhookSignature signature;
 
-    ZoomWebhookIngress(ZoomWebhookProperties properties, ZoomWebhookReceipts receipts) {
+    private final ZoomReceiptSignal signal;
+
+    ZoomWebhookIngress(ZoomWebhookProperties properties, ZoomWebhookReceipts receipts, ZoomReceiptSignal signal) {
+        this.signal = signal;
         this.properties = properties;
         this.receipts = receipts;
         this.signature = properties.enabled() ? new ZoomWebhookSignature(properties.secretToken()) : null;
@@ -110,6 +113,9 @@ public class ZoomWebhookIngress {
         try {
             boolean stored = receipts.store(properties.academyId(), event, eventTs.longValue(), body);
             log.info("Zoom webhook {} {}", event, stored ? "stored" : "already stored");
+            if (stored) {
+                signal.raise();
+            }
             return new Outcome(200, null);
         } catch (DataAccessException e) {
             log.error("Could not store Zoom webhook {}; asking Zoom to retry", event);
