@@ -338,10 +338,12 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.goto(rosterUrl);
   await page.getByRole("button", { name: "Remove real.instructor@example.invalid as Instructor" }).click();
   await expect(page.getByText("No one is assigned yet.")).toBeVisible();
-  expect((await instructor.goto(rosterUrl))?.status()).toBe(404);
+  await instructor.goto(rosterUrl);
+  await expect(instructor.getByRole("heading", { name: "Page not found" })).toBeVisible();
   await instructor.goto("/staff/courses");
   await expect(instructor.getByText("You are not assigned to any batch yet.")).toBeVisible();
-  expect((await instructor.goto(classUrl))?.status()).toBe(404);
+  await instructor.goto(classUrl);
+  await expect(instructor.getByRole("heading", { name: "Page not found" })).toBeVisible();
   await instructorContext.close();
 
   // 10. The student forgets their password: the link arrives by real SMTP and works once.
