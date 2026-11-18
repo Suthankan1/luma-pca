@@ -43,8 +43,16 @@ export function config() {
   return { origin: origin.origin, secure, names: cookieNames(secure), key: sessionKey(process.env.LUMA_SESSION_KEY) };
 }
 
+/**
+ * The Academy-requested student sign-in (student ID as username and password). Switched on here and in the API
+ * (LUMA_STUDENT_ID_LOGIN_ENABLED in both); the API refuses it while its own switch is off.
+ */
+export function studentIdLoginEnabled() {
+  return process.env.LUMA_STUDENT_ID_LOGIN_ENABLED === "true";
+}
+
 export async function authRequest(
-  path: "login" | "refresh" | "logout" | "me" | "mfa/enroll" | "mfa/verify" | "activate"
+  path: "login" | "student-id-login" | "refresh" | "logout" | "me" | "mfa/enroll" | "mfa/verify" | "activate"
     | "password-reset/request" | "password-reset/confirm",
   options?: ({ body: object } | { access: string }) & { client?: string | null }
 ) {

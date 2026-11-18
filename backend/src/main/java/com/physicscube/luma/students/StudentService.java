@@ -227,6 +227,20 @@ public class StudentService {
                 row.getTimestamp("updated_at").toInstant()), academyId, values);
     }
 
+    /** For other modules: ids of the academy's students by normalised student number, for the numbers in use. No role check. */
+    @Transactional(readOnly = true)
+    public Map<String, UUID> idsByNumbers(UUID academyId, Collection<String> normalizedNumbers) {
+        if (normalizedNumbers.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, UUID> ids = new java.util.HashMap<>();
+        jdbc.query("SELECT student_number, id FROM students WHERE academy_id = ? AND student_number = ANY (?)",
+                (org.springframework.jdbc.core.RowCallbackHandler) row -> ids.put(row.getString("student_number"),
+                        (UUID) row.getObject("id")),
+                academyId, normalizedNumbers.toArray(String[]::new));
+        return ids;
+    }
+
     /** For other modules: sign-in account ids of the academy's active students, or of those among {@code studentIds}. No role check. */
     @Transactional(readOnly = true)
     public List<UUID> activeAccountIds(UUID academyId, Collection<UUID> studentIds) {

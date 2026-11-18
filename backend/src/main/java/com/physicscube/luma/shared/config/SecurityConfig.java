@@ -25,9 +25,9 @@ public class SecurityConfig {
             Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter) throws Exception {
         http.authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**",
-                            "/api/v1/system/status", "/.well-known/jwks.json").permitAll()
+                            "/api/v1/system/status", "/.well-known/jwks.json", "/api/v1/auth/student-id-login").permitAll()
                     // The refresh token in the body is the credential for refresh and logout.
-                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/activate",
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/student-id-login", "/api/v1/auth/activate",
                             // The emailed reset token is the credential for confirming a reset.
                             "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm",
                             "/api/v1/auth/refresh", "/api/v1/auth/logout",
@@ -74,7 +74,8 @@ public class SecurityConfig {
                             "/api/v1/zoom/upcoming-webinars", "/api/v1/zoom/upcoming-webinars/*", "/api/v1/zoom/webinar-imports",
                             "/api/v1/attendance/pending", "/api/v1/attendance/finalisations",
                             "/api/v1/attendance-policy", "/api/v1/attendance-appeals", "/api/v1/attendance-appeals/*/resolution",
-                            "/api/v1/engagement-settings")
+                            "/api/v1/engagement-settings",
+                            "/api/v1/academy/classes", "/api/v1/academy/classes/link", "/api/v1/academy/classes/sync")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
                     // A student's own data; services resolve "own" from the token, never from input.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments", "/api/v1/me/class-sessions",

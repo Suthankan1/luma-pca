@@ -8,6 +8,7 @@ import {
   readMfaEnrollment,
   readMfaVerification,
   readTokens,
+  studentIdLoginEnabled,
 } from "@/lib/auth-server";
 import { clientAddressFrom, trustedProxyHops } from "@/lib/client-address";
 import {
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ act
 
 export async function POST(request: NextRequest, context: { params: Promise<{ action: string }> }) {
   const { action } = await context.params;
-  const allowedActions = ["login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery", "activate", "reset-request", "reset-confirm",
+  const allowedActions = ["login", "student-login", "refresh", "logout", "mfa-verify", "mfa-cancel", "mfa-recovery", "activate", "reset-request", "reset-confirm",
     "password-change"];
   if (!allowedActions.includes(action)) {
     return new NextResponse(null, { status: 404, headers: noStore });
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       return response;
     }
 
-    if (action === "login" && refreshToken) return go("/sign-in");
+    if ((action === "login" || action === "student-login") && refreshToken) return go("/sign-in");
     if (action === "refresh" && !refreshToken) return clearAll("/sign-in?error=expired");
 
     if (request.headers.get("content-type")?.split(";")[0] !== "application/x-www-form-urlencoded") {
@@ -241,16 +242,24 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
 
     const email = form.get("email")?.trim();
     const password = form.get("password");
+    const studentId = form.get("studentId")?.trim();
     if (action === "login" && (!email || email.length > 254 || !password || password.length > 256)) {
       return go(errorPath("invalid"));
     }
+    if (action === "student-login") {
+      if (!studentIdLoginEnabled()) return new NextResponse(null, { status: 404, headers: noStore });
+      if (!studentId || studentId.length > 60 || !password || password.length > 60) return go(errorPath("student"));
+    }
 
-    const result = await authRequest(
-      action as "login" | "refresh",
-      { body: action === "login" ? { email: email!, password: password! } : { refreshToken: refreshToken! }, client }
-    );
+    const result = action === "student-login"
+      ? await authRequest("student-id-login", { body: { studentId: studentId!, password: password! }, client })
+      : await authRequest(
+        action as "login" | "refresh",
+        { body: action === "login" ? { email: email!, password: password! } : { refreshToken: refreshToken! }, client }
+      );
 
     if (result.status === 401 || result.status === 400) {
+      if (action === "student-login") return go(errorPath("student"));
       return action === "login" ? go(errorPath("invalid")) : clearAll(errorPath("expired"));
     }
     if (result.status === 429) return go(errorPath("limited"));
@@ -258,7 +267,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
 
     const data = await result.json();
 
-    if (action === "login" && data?.mfaRequired === true) {
+    if ((action === "login" || action === "student-login") && data?.mfaRequired === true) {
       const challenge = readMfaChallenge(data);
       let secret: string | undefined;
       let otpauthUri: string | undefined;
