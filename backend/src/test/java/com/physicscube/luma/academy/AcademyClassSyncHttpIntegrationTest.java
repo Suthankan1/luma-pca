@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,18 @@ class AcademyClassSyncHttpIntegrationTest extends StaffApiIntegrationTest {
         source.execute("GRANT SELECT (pcaid, type, class_type, deleted_at) ON academy_src.payment TO academy_sync_reader");
         source.execute("GRANT SELECT (pcaid, name, mail, deleted_at) ON academy_src.student TO academy_sync_reader");
         source.execute("ALTER ROLE academy_sync_reader SET default_transaction_read_only = on");
+    }
+
+    /** The database is shared with every other test (a backup test restores it whole): leave nothing behind. */
+    @AfterAll
+    static void dropSource() {
+        source.execute("DROP SCHEMA IF EXISTS academy_src CASCADE");
+        try {
+            source.execute("DROP OWNED BY academy_sync_reader");
+            source.execute("DROP ROLE IF EXISTS academy_sync_reader");
+        } catch (org.springframework.dao.DataAccessException ignored) {
+            // A connection still open as the reader keeps the role; with the schema gone it owns and can read nothing.
+        }
     }
 
     UUID academyId;
