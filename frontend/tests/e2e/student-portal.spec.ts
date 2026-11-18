@@ -42,6 +42,26 @@ test.describe("Student portal", () => {
     await expect(classes).toContainText("Waves and oscillations");
   });
 
+  test("The class running now is shown first with a Zoom join button", async ({ page }) => {
+    await signIn(page, "student@example.invalid");
+    const next = page.getByRole("region", { name: "Live now" });
+    await expect(next).toContainText("Live class now");
+    await expect(next.getByRole("link", { name: /Join on Zoom now/ })).toHaveAttribute("href", "https://zoom.us/j/81234567890");
+    await expect(page.getByRole("list", { name: "Last 30 days" }).getByRole("listitem", { name: /^Attendance: \d+%$/ })).toBeVisible();
+    const classes = page.getByRole("region", { name: "MY CLASSES" });
+    await expect(classes.getByRole("listitem", { name: "Live class now" })).toContainText("Live now");
+    await expect(classes.getByRole("listitem", { name: "Revision for both batches" }).getByRole("link", { name: /Zoom link/ })).toHaveCount(0);
+    await page.getByRole("complementary", { name: "Academy navigation" }).getByRole("link", { name: "My attendance" }).click();
+    await expect(page.getByRole("heading", { name: "My attendance" })).toBeVisible();
+  });
+
+  test("The home page offers a student and a staff way in", async ({ page }) => {
+    await page.context().clearCookies();
+    await page.goto("/");
+    await page.getByRole("link", { name: /I’m a student/ }).click();
+    await expect(page).toHaveURL(/\/sign-in\?portal=student$/);
+  });
+
   test("A student without enrolments is told how to get one", async ({ page }) => {
     await signIn(page, "new-student@example.invalid");
     await expect(page.getByRole("region", { name: "MY CLASSES" })).toContainText("No classes in these four weeks.");

@@ -147,3 +147,8 @@ export function withoutCells(row: StudentSummary): Omit<StudentSummary, "cells">
   delete copy.cells;
   return copy as Omit<StudentSummary, "cells">;
 }
+
+/** The current time, read once per server render so every class on a page is judged against the same moment. */
+export function renderTime(): number {
+  return Date.now();
+}

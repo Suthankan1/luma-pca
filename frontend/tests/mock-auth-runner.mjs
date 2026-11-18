@@ -270,7 +270,7 @@ function studentApi(req, send, body) {
       localDate: new Date(Date.now() - 20 * 60_000).toISOString().slice(0, 10) }];
     return send(200, [...classes.map(({ offset, ...c }) => ({ ...c, startsAt: `${day(offset)}T12:30:00Z`, endsAt: `${day(offset)}T14:30:00Z`,
       timeZone: "Asia/Colombo", localDate: day(offset) })), ...live].filter(c => Date.parse(c.startsAt) >= from && Date.parse(c.startsAt) < to)
-      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map(c => ({ ...c, joinUrl: c.status === "SCHEDULED" ? "https://zoom.us/j/81234567890" : null })));
   }
   return send(404);
 }

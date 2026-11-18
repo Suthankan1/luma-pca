@@ -130,7 +130,8 @@ public class ClassSessionService {
                             .map(e -> new StudentClassView.Batch(e.batchId(), e.batchCode(), e.batchName()))
                             .distinct().sorted(Comparator.comparing(StudentClassView.Batch::code)).toList();
                     return mine.isEmpty() ? null : new StudentClassView(session.getId(), session.getTitle(), session.getStartsAt(),
-                            session.getEndsAt(), session.getTimeZone(), day, session.getStatus(), mine);
+                            session.getEndsAt(), session.getTimeZone(), day, session.getStatus(), mine,
+                            StudentClassView.joinUrl(session.getZoomWebinarId(), session.getStatus()));
                 })
                 .filter(java.util.Objects::nonNull)
                 .sorted(Comparator.comparing(StudentClassView::startsAt).thenComparing(StudentClassView::id))

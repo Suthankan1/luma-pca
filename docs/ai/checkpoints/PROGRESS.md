@@ -2179,3 +2179,30 @@ build runs the Next.js default bundler and repeats the smoke test.
   - Verified `https://luma-pca.vercel.app/` responding HTTP 200 with CSP and security headers.
   - Confirmed `/staff` 307 unauthenticated redirects functional.
 
+
+## Checkpoint UI-2 — 2026-11-18 — Frontend redesign after a review of every screen
+
+- **Branch:** `feat/frontend-redesign`.
+- **Review findings:**
+  - The staff menu had 10 flat numbered links and scrolled away on long pages.
+  - Titles were oversized and pushed content down.
+  - The student portal had no "next class", no Zoom link, and showed a running class as "Scheduled".
+  - The home page was almost empty, and the Today page sparse.
+  - On phones the menu was a wall of links, and the headline tiles stacked one per row.
+- **Changes:**
+  - **Staff menu:** grouped (Overview · Teaching · People · Setup), with icons and no numbers; it stays in view while
+    scrolling. On phones it becomes one horizontally scrolling strip.
+  - **Page header:** compact, with an actions slot.
+  - **Student portal:** its own menu (My classes, My attendance, password, sign out). The home page opens on a **Next class /
+    Live now** card with **Join on Zoom**, then a last-30-days attendance snapshot, then classes and batches side by side.
+    Running classes are marked "Live now"; past ones "Ended".
+  - **Today (staff):** the date, a 7-day snapshot (classes, students, average attendance, connected now), live classes with a
+    link to their live attendance, quick actions, and Needs attention.
+  - **Home:** "I'm a student" and "I'm academy staff" cards.
+  - **Sign-in:** student and staff forms side by side when student-ID sign-in is on.
+- **Backend:** `StudentClassView.joinUrl` (`https://zoom.us/j/<webinar>`) for scheduled classes only; the raw webinar ID is
+  still not sent. The Academy asked for joining links. `MyClassSessionHttpIntegrationTest` updated.
+- **Tests:**
+  - Playwright: 148 passed, 2 skipped by design. New: student next-class/join and home-page tests.
+  - Axe now also checks `/`, the dashboard views, Academy classes, the student attendance pages and My attendance.
+  - Unit tests and lint pass.
