@@ -192,9 +192,14 @@ test.describe("Zoom review", () => {
 
     await page.goto("/staff/zoom");
     const occurrence = page.getByRole("listitem", { name: `Webinar 555 0001 110${n} at ${n} Mar 2027 09:30` });
-    if (await occurrence.getByText("Change decision").count()) await occurrence.getByText("Change decision").click();
+    await expect(occurrence).toBeVisible();
+    const select = occurrence.locator("select[name='sessionId']");
+    if (!await select.isVisible()) {
+      await occurrence.getByText("Change decision").click();
+      await expect(select).toBeVisible();
+    }
     const weekday = n === "1" ? "Mon" : "Tue";
-    await occurrence.getByLabel("Class").selectOption({ label: `${weekday} ${n} Mar 2027 · 09:00–11:00 · Attendance class ${p}` });
+    await select.selectOption({ label: `${weekday} ${n} Mar 2027 · 09:00–11:00 · Attendance class ${p}` });
     await occurrence.getByLabel(/^Reason/).fill("Checked against the timetable");
     await occurrence.getByRole("button", { name: "Link to class" }).click();
     await expect(occurrence.locator(".status")).toHaveText("Linked by an administrator");
