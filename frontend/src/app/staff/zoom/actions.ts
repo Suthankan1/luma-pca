@@ -136,23 +136,3 @@ export async function removeIdentityDecision(_previous: FormState, form: FormDat
   revalidatePath("/staff/zoom/participants");
   return { ok: true, message: "Decision removed; the automatic match applies again." };
 }
-
-/** Creates classes for the chosen runs of an upcoming Zoom webinar; the API re-reads the times from Zoom. */
-export async function importWebinar(_previous: FormState, form: FormData): Promise<FormState> {
-  await requireSameOriginAction();
-  const webinarId = String(form.get("webinarId") ?? "").replace(/\D/g, "");
-  if (!/^\d{9,20}$/.test(webinarId)) return invalid;
-  const batchIds = form.getAll("batchIds").map(v => uuidOrNull(v)).filter((v): v is string => v !== null);
-  const occurrenceIds = form.getAll("occurrenceIds").map(v => String(v)).filter(v => /^[\w-]{1,100}$/.test(v));
-  const title = String(form.get("title") ?? "").trim().slice(0, 200);
-  if (batchIds.length === 0) return { ok: false, message: "Choose the batch or batches these classes are for." };
-  if (occurrenceIds.length === 0) return { ok: false, message: "Choose at least one date." };
-  const result = await staffApi<{ created: number; alreadyScheduled: number }>("/api/v1/zoom/webinar-imports",
-    { method: "POST", body: { webinarId, batchIds, occurrenceIds, title: title || null } }, 30000);
-  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
-  revalidatePath("/staff/zoom/import");
-  revalidatePath("/staff/sessions");
-  const { created, alreadyScheduled } = result.data;
-  return { ok: true, message: `Created ${created} class${created === 1 ? "" : "es"}`
-    + (alreadyScheduled ? `; ${alreadyScheduled} already scheduled.` : ".") };
-}

@@ -64,8 +64,7 @@ export default async function StaffPage() {
           })}
             {todays.length === 0 && <li className="dir-empty muted">No classes today.</li>}</ul>
           {manager && <div className="quick-links">
-            <Link className="action secondary" href="/staff/sessions">Schedule a class</Link>
-            <Link className="action secondary" href="/staff/zoom/import">Import classes from Zoom</Link>
+            <Link className="action secondary" href="/staff/webinars">Monitor a webinar</Link>
             <Link className="action secondary" href="/staff/academy">Academy classes</Link>
           </div>}
         </>}

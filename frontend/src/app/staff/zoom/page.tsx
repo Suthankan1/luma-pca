@@ -74,7 +74,7 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
           className={`chip ${v.key === view.key ? "cyan" : ""}`} aria-current={v.key === view.key ? "true" : undefined}>{v.label}</Link>)}
       </nav>
       <div className="link-row"><AutoLinkForm /><Link className="text-link" href="/staff/zoom/check">Check a webinar by link or ID →</Link>
-        <Link className="text-link" href="/staff/zoom/import">Import classes from Zoom →</Link></div>
+        <Link className="text-link" href="/staff/webinars">Monitored webinars →</Link></div>
       {sessions && !sessions.ok && <p className="session-error" role="alert">Class choices couldn’t be loaded; reload to decide.</p>}
       <ul className="dir-list">
         {occurrences.data.map((o, index) => {

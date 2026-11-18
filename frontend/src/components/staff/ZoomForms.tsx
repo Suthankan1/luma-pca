@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { autoLinkOccurrences, decideIdentity, decideOccurrence, fetchReport, fetchRunReport, importWebinar, linkRun, removeIdentityDecision, replayReceipt } from "@/app/staff/zoom/actions";
+import { autoLinkOccurrences, decideIdentity, decideOccurrence, fetchReport, fetchRunReport, linkRun, removeIdentityDecision, replayReceipt } from "@/app/staff/zoom/actions";
 import type { FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, className }: { state: FormState; className: string }) {
@@ -126,31 +126,5 @@ export function RemoveDecisionForm({ prefix, email }: { prefix: string; email: s
     <input id={`${prefix}-remove-reason`} name="reason" maxLength={300} required autoComplete="off" defaultValue={values?.reason} />
     <button className="action secondary" type="submit" disabled={pending}>Remove decision</button>
     <Feedback state={state} className="remove-feedback" />
-  </form>;
-}
-
-/** Turns the chosen runs of one upcoming webinar into classes for the chosen batches. */
-export function ImportWebinarForm({ prefix, webinarId, topic, runs, batches }: {
-  prefix: string; webinarId: string; topic: string;
-  runs: { occurrenceId: string; label: string; scheduled: boolean }[]; batches: { id: string; label: string }[];
-}) {
-  const [state, action, pending] = useActionState(importWebinar, null);
-  const open = runs.filter(r => !r.scheduled);
-  return <form action={action} className="session-form import-webinar">
-    <input type="hidden" name="webinarId" value={webinarId} />
-    <fieldset><legend>Dates</legend>
-      {runs.map(r => <label key={r.occurrenceId} className="check">
-        <input type="checkbox" name="occurrenceIds" value={r.occurrenceId} defaultChecked={!r.scheduled} disabled={r.scheduled} />
-        {" "}{r.label}{r.scheduled ? " · already a class" : ""}</label>)}
-    </fieldset>
-    <fieldset><legend>For batches</legend>
-      {batches.map(b => <label key={b.id} className="check"><input type="checkbox" name="batchIds" value={b.id} /> {b.label}</label>)}
-      {batches.length === 0 && <p className="muted">Create a batch first.</p>}
-    </fieldset>
-    <label htmlFor={`${prefix}-title`}>Class title</label>
-    <input id={`${prefix}-title`} name="title" maxLength={200} defaultValue={topic} autoComplete="off" />
-    <button className="action" type="submit" disabled={pending || open.length === 0}>
-      {pending ? "Creating…" : open.length === 0 ? "Every date is already a class" : "Create classes"}</button>
-    <Feedback state={state} className="import-feedback" />
   </form>;
 }

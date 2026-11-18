@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -34,13 +35,7 @@ test.describe("Attendance export", () => {
     await expect(page.locator("#batch-feedback")).toHaveText("Batch A created.");
 
     await page.goto("/staff/sessions");
-    await page.locator("#schedule-title").fill(`Export class ${p}`);
-    await page.locator("#schedule-date").fill("2027-04-05");
-    await page.locator("#schedule-start").fill("14:00");
-    await page.locator("#schedule-end").fill("16:00");
-    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-    await page.getByRole("button", { name: "Schedule class" }).click();
-    await expect(page.locator("#schedule-feedback")).toHaveText(`Export class ${p} scheduled.`);
+    await scheduleClass(page, { title: `Export class ${p}`, date: "2027-04-05", start: "14:00", end: "16:00", batch: `${C} · A · Batch A` });
     await page.goto("/staff/sessions?from=2027-04-05");
     await page.getByRole("link", { name: new RegExp(`Export class ${p}`) }).first().click();
 

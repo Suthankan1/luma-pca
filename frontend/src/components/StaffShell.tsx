@@ -9,13 +9,14 @@ export const staffNavGroups = [
     { key: "dashboard", label: "Dashboard", href: "/staff/dashboard", icon: "▦" },
   ] },
   { label: "Teaching", items: [
+    { key: "webinars", label: "Webinars", href: "/staff/webinars", icon: "◉" },
     { key: "sessions", label: "Classes", href: "/staff/sessions", icon: "▶" },
     { key: "attendance", label: "Attendance", href: "/staff/attendance", icon: "✓" },
     { key: "zoom", label: "Zoom review", href: "/staff/zoom", icon: "◎" },
   ] },
   { label: "People", items: [
     { key: "academy", label: "Academy classes", href: "/staff/academy", icon: "⇄" },
-    { key: "students", label: "Students", href: "/staff/students", icon: "◉" },
+    { key: "students", label: "Students", href: "/staff/students", icon: "☺" },
     { key: "team", label: "Staff", href: "/staff/team", icon: "◆" },
   ] },
   { label: "Setup", items: [

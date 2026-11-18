@@ -333,7 +333,9 @@ export function formatWebinarId(id: string | null) {
 }
 
 export type ClassSession = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
-  zoomWebinarId: string | null; seriesId?: string | null; batches: { batchId: string; courseId: string; code: string; name: string }[]; version: number };
+  zoomWebinarId: string | null; seriesId?: string | null; batches: { batchId: string; courseId: string; code: string; name: string }[]; version: number;
+  /** LUMA (scheduled by staff before Zoom owned schedules) or ZOOM_RUN (an actual run of a monitored webinar). */
+  origin?: "LUMA" | "ZOOM_RUN" };
 export type CourseRef = { id: string; code: string };
 type BatchRef = { id: string; courseId: string; code: string; name: string; active: boolean };
 

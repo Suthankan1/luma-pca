@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
 async function signIn(page: Page, email: string) {
@@ -68,14 +69,7 @@ test.describe("Attendance rule and final attendance", () => {
     // A past class on the seeded webinar, 09:00–11:00 Colombo; the student joined at 09:15 and stayed.
     const day = `2026-03-0${Number(n) + 4}`;
     await page.goto("/staff/sessions");
-    await page.locator("#schedule-title").fill(`Final class ${p}`);
-    await page.locator("#schedule-date").fill(day);
-    await page.locator("#schedule-start").fill("09:00");
-    await page.locator("#schedule-end").fill("11:00");
-    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-    await page.locator("#schedule-webinar").fill(`444 0001 110${n}`);
-    await page.getByRole("button", { name: "Schedule class" }).click();
-    await expect(page.locator("#schedule-feedback")).toHaveText(`Final class ${p} scheduled.`);
+    await scheduleClass(page, { title: `Final class ${p}`, date: day, start: "09:00", end: "11:00", batch: `${C} · A · Batch A`, webinar: `444 0001 110${n}` });
 
     await page.goto("/staff/zoom");
     const occurrence = page.getByRole("listitem", { name: `Webinar 444 0001 110${n} at ${Number(n) + 4} Mar 2026 09:05` });
