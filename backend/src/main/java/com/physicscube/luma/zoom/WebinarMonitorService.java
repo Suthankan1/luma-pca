@@ -47,9 +47,14 @@ public class WebinarMonitorService {
     private final MonitoredWebinars monitored;
     private final AuditLog audit;
     private final com.physicscube.luma.sessions.ClassSessionService sessions;
+    private final WebinarRunTracker runs;
+    /** Runs already stored this recently are picked up when a webinar is added or resumed (a run lasts at most 12 h). */
+    static final java.time.Duration BACKFILL = java.time.Duration.ofHours(24);
 
     WebinarMonitorService(ObjectProvider<ZoomApiClient> api, JdbcTemplate jdbc, AcademyClassService academyClasses,
-                          MonitoredWebinars monitored, AuditLog audit, com.physicscube.luma.sessions.ClassSessionService sessions) {
+                          MonitoredWebinars monitored, AuditLog audit, com.physicscube.luma.sessions.ClassSessionService sessions,
+                          WebinarRunTracker runs) {
+        this.runs = runs;
         this.sessions = sessions;
         this.api = api;
         this.jdbc = jdbc;
@@ -145,6 +150,7 @@ public class WebinarMonitorService {
         store(id, webinar, now);
         resolveClass(id, webinar.topic());
         monitored.changed(caller.academyId());
+        runs.backfill(caller.academyId(), webinarId, now.minus(BACKFILL));
         audit.record(caller.academyId(), caller.accountId(), "ZOOM_WEBINAR_MONITORED", "ZOOM_WEBINAR_MONITOR", id,
                 Map.of("webinarId", webinarId));
         return view(caller.academyId(), id);
@@ -168,6 +174,9 @@ public class WebinarMonitorService {
         jdbc.update("UPDATE zoom_webinar_monitors SET active = ?, stopped_by = ?, stopped_at = ?, version = version + 1 WHERE id = ?",
                 active, active ? null : caller.accountId(), active ? null : Timestamp.from(now), monitorId);
         monitored.changed(caller.academyId());
+        if (active) {
+            runs.backfill(caller.academyId(), require(caller.academyId(), monitorId), now.minus(BACKFILL));
+        }
         audit.record(caller.academyId(), caller.accountId(), active ? "ZOOM_WEBINAR_MONITOR_RESUMED" : "ZOOM_WEBINAR_MONITOR_STOPPED",
                 "ZOOM_WEBINAR_MONITOR", monitorId, Map.of());
         return view(caller.academyId(), monitorId);

@@ -45,7 +45,15 @@ class WebinarRunTracker {
                 WHERE academy_id = ? AND webinar_id = ? AND active
                 """, academyId, webinarId);
         if (monitors.isEmpty()) {
-            return false;
+            // Monitoring stopped during a run: its run still gets the rest of its events (its end above all).
+            monitors = jdbc.queryForList("""
+                    SELECT m.id, m.topic, m.time_zone, m.academy_class_name FROM zoom_webinar_runs r
+                    JOIN zoom_webinar_monitors m ON m.id = r.monitor_id
+                    WHERE r.academy_id = ? AND r.occurrence_uuid = ?
+                    """, academyId, occurrenceUuid);
+            if (monitors.isEmpty()) {
+                return false;
+            }
         }
         Map<String, Object> monitor = monitors.get(0);
         Instant eventTime = Instant.ofEpochMilli(eventTs);
@@ -148,6 +156,39 @@ class WebinarRunTracker {
         runSessions.retime(academyId, (UUID) run.get("class_session_id"), started, ended);
         log.info("Zoom webinar run closed from Zoom's participant report (its end event was missed)");
     }
+
+    /**
+     * A webinar was just added (or resumed) while it may already be running, or ran recently: its events already stored
+     * (the inbox keeps every event it receives) are applied in order, so the run starts at Zoom's actual start rather than
+     * at the next event. Only occurrences with an event in the last {@code since} and no run yet.
+     */
+    void backfill(UUID academyId, String webinarId, Instant since) {
+        List<Map<String, Object>> events = jdbc.queryForList("""
+                SELECT e.occurrence_uuid, e.event_type, e.event_ts, r.payload::text AS body
+                FROM zoom_occurrence_events e
+                JOIN zoom_webhook_receipts r ON r.id = e.receipt_id
+                WHERE e.academy_id = ? AND e.webinar_id = ?
+                  AND e.occurrence_uuid IN (SELECT occurrence_uuid FROM zoom_occurrence_events WHERE academy_id = ? AND webinar_id = ?
+                                            AND event_ts >= ?)
+                  AND NOT EXISTS (SELECT 1 FROM zoom_webinar_runs w WHERE w.academy_id = e.academy_id AND w.occurrence_uuid = e.occurrence_uuid)
+                ORDER BY e.event_ts, e.created_at
+                """, academyId, webinarId, academyId, webinarId, since.toEpochMilli());
+        for (Map<String, Object> event : events) {
+            Map<?, ?> object = Map.of();
+            try {
+                Map<?, ?> body = JSON.readValue((String) event.get("body"), Map.class);
+                if (body.get("payload") instanceof Map<?, ?> payload && payload.get("object") instanceof Map<?, ?> o) {
+                    object = o;
+                }
+            } catch (RuntimeException e) {
+                // A scrubbed or unreadable payload: event times stand in for Zoom's start and end.
+            }
+            onEvent(academyId, webinarId, (String) event.get("occurrence_uuid"), (String) event.get("event_type"),
+                    ((Number) event.get("event_ts")).longValue(), object);
+        }
+    }
+
+    private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
 
     /** Zoom's ISO time in the event, else {@code fallback}. */
     static Instant time(Object value, Instant fallback) {

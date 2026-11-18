@@ -133,7 +133,7 @@ public class ClassSessionService {
                             .distinct().sorted(Comparator.comparing(StudentClassView.Batch::code)).toList();
                     return mine.isEmpty() ? null : new StudentClassView(session.getId(), session.getTitle(), session.getStartsAt(),
                             session.getEndsAt(), session.getTimeZone(), day, session.getStatus(), mine,
-                            StudentClassView.joinUrl(session.getZoomWebinarId(), session.getStatus()));
+                            StudentClassView.joinUrl(session.getZoomWebinarId(), session.getStatus()), session.getOrigin());
                 })
                 .filter(java.util.Objects::nonNull)
                 .sorted(Comparator.comparing(StudentClassView::startsAt).thenComparing(StudentClassView::id))
@@ -487,7 +487,9 @@ public class ClassSessionService {
 
     private ClassSession readable(CurrentAccount caller, UUID sessionId, BatchScope scope) {
         return sessions.findByIdAndAcademyId(sessionId, caller.academyId())
-                .filter(session -> session.batchIds().stream().anyMatch(scope::includes))
+                // Owners and administrators see every class, including a Zoom run whose Academy class is not resolved yet
+                // (it has no batches); batch-scoped staff only classes of their batches.
+                .filter(session -> scope.all() || session.batchIds().stream().anyMatch(scope::includes))
                 .orElseThrow(() -> new ResourceNotFoundException("Class session"));
     }
 

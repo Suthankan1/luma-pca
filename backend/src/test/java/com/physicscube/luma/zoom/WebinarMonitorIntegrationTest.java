@@ -446,4 +446,51 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         assertEquals("FETCHED", jdbc.queryForObject("SELECT status FROM zoom_report_fetches WHERE academy_id = ? AND occurrence_uuid = 'Ended=='",
                 String.class, academyId));
     }
+
+    @Test
+    void anUnresolvedRunsClassIsOpenToAdministratorsWithItsEvidenceButNotToBatchStaff() {
+        SCHEDULED_TOPIC.set("Physics Revision"); // ambiguous: no Academy class, so no batches
+        add(SCHEDULED);
+        Instant start = SCHEDULED_AT.minus(1, ChronoUnit.HOURS);
+        started(SCHEDULED, "Open==", start);
+        visit(SCHEDULED, "Open==", "amaya@example.test", "o1", start.plus(5, ChronoUnit.MINUTES), start.plus(35, ChronoUnit.MINUTES));
+        fixtures.student("PCA001", "amaya@example.test");
+        process();
+        Object session = run("Open==").get("class_session_id");
+        assertEquals(200, api.get("/api/v1/class-sessions/" + session, admin).statusCode(), "the Attendance link works");
+        Map<String, Object> amaya = attendanceOf(session, "PCA001");
+        assertEquals(false, amaya.get("expected"), "seen, not expected: nobody can be marked absent");
+        assertEquals(1800, ((Number) amaya.get("connectedSeconds")).intValue());
+        assertEquals(200, api.get("/api/v1/class-sessions/" + session + "/zoom-run", admin).statusCode());
+        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
+        assertEquals(404, api.get("/api/v1/class-sessions/" + session, instructor).statusCode());
+    }
+
+    @Test
+    void addingAWebinarThatIsAlreadyRunningStartsItsRunAtZoomsActualStart() {
+        Instant start = Instant.now().truncatedTo(ChronoUnit.SECONDS).minus(40, ChronoUnit.MINUTES);
+        started(SCHEDULED, "Running==", start); // stored before anyone monitored the webinar
+        visit(SCHEDULED, "Running==", "amaya@example.test", "b1", start.plus(2, ChronoUnit.MINUTES), null);
+        process();
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM zoom_webinar_runs WHERE academy_id = ?", Integer.class, academyId));
+
+        Map<String, Object> monitor = add(SCHEDULED);
+        Map<String, Object> run = run("Running==");
+        assertEquals("LIVE", run.get("state"));
+        assertEquals(start, ((Timestamp) run.get("actual_started_at")).toInstant(), "not the moment staff added it");
+        assertNotEquals(null, monitor.get("live"));
+    }
+
+    @Test
+    void stoppingMonitoringDuringARunStillEndsThatRun() {
+        Map<String, Object> monitor = add(SCHEDULED);
+        Instant start = Instant.now().truncatedTo(ChronoUnit.SECONDS).minus(50, ChronoUnit.MINUTES);
+        started(SCHEDULED, "StopLive==", start);
+        process();
+        assertEquals(200, api.post("/api/v1/zoom/monitors/" + monitor.get("id") + "/stop", "{}", admin).statusCode());
+        ended(SCHEDULED, "StopLive==", start, start.plus(45, ChronoUnit.MINUTES));
+        process();
+        assertEquals("ENDED", run("StopLive==").get("state"));
+        assertEquals(start.plus(45, ChronoUnit.MINUTES), ((Timestamp) run("StopLive==").get("actual_ended_at")).toInstant());
+    }
 }
