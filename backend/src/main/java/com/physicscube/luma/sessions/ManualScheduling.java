@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 /**
  * Academy decision 2026-11-18: Zoom owns webinar schedules, so LUMA no longer creates, edits, moves or cancels classes,
  * weekly series or Zoom imports; classes come from monitored webinars' actual runs. Off by default; it can be switched on
- * ({@code LUMA_MANUAL_SCHEDULING_ENABLED}) only for test setups that build history directly. Reading classes, attendance
+ * ({@code LUMA_SESSIONS_MANUAL_SCHEDULING}) only for test setups that build history directly. Reading classes, attendance
  * and history is unaffected.
  */
 @Component

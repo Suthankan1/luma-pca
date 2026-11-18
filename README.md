@@ -9,12 +9,15 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
 - **Accounts and access:** staff and student sign-in (RS256 JWTs, rotating refresh sessions in HttpOnly cookies, TOTP MFA
   with recovery codes for every staff role), invitations, password reset and password change, per-visitor and per-account
   rate limits, account lockout; roles scoped to the academy, assigned batches, or the student's own data on every route.
-- **Academic data:** courses, batches, students (CSV import), enrolments, staff assignments, classes and weekly series
-  shared by several batches, bulk invitation emails, an append-only activity log.
-- **Less manual work:** classes imported from the academy's upcoming Zoom webinars, a home page of what needs attention,
-  every ready class finalised at once or automatically once Zoom's report is in.
-- **Zoom:** signed webhook receipt (proven with a real test webinar), a retrying worker, automatic linking of each webinar
-  occurrence to its class, participants matched to students by Zoom email (or an administrator's audited decision), Zoom's
+- **Academic data:** courses, batches, students (CSV import, or synced read-only from the Academy's own database by class),
+  enrolments, staff assignments, bulk invitation emails, an append-only activity log.
+- **Zoom owns schedules (Academy decision 2026-11-18):** staff add a webinar by its ID or join link only; LUMA reads its
+  title, schedule and occurrences from Zoom (read-only) and has no scheduling, editing or import controls. Every run Zoom
+  actually starts (early, late or unscheduled) becomes its own attendance class, keyed by the occurrence UUID, from the
+  actual start to the actual end; a missed end is closed from Zoom's report. See `docs/integration/ZOOM-RULES.md`.
+- **Less manual work:** a home page of what needs attention, an attendance dashboard by course, batch and period, every
+  ready class finalised at once or automatically once Zoom's report is in.
+- **Zoom:** signed webhook receipt (proven with a real test webinar), a retrying worker, participants matched to students by Zoom email (or an administrator's audited decision), Zoom's
   participant report fetched after each webinar (host marked, registrants matched by their registration email); "Check a
   webinar" by join link or ID shows any past run, even ones LUMA never received live; IP/device data is never stored.
 - **Attendance:** provisional facts live (time connected with rejoins merged, lateness), then final present/late/absent
@@ -48,7 +51,7 @@ Do not onboard real students until the academy's P0 decisions are signed off (`d
 | Database | PostgreSQL 17, Flyway; schema evolves through reviewed migrations |
 | Zoom | **Implemented:** signed webhooks into an idempotent inbox with a retrying worker, S2S OAuth read-only client, post-webinar participant reports |
 | Async | **Implemented:** database inbox with SKIP LOCKED workers (Zoom receipts, invitation emails, reports, retention); dead letters with audited replay |
-| Updates | **Implemented:** reconciliation with Zoom's report before final attendance; class pages refresh themselves while a class runs |
+| Updates | **Implemented:** reconciliation with Zoom's report before final attendance; webinar and class pages refresh themselves while a run is live |
 | Production | **As code, not applied:** AWS ECS/Fargate, RDS, S3, WAF, CloudWatch alarms, AWS Backup (Terraform validated in CI); needs the academy's budget and account |
 
 ## Prerequisites

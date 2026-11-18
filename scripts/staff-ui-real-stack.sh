@@ -28,7 +28,7 @@ docker run -d --rm --name $MAIL -p 127.0.0.1:$SMTP:1025 -p 127.0.0.1:$MAILPIT:80
 docker run -d --rm --name $PG -e POSTGRES_USER=luma -e POSTGRES_PASSWORD=$DBPASS -e POSTGRES_DB=luma -p 127.0.0.1:55433:5432 postgres:17-alpine >/dev/null
 for i in $(seq 1 60); do docker exec $PG pg_isready -U luma -d luma >/dev/null 2>&1 && break; sleep 1; done; sleep 2
 DB_URL=jdbc:postgresql://localhost:55433/luma DB_USERNAME=luma DB_PASSWORD=$DBPASS SERVER_PORT=$API LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true \
-  LUMA_ZOOM_PROCESSING_ENABLED=false LUMA_MAIL_ENABLED=true LUMA_MAIL_FROM=no-reply@example.invalid \
+  LUMA_ZOOM_PROCESSING_ENABLED=false LUMA_SESSIONS_MANUAL_SCHEDULING=true LUMA_MAIL_ENABLED=true LUMA_MAIL_FROM=no-reply@example.invalid \
   LUMA_MAIL_WEB_ORIGIN=$ORIGIN LUMA_RATE_LIMIT_RESET_REQUEST_LIMIT=3 LUMA_MAIL_BULK_POLL_INTERVAL=PT1S SPRING_MAIL_HOST=127.0.0.1 SPRING_MAIL_PORT=$SMTP "$JAVA" -jar "$ROOT/backend/target/luma-backend-0.1.0-SNAPSHOT.jar" > "$S/backend.log" 2>&1 & BPID=$!
 for i in $(seq 1 90); do curl -sf localhost:$API/actuator/health/readiness >/dev/null && break; sleep 1; done
 curl -sf localhost:$API/actuator/health/readiness >/dev/null || { echo "backend did not start"; tail -20 "$S/backend.log"; exit 1; }
@@ -82,7 +82,7 @@ LUMA_TRUSTED_PROXY_HOPS=1 LUMA_WEB_ORIGIN=$ORIGIN LUMA_SESSION_KEY=$(openssl ran
 for i in $(seq 1 60); do curl -sf -o /dev/null $ORIGIN/sign-in && break; sleep 1; done
 
 for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:$MAILPIT/api/v1/messages && break; sleep 1; done
-LUMA_REAL_STACK_URL=$ORIGIN LUMA_REAL_MAILPIT_URL=http://127.0.0.1:$MAILPIT LUMA_REAL_ADMIN_INVITE=$INVITE LUMA_REAL_PASSPHRASE=$PHRASE \
+LUMA_REAL_STACK_URL=$ORIGIN LUMA_REAL_API_URL=http://127.0.0.1:$API LUMA_REAL_MAILPIT_URL=http://127.0.0.1:$MAILPIT LUMA_REAL_ADMIN_INVITE=$INVITE LUMA_REAL_PASSPHRASE=$PHRASE \
   npx playwright test -c playwright.real-stack.config.ts
 status=$?
 

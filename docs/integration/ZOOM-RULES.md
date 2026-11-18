@@ -69,3 +69,36 @@ Full research citations: [`docs/research/zoom-feasibility-full.md`](../research/
   join/leave and duration. Where every linked occurrence has a report, attendance says RECONCILED.
 - Field mapping of the report was confirmed against the real test webinar by `scripts/zoom-api-check.sh` (13 Nov: 5 join
   sessions by 4 people); storage, retry and replacement are tested against a fake Zoom server.
+
+## As built (WID, 2026-11-18): Zoom owns schedules; actual runs create attendance classes
+
+Academy decision (`docs/product/ZOOM-WEBINAR-ID-ONLY-ACCEPTANCE.md`). Verified with fixtures and stored webhooks in
+Testcontainers; **not yet proven against the academy's real Zoom account** (needs the webinar read scope and the four
+webinar event subscriptions on the existing app, and a test webinar run).
+
+- **Monitoring:** `POST /api/v1/zoom/monitors {webinar}` takes only a webinar ID or join link (owners/admins, audited).
+  LUMA calls Zoom's Get a Webinar (read-only) to prove the academy's account can read it and copies title, timezone,
+  scheduled start and duration (null when Zoom has none, never invented), recurrence and occurrences into
+  `zoom_webinar_monitors` (V29). It re-reads Zoom every 30 minutes and on "Refresh from Zoom"; a failed read keeps the
+  last copy marked stale. "Stop monitoring" changes only LUMA. LUMA makes **no** Zoom write call anywhere.
+- **Runs:** for a monitored webinar, every event (`webinar.started`, `webinar.ended`, `webinar.participant_joined`,
+  `webinar.participant_left`) creates or updates the run of its occurrence UUID (`zoom_webinar_runs`, one per
+  `(academy, occurrence_uuid)`), and the run's attendance class (`class_sessions.origin = 'ZOOM_RUN'`). The run starts at
+  Zoom's `start_time` on `webinar.started` (else the event time); a run whose start was missed starts at its first event
+  (`actual_started_at` stays null: not invented). `webinar.ended` sets the actual end. The class is retimed to the actual
+  run, so attendance is bounded by the actual start and end, not the schedule; while live the class ends at the 12-hour
+  class limit so nothing is cut off, and dashboards count only the time held so far.
+- **Idempotency and order:** one advisory lock per occurrence; receipts are stored once; an ended run is never reopened;
+  a late `webinar.started` sets the start without changing the state; runs of the same webinar ID on different days stay
+  separate (different UUIDs).
+- **Reconciliation:** ended runs get Zoom's participant report as before. A run whose `webinar.ended` never arrived is
+  fetched once older than the class limit plus the report delay; the report closes it at the last leave.
+- **Course association:** a run expects the students of the webinar's Academy class only when that class is certain: the
+  Zoom title equals exactly one Academy `class_type` (case and spacing ignored) or an administrator chose it (audited),
+  and the class is set up as a LUMA batch. Otherwise the run has no expected students: evidence is kept, nobody is marked
+  absent. Students are matched by Zoom email/registration or an audited staff decision, never by display name.
+- **Webhook allow-list:** a monitored webinar's events are stored even when `LUMA_ZOOM_WEBHOOK_WEBINAR_ALLOW_LIST` does
+  not list it.
+- **Unmonitored webinars** keep the older behaviour (link to a class staff scheduled in the ±60-minute window), so history
+  is unchanged. Scheduling, editing, cancelling and importing classes answer 409 unless
+  `LUMA_SESSIONS_MANUAL_SCHEDULING=true` (test setups only).

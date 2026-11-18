@@ -1,6 +1,6 @@
 # LUMA architecture: Zoom-owned metadata, webhook-created attendance runs
 
-**Status:** Target architecture for the 2026-11-18 Academy change request. Existing code is **partially compatible**; do not mark this design as shipped until tests and a real sandbox run pass.
+**Status:** Implemented on branch `feat/webinar-id-auto-tracking` (see `docs/integration/ZOOM-RULES.md`, "As built (WID)"); verified with fixtures and stored webhooks, not yet with the academy's real Zoom account.
 
 ## What exists and what must change
 

@@ -2227,3 +2227,55 @@ build runs the Next.js default bundler and repeats the smoke test.
   - Full desktop Playwright run passed (77).
   - One full desktop + mobile run had `student-search` fail in both projects. It passes on its own and in the desktop-only
     run; the repeat run was stopped, so CI is the check.
+
+## Checkpoint WID — 2026-11-18 — Webinar-ID-only monitoring; Zoom owns schedules; actual runs create attendance
+
+- **Branch / PR:** `feat/webinar-id-auto-tracking` → PR to `main`, **not merged**. Specs:
+  - `docs/product/ZOOM-WEBINAR-ID-ONLY-ACCEPTANCE.md`
+  - `docs/architecture/ZOOM-WEBINAR-AUTO-SESSIONS.md`
+  - `docs/delivery/WEBINAR-AUTO-TRACKING-IMPLEMENTATION.md`
+- **WID-00 audit:** the webhook inbox, worker, per-UUID evidence, reports and identity matching were reusable. The one
+  schedule dependency was `OccurrenceLinker`, which linked a run only to a LUMA SCHEDULED class within ±60 min.
+- **WID-01/02 (monitoring and sync):**
+  - `zoom_webinar_monitors` (V29) and `POST/GET /api/v1/zoom/monitors`; sync, stop, resume and academy-class routes.
+  - Staff give only an ID or link. Zoom Get a Webinar (read-only) copies title, timezone, schedule (null when none) and
+    occurrences; sync runs every 30 min and on demand. A failed sync keeps the last copy, marked stale. No Zoom write calls.
+- **WID-03/04 (runs and visits):**
+  - `zoom_webinar_runs` holds one run per occurrence UUID; `WebinarRunTracker` is called from the existing event handler.
+  - Each run gets its own class (`origin = ZOOM_RUN`), created by `ZoomRunSessions` and retimed to the actual start and end.
+  - An advisory lock per occurrence keeps processing idempotent. An ended run never reopens, and a missed start is not
+    invented.
+  - Join/leave evidence is unchanged and keyed by UUID; time is the union of intervals bounded by the actual run.
+- **WID-05 (reconciliation):** the report worker also fetches runs that never sent `webinar.ended`, and the report closes
+  them at the last leave. Dashboards count a live class by time held so far.
+- **WID-06 (Academy roster):**
+  - Students are expected only when the Academy class is certain (exact title match or an admin's choice) and set up as
+    a batch. Otherwise no expected students, so nobody is marked absent.
+  - An admin's choice also reaches the run in progress.
+  - Identity: email, registration or an audited decision only.
+- **WID-07 (UI):**
+  - New Webinars page (nav: Teaching): ID/link-only add form, Live now, read-only Zoom timetable, Academy class, runs.
+  - A class page shows its Zoom run (scheduled vs actual).
+  - Removed: schedule, series, edit, cancel and import forms and their actions (`/staff/zoom/import` redirects).
+  - Scheduling, editing, cancelling and import routes answer 409 unless `LUMA_SESSIONS_MANUAL_SCHEDULING=true` (tests only).
+  - The webhook allow-list admits monitored webinars.
+- **Tests (local, this Mac):**
+  - Backend full suite: 436 run, 435 pass. The 1 failure is `ZoomWebhookDisabledIntegrationTest`, which fails on unchanged
+    `main` too because the local ignored `.env` sets a webhook secret; CI has none.
+  - New backend tests:
+    - `WebinarMonitorIntegrationTest` (9): early start, late start, unscheduled, Zoom change, 3 days = 3 runs,
+      duplicate/out-of-order, missed start, missed end closed by report, ambiguous title, admin decision,
+      authorization/cross-academy, stop keeps history, 35 + 45 = 80 min with an overlap.
+    - `ManualSchedulingOffIntegrationTest`.
+  - Playwright: 147 passed, 3 skipped by design. New Webinars test; the series spec is replaced by a "no scheduling controls"
+    check.
+  - Real stack: 2/2 (classes created through the API with scheduling switched on for that backend).
+  - Unit tests: 76. Session smoke: passes. Also passing: OpenAPI (122 endpoints), structure check, lint, build.
+- **Not verified / external blockers:** no real Zoom proof yet. Needed:
+  - the existing app's webinar read scope;
+  - subscriptions to `webinar.started`, `webinar.ended`, `webinar.participant_joined` and `webinar.participant_left`
+    (already used);
+  - an authorized test webinar to start early.
+  - Also: the Academy database role still has to be recreated before Academy classes resolve.
+- **Rollback:** V29 is additive; reverting the code leaves the tables unused. Classes created by runs remain readable
+  history.
