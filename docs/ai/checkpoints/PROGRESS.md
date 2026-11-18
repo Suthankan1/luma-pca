@@ -2082,3 +2082,34 @@ build runs the Next.js default bundler and repeats the smoke test.
 - **Slow-call log:** the web app logs backend calls over `LUMA_SLOW_API_MS` (800 ms) as
   `[luma] slow api GET /api/v1/class-sessions/:id/attendance 200 1235 ms` (IDs masked, no query string) to Vercel's logs.
 - Local: backend full suite, Playwright 128, unit tests 58.
+
+## Checkpoint ACAD-1 — 2026-11-18 — Academy classes linked to batches, rosters synced
+
+- **Branch / PR:** `feat/academy-class-sync`, draft PR #107 (not merged: merging deploys).
+- **Catalog:** reads the Academy's real `public.payment` (configurable), `type = 'class'` (case-insensitive), not
+  deleted, non-blank class and ID. Counts distinct upper-cased `pcaid`, never payment rows. Optional student table
+  (`pcaid`, `name`, `mail` only); details used only when exactly one live row matches. Table names checked against
+  `schema.table`; 20 s query timeout; driver errors never reach the response.
+- **Adapter, not a rebuild:** each Academy class links to one LUMA batch (`academy_class_links`, V27). Sync creates
+  missing students by Academy ID, enrols them, never duplicates, never withdraws (leavers are listed), keeps staff
+  withdrawals, and uses the Academy email as sign-in email only when unique (Zoom matches by email; others get an
+  undeliverable placeholder and the existing identity decisions). Audit: counts and class label only.
+- **API:** `GET /api/v1/academy/classes`, `PUT .../link`, `POST .../sync` — Owner/Admin only.
+- **Tests:** `AcademyPaymentsCatalogIntegrationTest` (6, through a column-limited read-only role: cannot read amounts,
+  NIC, the attendance table, or write), `AcademyClassSyncHttpIntegrationTest` (3).
+- **Blocker:** live connection unverified — Supabase's pooler answers `user not found` for `luma_academy_readonly`
+  (the role script likely rolled back). Credentials are in the local ignored `.env` only.
+- **Open Academy decisions:** whether expired payments still count (baseline: historical); labels like `Admission`.
+
+## Checkpoint ACAD-2 — 2026-11-18 — Academy-requested student ID sign-in (off by default)
+
+- **Same branch / PR #107.** `POST /api/v1/auth/student-id-login` `{studentId, password}`: password must equal the ID
+  (case-insensitive). Opens a normal student session only for an account whose sole role is STUDENT; pending accounts
+  are activated with a random unknown password. Same 401 for every refusal; shares the per-client sign-in limit.
+  404 unless `LUMA_STUDENT_ID_LOGIN_ENABLED=true` (API and web). Risk write-up: `docs/security/STUDENT-ID-LOGIN.md`.
+- **Web:** sign-in page shows a "Students" form above the staff form when switched on (hidden for `?portal=staff`);
+  BFF action `student-login` sets the same HttpOnly cookies as email sign-in.
+- **Tests:** `StudentIdLoginHttpIntegrationTest` (6: own data only, staff routes 403, logout, refusals identical,
+  staff-role account refused, other academy refused, rate limit 429), `StudentIdLoginDisabledHttpIntegrationTest` (1),
+  Playwright `student-id-login.spec.ts` (3 × 2 projects). Local: Playwright 134 passed, unit tests pass, lint and build.
+- **Next:** staff "Academy classes" page (list, link, sync); class → webinar mapping view with live per-student status.

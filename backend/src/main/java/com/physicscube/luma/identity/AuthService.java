@@ -129,6 +129,45 @@ public class AuthService {
         });
     }
 
+    /**
+     * The Academy-requested student sign-in (student ID as both username and password). The caller has already
+     * checked the typed password equals the student ID and found the student's account; this only ever opens a
+     * session for an account whose sole role is STUDENT, so it can never grant staff access. A pending account
+     * (never activated) is activated with a random password nobody knows, so email sign-in stays closed to it.
+     * Disabled and locked accounts are refused exactly like a wrong password.
+     */
+    public LoginOutcome studentIdLogin(UUID accountId) {
+        AccountSummary found = accountService.findById(accountId)
+                .filter(account -> account.status() != AccountStatus.DISABLED)
+                .filter(account -> account.roles().equals(Set.of(Role.STUDENT)))
+                .orElseThrow(InvalidCredentialsException::new);
+        if (found.status() == AccountStatus.PENDING_ACTIVATION) {
+            accountService.setPassword(accountId, UUID.randomUUID() + "-" + UUID.randomUUID());
+        }
+        int authVersion = accountService.findById(accountId).orElseThrow(InvalidCredentialsException::new).authVersion();
+        Instant now = DbTime.now();
+        Instant attemptLockUntil = DbTime.truncate(now.plus(properties.lockDuration()));
+        if (accounts.reserveLoginAttempt(accountId, properties.maxFailedLogins(), now, attemptLockUntil) != 1) {
+            throw new InvalidCredentialsException();
+        }
+        return transaction.execute(status -> {
+            if (accounts.recordLoginSuccess(accountId, authVersion, DbTime.now(), attemptLockUntil) != 1) {
+                throw new InvalidCredentialsException();
+            }
+            AccountSummary summary = accounts.findById(accountId).map(AccountSummary::of)
+                    .orElseThrow(InvalidCredentialsException::new);
+            if (!summary.roles().equals(Set.of(Role.STUDENT))) {
+                throw new InvalidCredentialsException();
+            }
+            // A student who chose to add an authenticator keeps that protection.
+            if (mfa.isEnrolled(summary.id())) {
+                MfaService.Challenge challenge = mfa.begin(summary.id(), summary.authVersion());
+                return new LoginOutcome(null, new MfaChallenge(challenge.token(), challenge.expiresInSeconds(), challenge.enrolled()));
+            }
+            return new LoginOutcome(tokens(summary, sessions.start(summary.id(), summary.authVersion(), false)), null);
+        });
+    }
+
     /** First sign-in of an account that needs MFA: returns the secret to load into an authenticator app. */
     public MfaEnrollment beginMfaEnrollment(String mfaToken) {
         MfaService.Enrollment enrollment = mfa.enroll(mfaToken);

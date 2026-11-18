@@ -13,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 interface StudentRepository extends JpaRepository<Student, UUID> {
     Optional<Student> findByIdAndAcademyId(UUID id, UUID academyId);
 
+    Optional<Student> findByAcademyIdAndStudentNumber(UUID academyId, String studentNumber);
+
     Optional<Student> findByAccountIdAndAcademyId(UUID accountId, UUID academyId);
 
     boolean existsByAcademyIdAndStudentNumber(UUID academyId, String studentNumber);

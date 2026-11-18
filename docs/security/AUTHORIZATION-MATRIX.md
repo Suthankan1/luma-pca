@@ -33,3 +33,12 @@ See `docs/architecture/adr/ADR-0004-multi-course-batch.md`.
 Admin and staff assigned to the batch (404 otherwise). `GET /api/v1/attendance/summary` (totals per batch, no student
 numbers, names or emails) for Owner, Admin and Analyst. Analysts may also read the attendance rule; they still have no
 batch, roster, class or student access.
+
+**As built (ACAD-1, Academy classes):** `GET /api/v1/academy/classes`, `PUT /api/v1/academy/classes/link` and
+`POST /api/v1/academy/classes/sync` are Owner and Admin only (403 for every other role, 401 without a token). A link
+must name a batch of the caller's academy (404 otherwise). The Academy database is read through a separate
+column-limited read-only role; nothing is written to it.
+
+**As built (ACAD-2, student ID sign-in):** see `docs/security/STUDENT-ID-LOGIN.md`. The session it opens is an
+ordinary student session: the same "own data only" rules and the same 403s on staff routes apply. Accounts holding
+any role other than STUDENT are refused.

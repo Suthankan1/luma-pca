@@ -118,6 +118,11 @@ luma:
       poll-interval: ${LUMA_MAIL_BULK_POLL_INTERVAL:PT30S}
       batch-size: ${LUMA_MAIL_BULK_BATCH_SIZE:20}
       max-attempts: ${LUMA_MAIL_BULK_MAX_ATTEMPTS:5}
+  # Academy-requested student sign-in: the student ID is both username and password. Guessable by design; keep off
+  # until the Academy has accepted the risk in writing. Only accounts whose sole role is STUDENT can sign in this way.
+  student-id-login:
+    enabled: ${LUMA_STUDENT_ID_LOGIN_ENABLED:false}
+    academy-id: ${LUMA_STUDENT_ID_LOGIN_ACADEMY_ID:${LUMA_ZOOM_WEBHOOK_ACADEMY_ID:}}
   password-reset:
     ttl: ${LUMA_PASSWORD_RESET_TTL:PT30M}
     max-requests-per-hour: ${LUMA_PASSWORD_RESET_MAX_REQUESTS_PER_HOUR:3}
