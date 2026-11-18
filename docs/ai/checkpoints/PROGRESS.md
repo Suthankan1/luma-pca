@@ -2113,3 +2113,23 @@ build runs the Next.js default bundler and repeats the smoke test.
   staff-role account refused, other academy refused, rate limit 429), `StudentIdLoginDisabledHttpIntegrationTest` (1),
   Playwright `student-id-login.spec.ts` (3 × 2 projects). Local: Playwright 134 passed, unit tests pass, lint and build.
 - **Next:** staff "Academy classes" page (list, link, sync); class → webinar mapping view with live per-student status.
+
+## Checkpoint ACAD-3 — 2026-11-18 — Staff "Academy classes" page and frontend follow-ups
+
+- **Same branch / PR #108.**
+- **`/staff/academy` (owners/admins; nav item 02):** every Academy class with its distinct-student count and status.
+  - "Set up in LUMA" (one click): creates the `ACADEMY` course the first time, a batch named after the class (code derived and
+    kept unique), links it and syncs it.
+  - "Or use an existing batch": links a batch that already has history, then syncs.
+  - "Sync students": shows the result and lists what needs a decision (no name, no usable email, leavers, staff withdrawals,
+    deactivated, unusable IDs).
+  - Links to the batch roster and the batch's classes and webinars.
+  - 503 from the API shows a "not connected yet" notice, and the old workflows keep working.
+  - One form action per row, so the outcome stays visible after the page refreshes.
+- **Follow-ups:**
+  - Students and Courses pages point to Academy classes for students and batches that come from the Academy.
+  - Invite panels say students can sign in with their ID (when switched on).
+  - The student portal shows "Signed in as <name> · student ID <id>".
+  - Backend: bulk invitations never email the `@students.academy.invalid` placeholders (`StudentInvitationHttpIntegrationTest`).
+  - Fixed the CI failure: the sync test now drops its synthetic schema and role, which the backup/restore test was tripping on.
+- **Tests:** unit 62 (new `academy.test.mjs`), Playwright `academy-classes.spec.ts`, full suite below, lint, build.

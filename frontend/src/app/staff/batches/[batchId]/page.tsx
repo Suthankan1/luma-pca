@@ -3,7 +3,7 @@ import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
 import { AssignForm, UnassignButton } from "@/components/staff/TeamForms";
-import { requirePortal } from "@/lib/auth-server";
+import { requirePortal, studentIdLoginEnabled } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { AttendanceExportForm } from "@/components/staff/AttendanceExportForm";
@@ -80,6 +80,8 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
     </section>
     {manager && <section className="panel panel-gap" aria-labelledby="batch-invite-title">
       <h2 id="batch-invite-title" className="panel-title">INVITE BY EMAIL</h2>
+      {studentIdLoginEnabled() && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
+        for email sign-in. Students without an email of their own are never emailed.</p>}
       <BulkInviteForm batchId={batchId} scope="this batch’s current students" />
     </section>}
     {assignments && <section className="panel panel-gap" aria-labelledby="assigned-title">

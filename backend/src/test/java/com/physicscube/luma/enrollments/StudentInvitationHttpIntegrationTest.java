@@ -89,6 +89,14 @@ class StudentInvitationHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
+    void academyPlaceholderAddressesAreNeverEmailed() {
+        student("PCA-REAL", batch);
+        Map<String, Object> placeholder = fixtures.student("PCA-NOMAIL", "pca-nomail@students.academy.invalid");
+        assertEquals(201, fixtures.enroll(batch, (String) placeholder.get("id"), "2026-01-05").statusCode());
+        assertEquals(counts(1, 1, 0, 0), invite("{\"batchId\":\"" + batch + "\",\"dryRun\":true}"));
+    }
+
+    @Test
     void aBatchsCurrentStudentsAreEmailedOnceAndTheirLinksActivate() {
         student("PCA-1", batch);
         student("PCA-2", batch);

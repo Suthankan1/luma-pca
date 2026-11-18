@@ -21,7 +21,8 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
   const window = sessionWindow(params.from, undefined, WINDOW_DAYS);
   const href = (from?: string) => from ? `/student?from=${from}` : "/student";
   const query = new URLSearchParams({ from: window.fromInstant, to: window.toInstant });
-  const [enrollments, classes, attendance, consent] = await Promise.all([
+  const [me, enrollments, classes, attendance, consent] = await Promise.all([
+    studentApi<{ studentNumber: string; fullName: string }>("/api/v1/me/student"),
     studentApi<MyEnrollment[]>("/api/v1/me/enrollments"),
     studentApi<MyClass[]>(`/api/v1/me/class-sessions?${query}`),
     studentApi<AttendanceRecordView[]>("/api/v1/me/attendance"),
@@ -30,7 +31,9 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
 
   return <Shell active="student" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
     <h1 className="heading">Student portal</h1>
-    <p className="sub">You’re signed in to Physics Cube Academy.</p>
+    <p className="sub">{me.ok
+      ? <>Signed in as <strong>{me.data.fullName}</strong> · student ID <strong>{me.data.studentNumber}</strong></>
+      : "You’re signed in to Physics Cube Academy."}</p>
     {!enrollments.ok || !classes.ok
       ? <p className="session-error" role="alert">We couldn’t load your classes right now. Please reload the page shortly.</p>
       : <>
