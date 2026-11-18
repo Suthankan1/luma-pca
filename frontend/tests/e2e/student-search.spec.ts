@@ -12,10 +12,10 @@ async function signInAsAdmin(page: Page) {
 }
 
 test.describe("Student search", () => {
-  // The mock backend is shared across projects and specs: names are unique per project.
+  // Names are unique per project and per attempt, so a retry never collides with students the first attempt imported.
   let p = "qd";
   test.beforeEach(({}, testInfo) => {
-    p = testInfo.project.name === "mobile" ? "qm" : "qd";
+    p = (testInfo.project.name === "mobile" ? "qm" : "qd") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
   test("An administrator finds students by name, number or email, keeping filters", async ({ page }) => {
