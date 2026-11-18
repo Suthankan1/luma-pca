@@ -28,10 +28,12 @@ export function formatWebinarId(id: string) {
   return id.length === 11 ? `${id.slice(0, 3)} ${id.slice(3, 7)} ${id.slice(7)}` : id.replace(/(\d{3})(?=\d)/g, "$1 ");
 }
 
-/** "Wed 18 Nov 2026, 18:00" in the given zone (the academy's when Zoom gives none). */
+/** "Wed 18 Nov 2026, 18:00" in the given zone (the academy's when Zoom gives none); the same on every ICU version. */
 export function formatWhen(instant: string, timeZone: string | null) {
-  return new Intl.DateTimeFormat("en-GB", { timeZone: timeZone ?? ACADEMY_ZONE, weekday: "short", day: "numeric", month: "short",
-    year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(instant));
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: timeZone ?? ACADEMY_ZONE, weekday: "short", day: "numeric",
+    month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(instant))
+    .map(part => [part.type, part.value]));
+  return `${parts.weekday} ${parts.day} ${parts.month} ${parts.year}, ${parts.hour}:${parts.minute}`;
 }
 
 export function formatTime(instant: string, timeZone: string | null) {
