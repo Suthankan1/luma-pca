@@ -55,7 +55,8 @@ export default async function WebinarsPage() {
     </StaffShell>;
   }
   const live = monitors.data.filter(m => m.live);
-  const liveUntil = new Date(now + 12 * 3600_000).toISOString();
+  // Refreshes while the page is open, so a webinar Zoom starts meanwhile appears without a reload (faster while one is live).
+  const refreshUntil = new Date(now + 12 * 3600_000).toISOString();
 
   return <StaffShell {...shell}>
     <section className="panel" aria-labelledby="add-title">
@@ -65,10 +66,10 @@ export default async function WebinarsPage() {
 
     <section className="panel panel-gap" aria-labelledby="live-title">
       <h2 id="live-title" className="panel-title">LIVE NOW</h2>
+      <LiveRefresh until={refreshUntil} seconds={live.length ? 30 : 60} label="while this page is open" />
       {live.length === 0 ? <p className="panel-sub">No monitored webinar is running. When Zoom starts one, it appears here with its attendance,
         even if nobody had LUMA open.</p>
         : <>
-          <LiveRefresh until={liveUntil} seconds={30} />
           <ul className="live-cards">{live.map(m => {
             const run = m.live!;
             const start = runStart(run);

@@ -2279,3 +2279,31 @@ build runs the Next.js default bundler and repeats the smoke test.
   - Also: the Academy database role still has to be recreated before Academy classes resolve.
 - **Rollback:** V29 is additive; reverting the code leaves the tables unused. Classes created by runs remain readable
   history.
+
+### WID review fixes — 2026-11-19
+
+Found by reviewing the WID branch and CI, and fixed with tests:
+
+1. **Unresolved runs returned 404.** A run whose Academy class is unresolved has a class with no batches, which even
+   owners and administrators could not open, so the Attendance links failed. Owners and admins now see every class;
+   batch-scoped staff still see only their batches' classes.
+2. **A webinar added while running started late.** Its run began at the next event, after the webinar had started.
+   Adding or resuming a webinar now applies the stored events of its runs from the last 24 h, so the run starts at Zoom's
+   actual start.
+3. **Stopping monitoring stranded a live run.** The run waited 12 h for the report fallback. Its remaining events,
+   including the end, are now still applied.
+4. **Live runs showed a false 12-hour range.** Staff Classes, Today and the student portal now say "live since 16:00".
+   Student class views carry `origin`.
+5. **CSV import stuck before page load.** A file chosen before the page finished loading was lost and "Check file" stayed
+   disabled. This was the cause of the recurring `student-search` CI failure; the form now picks the file up on load.
+6. **Webinars page missed new starts.** It refreshed only while a run was live; it now refreshes while open (60 s, 30 s
+   when live).
+7. **Stopped webinars flagged stale.** A stopped webinar's copy is no longer shown as stale.
+8. **`.env`-dependent test.** `ZoomWebhookDisabledIntegrationTest` no longer depends on a developer's local `.env`.
+
+Tests:
+
+- Backend full suite: 439 run, 438 pass before item 8; the remaining failure was item 8, now fixed and passing on its own.
+- `WebinarMonitorIntegrationTest`: now 12 tests.
+- Playwright: 147 passed, 3 skipped by design.
+- Real stack: 2/2. Unit tests: 79. Smoke, lint, build: pass.

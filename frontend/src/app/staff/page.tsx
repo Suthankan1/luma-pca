@@ -3,7 +3,7 @@ import { StaffShell } from "@/components/StaffShell";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { academyToday, classPhase, formatClassTime, isAcademyManager, sessionWindow, type AttendanceAppeal, type ClassSession, type PendingAttendance } from "@/lib/staff-forms";
+import { academyToday, classPhase, classTimeLabel, isAcademyManager, sessionWindow, type AttendanceAppeal, type ClassSession, type PendingAttendance } from "@/lib/staff-forms";
 import { Kpis } from "@/components/insights/Kpis";
 import { formatDuration, level, presets, type Dashboard } from "@/lib/insights";
 
@@ -56,7 +56,7 @@ export default async function StaffPage() {
             const over = phase === "over";
             return <li key={c.id} className="dir-row" aria-label={`Today ${c.title}`}>
               <span><Link className="text-link" href={`/staff/sessions/${c.id}`}><strong>{c.title}</strong></Link>
-                {" "}<span className="muted">{formatClassTime(c.startsAt, c.endsAt, c.timeZone)}</span></span>
+                {" "}<span className="muted">{classTimeLabel(c)}</span></span>
               {live ? <span className="dir-meta"><span className="pill pill-live">Live now</span>
                 <Link className="text-link" href={`/staff/sessions/${c.id}`}>Live attendance →</Link></span>
                 : <span className={`status ${over ? "off" : "on"}`}>{over ? "Ended" : c.zoomWebinarId ? "Upcoming" : "No webinar ID"}</span>}

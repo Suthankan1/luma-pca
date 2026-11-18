@@ -866,7 +866,7 @@ function monitorsApi(req, body, send) {
         for (const [state, minutesAgo, length] of [["ENDED", 7 * 24 * 60, 110], ["LIVE", 25, null]]) {
           const started = new Date(Date.now() - minutesAgo * 60_000).toISOString();
           const ended = length ? new Date(Date.now() - (minutesAgo - length) * 60_000).toISOString() : null;
-          const session = { id: uuid(), title: m.topic, startsAt: started, endsAt: ended ?? new Date(Date.now() + 11 * 3600_000).toISOString(),
+          const session = { id: uuid(), title: m.topic, startsAt: started, endsAt: ended ?? new Date(Date.parse(started) + 12 * 3600_000).toISOString(),
             timeZone: "Asia/Colombo", status: "SCHEDULED", zoomWebinarId: id, seriesId: null, batchIds: [], origin: "ZOOM_RUN", version: 0 };
           classSessions.push(session);
           runSessions.set(session.id, { monitorId: m.id, occurrenceUuid: `run-${state}-${session.id.slice(-4)}==`, classSessionId: session.id,

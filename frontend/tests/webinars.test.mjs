@@ -38,3 +38,8 @@ test("ids and durations read naturally", () => {
   assert.equal(formatElapsed(65 * 60), "1 h 05 min");
   assert.equal(formatElapsed(25 * 60), "25 min");
 });
+
+test("a stopped webinar's copy is history, not stale", () => {
+  const now = Date.parse("2026-11-18T12:00:00Z");
+  assert.equal(syncNote({ syncStatus: "OK", syncedAt: "2026-11-01T11:00:00Z", syncError: null, active: false }, now).stale, false);
+});

@@ -4,7 +4,8 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  batchOptions, formatClassTime, formatDate, isAcademyManager, sessionListHref, sessionWindow, uuidOrNull, type ClassSession, type CourseRef,
+  classTimeLabel,
+  batchOptions, formatDate, isAcademyManager, sessionListHref, sessionWindow, uuidOrNull, type ClassSession, type CourseRef,
 } from "@/lib/staff-forms";
 
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -68,7 +69,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
           {sessions.data.map(session => <li key={session.id} className="dir-row dir-course">
             <div>
               <Link className="text-link" href={`/staff/sessions/${session.id}`}><strong>{session.title}</strong></Link>
-              <span className="dir-dates muted"> {formatClassTime(session.startsAt, session.endsAt, session.timeZone)}</span>
+              <span className="dir-dates muted"> {classTimeLabel(session)}</span>
               <div className="dir-dates muted">{session.batches.map(batch => batch.code).join(", ")}</div>
             </div>
             <span className={`status ${session.status === "SCHEDULED" ? "on" : "off"}`}>{session.status !== "SCHEDULED" ? "Cancelled"

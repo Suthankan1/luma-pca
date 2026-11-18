@@ -71,6 +71,12 @@ test.describe("Less manual work for staff", () => {
     await expect(office.locator(".form-ok")).toContainText("The Zoom webinar is unchanged");
     await expect(office).toContainText("Not monitored");
 
+    // The run's class is listed as live, with no invented end time.
+    await page.goto("/staff/sessions");
+    await expect(page.getByRole("listitem").filter({ hasText: "A/L Physics 2027" }).first()).toContainText("live since");
+    await page.goto("/staff/webinars");
+    await expect(page.locator(".live-refresh")).toContainText("while this page is open");
+
     // The live run's class shows Zoom's schedule beside the actual start.
     await live.getByRole("link", { name: "Live attendance →" }).click();
     const run = page.getByRole("region", { name: "ZOOM RUN" });

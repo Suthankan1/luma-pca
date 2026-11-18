@@ -67,7 +67,9 @@ export function upcomingOccurrences(occurrences: ZoomOccurrence[], now: number, 
 }
 
 /** Has the Zoom copy gone stale? (last sync failed, or older than a day) */
-export function syncNote(m: Pick<WebinarMonitor, "syncStatus" | "syncedAt" | "syncError">, now: number) {
+export function syncNote(m: Pick<WebinarMonitor, "syncStatus" | "syncedAt" | "syncError"> & { active?: boolean }, now: number) {
+  // A stopped webinar is not read from Zoom on purpose: its copy is history, not stale.
+  if (m.active === false) return { stale: false, text: m.syncedAt ? `Last read from Zoom ${formatWhen(m.syncedAt, ACADEMY_ZONE)}` : "Not monitored" };
   if (m.syncStatus === "NOT_FOUND") return { stale: true, text: "Zoom no longer finds this webinar; showing the last copy" };
   if (m.syncStatus === "FAILED") return { stale: true, text: "Zoom could not be reached; showing the last copy" };
   if (!m.syncedAt) return { stale: true, text: "Not read from Zoom yet" };
