@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Without a configured secret the endpoint does not exist, even for correctly signed requests. */
+// The default (no secret configured), whatever a developer's local .env holds: application.yml also reads ../.env.
+@org.springframework.test.context.TestPropertySource(properties = "luma.zoom.webhook.secret-token=")
 class ZoomWebhookDisabledIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     JdbcTemplate jdbc;

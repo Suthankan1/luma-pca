@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
 async function signInStaff(page: Page, email: string) {
@@ -43,13 +44,7 @@ test.describe("Attendance summaries", () => {
       await expect(page.locator("#enroll-feedback")).toHaveText("Enrolled.");
     }
     await page.goto("/staff/sessions");
-    await page.locator("#schedule-title").fill(`Summary class ${p}`);
-    await page.locator("#schedule-date").fill("2027-01-04");
-    await page.locator("#schedule-start").fill("18:00");
-    await page.locator("#schedule-end").fill("20:00");
-    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-    await page.getByRole("button", { name: "Schedule class" }).click();
-    await expect(page.locator("#schedule-feedback")).toHaveText(`Summary class ${p} scheduled.`);
+    await scheduleClass(page, { title: `Summary class ${p}`, date: "2027-01-04", start: "18:00", end: "20:00", batch: `${C} · A · Batch A` });
 
     await page.goto("/staff/sessions?from=2027-01-04");
     await page.getByRole("link", { name: new RegExp(`Summary class ${p}`) }).first().click();

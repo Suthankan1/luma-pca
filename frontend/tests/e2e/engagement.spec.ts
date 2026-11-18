@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
 async function signInStaff(page: Page, email: string) {
@@ -59,13 +60,7 @@ test.describe("Engagement with consent", () => {
     await page.locator("#batch-starts").fill("2027-01-01");
     await page.getByRole("button", { name: "Create batch" }).click();
     await page.goto("/staff/sessions");
-    await page.locator("#schedule-title").fill(`Engagement class ${p}`);
-    await page.locator("#schedule-date").fill("2027-05-03");
-    await page.locator("#schedule-start").fill("14:00");
-    await page.locator("#schedule-end").fill("16:00");
-    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-    await page.getByRole("button", { name: "Schedule class" }).click();
-    await expect(page.locator("#schedule-feedback")).toHaveText(`Engagement class ${p} scheduled.`);
+    await scheduleClass(page, { title: `Engagement class ${p}`, date: "2027-05-03", start: "14:00", end: "16:00", batch: `${C} · A · Batch A` });
     await page.goto("/staff/sessions?from=2027-05-03");
     await page.getByRole("link", { name: new RegExp(`Engagement class ${p}`) }).first().click();
     const engagement = page.getByRole("region", { name: "ENGAGEMENT" });

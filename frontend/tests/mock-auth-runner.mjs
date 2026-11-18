@@ -28,6 +28,9 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
+  if (req.url.startsWith("/api/v1/zoom/monitors") || /^\/api\/v1\/class-sessions\/[^/]+\/zoom-run$/.test(req.url)) {
+    return monitorsApi(req, body, send);
+  }
   if (req.url.startsWith("/api/v1/attendance/dashboard") || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
     return insightsApi(req, send);
   }
@@ -811,6 +814,85 @@ function mockAttendance(session) {
     webinarEnded: linked.length > 0, unmatchedPeople, calculatedAt: new Date().toISOString(), students: rows, finalisedAt: final?.at ?? null };
 }
 
+// Monitored Zoom webinars (Zoom owns schedules). Zoom's side: a recurring webinar started two hours before its scheduled
+// time (live now), and one with no fixed time. Monitoring the first creates its live run and one earlier, reported run.
+const zoomWebinars = {
+  "84400000001": () => ({ topic: "A/L Physics 2027", type: 9, durationMinutes: 120, timeZone: "Asia/Colombo",
+    scheduledStartAt: new Date(Date.now() + 95 * 60_000).toISOString(),
+    occurrences: [1, 8, 15].map((d, i) => ({ occurrenceId: `1700${i}`, startTime: new Date(Date.now() + 95 * 60_000 + (d - 1) * 7 * 86400_000).toISOString(),
+      durationMinutes: 120, status: "available" })) }),
+  "84400000002": () => ({ topic: "Office hours", type: 6, durationMinutes: 60, timeZone: "Asia/Colombo", scheduledStartAt: null, occurrences: [] }),
+};
+const monitors = [];
+const runSessions = new Map(); // class id -> run
+function monitorView(m) {
+  const runs = [...runSessions.values()].filter(r => r.monitorId === m.id).sort((a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt))
+    .map(r => { const copy = { ...r }; delete copy.monitorId; return copy; });
+  const live = runs.find(r => r.state === "LIVE") ?? null;
+  return { ...m, classResolved: !!m.academyClassName, live, runs };
+}
+function monitorsApi(req, body, send) {
+  if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  const runPage = req.url.match(/^\/api\/v1\/class-sessions\/([^/]+)\/zoom-run$/);
+  if (runPage) {
+    const run = runSessions.get(runPage[1]);
+    if (!run) return send(204);
+    const m = monitors.find(x => x.id === run.monitorId);
+    return send(200, { webinarId: m.webinarId, topic: m.topic, occurrenceUuid: run.occurrenceUuid, state: run.state, firstSeenAt: run.firstSeenAt,
+      actualStartedAt: run.actualStartedAt, actualEndedAt: run.actualEndedAt, scheduledStartAt: m.scheduledStartAt, scheduledDurationMinutes: m.durationMinutes,
+      timeZone: m.timeZone, reported: run.reported, connectedNow: run.connectedNow, people: run.people, academyClassName: m.academyClassName,
+      classResolved: !!m.academyClassName });
+  }
+  if (!manager) return send(403, { detail: "Forbidden" });
+  if (req.url === "/api/v1/zoom/monitors" && req.method === "GET") return send(200, monitors.map(monitorView));
+  if (req.url === "/api/v1/zoom/monitors" && req.method === "POST") {
+    const text = String(body.webinar ?? "").trim();
+    const plain = text.replace(/[\s-]/g, "");
+    const link = text.startsWith("https://") ? text.match(/\/(?:j|w|s|wc\/join|webinar)\/(\d{9,20})(?:[/?#]|$)/) : null;
+    const id = /^\d{9,20}$/.test(plain) ? plain : link ? link[1] : null;
+    if (!id) return send(400, { detail: "Paste the webinar's join link or its ID (9 to 20 digits)." });
+    if (!zoomWebinars[id]) return send(404, { detail: "Webinar in the academy's Zoom account not found" });
+    let m = monitors.find(x => x.webinarId === id);
+    const zoom = zoomWebinars[id]();
+    if (!m) {
+      const exact = Object.keys(academySource).filter(name => name.toLowerCase() === zoom.topic.toLowerCase());
+      m = { id: uuid(), webinarId: id, ...zoom, recurring: zoom.type !== 5, syncStatus: "OK", syncedAt: new Date().toISOString(), syncError: null,
+        academyClassName: exact.length === 1 ? exact[0] : null, classSource: exact.length === 1 ? "EXACT_TITLE" : null,
+        classBatchId: exact.length === 1 ? academyLinks.get(exact[0])?.batchId ?? null : null, active: true, addedAt: new Date().toISOString(), version: 0 };
+      delete m.type;
+      monitors.push(m);
+      if (id === "84400000001") {
+        for (const [state, minutesAgo, length] of [["ENDED", 7 * 24 * 60, 110], ["LIVE", 25, null]]) {
+          const started = new Date(Date.now() - minutesAgo * 60_000).toISOString();
+          const ended = length ? new Date(Date.now() - (minutesAgo - length) * 60_000).toISOString() : null;
+          const session = { id: uuid(), title: m.topic, startsAt: started, endsAt: ended ?? new Date(Date.parse(started) + 12 * 3600_000).toISOString(),
+            timeZone: "Asia/Colombo", status: "SCHEDULED", zoomWebinarId: id, seriesId: null, batchIds: [], origin: "ZOOM_RUN", version: 0 };
+          classSessions.push(session);
+          runSessions.set(session.id, { monitorId: m.id, occurrenceUuid: `run-${state}-${session.id.slice(-4)}==`, classSessionId: session.id,
+            state, firstSeenAt: started, actualStartedAt: started, actualEndedAt: ended, reported: state === "ENDED",
+            connectedNow: state === "LIVE" ? 12 : 0, people: state === "LIVE" ? 15 : 18 });
+        }
+      }
+    } else {
+      m.active = true;
+    }
+    return send(200, monitorView(m));
+  }
+  const action = req.url.match(/^\/api\/v1\/zoom\/monitors\/([^/]+)\/(sync|stop|resume|academy-class)$/);
+  const m = action && monitors.find(x => x.id === action[1]);
+  if (!m) return send(404, { detail: "Monitored webinar not found" });
+  if (action[2] === "sync") Object.assign(m, { syncedAt: new Date().toISOString(), syncStatus: "OK" });
+  if (action[2] === "stop") m.active = false;
+  if (action[2] === "resume") m.active = true;
+  if (action[2] === "academy-class") {
+    const name = body.academyClassName ? String(body.academyClassName).trim() : null;
+    if (name && !academySource[name]) return send(404, { detail: "Academy class not found" });
+    Object.assign(m, { academyClassName: name, classSource: name ? "ADMIN" : null, classBatchId: name ? academyLinks.get(name)?.batchId ?? null : null });
+  }
+  return send(200, monitorView(m));
+}
+
 // Attendance dashboards: two finished classes, three students. The Academy's example: Amaya joins three times in the
 // first class (25 + 25 + 20 minutes = 70 of 120).
 const insightDay = days => { const d = new Date(Date.now() - days * 86400_000); d.setUTCHours(3, 30, 0, 0); return d; };
@@ -1387,7 +1469,9 @@ function academicApi(req, body, send) {
   return send(405);
 }
 
-await new Promise((resolve, reject) => backend.listen(0, "127.0.0.1", resolve).once("error", reject));
+// A fixed port (web port + 1000) so end-to-end tests can create history directly (tests/e2e/support/classes.ts).
+const mockApiPort = Number(process.env.LUMA_PLAYWRIGHT_PORT ?? "3090") + 1000;
+await new Promise((resolve, reject) => backend.listen(mockApiPort, "127.0.0.1", resolve).once("error", reject));
 const backendPort = backend.address().port;
 const webPort = process.env.LUMA_PLAYWRIGHT_PORT ?? "3090";
 const webOrigin = `http://127.0.0.1:${webPort}`;

@@ -49,7 +49,8 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/class-sessions", "/api/v1/class-sessions/*",
                             "/api/v1/class-sessions/*/students", "/api/v1/class-sessions/*/attendance",
                             "/api/v1/class-sessions/*/attendance/export", "/api/v1/batches/*/attendance/export",
-                            "/api/v1/batches/*/attendance/summary", "/api/v1/attendance/dashboard")
+                            "/api/v1/batches/*/attendance/summary", "/api/v1/attendance/dashboard",
+                            "/api/v1/class-sessions/*/zoom-run")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/assignments").hasAnyRole("INSTRUCTOR", "ATTENDANCE_OFFICER")
                     // Corrections: services limit attendance officers to students of their batches.
@@ -75,7 +76,9 @@ public class SecurityConfig {
                             "/api/v1/attendance/pending", "/api/v1/attendance/finalisations",
                             "/api/v1/attendance-policy", "/api/v1/attendance-appeals", "/api/v1/attendance-appeals/*/resolution",
                             "/api/v1/engagement-settings",
-                            "/api/v1/academy/classes", "/api/v1/academy/classes/link", "/api/v1/academy/classes/sync")
+                            "/api/v1/academy/classes", "/api/v1/academy/classes/link", "/api/v1/academy/classes/sync",
+                            "/api/v1/zoom/monitors", "/api/v1/zoom/monitors/*/sync", "/api/v1/zoom/monitors/*/stop",
+                            "/api/v1/zoom/monitors/*/resume", "/api/v1/zoom/monitors/*/academy-class")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
                     // A student's own data; services resolve "own" from the token, never from input.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments", "/api/v1/me/class-sessions",

@@ -227,6 +227,22 @@ export function instantParts(iso: string, zone: string) {
 }
 
 /** "Mon 11 Jan 2027 · 18:00–20:00" in the class's own zone (24-hour clock). */
+/** The class-length limit a live Zoom run's class ends at until Zoom says it ended (backend ZoomRunSessions.LIVE_SPAN). */
+export const LIVE_RUN_SPAN_MS = 12 * 3600_000;
+
+/** A Zoom run still going on: its end is only the class-length limit, not a real end time. */
+export function isLiveRun(c: { origin?: string | null; startsAt: string; endsAt: string }, now = Date.now()) {
+  return c.origin === "ZOOM_RUN" && Date.parse(c.endsAt) - Date.parse(c.startsAt) === LIVE_RUN_SPAN_MS && now < Date.parse(c.endsAt);
+}
+
+/** "Wed 18 Nov 2026 · 16:00–17:40", or for a live Zoom run "Wed 18 Nov 2026 · live since 16:00" (no invented end). */
+export function classTimeLabel(c: { origin?: string | null; startsAt: string; endsAt: string; timeZone: string }, now = Date.now()) {
+  if (!isLiveRun(c, now)) return formatClassTime(c.startsAt, c.endsAt, c.timeZone);
+  const start = instantParts(c.startsAt, c.timeZone);
+  const weekday = new Intl.DateTimeFormat("en-GB", { timeZone: c.timeZone, weekday: "short" }).format(new Date(c.startsAt));
+  return `${weekday} ${formatDate(start.date)} · live since ${start.time}`;
+}
+
 export function formatClassTime(startsAt: string, endsAt: string, zone: string) {
   const start = instantParts(startsAt, zone);
   const end = instantParts(endsAt, zone);
@@ -333,7 +349,9 @@ export function formatWebinarId(id: string | null) {
 }
 
 export type ClassSession = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
-  zoomWebinarId: string | null; seriesId?: string | null; batches: { batchId: string; courseId: string; code: string; name: string }[]; version: number };
+  zoomWebinarId: string | null; seriesId?: string | null; batches: { batchId: string; courseId: string; code: string; name: string }[]; version: number;
+  /** LUMA (scheduled by staff before Zoom owned schedules) or ZOOM_RUN (an actual run of a monitored webinar). */
+  origin?: "LUMA" | "ZOOM_RUN" };
 export type CourseRef = { id: string; code: string };
 type BatchRef = { id: string; courseId: string; code: string; name: string; active: boolean };
 

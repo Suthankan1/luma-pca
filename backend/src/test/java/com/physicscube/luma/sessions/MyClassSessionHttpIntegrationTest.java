@@ -112,7 +112,7 @@ class MyClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals("Asia/Colombo", mine.get(0).get("timeZone"));
         for (Map<String, Object> view : mine) {
             assertFalse(view.containsKey("zoomWebinarId"), "students do not get the webinar ID");
-            assertEquals(java.util.Set.of("id", "title", "startsAt", "endsAt", "timeZone", "localDate", "status", "batches", "joinUrl"),
+            assertEquals(java.util.Set.of("id", "title", "startsAt", "endsAt", "timeZone", "localDate", "status", "batches", "joinUrl", "origin"),
                     view.keySet());
         }
     }

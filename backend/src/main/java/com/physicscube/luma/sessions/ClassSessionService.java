@@ -43,6 +43,8 @@ public class ClassSessionService {
     private final EnrollmentService enrollments;
     private final org.springframework.context.ApplicationEventPublisher events;
     private final com.physicscube.luma.audit.AuditLog audit;
+    @org.springframework.beans.factory.annotation.Autowired
+    private ManualScheduling manualScheduling;
 
     ClassSessionService(ClassSessionRepository sessions, BatchService batches, EnrollmentService enrollments,
                         org.springframework.context.ApplicationEventPublisher events, com.physicscube.luma.audit.AuditLog audit) {
@@ -131,7 +133,7 @@ public class ClassSessionService {
                             .distinct().sorted(Comparator.comparing(StudentClassView.Batch::code)).toList();
                     return mine.isEmpty() ? null : new StudentClassView(session.getId(), session.getTitle(), session.getStartsAt(),
                             session.getEndsAt(), session.getTimeZone(), day, session.getStatus(), mine,
-                            StudentClassView.joinUrl(session.getZoomWebinarId(), session.getStatus()));
+                            StudentClassView.joinUrl(session.getZoomWebinarId(), session.getStatus()), session.getOrigin());
                 })
                 .filter(java.util.Objects::nonNull)
                 .sorted(Comparator.comparing(StudentClassView::startsAt).thenComparing(StudentClassView::id))
@@ -167,6 +169,7 @@ public class ClassSessionService {
     public SessionView create(CurrentAccount caller, String title, Instant startsAt, Instant endsAt, String timeZone,
                               List<UUID> batchIds, String zoomWebinarId) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         ZoneId zone = zone(timeZone);
         checkTimes(startsAt, endsAt);
         Set<UUID> wanted = checkBatches(caller, batchIds, Set.of());
@@ -195,6 +198,7 @@ public class ClassSessionService {
                                      String timeZone, List<UUID> batchIds, String zoomWebinarId, List<java.time.LocalDate> skipDates,
                                      boolean dryRun) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         ZoneId zone = zone(timeZone);
         if (lastDate.isBefore(firstDate) || java.time.temporal.ChronoUnit.DAYS.between(firstDate, lastDate) > MAX_SERIES_SPAN_DAYS) {
             throw new InvalidRequestException("lastDate must be on or after firstDate and at most " + MAX_SERIES_SPAN_DAYS + " days later");
@@ -276,6 +280,7 @@ public class ClassSessionService {
                                            java.time.LocalTime startTime, java.time.LocalTime endTime, String zoomWebinarId,
                                            boolean clearWebinar, boolean dryRun) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         String newTitle = title == null || title.isBlank() ? null : title.strip();
         if (newTitle != null && newTitle.length() > 200) {
             throw new InvalidRequestException("title must be at most 200 characters");
@@ -370,6 +375,7 @@ public class ClassSessionService {
     @Transactional
     public int cancelSeriesFrom(CurrentAccount caller, UUID seriesId, java.time.LocalDate fromDate) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         List<ClassSession> series = sessions.findByAcademyIdAndSeriesIdOrderByStartsAt(caller.academyId(), seriesId);
         if (series.isEmpty()) {
             throw new ResourceNotFoundException("Class series");
@@ -391,6 +397,7 @@ public class ClassSessionService {
                               String timeZone, List<UUID> batchIds, String status, String zoomWebinarId,
                               long expectedVersion) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         ZoneId zone = zone(timeZone);
         checkTimes(startsAt, endsAt);
         if (!STATUSES.contains(status)) {
@@ -480,7 +487,9 @@ public class ClassSessionService {
 
     private ClassSession readable(CurrentAccount caller, UUID sessionId, BatchScope scope) {
         return sessions.findByIdAndAcademyId(sessionId, caller.academyId())
-                .filter(session -> session.batchIds().stream().anyMatch(scope::includes))
+                // Owners and administrators see every class, including a Zoom run whose Academy class is not resolved yet
+                // (it has no batches); batch-scoped staff only classes of their batches.
+                .filter(session -> scope.all() || session.batchIds().stream().anyMatch(scope::includes))
                 .orElseThrow(() -> new ResourceNotFoundException("Class session"));
     }
 
@@ -528,6 +537,6 @@ public class ClassSessionService {
                         .map(b -> new SessionView.Batch(b.id(), b.courseId(), b.code(), b.name()))
                         .sorted(Comparator.comparing(SessionView.Batch::code).thenComparing(SessionView.Batch::batchId))
                         .toList(),
-                s.getVersion(), s.getCreatedAt(), s.getUpdatedAt())).toList();
+                s.getVersion(), s.getCreatedAt(), s.getUpdatedAt(), s.getOrigin())).toList();
     }
 }

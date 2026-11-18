@@ -13,6 +13,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"luma.auth.ephemeral-signing-key=true",
+        // Tests build class history directly; in production Zoom owns schedules (ManualSchedulingOffIntegrationTest).
+        "luma.sessions.manual-scheduling=true",
         // Tests drive the receipt processor directly; no background polling.
         "luma.zoom.processing.enabled=false",
         // Tests drive Zoom report fetching directly.

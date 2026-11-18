@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { test, expect } from "@playwright/test";
 
 test("An administrator checks a past webinar run from its link and links it to the class", async ({ page }, testInfo) => {
@@ -30,13 +31,7 @@ test("An administrator checks a past webinar run from its link and links it to t
   await page.locator("#batch-starts").fill("2026-01-01");
   await page.getByRole("button", { name: "Create batch" }).click();
   await page.goto("/staff/sessions");
-  await page.locator("#schedule-title").fill(`Checked class ${p}`);
-  await page.locator("#schedule-date").fill("2026-03-10");
-  await page.locator("#schedule-start").fill("09:00");
-  await page.locator("#schedule-end").fill("11:00");
-  await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-  await page.getByRole("button", { name: "Schedule class" }).click();
-  await expect(page.locator("#schedule-feedback")).toHaveText(`Checked class ${p} scheduled.`);
+  await scheduleClass(page, { title: `Checked class ${p}`, date: "2026-03-10", start: "09:00", end: "11:00", batch: `${C} · A · Batch A` });
 
   await page.goto("/staff/zoom");
   await page.getByRole("link", { name: "Check a webinar by link or ID →" }).click();

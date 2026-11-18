@@ -4,12 +4,13 @@ import { StaffShell } from "@/components/StaffShell";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { CorrectionForm, FinaliseForm, RecalculateForm } from "@/components/staff/AttendanceForms";
 import { ClosePulseButton, PulseForm } from "@/components/staff/EngagementForms";
-import { CancelSeriesForm, EditSeriesForm, EditSessionForm, StatusForm, type SessionDefaults } from "@/components/staff/SessionForms";
+import { formatElapsed, formatTime, formatWebinarId as formatZoomId, formatWhen, runStart, type ClassRun } from "@/lib/webinars";
+import { renderTime } from "@/lib/insights";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  batchOptions, occurrencePeopleHref, occurrenceSource, formatClassTime, formatDate, formatDuration, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
+  occurrencePeopleHref, occurrenceSource, formatClassTime, formatDate, formatDuration, formatInstant, formatWebinarId, instantParts, isAcademyManager, occurrenceState, uuidOrNull,
   outcomeLabels, reactionLabels, type ClassEngagement, type ClassSession, type CourseRef, type Occurrence, type ProvisionalAttendance,
 } from "@/lib/staff-forms";
 
@@ -26,7 +27,7 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   const manager = isAcademyManager(identity.roles);
   const canCorrect = manager || identity.roles.includes("ATTENDANCE_OFFICER");
   const canAsk = manager || identity.roles.includes("INSTRUCTOR");
-  const [session, expected, batches, courses, zoom, attendance, engagement] = await Promise.all([
+  const [session, expected, batches, courses, zoom, attendance, engagement, zoomRun] = await Promise.all([
     staffApi<ClassSession>(`/api/v1/class-sessions/${sessionId}`),
     staffApi<ExpectedStudent[]>(`/api/v1/class-sessions/${sessionId}/students`),
     manager ? staffApi<Batch[]>("/api/v1/batches") : Promise.resolve(null),
@@ -34,6 +35,7 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
     manager ? staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?decided=true&sessionId=${sessionId}&limit=50`) : Promise.resolve(null),
     staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${sessionId}/attendance`),
     staffApi<ClassEngagement>(`/api/v1/class-sessions/${sessionId}/engagement`),
+    staffApi<ClassRun | null>(`/api/v1/class-sessions/${sessionId}/zoom-run`),
   ]);
   if (!session.ok && (session.status === 404 || session.status === 403)) notFound();
   const shell = { active: "sessions" as const, crumb: "Timetable", hasStudentPortal: hasPortal(identity, "student") };
@@ -44,16 +46,16 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   }
   const s = session.data;
   const start = instantParts(s.startsAt, s.timeZone);
-  const defaults: SessionDefaults = { title: s.title, date: start.date, startTime: start.time, endTime: instantParts(s.endsAt, s.timeZone).time,
-    zoomWebinarId: s.zoomWebinarId ?? "", batchIds: s.batches.map(b => b.batchId) };
-  const current = new Set(defaults.batchIds);
-  // Active batches can be added; batches already on the class stay listed even if since deactivated.
-  const options = batches?.ok && courses?.ok ? batchOptions(courses.data, batches.data, b => b.active || current.has(b.id)) : [];
+  const run = zoomRun.ok && zoomRun.data ? zoomRun.data : null;
+  const now = renderTime();
   const batchCode = new Map(s.batches.map(b => [b.batchId, b.code]));
   const cancelled = s.status !== "SCHEDULED";
 
-  return <StaffShell {...shell} title={s.title}
-    subtitle={`${formatClassTime(s.startsAt, s.endsAt, s.timeZone)} (${s.timeZone})${cancelled ? " · Cancelled" : ""}`}>
+  const runBegan = run ? runStart(run) : null;
+  const subtitle = run && runBegan
+    ? `${run.state === "LIVE" ? "Live now · " : ""}${formatWhen(runBegan.at, s.timeZone)} actual start${run.actualEndedAt ? `, ended ${formatTime(run.actualEndedAt, s.timeZone)}` : ""} (${s.timeZone})`
+    : `${formatClassTime(s.startsAt, s.endsAt, s.timeZone)} (${s.timeZone})${cancelled ? " · Cancelled" : ""}`;
+  return <StaffShell {...shell} title={s.title} subtitle={subtitle}>
     <p><Link className="text-link" href="/staff/sessions">← Classes</Link></p>
     {cancelled && <p className="banner">This class is cancelled. It stays on record and is not linked to Zoom events automatically.</p>}
     <div className="staff-grid">
@@ -87,12 +89,29 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
           <p className="panel-sub"><Link className="text-link" href="/staff/zoom">Review Zoom occurrences →</Link></p>
         </div>}
       </section>
-      {manager && <section className="panel" aria-labelledby="manage-title">
-        <h2 id="manage-title" className="panel-title">MANAGE</h2>
-        <EditSessionForm session={s} batches={options} defaults={defaults} />
-        <StatusForm session={s} defaults={defaults} />
-        {s.seriesId && s.status === "SCHEDULED" && <EditSeriesForm sessionId={s.id} seriesId={s.seriesId} fromDate={s.localDate} timeZone={s.timeZone} />}
-        {s.seriesId && <CancelSeriesForm sessionId={s.id} seriesId={s.seriesId} fromDate={s.localDate} />}
+      {run && runBegan ? <section className="panel" aria-labelledby="zoom-run-title">
+        <h2 id="zoom-run-title" className="panel-title">ZOOM RUN</h2>
+        <p className="panel-sub">This class was created when Zoom actually started webinar {formatZoomId(run.webinarId)}. Times come from Zoom;
+          LUMA does not change them.</p>
+        <dl className="zoom-run-facts">
+          <div><dt>Status</dt><dd>{run.state === "LIVE" ? <span className="pill pill-live">Live</span> : "Ended"}</dd></div>
+          <div><dt>Actual start</dt><dd>{formatTime(runBegan.at, s.timeZone)}{runBegan.known ? "" : " (first event; Zoom’s start not received)"}</dd></div>
+          <div><dt>Actual end</dt><dd>{run.actualEndedAt ? formatTime(run.actualEndedAt, s.timeZone) : "—"}</dd></div>
+          <div><dt>{run.state === "LIVE" ? "Running for" : "Length"}</dt>
+            <dd>{formatElapsed(((run.actualEndedAt ? Date.parse(run.actualEndedAt) : now) - Date.parse(runBegan.at)) / 1000)}</dd></div>
+          <div><dt>Zoom schedule</dt><dd>{run.scheduledStartAt ? `${formatWhen(run.scheduledStartAt, s.timeZone)}${run.scheduledDurationMinutes
+            ? ` · ${run.scheduledDurationMinutes} min` : ""}` : "No Zoom schedule"}</dd></div>
+          {run.state === "LIVE" && <div><dt>Connected now</dt><dd>{run.connectedNow}</dd></div>}
+          <div><dt>Joined</dt><dd>{run.people} {run.people === 1 ? "person" : "people"}</dd></div>
+          <div><dt>Zoom’s report</dt><dd>{run.reported ? "Received (final source)" : run.state === "LIVE" ? "After the webinar" : "Waiting for Zoom"}</dd></div>
+          <div><dt>Academy class</dt><dd>{run.classResolved ? run.academyClassName : "Unresolved: no students expected"}</dd></div>
+        </dl>
+        {manager && <p className="link-row"><Link className="text-link" href="/staff/webinars">Webinars →</Link></p>}
+      </section>
+      : manager && <section className="panel" aria-labelledby="zoom-run-title">
+        <h2 id="zoom-run-title" className="panel-title">ZOOM</h2>
+        <p className="panel-sub">This class was scheduled in LUMA before Zoom owned schedules. It stays on record with its attendance; it can no
+          longer be edited or cancelled here.</p>
       </section>}
     </div>
     <section className="panel panel-gap" aria-labelledby="attendance-title">

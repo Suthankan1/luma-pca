@@ -51,6 +51,10 @@ class ClassSession {
     @Column(name = "zoom_webinar_id", length = 20)
     private String zoomWebinarId;
 
+    /** LUMA (scheduled by staff before 2026-11-18) or ZOOM_RUN (created by an actual Zoom webinar run). */
+    @Column(name = "origin", insertable = false, updatable = false)
+    private String origin;
+
     @Column(name = "series_id", updatable = false)
     private UUID seriesId;
 
@@ -140,6 +144,10 @@ class ClassSession {
 
     String getTimeZone() {
         return timeZone;
+    }
+
+    String getOrigin() {
+        return origin == null ? "LUMA" : origin;
     }
 
     String getZoomWebinarId() {

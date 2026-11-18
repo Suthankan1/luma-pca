@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
 async function signInAsAdmin(page: Page) {
@@ -67,13 +68,7 @@ test.describe("Activity log", () => {
     await page.locator("#batch-starts").fill("2027-01-10");
     await page.getByRole("button", { name: "Create batch" }).click();
     await page.goto("/staff/sessions");
-    await page.locator("#schedule-title").fill(`Audited ${p}`);
-    await page.locator("#schedule-date").fill("2027-04-03");
-    await page.locator("#schedule-start").fill("09:00");
-    await page.locator("#schedule-end").fill("11:00");
-    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${P}-TT · ${P}-SAT · Saturday`, { exact: true }).check();
-    await page.getByRole("button", { name: "Schedule class" }).click();
-    await expect(page.locator("#schedule-feedback")).toHaveText(`Audited ${p} scheduled.`);
+    await scheduleClass(page, { title: `Audited ${p}`, date: "2027-04-03", start: "09:00", end: "11:00", batch: `${P}-TT · ${P}-SAT · Saturday` });
 
     await page.goto("/staff/activity?category=classes");
     const entry = page.locator(".activity-list > li").filter({ hasText: `Scheduled “Audited ${p}”` });

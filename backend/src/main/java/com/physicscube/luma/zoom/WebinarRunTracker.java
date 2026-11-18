@@ -1,0 +1,215 @@
+package com.physicscube.luma.zoom;
+
+import com.physicscube.luma.academy.AcademyClassService;
+import com.physicscube.luma.sessions.ClassSessionService;
+import com.physicscube.luma.sessions.ZoomRunSessions;
+import com.physicscube.luma.shared.time.DbTime;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+
+/**
+ * Turns Zoom events of a monitored webinar into attendance runs, one per occurrence UUID, whatever Zoom's schedule says.
+ * The first event of a run creates it (and its attendance class); {@code webinar.started} sets the actual start (Zoom's
+ * {@code start_time}, else the event time) and {@code webinar.ended} the actual end. Events may arrive twice, late or in
+ * any order: the run is locked per occurrence, every update is idempotent, an ended run is never reopened, and a start or
+ * end once known is only replaced by Zoom's own start/end event. Runs the attendance class's times follow (bounded by the
+ * actual run, not a schedule). Students are expected only when the webinar's Academy class is known for certain.
+ */
+@Component
+class WebinarRunTracker {
+    private static final Logger log = LoggerFactory.getLogger(WebinarRunTracker.class);
+
+    private final JdbcTemplate jdbc;
+    private final ZoomRunSessions runSessions;
+    private final AcademyClassService academyClasses;
+
+    WebinarRunTracker(JdbcTemplate jdbc, ZoomRunSessions runSessions, AcademyClassService academyClasses) {
+        this.jdbc = jdbc;
+        this.runSessions = runSessions;
+        this.academyClasses = academyClasses;
+    }
+
+    /** @return {@code false} when the webinar is not monitored (the event is left to the older class matcher) */
+    boolean onEvent(UUID academyId, String webinarId, String occurrenceUuid, String eventType, long eventTs, Map<?, ?> object) {
+        List<Map<String, Object>> monitors = jdbc.queryForList("""
+                SELECT id, topic, time_zone, academy_class_name FROM zoom_webinar_monitors
+                WHERE academy_id = ? AND webinar_id = ? AND active
+                """, academyId, webinarId);
+        if (monitors.isEmpty()) {
+            // Monitoring stopped during a run: its run still gets the rest of its events (its end above all).
+            monitors = jdbc.queryForList("""
+                    SELECT m.id, m.topic, m.time_zone, m.academy_class_name FROM zoom_webinar_runs r
+                    JOIN zoom_webinar_monitors m ON m.id = r.monitor_id
+                    WHERE r.academy_id = ? AND r.occurrence_uuid = ?
+                    """, academyId, occurrenceUuid);
+            if (monitors.isEmpty()) {
+                return false;
+            }
+        }
+        Map<String, Object> monitor = monitors.get(0);
+        Instant eventTime = Instant.ofEpochMilli(eventTs);
+        // One worker at a time per run: the first event creates it, later ones only update it.
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", academyId + "/" + occurrenceUuid);
+        List<Map<String, Object>> found = jdbc.queryForList("""
+                SELECT class_session_id, first_seen_at, actual_started_at, actual_ended_at, state
+                FROM zoom_webinar_runs WHERE academy_id = ? AND occurrence_uuid = ?
+                """, academyId, occurrenceUuid);
+        Instant now = DbTime.now();
+        UUID sessionId;
+        Instant firstSeen;
+        Instant started;
+        Instant ended;
+        String state;
+        if (found.isEmpty()) {
+            sessionId = runSessions.create(academyId, (String) monitor.get("topic"), eventTime, zone((String) monitor.get("time_zone")),
+                    webinarId, academyClasses.linkedBatch(academyId, (String) monitor.get("academy_class_name")).map(List::of).orElse(List.of()));
+            firstSeen = eventTime;
+            started = null;
+            ended = null;
+            state = "LIVE";
+            jdbc.update("""
+                    INSERT INTO zoom_webinar_runs (academy_id, occurrence_uuid, webinar_id, monitor_id, class_session_id, first_seen_at,
+                                                   state, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'LIVE', ?, ?)
+                    """, academyId, occurrenceUuid, webinarId, monitor.get("id"), sessionId, Timestamp.from(eventTime),
+                    Timestamp.from(now), Timestamp.from(now));
+            // The run's class is the occurrence's class; an administrator's earlier decision about it stands.
+            jdbc.update("""
+                    INSERT INTO zoom_occurrence_links (academy_id, occurrence_uuid, webinar_id, class_session_id, link_source, linked_at)
+                    VALUES (?, ?, ?, ?, 'AUTOMATIC', ?)
+                    ON CONFLICT (academy_id, occurrence_uuid) DO NOTHING
+                    """, academyId, occurrenceUuid, webinarId, sessionId, Timestamp.from(now));
+            log.info("Zoom webinar {} run detected ({}); attendance class created", webinarId, eventType);
+        } else {
+            Map<String, Object> run = found.get(0);
+            sessionId = (UUID) run.get("class_session_id");
+            firstSeen = ((Timestamp) run.get("first_seen_at")).toInstant();
+            started = run.get("actual_started_at") == null ? null : ((Timestamp) run.get("actual_started_at")).toInstant();
+            ended = run.get("actual_ended_at") == null ? null : ((Timestamp) run.get("actual_ended_at")).toInstant();
+            state = (String) run.get("state");
+        }
+        if (eventTime.isBefore(firstSeen)) {
+            firstSeen = eventTime;
+        }
+        switch (eventType) {
+            case "webinar.started" -> started = time(object.get("start_time"), eventTime);
+            case "webinar.ended" -> {
+                ended = time(object.get("end_time"), eventTime);
+                if (started == null && object.get("start_time") != null) {
+                    started = time(object.get("start_time"), null);
+                }
+                state = "ENDED";
+            }
+            default -> {
+                // Joins and leaves add evidence only (stored by the caller); they never move a run's start or end.
+            }
+        }
+        if (started != null && ended != null && ended.isBefore(started)) {
+            ended = started;
+        }
+        jdbc.update("""
+                UPDATE zoom_webinar_runs SET first_seen_at = ?, actual_started_at = ?, actual_ended_at = ?, state = ?, updated_at = ?
+                WHERE academy_id = ? AND occurrence_uuid = ?
+                """, Timestamp.from(firstSeen), started == null ? null : Timestamp.from(started), ended == null ? null : Timestamp.from(ended),
+                state, Timestamp.from(now), academyId, occurrenceUuid);
+        Instant classStart = started != null ? started : firstSeen;
+        runSessions.retime(academyId, sessionId, classStart, "ENDED".equals(state) ? (ended != null ? ended : classStart) : null);
+        return true;
+    }
+
+    /**
+     * Zoom's participant report for a run arrived (inside its storing transaction). A run still marked live missed its
+     * webinar.ended: it ends at the last leave in the report, and a start Zoom never sent becomes the first join. Known
+     * times are never changed; an ended run is left as it is.
+     */
+    void reportStored(UUID academyId, String occurrenceUuid) {
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", academyId + "/" + occurrenceUuid);
+        List<Map<String, Object>> found = jdbc.queryForList("""
+                SELECT r.class_session_id, r.first_seen_at, r.actual_started_at, r.state,
+                       (SELECT min(p.joined_at) FROM zoom_report_participants p WHERE p.academy_id = r.academy_id AND p.occurrence_uuid = r.occurrence_uuid) AS first_join,
+                       (SELECT max(p.left_at) FROM zoom_report_participants p WHERE p.academy_id = r.academy_id AND p.occurrence_uuid = r.occurrence_uuid) AS last_leave
+                FROM zoom_webinar_runs r WHERE r.academy_id = ? AND r.occurrence_uuid = ?
+                """, academyId, occurrenceUuid);
+        if (found.isEmpty() || !"LIVE".equals(found.get(0).get("state")) || found.get(0).get("last_leave") == null) {
+            return;
+        }
+        Map<String, Object> run = found.get(0);
+        Instant started = run.get("actual_started_at") != null ? ((Timestamp) run.get("actual_started_at")).toInstant()
+                : ((Timestamp) run.get("first_join")).toInstant();
+        Instant ended = ((Timestamp) run.get("last_leave")).toInstant();
+        if (ended.isBefore(started)) {
+            ended = started;
+        }
+        jdbc.update("""
+                UPDATE zoom_webinar_runs SET actual_started_at = ?, actual_ended_at = ?, state = 'ENDED', updated_at = ?
+                WHERE academy_id = ? AND occurrence_uuid = ?
+                """, Timestamp.from(started), Timestamp.from(ended), Timestamp.from(DbTime.now()), academyId, occurrenceUuid);
+        runSessions.retime(academyId, (UUID) run.get("class_session_id"), started, ended);
+        log.info("Zoom webinar run closed from Zoom's participant report (its end event was missed)");
+    }
+
+    /**
+     * A webinar was just added (or resumed) while it may already be running, or ran recently: its events already stored
+     * (the inbox keeps every event it receives) are applied in order, so the run starts at Zoom's actual start rather than
+     * at the next event. Only occurrences with an event in the last {@code since} and no run yet.
+     */
+    void backfill(UUID academyId, String webinarId, Instant since) {
+        List<Map<String, Object>> events = jdbc.queryForList("""
+                SELECT e.occurrence_uuid, e.event_type, e.event_ts, r.payload::text AS body
+                FROM zoom_occurrence_events e
+                JOIN zoom_webhook_receipts r ON r.id = e.receipt_id
+                WHERE e.academy_id = ? AND e.webinar_id = ?
+                  AND e.occurrence_uuid IN (SELECT occurrence_uuid FROM zoom_occurrence_events WHERE academy_id = ? AND webinar_id = ?
+                                            AND event_ts >= ?)
+                  AND NOT EXISTS (SELECT 1 FROM zoom_webinar_runs w WHERE w.academy_id = e.academy_id AND w.occurrence_uuid = e.occurrence_uuid)
+                ORDER BY e.event_ts, e.created_at
+                """, academyId, webinarId, academyId, webinarId, since.toEpochMilli());
+        for (Map<String, Object> event : events) {
+            Map<?, ?> object = Map.of();
+            try {
+                Map<?, ?> body = JSON.readValue((String) event.get("body"), Map.class);
+                if (body.get("payload") instanceof Map<?, ?> payload && payload.get("object") instanceof Map<?, ?> o) {
+                    object = o;
+                }
+            } catch (RuntimeException e) {
+                // A scrubbed or unreadable payload: event times stand in for Zoom's start and end.
+            }
+            onEvent(academyId, webinarId, (String) event.get("occurrence_uuid"), (String) event.get("event_type"),
+                    ((Number) event.get("event_ts")).longValue(), object);
+        }
+    }
+
+    private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
+
+    /** Zoom's ISO time in the event, else {@code fallback}. */
+    static Instant time(Object value, Instant fallback) {
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Instant.parse(text.strip());
+            } catch (DateTimeParseException e) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private static String zone(String zoomZone) {
+        if (zoomZone != null) {
+            try {
+                return ZoneId.of(zoomZone).getId();
+            } catch (RuntimeException e) {
+                // fall through
+            }
+        }
+        return ClassSessionService.DEFAULT_TIME_ZONE;
+    }
+}

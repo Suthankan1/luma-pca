@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
 async function signInAsAdmin(page: Page) {
@@ -36,14 +37,7 @@ test.describe("Zoom review", () => {
 
     // A class on the webinar of the seeded occurrence, 18:00–20:00 Colombo (12:30–14:30 UTC).
     await page.goto("/staff/sessions");
-    await page.locator("#schedule-title").fill(`Zoom class ${p}`);
-    await page.locator("#schedule-date").fill(`2027-03-0${n}`);
-    await page.locator("#schedule-start").fill("18:00");
-    await page.locator("#schedule-end").fill("20:00");
-    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-    await page.locator("#schedule-webinar").fill(`987 6543 210${n}`);
-    await page.getByRole("button", { name: "Schedule class" }).click();
-    await expect(page.locator("#schedule-feedback")).toHaveText(`Zoom class ${p} scheduled.`);
+    await scheduleClass(page, { title: `Zoom class ${p}`, date: `2027-03-0${n}`, start: "18:00", end: "20:00", batch: `${C} · A · Batch A`, webinar: `987 6543 210${n}` });
 
     await page.getByRole("link", { name: /Zoom review$/ }).first().click();
     await expect(page).toHaveURL(/\/staff\/zoom$/);
@@ -92,12 +86,8 @@ test.describe("Zoom review", () => {
     await expect(linked.getByRole("listitem")).toHaveCount(1);
     await expect(linked.getByRole("listitem")).toContainText(`Started ${n} Mar 2027 18:05 · 6 events`);
     await expect(linked.getByRole("listitem").locator(".status")).toHaveText("Linked automatically");
-    await page.locator("#edit-date").fill(`2027-03-1${n}`);
-    await page.getByRole("button", { name: "Save changes" }).click();
-    await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students and automatic Zoom links follow the new date, time and webinar.");
-    await expect(linked).toContainText("None yet.");
-    await page.goto("/staff/zoom");
-    await expect(auto.locator(".status")).toHaveText("Needs review");
+    // Classes can no longer be moved in LUMA (Zoom owns schedules), so a link is not revised by an edit here.
+    await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(0);
   });
 
   test("Zoom participants are matched to students by sign-in email, or by an administrator with a reason", async ({ page }) => {
@@ -182,13 +172,7 @@ test.describe("Zoom review", () => {
     await expect(page.locator("#enroll-feedback")).toHaveText("Enrolled.");
 
     await page.goto("/staff/sessions");
-    await page.locator("#schedule-title").fill(`Attendance class ${p}`);
-    await page.locator("#schedule-date").fill(`2027-03-0${n}`);
-    await page.locator("#schedule-start").fill("09:00");
-    await page.locator("#schedule-end").fill("11:00");
-    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-    await page.getByRole("button", { name: "Schedule class" }).click();
-    await expect(page.locator("#schedule-feedback")).toHaveText(`Attendance class ${p} scheduled.`);
+    await scheduleClass(page, { title: `Attendance class ${p}`, date: `2027-03-0${n}`, start: "09:00", end: "11:00", batch: `${C} · A · Batch A` });
 
     await page.goto("/staff/zoom");
     const occurrence = page.getByRole("listitem", { name: `Webinar 555 0001 110${n} at ${n} Mar 2027 09:30` });

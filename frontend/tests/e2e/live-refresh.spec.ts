@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { test, expect } from "@playwright/test";
 
 test("A running class's page updates itself, and staff can pause it", async ({ page }, testInfo) => {
@@ -28,13 +29,7 @@ test("A running class's page updates itself, and staff can pause it", async ({ p
   await expect(page.locator("#batch-feedback")).toHaveText("Batch A created.");
 
   await page.goto("/staff/sessions");
-  await page.locator("#schedule-title").fill(`Live class ${p}`);
-  await page.locator("#schedule-date").fill(start.slice(0, 10));
-  await page.locator("#schedule-start").fill(start.slice(11, 16));
-  await page.locator("#schedule-end").fill(end.slice(11, 16));
-  await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-  await page.getByRole("button", { name: "Schedule class" }).click();
-  await expect(page.locator("#schedule-feedback")).toHaveText(`Live class ${p} scheduled.`);
+  await scheduleClass(page, { title: `Live class ${p}`, date: start.slice(0, 10), start: start.slice(11, 16), end: end.slice(11, 16), batch: `${C} · A · Batch A` });
   await page.goto(`/staff/sessions?from=${start.slice(0, 10)}`);
   await page.getByRole("link", { name: new RegExp(`Live class ${p}`) }).first().click();
 

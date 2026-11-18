@@ -118,6 +118,10 @@ luma:
       poll-interval: ${LUMA_MAIL_BULK_POLL_INTERVAL:PT30S}
       batch-size: ${LUMA_MAIL_BULK_BATCH_SIZE:20}
       max-attempts: ${LUMA_MAIL_BULK_MAX_ATTEMPTS:5}
+  sessions:
+    # Zoom owns webinar schedules (Academy decision 2026-11-18): LUMA neither creates, edits, cancels nor imports classes;
+    # each actual run of a monitored webinar becomes a class. Only test setups that build history switch this on.
+    manual-scheduling: ${LUMA_SESSIONS_MANUAL_SCHEDULING:false}
   # Academy-requested student sign-in: the student ID is both username and password. Guessable by design; keep off
   # until the Academy has accepted the risk in writing. Only accounts whose sole role is STUDENT can sign in this way.
   student-id-login:

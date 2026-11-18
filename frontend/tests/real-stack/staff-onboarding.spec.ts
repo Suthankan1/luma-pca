@@ -49,6 +49,52 @@ function totp(base32: string, at = Date.now()) {
   return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
 }
 
+/**
+ * Classes are no longer scheduled in LUMA's screens (Zoom owns schedules). Steps that need a class with history create it
+ * through the real API as the administrator (password + authenticator code), with manual scheduling switched on for this
+ * test backend only (scripts/staff-ui-real-stack.sh).
+ */
+const apiBase = process.env.LUMA_REAL_API_URL!;
+let apiToken = "";
+/** A code for a time step after the last one used (shared with the browser sign-ins), waiting for the clock when one step
+ * of drift is not enough. */
+async function adminCode() {
+  for (;;) {
+    const current = Math.floor(Date.now() / 30_000);
+    const step = Math.max(current, lastAdminStep + 1);
+    if (step <= current + 1) {
+      lastAdminStep = step;
+      return totp(adminSecret, step * 30_000);
+    }
+    await new Promise(resolve => setTimeout(resolve, 2_000));
+  }
+}
+async function adminToken() {
+  if (apiToken) return apiToken;
+  const login = await (await fetch(`${apiBase}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: adminEmail, password: passphrase }) })).json() as { mfaToken: string };
+  const verified = await fetch(`${apiBase}/api/v1/auth/mfa/verify`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mfaToken: login.mfaToken, code: await adminCode() }) });
+  expect(verified.status, await verified.clone().text()).toBe(200);
+  apiToken = ((await verified.json()) as { accessToken: string }).accessToken;
+  return apiToken;
+}
+async function createClass(title: string, date: string, start: string, end: string, batch: string, webinar?: string) {
+  const token = await adminToken();
+  const get = async (path: string) => (await fetch(`${apiBase}${path}`, { headers: { Authorization: `Bearer ${token}` } })).json();
+  const [courseCode, batchCode] = batch.split(" · ");
+  const course = ((await get("/api/v1/courses")) as { id: string; code: string }[]).find(c => c.code === courseCode)!;
+  const found = ((await get("/api/v1/batches")) as { id: string; courseId: string; code: string }[])
+    .find(b => b.courseId === course.id && b.code === batchCode)!;
+  const at = (time: string) => new Date(Date.parse(`${date}T${time}:00+05:30`)).toISOString();
+  const created = await fetch(`${apiBase}/api/v1/class-sessions`, { method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ title, startsAt: at(start), endsAt: at(end), timeZone: "Asia/Colombo", batchIds: [found.id],
+      zoomWebinarId: webinar ? webinar.replace(/\s/g, "") : null }) });
+  expect(created.status, await created.clone().text()).toBe(201);
+  return ((await created.json()) as { id: string }).id;
+}
+
 test("an administrator onboards a student end to end on the real stack", async ({ page, browser }) => {
   expect(adminInvite, "LUMA_REAL_ADMIN_INVITE").toBeTruthy();
 
@@ -68,7 +114,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   const secret = (await page.locator("code.mfa-secret").innerText()).replace(/\s/g, "");
   adminSecret = secret;
   lastAdminStep = Math.floor(Date.now() / 30_000);
-  await page.fill("#code", totp(secret));
+  await page.fill("#code", totp(secret, lastAdminStep * 30_000));
   await page.getByRole("button", { name: "Verify and save" }).click();
   await expect(page).toHaveURL(/\/sign-in\/mfa\/recovery-codes/);
   await page.getByLabel("I have safely saved or written down these recovery codes").check();
@@ -212,29 +258,17 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.getByRole("button", { name: "Assign" }).click();
   await expect(page.locator("#assign-feedback")).toHaveText("Assigned. They can open this roster from their next request.");
 
-  // 7b. A class for the batch, entered in Sri Lanka time; the API stores UTC.
-  await page.goto("/staff/sessions");
-  await page.locator("#schedule-title").fill("Real stack class");
-  await page.locator("#schedule-date").fill("2027-01-13");
-  await page.locator("#schedule-start").fill("18:00");
-  await page.locator("#schedule-end").fill("20:00");
-  await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel("REAL-PHY · MON · Monday evening", { exact: true }).check();
-  await page.locator("#schedule-webinar").fill("812 3456 7890");
-  await page.getByRole("button", { name: "Schedule class" }).click();
-  await expect(page.locator("#schedule-feedback")).toHaveText("Real stack class scheduled.");
-  await page.getByRole("link", { name: "Open the class →" }).click();
-  await expect(page).toHaveURL(/\/staff\/sessions\/[0-9a-f-]{36}$/);
+  // 7b. A class for the batch (history: classes now come from Zoom runs, so it is created through the API), in Sri Lanka
+  // time; the API stores UTC. The class page has no edit or cancel controls.
+  const classId = await createClass("Real stack class", "2027-01-13", "18:00", "20:30", "REAL-PHY · MON · Monday evening", "812 3456 7890");
+  await page.goto(`/staff/sessions/${classId}`);
   const classUrl = page.url();
-  await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:00 (Asia/Colombo)");
+  await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
   await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
-  // The seeded Zoom occurrence on this webinar at 18:20 was linked as soon as the class was scheduled.
+  // The seeded Zoom occurrence on this webinar at 18:20 was linked as soon as the class existed.
   const zoomLinks = page.getByRole("region", { name: "Zoom occurrences linked" });
   await expect(zoomLinks.getByRole("listitem").locator(".status")).toHaveText(["Linked automatically"]);
-  await page.locator("#edit-end").fill("20:30");
-  await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.locator("#edit-feedback")).toHaveText("Saved. Expected students and automatic Zoom links follow the new date, time and webinar.");
-  await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
-  await expect(zoomLinks.getByRole("listitem").locator(".status")).toHaveText(["Linked automatically"], { timeout: 1000 });
+  await expect(page.getByRole("button", { name: /Save changes|Cancel class/ })).toHaveCount(0);
 
   // 7b'. The student sees the class and their batch in the student portal.
   const studentAgain = await browser.newContext();
@@ -250,22 +284,10 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(portal.getByRole("region", { name: "MY BATCHES" })).toContainText("from 12 Jan 2027");
   await studentAgain.close();
 
-  // 7b''. A weekly series on the real API: Mondays in early March, entered in Sri Lanka time.
+  // 7b''. LUMA no longer schedules classes or weekly series: the Classes page points to Zoom webinar monitoring.
   await page.goto("/staff/sessions");
-  const seriesForm = page.locator("form", { has: page.locator("#series-title") });
-  await page.locator("#series-title").fill("Real series");
-  await page.locator("#series-first").fill("2027-03-01");
-  await page.locator("#series-last").fill("2027-03-14");
-  await seriesForm.getByLabel("Mon", { exact: true }).check();
-  await page.locator("#series-start").fill("18:00");
-  await page.locator("#series-end").fill("20:00");
-  await seriesForm.getByLabel("REAL-PHY · MON · Monday evening", { exact: true }).check();
-  await page.getByRole("button", { name: "Preview classes" }).click();
-  await expect(page.locator("#series-feedback")).toHaveText("2 classes, 1 Mar 2027 – 8 Mar 2027. Nothing has been created yet.");
-  await page.getByRole("button", { name: "Create 2 classes" }).click();
-  await expect(page.locator("#series-feedback")).toHaveText("Created 2 classes, 1 Mar 2027 – 8 Mar 2027.");
-  await page.goto("/staff/sessions?from=2027-03-01");
-  await expect(page.locator(".dir-course").filter({ hasText: "Real series" }).first()).toContainText("Mon 1 Mar 2027 · 18:00–20:00");
+  await expect(page.locator("#schedule-title, #series-title")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "WHERE CLASSES COME FROM" })).toContainText("Zoom owns the schedule");
 
   // 7c. Zoom review against the seeded occurrences: scheduling the class already linked the one
   // on its webinar and time (re-running the matcher finds nothing more); the other occurrence is
@@ -276,7 +298,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(auto.locator(".status")).toHaveText("Linked automatically");
   await expect(manual.locator(".status")).toHaveText("Needs review");
   await page.getByRole("button", { name: "Run automatic linking" }).click();
-  // The other one waiting is the seeded past run (9 Mar 2026), which step 12 links by scheduling its class.
+  // The other one waiting is the seeded past run (9 Mar 2026), which step 12 links by creating its class.
   await expect(page.locator(".autolink-feedback")).toHaveText("Linked 0 occurrences; 2 still need review.");
   await expect(auto.locator(".status")).toHaveText("Linked automatically");
   await expect(auto.getByRole("link", { name: /^Real stack class, Wed 13 Jan 2027/ })).toBeVisible();
@@ -425,17 +447,8 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator("#enroll-feedback")).toHaveText("Enrolled.");
   const studentRecord = page.url();
 
-  await page.goto("/staff/sessions");
-  await page.locator("#schedule-title").fill("Past real class");
-  await page.locator("#schedule-date").fill("2026-03-09");
-  await page.locator("#schedule-start").fill("18:00");
-  await page.locator("#schedule-end").fill("20:00");
-  await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel("REAL-PHY · PAST · Past term", { exact: true }).check();
-  await page.locator("#schedule-webinar").fill("833 0001 1100");
-  await page.getByRole("button", { name: "Schedule class" }).click();
-  await expect(page.locator("#schedule-feedback")).toHaveText("Past real class scheduled.");
-  await page.getByRole("link", { name: "Open the class →" }).click();
-  await expect(page).toHaveURL(/\/staff\/sessions\/[0-9a-f-]{36}$/);
+  const pastClassId = await createClass("Past real class", "2026-03-09", "18:00", "20:00", "REAL-PHY · PAST · Past term", "833 0001 1100");
+  await page.goto(`/staff/sessions/${pastClassId}`);
   const pastClass = page.url();
 
   // The run linked itself; its people are matched by sign-in email; the guest waits for review.
@@ -502,7 +515,7 @@ async function signInAdmin(page: Page) {
   // A code is accepted once: wait for the next 30-second step after the last one used.
   while (Math.floor(Date.now() / 30_000) <= lastAdminStep) await page.waitForTimeout(1_000);
   lastAdminStep = Math.floor(Date.now() / 30_000);
-  await page.fill("#code", totp(adminSecret));
+  await page.fill("#code", totp(adminSecret, lastAdminStep * 30_000));
   await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
@@ -557,17 +570,9 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await settings.getByRole("button", { name: "Save engagement settings" }).click();
   await expect(page.locator("#engagement-feedback")).toHaveText("Engagement is on. Students are asked for consent in their portal.");
   const from = colombo(-15), to = colombo(60);
-  await page.goto("/staff/sessions");
-  await page.locator("#schedule-title").fill("Live acceptance class");
-  await page.locator("#schedule-date").fill(from.date);
-  await page.locator("#schedule-start").fill(from.time);
-  if (to.date !== from.date) test.skip(true, "a class across midnight cannot be entered; run again later");
-  await page.locator("#schedule-end").fill(to.time);
-  await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel("REAL-PHY · PAST · Past term", { exact: true }).check();
-  await page.getByRole("button", { name: "Schedule class" }).click();
-  await expect(page.locator("#schedule-feedback")).toHaveText("Live acceptance class scheduled.");
-  await page.getByRole("link", { name: "Open the class →" }).click();
-  await expect(page).toHaveURL(/\/staff\/sessions\/[0-9a-f-]{36}$/);
+  if (to.date !== from.date) test.skip(true, "a class across midnight cannot be created in one day; run again later");
+  const liveClassId = await createClass("Live acceptance class", from.date, from.time, to.time, "REAL-PHY · PAST · Past term");
+  await page.goto(`/staff/sessions/${liveClassId}`);
   const liveClass = page.url();
 
   await student.reload();

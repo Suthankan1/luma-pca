@@ -5,14 +5,14 @@ import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
 import { AppealForm } from "@/components/AppealForm";
 import { ConsentForm } from "@/components/StudentEngagement";
-import { formatClassTime, formatDate, classOpenForEngagement, classPhase, formatDuration, outcomeLabels, sessionWindow, type AttendanceRecordView, type MyConsent } from "@/lib/staff-forms";
+import { classTimeLabel, formatClassTime, formatDate, classOpenForEngagement, classPhase, isLiveRun, formatDuration, outcomeLabels, sessionWindow, type AttendanceRecordView, type MyConsent } from "@/lib/staff-forms";
 import { Kpis } from "@/components/insights/Kpis";
 import { formatClock, formatDay, level, presets, renderTime, type StudentOverview } from "@/lib/insights";
 import { academyToday } from "@/lib/staff-forms";
 
 type MyEnrollment = { id: string; batchCode: string; batchName: string; enrolledOn: string; withdrawnOn: string | null; status: string };
 type MyClass = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
-  batches: { batchId: string; code: string; name: string }[]; joinUrl?: string | null };
+  batches: { batchId: string; code: string; name: string }[]; joinUrl?: string | null; origin?: string | null };
 
 /** "in 2 days", "in 3 h", "in 25 min" until a class starts. */
 function startsIn(startsAt: string, now = Date.now()) {
@@ -66,7 +66,8 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
       {next ? <div className="next-class-body">
         <div>
           <p className="next-class-title">{next.title}</p>
-          <p className="next-class-when">{formatDay(next.startsAt, next.timeZone)} · {formatClock(next.startsAt, next.timeZone)}–{formatClock(next.endsAt, next.timeZone)}
+          <p className="next-class-when">{formatDay(next.startsAt, next.timeZone)} · {isLiveRun(next, now)
+            ? `started ${formatClock(next.startsAt, next.timeZone)}` : `${formatClock(next.startsAt, next.timeZone)}–${formatClock(next.endsAt, next.timeZone)}`}
             {!nextLive && <span> · {startsIn(next.startsAt, now)}</span>}
             {next.batches.length > 0 && <span> · {next.batches.map(b => b.code).join(", ")}</span>}</p>
         </div>
@@ -101,7 +102,7 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
             {classes.data.map(c => <li key={c.id} className="dir-row dir-course" aria-label={c.title}>
               <div>
                 <strong>{c.title}</strong>
-                <span className="dir-dates muted"> {formatClassTime(c.startsAt, c.endsAt, c.timeZone)} ({c.timeZone})</span>
+                <span className="dir-dates muted"> {classTimeLabel(c, now)} ({c.timeZone})</span>
                 <div className="dir-dates muted">{c.batches.map(batch => batch.code).join(", ")}</div>
               </div>
               <span className="dir-meta">

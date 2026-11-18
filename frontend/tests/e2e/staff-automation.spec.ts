@@ -1,3 +1,4 @@
+import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
 async function signInStaff(page: Page, email: string) {
@@ -18,55 +19,70 @@ test.describe("Less manual work for staff", () => {
     p = (testInfo.project.name === "mobile" ? "am" : "ad") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
-  test("Upcoming Zoom webinars become classes in one step, never twice", async ({ page }) => {
+  test("A webinar is monitored by its ID alone; Zoom's schedule is read-only and an early start is live at once", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "One mock Zoom account: monitored once");
     await signInStaff(page, "admin-enrolled@example.invalid");
-    const C = `IMP-${p.toUpperCase()}`;
-    await page.goto("/staff/courses");
-    await page.locator("#course-code").fill(`imp-${p}`);
-    await page.locator("#course-title").fill("Import course");
-    await page.getByRole("button", { name: "Create course" }).click();
-    await page.locator("#batch-course").selectOption({ label: `${C} · Import course` });
-    await page.locator("#batch-code").fill("a");
-    await page.locator("#batch-name").fill("Batch A");
-    await page.locator("#batch-starts").fill("2027-01-01");
-    await page.getByRole("button", { name: "Create batch" }).click();
+    await page.goto("/staff/webinars");
+    await expect(page.getByRole("heading", { name: "Webinars", level: 1 })).toBeVisible();
+    // Only one field: the webinar ID or link. No title, date, time or recurrence to type.
+    const add = page.getByRole("region", { name: "MONITOR A WEBINAR" });
+    await expect(add.getByRole("textbox")).toHaveCount(1);
+    await expect(add.locator("input[type=date], input[type=time], select")).toHaveCount(0);
 
+    await add.getByLabel("Zoom webinar ID or join link").fill("https://zoom.us/webinar/register/WN_abc");
+    await add.getByRole("button", { name: "Monitor webinar" }).click();
+    await expect(add.locator(".session-error")).toContainText("ID");
+    await add.getByLabel("Zoom webinar ID or join link").fill("844 9999 9999");
+    await add.getByRole("button", { name: "Monitor webinar" }).click();
+    await expect(add.locator(".session-error")).toContainText("not in the academy’s Zoom account");
+
+    await add.getByLabel("Zoom webinar ID or join link").fill("https://us02web.zoom.us/j/84400000001?pwd=x");
+    await add.getByRole("button", { name: "Monitor webinar" }).click();
+    await expect(add.locator(".form-ok")).toContainText("Monitoring “A/L Physics 2027”");
+
+    // Zoom started it about two hours before its scheduled time: live now, from the actual start.
+    await page.reload();
+    const live = page.getByRole("listitem", { name: "Live A/L Physics 2027" });
+    await expect(live).toContainText("Connected now12");
+    await expect(live).toContainText(/Running for\s*25 min/);
+    await expect(live.locator("dd").nth(1)).not.toHaveText(await live.locator("dd").nth(0).innerText());
+
+    const card = page.getByRole("listitem", { name: "Webinar 844 0000 0001" });
+    await expect(card).toContainText("A/L Physics 2027");
+    await expect(card).toContainText("(Asia/Colombo)");
+    await expect(card.locator(".occurrences li")).toHaveCount(3);
+    await expect(card).toContainText("Academy class: A/L Physics 2027 (matches the Zoom title)");
+    await card.getByText(/^Runs \(2\)$/).click();
+    await expect(card.getByRole("listitem").filter({ hasText: "Zoom report in" })).toHaveCount(1);
+    for (const name of ["Save changes", "Schedule class", "Cancel class", "Create classes"]) {
+      await expect(page.getByRole("button", { name })).toHaveCount(0);
+    }
+
+    // A webinar with no fixed time in Zoom: nothing is invented.
+    await add.getByLabel("Zoom webinar ID or join link").fill("84400000002");
+    await add.getByRole("button", { name: "Monitor webinar" }).click();
+    const office = page.getByRole("listitem", { name: "Webinar 844 0000 0002" });
+    await expect(office).toContainText("Recurring, no fixed time in Zoom");
+    await expect(office.locator(".class-note")).toContainText("Academy class unresolved");
+    await office.getByLabel("Academy class").selectOption("Admission");
+    await office.getByRole("button", { name: "Save" }).click();
+    await expect(office.locator(".form-ok")).toHaveText("Academy class set to “Admission”.");
+    await office.getByRole("button", { name: "Stop monitoring Office hours" }).click();
+    await expect(office.locator(".form-ok")).toContainText("The Zoom webinar is unchanged");
+    await expect(office).toContainText("Not monitored");
+
+    // The run's class is listed as live, with no invented end time.
     await page.goto("/staff/sessions");
-    await page.getByRole("link", { name: "Import classes from your Zoom webinars →" }).click();
-    await expect(page).toHaveURL(/\/staff\/zoom\/import$/);
-    const list = page.getByRole("region", { name: "UPCOMING WEBINARS" });
-    await expect(list.getByRole("listitem", { name: "Webinar 844 0000 0001" })).toContainText("Not in LUMA yet");
-    await expect(list.getByRole("listitem", { name: "Webinar 844 0000 0002" })).toContainText("no fixed time");
-    await page.getByRole("search", { name: "Find a webinar" }).getByLabel("Find a webinar").fill("office");
-    await page.getByRole("search", { name: "Find a webinar" }).getByRole("button", { name: "Search" }).click();
-    await expect(list.getByRole("listitem", { name: /^Webinar / })).toHaveCount(1);
-    await list.getByRole("link", { name: "Office hours" }).click();
-    const office = page.getByRole("region", { name: "Webinar 844 0000 0002" });
-    await expect(office).toContainText("no fixed time");
-    await expect(office).toContainText("not on the server’s webhook allow-list");
-    await page.getByRole("link", { name: "← All upcoming webinars" }).click();
-    await list.getByRole("link", { name: "A/L Physics weekly" }).click();
-    const weekly = page.getByRole("region", { name: "Webinar 844 0000 0001" });
-    await expect(weekly).toContainText("recurring");
-    await expect(weekly).not.toContainText("allow-list");
+    await expect(page.getByRole("listitem").filter({ hasText: "A/L Physics 2027" }).first()).toContainText("live since");
+    await page.goto("/staff/webinars");
+    await expect(page.locator(".live-refresh")).toContainText("while this page is open");
 
-    await weekly.getByRole("button", { name: "Create classes" }).click();
-    await expect(weekly.locator(".import-feedback")).toHaveText("Choose the batch or batches these classes are for.");
-    await weekly.getByLabel("Mon 15 Feb 2027 · 18:00–20:00").uncheck();
-    await weekly.getByLabel(`${C} · A · Batch A`).check();
-    await weekly.getByLabel("Class title").fill("A/L Physics (imported)");
-    await weekly.getByRole("button", { name: "Create classes" }).click();
-    await expect(weekly.locator(".import-feedback")).toHaveText("Created 2 classes.");
-    await expect(weekly.getByLabel("Mon 1 Feb 2027 · 18:00–20:00 · already a class")).toBeDisabled();
-    await expect(weekly.getByLabel("Mon 15 Feb 2027 · 18:00–20:00")).toBeEnabled();
-
-    await page.goto("/staff/zoom/import");
-    await expect(page.getByRole("region", { name: "UPCOMING WEBINARS" }).getByRole("listitem", { name: "Webinar 844 0000 0001" }))
-      .toContainText("2 classes in LUMA");
-    await page.goto("/staff/sessions?from=2027-02-01");
-    await expect(page.getByRole("link", { name: /A\/L Physics \(imported\)/ })).toHaveCount(2);
-    await page.goto("/staff/activity?category=zoom");
-    await expect(page.getByText("Imported 2 classes from Zoom webinar 84400000001").first()).toBeVisible();
+    // The live run's class shows Zoom's schedule beside the actual start.
+    await live.getByRole("link", { name: "Live attendance →" }).click();
+    const run = page.getByRole("region", { name: "ZOOM RUN" });
+    await expect(run).toContainText("Live");
+    await expect(run).toContainText("Zoom’s report");
+    await expect(page.locator(".sub").first()).toContainText("Live now");
   });
 
   test("Ended classes wait in one list and are finalised together; the owner can switch on automatic finalisation", async ({ page }) => {
@@ -100,14 +116,7 @@ test.describe("Less manual work for staff", () => {
     await page.locator("#batch-starts").fill("2026-01-01");
     await page.getByRole("button", { name: "Create batch" }).click();
     await page.goto("/staff/sessions");
-    await page.locator("#schedule-title").fill(`Ended class ${p}`);
-    await page.locator("#schedule-date").fill(yesterday);
-    await page.locator("#schedule-start").fill("09:00");
-    await page.locator("#schedule-end").fill("10:00");
-    await page.locator("form", { has: page.locator("#schedule-title") }).getByLabel(`${C} · A · Batch A`, { exact: true }).check();
-    await page.locator("#schedule-webinar").fill("838 1234 5678");
-    await page.getByRole("button", { name: "Schedule class" }).click();
-    await expect(page.locator("#schedule-feedback")).toHaveText(`Ended class ${p} scheduled.`);
+    await scheduleClass(page, { title: `Ended class ${p}`, date: yesterday, start: "09:00", end: "10:00", batch: `${C} · A · Batch A`, webinar: "838 1234 5678" });
 
     await page.goto("/staff/attendance");
     const waiting = page.getByRole("region", { name: "WAITING TO BE FINALISED" });

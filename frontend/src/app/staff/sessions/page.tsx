@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
-import { ScheduleForm, SeriesForm } from "@/components/staff/SessionForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  batchOptions, formatClassTime, formatDate, isAcademyManager, sessionListHref, sessionWindow, uuidOrNull, type ClassSession, type CourseRef,
+  classTimeLabel,
+  batchOptions, formatDate, isAcademyManager, sessionListHref, sessionWindow, uuidOrNull, type ClassSession, type CourseRef,
 } from "@/lib/staff-forms";
 
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -18,8 +18,8 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   const window = sessionWindow(params.from);
   const batchFilter = uuidOrNull(typeof params.batch === "string" ? params.batch : null);
   const manager = isAcademyManager(identity.roles);
-  const shell = { active: "sessions" as const, crumb: "Timetable", title: "Classes",
-    subtitle: "A class can be shared by several batches; each student is expected once. Classes are cancelled, never deleted.",
+  const shell = { active: "sessions" as const, crumb: "Teaching", title: "Classes",
+    subtitle: "Every run of a monitored Zoom webinar becomes a class here, timed from Zoom’s actual start. Earlier classes stay on record.",
     hasStudentPortal: hasPortal(identity, "student") };
 
   const query = new URLSearchParams({ from: window.fromInstant, to: window.toInstant });
@@ -44,10 +44,9 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
     </StaffShell>;
   }
   const filterOptions = batchOptions(courses?.ok ? courses.data : [], batches.data, () => true);
-  const scheduleOptions = courses?.ok ? batchOptions(courses.data, batches.data, batch => batch.active) : [];
 
   return <StaffShell {...shell}>
-    {!manager && <p className="banner">Only academy owners and administrators schedule classes. You see classes for the batches you are assigned to.</p>}
+    {!manager && <p className="banner">You see the classes of the batches you are assigned to.</p>}
     <div className={manager ? "staff-grid" : undefined}>
       <section className="panel" aria-labelledby="classes-title">
         <h2 id="classes-title" className="panel-title">CLASSES</h2>
@@ -70,19 +69,20 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
           {sessions.data.map(session => <li key={session.id} className="dir-row dir-course">
             <div>
               <Link className="text-link" href={`/staff/sessions/${session.id}`}><strong>{session.title}</strong></Link>
-              <span className="dir-dates muted"> {formatClassTime(session.startsAt, session.endsAt, session.timeZone)}</span>
+              <span className="dir-dates muted"> {classTimeLabel(session)}</span>
               <div className="dir-dates muted">{session.batches.map(batch => batch.code).join(", ")}</div>
             </div>
-            <span className={`status ${session.status === "SCHEDULED" ? "on" : "off"}`}>{session.status === "SCHEDULED" ? "Scheduled" : "Cancelled"}</span>
+            <span className={`status ${session.status === "SCHEDULED" ? "on" : "off"}`}>{session.status !== "SCHEDULED" ? "Cancelled"
+              : session.origin === "ZOOM_RUN" ? "Zoom run" : "Scheduled before"}</span>
           </li>)}
           {sessions.data.length === 0 && <li className="dir-empty muted">No classes in these two weeks.</li>}
         </ul>
       </section>
-      {manager && <section className="panel" aria-labelledby="new-class-title">
-        <h2 id="new-class-title" className="panel-title">NEW CLASS</h2>
-        <p className="link-row"><Link className="text-link" href="/staff/zoom/import">Import classes from your Zoom webinars →</Link></p>
-        <ScheduleForm batches={scheduleOptions} />
-        <SeriesForm batches={scheduleOptions} />
+      {manager && <section className="panel" aria-labelledby="where-title">
+        <h2 id="where-title" className="panel-title">WHERE CLASSES COME FROM</h2>
+        <p className="panel-sub">Zoom owns the schedule. LUMA does not create, move or cancel classes: monitor a webinar by its ID or link and each
+          run Zoom starts (early, late or unscheduled) is recorded as a class, with attendance from its actual start.</p>
+        <p className="link-row"><Link className="action" href="/staff/webinars">Webinars →</Link></p>
       </section>}
     </div>
   </StaffShell>;

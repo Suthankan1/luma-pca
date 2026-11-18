@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { importStudents, type ImportOutcome } from "@/app/staff/students/actions";
 import { parseStudentCsv, type ImportRow } from "@/lib/student-import";
 
@@ -21,6 +21,13 @@ export function StudentImportForm({ batches, today }: { batches: { id: string; l
   const key = file ? `${file.name}|${file.rows.length}|${batchId}|${batchId ? enrolledOn : ""}` : "";
   const checkedClean = outcome?.ok && outcome.dryRun && outcome.problems.length === 0 && outcome.key === key;
   const batchLabel = batches.find(batch => batch.id === batchId)?.label;
+
+  const input = useRef<HTMLInputElement>(null);
+  // A file chosen before the page finished loading (a slow phone) fired its change event before React listened: pick it up.
+  useEffect(() => {
+    const early = input.current?.files?.[0];
+    if (early) void choose(early);
+  }, []);
 
   async function choose(chosen: File | undefined) {
     setOutcome(null);
@@ -54,7 +61,7 @@ export function StudentImportForm({ batches, today }: { batches: { id: string; l
   return <form className="session-form staff-form" onSubmit={event => { event.preventDefault(); send(!checkedClean); }}
     aria-describedby="import-feedback">
     <label htmlFor="import-file">CSV file</label>
-    <input id="import-file" type="file" accept=".csv,text/csv" required onChange={event => choose(event.target.files?.[0])} />
+    <input id="import-file" ref={input} type="file" accept=".csv,text/csv" required onChange={event => choose(event.target.files?.[0])} />
     <p className="panel-sub">Save the spreadsheet as CSV. The first line names the columns: student number, full name, email (other columns are ignored). Up to 1,000 students per file.</p>
     {fileError && <p id="import-feedback" className="session-error" role="alert">{fileError}</p>}
     {file && <p className="panel-sub">{file.name}: {file.rows.length} student{file.rows.length === 1 ? "" : "s"} found.</p>}

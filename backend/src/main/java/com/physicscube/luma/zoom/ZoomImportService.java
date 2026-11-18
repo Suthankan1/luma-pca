@@ -35,6 +35,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ZoomImportService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.physicscube.luma.sessions.ManualScheduling manualScheduling;
     /** A class counts as the same run when it starts within this of Zoom's start time. */
     static final Duration SAME_RUN = Duration.ofMinutes(30);
     static final Duration HORIZON = Duration.ofDays(120);
@@ -131,6 +133,7 @@ public class ZoomImportService {
     @org.springframework.transaction.annotation.Transactional
     public ImportResult importRuns(CurrentAccount caller, String webinarId, List<UUID> batchIds, List<String> occurrenceIds, String title) {
         caller.requireAcademyManager();
+        manualScheduling.require();
         if (webinarId == null || !webinarId.replaceAll("[\\s-]", "").matches("[0-9]{9,20}")) {
             throw new InvalidRequestException("webinarId must be a Zoom webinar ID");
         }
