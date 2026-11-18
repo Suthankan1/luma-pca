@@ -34,6 +34,7 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
     <p className="sub">{me.ok
       ? <>Signed in as <strong>{me.data.fullName}</strong> · student ID <strong>{me.data.studentNumber}</strong></>
       : "You’re signed in to Physics Cube Academy."}</p>
+    <p className="link-row"><Link className="action" href="/student/attendance">My attendance →</Link></p>
     {!enrollments.ok || !classes.ok
       ? <p className="session-error" role="alert">We couldn’t load your classes right now. Please reload the page shortly.</p>
       : <>

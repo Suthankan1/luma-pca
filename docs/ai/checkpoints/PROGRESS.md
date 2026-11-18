@@ -2133,3 +2133,30 @@ build runs the Next.js default bundler and repeats the smoke test.
   - Backend: bulk invitations never email the `@students.academy.invalid` placeholders (`StudentInvitationHttpIntegrationTest`).
   - Fixed the CI failure: the sync test now drops its synthetic schema and role, which the backup/restore test was tripping on.
 - **Tests:** unit 62 (new `academy.test.mjs`), Playwright `academy-classes.spec.ts`, full suite below, lint, build.
+
+## Checkpoint ATT-DASH — 2026-11-18 — Attendance dashboards (staff and student), redesigned around the Academy's request
+
+- **Same branch / PR #108.** The Academy found the existing screens hard to use; they asked for one place showing student
+  ID, name, time in the webinar and attendance, filterable by course, with leave/rejoin detail per student.
+- **Backend:**
+  - `AttendanceInsightsService` with `GET /api/v1/attendance/dashboard` (course or batch, 1-92 days), which returns totals,
+    classes, students and per-class cells.
+  - `GET /api/v1/students/{id}/attendance-overview` and `GET /api/v1/me/attendance-overview` return courses and batches,
+    totals per batch, and every class with its connection timeline.
+  - Same facts as the class page: Zoom's report when fetched, else live events. Rejoins are merged and clipped to the class;
+    once finalised, the final record's time and outcome are used.
+  - At most 80 classes, computed 6 at a time.
+- **Web:**
+  - New **Dashboard** (nav 02): course and batch filters, quick periods and dates, and headline tiles (classes, students,
+    average attendance against the rule, below the rule, connected now).
+  - Three views: **Students** (search, show below-rule or never-joined, sort, a bar per student, opens the student page),
+    **Classes**, and **Grid** (students × classes heat map).
+  - **Student page** (`/staff/students/{id}/attendance`): tiles, courses and batches with each one's attendance, and class
+    cards that expand into a timeline bar and the list of joins, leaves and "away 10 min, then rejoined".
+  - **My attendance** for students (`/student/attendance`) uses the same layout. On phones the tables become cards.
+  - "Overview" is renamed "Today", and it links to the dashboard.
+- **Tests:**
+  - `AttendanceInsightsIntegrationTest` (4): the Academy's 25 + 25 + 20 = 70-minute example with an overlapping duplicate,
+    58%, 3 rejoins, filters, the student's own view, 403/404 isolation and the 92-day limit.
+  - Unit tests: `insights.test.mjs`.
+  - Playwright `attendance-dashboard.spec.ts` (4 × 2 projects). Full suite 144 passed, 2 skipped by design.

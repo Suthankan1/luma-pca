@@ -3,7 +3,8 @@ import { LinkPending } from "./LinkPending";
 import type { ReactNode } from "react";
 
 export const staffNav = [
-  { key: "overview", label: "Overview", href: "/staff" },
+  { key: "overview", label: "Today", href: "/staff" },
+  { key: "dashboard", label: "Dashboard", href: "/staff/dashboard" },
   { key: "academy", label: "Academy classes", href: "/staff/academy" },
   { key: "courses", label: "Courses & batches", href: "/staff/courses" },
   { key: "sessions", label: "Classes", href: "/staff/sessions" },
