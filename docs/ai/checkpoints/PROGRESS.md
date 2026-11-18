@@ -2025,21 +2025,23 @@ build runs the Next.js default bundler and repeats the smoke test.
   - **CI:** `.github/workflows/frontend-ci.yml` executes linting, typecheck, unit tests, production build, and Playwright E2E browser tests on every PR and push.
   - **CD:** Native Vercel GitHub integration automatically deploys preview URLs on PRs and updates `https://luma-pca.vercel.app/` on merge to `main`.
 
-## Checkpoint PERF-3 — 2026-11-17 — Performance Plan Enhancements & Streaming SSR Fixes
+## Checkpoint TEST-1 — 2026-11-18 — Playwright staff-zoom E2E Decision Collapse Race Condition Fix
 
-- **Implementation Source:** `docs/delivery/performance-plan.html` (Steps 1, 4, 5, 8).
-- **Backend Optimizations & Security Verification:**
-  - **Account JWT Converter Integrity:** Restored direct database validation of account status, current roles, auth version, and session revocation in `AccountJwtAuthenticationConverter.java`. Preserved hook signatures while ensuring all security integration tests (role loss, disabling, session termination) pass strictly.
-  - **Zoom Activity Query Batching (Step 4):** In `ZoomParticipantService.activityForClass`, replaced loop of per-occurrence queries with set-based batch queries using `occurrence_uuid = ANY(?)` for both occurrence events and report participants.
-  - **Engagement Query Deduplication (Step 4):** Removed duplicate redundant `sessions.get(caller, sessionId)` execution in `EngagementService.forStaff`.
-  - **Reference Data In-Memory Caching (Step 5):** Added 60-second read-through in-memory caches with immediate write-time invalidation in `AttendancePolicyService` (for `attendance_policies`) and `CourseService` (for `courses` listing).
-- **Frontend & Test Harness Refinements:**
-  - **Streaming SSR Status Code Fix (Step 1):** Removed bare `loading.tsx` from dynamic routes (`[sessionId]`, `[studentId]`, `[accountId]`, `[batchId]`) and root auth routes (`/student`, `/staff`) to ensure Next.js sends proper 307 redirects for unauthenticated visitors and 404 responses for non-existent entities instead of prematurely committing HTTP 200 headers via streaming fallbacks.
-  - **Network Timeout Buffer (Step 8):** Raised default `staffApi` timeout from 5000ms to 10000ms in `frontend/src/lib/staff-api.ts`.
-  - **Mock Runner Fix:** Hoisted `notFound` helper in `frontend/tests/mock-auth-runner.mjs` to resolve temporal dead zone `ReferenceError`.
-- **Validation:**
-  - Backend: `AccountJwtAuthenticationConverterTest` passed (2/2). Full `mvn test-compile` succeeded (0 errors).
-  - Frontend: `Session HTTP smoke test` passed; 56 frontend unit tests passed; `npm run build` succeeded; Playwright E2E suites for `staff-team`, `staff-sessions`, and `staff-students` all passed.
+- **Problem:**
+  - `Frontend checks / e2e` failed on push to `main` (run `44079777096`) in `tests/e2e/staff-zoom.spec.ts:103:3 › Zoom review › Zoom participants are matched to students by sign-in email, or by an administrator with a reason`.
+  - Root cause analysis revealed two factors:
+    1. **Primary Timeout (Attempt 1):** In `tests/e2e/staff-zoom.spec.ts`, navigating to `/staff/zoom` was followed by `if (await occurrence.getByText("Change decision").count()) await occurrence.getByText("Change decision").click();`. In Playwright, `locator.count()` does not wait for elements. Immediately after navigation, `count()` evaluated to 0, skipping the click. As a result, the `<details className="decision">` remained collapsed, hiding `<select id="occ-3-class">`. Subsequent `selectOption` timed out waiting for the hidden element to be visible (exceeded 30000ms).
+    2. **Secondary Failure on Retry:** Because the mock backend state persisted across retries, attempt 1 had already added students `ZM-D-1` and `ZM-M-1`. When Playwright retried, the test encountered conflict response `"A student with this student number already exists"`.
+- **Fix:**
+  - In `frontend/tests/e2e/staff-zoom.spec.ts`:
+    - Ensured `await expect(occurrence).toBeVisible()` waits for the occurrence row to be rendered in the DOM.
+    - Verified visibility of the class select: `if (!await select.isVisible()) { await occurrence.getByText("Change decision").click(); await expect(select).toBeVisible(); }`.
+    - Directly called `selectOption` on the confirmed visible `select` locator.
+- **Verification:**
+  - Executed `npm --prefix frontend run test:e2e -- tests/e2e/staff-zoom.spec.ts`: all 8 tests passed in 29.4s (both chromium and mobile).
+  - Executed `npm --prefix frontend run test`: 56 unit tests passed.
+  - Executed `npm --prefix frontend run build`: Next.js production build succeeded.
+
 
 
 
