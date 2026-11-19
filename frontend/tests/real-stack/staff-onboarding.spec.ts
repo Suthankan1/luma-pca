@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test, expect, devices, type Browser, type Page } from "@playwright/test";
+import { openSection } from "../e2e/support/ui";
 
 /**
  * Real stack, real browser: an administrator activates their invitation, enrols an
@@ -140,6 +141,7 @@ test("an administrator onboards a student end to end on the real stack", async (
 
   // 4. Student, invitation and enrolment.
   await page.goto("/staff/students");
+  await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill("pca-real-001");
   await page.locator("#student-name").fill("Real Stack Student");
   await page.locator("#student-email").fill("real.student@example.invalid");
@@ -215,6 +217,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.goto("/staff/courses");
   await page.getByRole("link", { name: /MON/ }).first().click();
   const invitePanel = page.getByRole("region", { name: "INVITE BY EMAIL" });
+  await openSection(invitePanel, "Email sign-in links");
   await invitePanel.getByRole("button", { name: "Check who will be emailed" }).click();
   await expect(invitePanel.locator("#bulk-invite-feedback")).toHaveText("2 students will be emailed. Nothing has been sent yet.");
   await invitePanel.getByRole("button", { name: "Email 2 invitations" }).click();
@@ -302,6 +305,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator(".autolink-feedback")).toHaveText("Linked 0 occurrences; 2 still need review.");
   await expect(auto.locator(".status")).toHaveText("Linked automatically");
   await expect(auto.getByRole("link", { name: /^Real stack class, Wed 13 Jan 2027/ })).toBeVisible();
+  await openSection(manual, "Decide");
   await manual.getByLabel("Class").selectOption({ label: "Wed 13 Jan 2027 · 18:00–20:30 · Real stack class" });
   await manual.getByLabel(/^Reason/).fill("Checked against the timetable");
   await manual.getByRole("button", { name: "Link to class" }).click();
@@ -313,6 +317,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   const failed = page.getByRole("region", { name: "FAILED EVENTS" });
   const receipt = failed.getByRole("listitem").filter({ hasText: "Seeded failure for the real-stack test" });
   await expect(receipt).toContainText("Participant left");
+  await openSection(receipt, "Replay this event");
   await receipt.getByLabel(/^Reason/).fill("Parser fixed");
   await receipt.getByRole("button", { name: "Replay" }).click();
   await expect(failed).toContainText("No failed events.");
@@ -460,7 +465,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(people.getByRole("listitem", { name: "real.guest@example.invalid" }).locator(".status")).toHaveText("Not matched");
 
   // The owner records the rule; the class is final from Zoom's report: 6 540 s of 7 200 s, first join 18:06 → present.
-  await page.goto("/staff/attendance");
+  await page.goto("/staff/attendance?section=settings");
   await page.locator("#policy-percent").fill("75");
   await page.locator("#policy-late").fill("10");
   await page.locator("#policy-description").fill("Approved for the real-stack run");
@@ -498,7 +503,8 @@ test("an administrator onboards a student end to end on the real stack", async (
   await portalAgain.fill("#password", newPassphrase);
   await portalAgain.getByRole("button", { name: "Sign in" }).click();
   await expect(portalAgain).toHaveURL(/\/student$/);
-  await expect(portalAgain.getByRole("region", { name: "MY ATTENDANCE" }).getByRole("listitem", { name: "Attendance Past real class" })
+  await portalAgain.goto("/student/attendance");
+  await expect(portalAgain.getByRole("region", { name: "FINAL ATTENDANCE AND APPEALS" }).getByRole("listitem", { name: "Attendance Past real class" })
     .locator(".status")).toHaveText("Excused");
   await finalStudent.close();
   await page.goto("/staff/activity?category=classes");
@@ -547,7 +553,8 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
 
   // UAT 11: the student appeals the corrected class; an administrator accepts it as Present.
   let student = await signInStudent(browser);
-  const record = student.getByRole("region", { name: "MY ATTENDANCE" }).getByRole("listitem", { name: "Attendance Past real class" });
+  await student.goto("/student/attendance");
+  const record = student.getByRole("region", { name: "FINAL ATTENDANCE AND APPEALS" }).getByRole("listitem", { name: "Attendance Past real class" });
   await record.getByText("Appeal this").click();
   await record.getByLabel("What should the academy know?").fill("I was in class for the whole session; the note was for another day.");
   await record.getByRole("button", { name: "Send appeal" }).click();
@@ -565,6 +572,7 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await expect(record).toContainText("appeal accepted");
 
   // UAT 12: the owner switches engagement on; the student agrees (named in rankings) and reacts during a running class.
+  await page.goto("/staff/attendance?section=settings");
   const settings = page.getByRole("region", { name: "ENGAGEMENT" });
   await settings.getByLabel("Engagement is on").check();
   await settings.getByRole("button", { name: "Save engagement settings" }).click();
@@ -575,7 +583,7 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await page.goto(`/staff/sessions/${liveClassId}`);
   const liveClass = page.url();
 
-  await student.reload();
+  await student.goto("/student");
   const panel = student.getByRole("region", { name: "REACTIONS AND QUESTIONS" });
   await panel.getByLabel("Staff may also see my name in engagement rankings").check();
   await panel.getByRole("button", { name: "I agree" }).click();
@@ -610,6 +618,7 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   // UAT 15: the batch's top 10 names only the consenting, opted-in student.
   await page.getByRole("link", { name: "Roster →" }).first().click();
   const ranking = page.getByRole("region", { name: "ENGAGEMENT RANKING" });
+  await openSection(ranking, "engagement ranking");
   await ranking.getByRole("button", { name: "Show ranking" }).click();
   await expect(ranking.getByRole("listitem", { name: "Rank 1" })).toContainText("PCA-REAL-001 Real Stack Student");
   await expect(ranking.getByRole("listitem", { name: /^Rank / })).toHaveCount(1);
