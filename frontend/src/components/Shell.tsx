@@ -44,16 +44,19 @@ export function Shell({ children, active, otherPortal, studentSection }: {
       <main className="content staff-content">{children}</main>
     </div>;
   }
-  return <div className="shell">
-    <aside className="aside" aria-label="Academy navigation">
-      <Link href="/" className="brand"><span className="brandmark" aria-hidden>◈</span> luma.</Link>
-      <p className="text-xs tracking-widest text-cyan-200 w-full mt-3 mb-2">PHYSICS CUBE ACADEMY</p>
+  return <div className="public-shell">
+    <header className="public-header" aria-label="Academy navigation">
+      <AcademyBrand href="/" />
+      <div className="public-brand-copy"><strong>PHYSICS CUBE</strong><span>ACADEMY · LUMA</span></div>
+      <nav className="public-nav" aria-label="Platform navigation">
       {active === "staff" ? <>
         <Link className="navitem active" aria-current="page" href="/staff">Staff portal</Link>
         {otherPortal && <Link className="navitem" href={`/${otherPortal}`}>Student portal</Link>}
       </> : <Link className={`navitem ${active === "home" ? "active" : ""}`} href="/"
         aria-current={active === "home" ? "page" : undefined}>Platform home</Link>}
-    </aside>
-    <main className="content">{children}</main>
+      </nav>
+    </header>
+    <main className={`public-content ${active === "home" ? "public-home" : "public-auth"}`}>{children}</main>
+    <footer className="public-footer"><span>Physics Cube Academy</span><span>A little more connected.</span></footer>
   </div>;
 }

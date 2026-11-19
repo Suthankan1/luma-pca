@@ -30,7 +30,9 @@ export default async function SignIn({ searchParams }: {
 
   return <Shell>
     <section className={`panel session-panel ${studentIdLoginEnabled() && portal !== "staff" && !identity && !canRefresh ? "session-panel-wide" : ""}`}>
+      <p className="eyebrow">{portal === "staff" ? "STAFF PORTAL" : portal === "student" ? "STUDENT PORTAL" : "PHYSICS CUBE ACADEMY"}</p>
       <h1 className="heading">Sign in to LUMA</h1>
+      <p className="sub">Welcome back. Your academy is right here.</p>
       {message && <p className="session-error" role="alert">{message}</p>}
       {signedOut === "1" && <p className="sub" role="status">You’re signed out.</p>}
       {activated === "1" && <p className="sub" role="status">Your account is active. Sign in with your new password.</p>}

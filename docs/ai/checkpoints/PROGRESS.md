@@ -2350,3 +2350,9 @@ Next: consider collapsing the Team and Courses forms, and enlarging the inline l
 - Verified sign-in in Edge at 1440px and 390px: one decoded logo and no horizontal overflow; inspected the mobile screenshot. ESLint passed. TypeScript verification recorded below after completion.
 - No API, authorization, contracts or diagrams changed. Authenticated staff/student views were not exercised in the browser; both use the same shared logo component. No deployment; rollback is reverting the component/shell/style changes.
 - Typecheck: `npm run typecheck` passed.
+
+## Premium visual refresh — 2026-11-19
+
+- Reworked public `Shell.tsx` into a compact PCA header/footer; redesigned `app/page.tsx` with an editorial hero, CSS orbital illustration and glass portal cards. Added sign-in context in `sign-in/page.tsx`. `globals.css` adds a procedural grain texture, translucent surfaces, restrained entrance/orbit animations and shared portal surface styling. PCA remains the navigation logo.
+- Checks passed: ESLint, TypeScript, Edge browser home at 1440/768/390/320px without horizontal overflow; both student/staff links reached sign-in. Reduced-motion emulation disabled orbital animation. Desktop/mobile screenshots reviewed; fixed clipping on floating illustration notes.
+- No backend/auth contracts changed. Authenticated portal screens and full end-to-end suite not exercised; shared portal changes are surface styling only. No deployment. Rollback: revert this slice's page, shell and CSS changes; no database changes.
