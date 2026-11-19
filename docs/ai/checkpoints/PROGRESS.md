@@ -2334,3 +2334,12 @@ Tests:
 - Real stack: pass.
 
 Next: consider collapsing the Team and Courses forms, and enlarging the inline links on Zoom review.
+
+## Local startup verification — 2026-11-19 (Windows)
+
+- Installed frontend dependencies with `npm ci` (397 packages audited, zero reported vulnerabilities).
+- Stopped the unrelated SwiftDrop frontend/gateway using ports 3000/8080 at the user's request.
+- Started Next.js at http://localhost:3000 and Spring Boot at http://localhost:8080, with isolated local PostgreSQL 17 on port 5433. All 29 local migrations applied; readiness returned UP and frontend HTTP returned 200.
+- Existing root environment points to hosted services. The first backend attempt loaded it and was stopped; subsequent startup explicitly overrides config import and uses local database settings with Academy payments, mail and Zoom integrations disabled.
+- No application code or contracts changed. No full test suite run; verification covers startup and HTTP availability only. Fresh local database has no owner account, so sign-in requires owner bootstrap. Integrations were not verified.
+- No deployment performed. Stop the local development processes/container to roll back; the local database volume persists. Development signing/MFA keys are ephemeral.
