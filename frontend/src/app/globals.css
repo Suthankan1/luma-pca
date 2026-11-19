@@ -400,3 +400,11 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 @media (max-width: 580px) { .kpis-compact { grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; } .kpis-compact .kpi { padding:10px; }
   .kpis-compact .kpi-value { font-size:17px; } .kpis-compact .kpi-note { display:none; } .kpis-compact .kpi-label { font-size:10px; letter-spacing:.2px; } }
 .summary-link { margin:0 0 18px; }
+/* Touch targets (WCAG 2.2 2.5.8): standalone links and small buttons reach at least 24 px; links inside sentences are exempt. */
+.staff-signout { display:inline-block; padding:6px 0; min-height:32px; }
+.dir-row > .text-link, .dir-row > span > .text-link, .dir-row > div > .text-link, .dir-meta .text-link, .link-row .text-link,
+.task-row .text-link, .pager .text-link, .nav-links .text-link { display:inline-block; padding:4px 0; min-height:28px; }
+.decision summary { display:inline-flex; align-items:center; }
+.live-cards, .signin-cards { grid-template-columns:repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
+.entry-cards { grid-template-columns:repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+.live-facts { grid-template-columns:repeat(auto-fit, minmax(min(110px, 100%), 1fr)); }

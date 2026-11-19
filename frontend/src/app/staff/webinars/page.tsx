@@ -45,7 +45,9 @@ function WebinarCard({ m, now, classOptions }: { m: WebinarMonitor; now: number;
       </div>
       <span className="dir-meta">
         {m.live ? <span className="pill pill-live">Live</span> : <span className="state">{m.active ? "Not live" : "Not monitored"}</span>}
-        <span className={`state ${m.classResolved ? "state-final" : "state-warn"}`}>{m.classResolved ? "Class matched" : "Class unresolved"}</span>
+        {/* Students are expected only when the class is matched AND set up as a batch: say which step is missing. */}
+        <span className={`state ${m.classResolved && m.classBatchId ? "state-final" : "state-warn"}`}>{!m.classResolved ? "Class unresolved"
+          : m.classBatchId ? "Class matched" : "Class not set up"}</span>
       </span>
     </div>
     <p className={`class-note ${m.classResolved ? "" : "is-unresolved"}`}>
