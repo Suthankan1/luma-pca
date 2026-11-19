@@ -2307,3 +2307,30 @@ Tests:
 - `WebinarMonitorIntegrationTest`: now 12 tests.
 - Playwright: 147 passed, 3 skipped by design.
 - Real stack: 2/2. Unit tests: 79. Smoke, lint, build: pass.
+
+## Checkpoint UX-1 — 2026-11-19 — Frontend UX overhaul (staff and student)
+
+Branch `feat/luma-frontend-ux-overhaul`, frontend only. No backend contracts changed. Details, audit table and
+screenshots are in `docs/ux/UX-OVERHAUL-2026-11.md`.
+
+- Staff navigation is grouped Overview / Teaching / Academy / Administration. Attendance is one section with tabs
+  (To do · Reports · Batch totals · Rule & settings). `/staff/dashboard` stays as the Reports tab.
+- Today puts live Zoom runs first, then work waiting, today's classes and recently finished runs. The KPI tiles that
+  repeated Reports were removed.
+- Webinar cards show status first; upcoming dates, management and run history are disclosures. Stopped webinars stay
+  listed.
+- Zoom review, Students and batch pages use disclosures. Zoom review dropped from 5046 px to 2683 px on desktop.
+- Student home: the live or next class, a compact summary, then one link to `/student/attendance`, which now holds
+  the final attendance records and their appeals.
+- Outdated texts about "scheduling" or "importing" classes were replaced with the webinar-ID workflow.
+- No horizontal overflow at 1440, 1280, 768, 390 or 320 px. Most touch targets are now at least 24 px.
+
+Tests:
+
+- Lint, typecheck and build: pass.
+- Unit tests: 79 pass.
+- Smoke test: pass.
+- Playwright: 147 passed, 3 skipped by design.
+- Real stack: pass.
+
+Next: consider collapsing the Team and Courses forms, and enlarging the inline links on Zoom review.
