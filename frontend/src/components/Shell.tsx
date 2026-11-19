@@ -57,6 +57,6 @@ export function Shell({ children, active, otherPortal, studentSection }: {
       </nav>
     </header>
     <main className={`public-content ${active === "home" ? "public-home" : "public-auth"}`}>{children}</main>
-    <footer className="public-footer"><span>Physics Cube Academy</span><span>A little more connected.</span></footer>
+    <footer className="public-footer"><span>Physics Cube Academy</span><span>Attendance tracking</span></footer>
   </div>;
 }

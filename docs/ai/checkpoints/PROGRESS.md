@@ -2356,3 +2356,9 @@ Next: consider collapsing the Team and Courses forms, and enlarging the inline l
 - Reworked public `Shell.tsx` into a compact PCA header/footer; redesigned `app/page.tsx` with an editorial hero, CSS orbital illustration and glass portal cards. Added sign-in context in `sign-in/page.tsx`. `globals.css` adds a procedural grain texture, translucent surfaces, restrained entrance/orbit animations and shared portal surface styling. PCA remains the navigation logo.
 - Checks passed: ESLint, TypeScript, Edge browser home at 1440/768/390/320px without horizontal overflow; both student/staff links reached sign-in. Reduced-motion emulation disabled orbital animation. Desktop/mobile screenshots reviewed; fixed clipping on floating illustration notes.
 - No backend/auth contracts changed. Authenticated portal screens and full end-to-end suite not exercised; shared portal changes are surface styling only. No deployment. Rollback: revert this slice's page, shell and CSS changes; no database changes.
+
+## Attendance landing copy cleanup — 2026-11-19
+
+- Simplified `app/page.tsx` to “Track your attendance.” and student/staff sign-in cards. Removed learning-portal messaging, slogans, explanatory paragraphs and orbital illustration. Retained the PCA logo, glass surfaces and textured background. Updated the public footer in `Shell.tsx` and compact landing spacing in `globals.css`.
+- Passed: targeted ESLint; Edge checks at 1440/390/320px for heading, removal of old copy and no horizontal overflow; both portal links reach sign-in.
+- No backend/contracts changed; full suite and authenticated views not rerun. No deployment or database changes; rollback by reverting this slice's UI edits.
