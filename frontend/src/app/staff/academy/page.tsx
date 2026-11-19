@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
+import { Disclosure } from "@/components/Disclosure";
 import { AcademyClassActions } from "@/components/staff/AcademyForms";
 import { requirePortal } from "@/lib/auth-server";
 import { formatSyncedAt, type AcademyClass } from "@/lib/academy";
@@ -73,16 +74,17 @@ export default async function AcademyClassesPage() {
         })}
       </ul>
     </section>
-    <section className="panel" aria-labelledby="how-title">
-      <h2 id="how-title" className="panel-title">HOW IT WORKS</h2>
+    <Disclosure summary="How Academy classes work" className="panel-gap">
       <ul className="panel-sub how-list">
         <li><strong>Set up in LUMA</strong> creates a batch named after the class (course ACADEMY) and enrols its students. Use an
           existing batch instead if the class already has one with history.</li>
         <li><strong>Sync students</strong> adds students who joined the Academy class since. Nobody is removed automatically: students
           who left are listed so you can decide on the batch roster.</li>
-        <li>Then schedule classes for the batch and link their Zoom webinars, or import them from Zoom, as usual.</li>
+        <li>Then add the class’s Zoom webinar under <Link className="text-link" href="/staff/webinars">Webinars</Link> (its ID or link
+          only). When the webinar’s Zoom title matches the Academy class, each run expects these students; otherwise choose the class
+          there.</li>
         <li>LUMA never changes the Academy’s records and never reads its attendance table.</li>
       </ul>
-    </section>
+    </Disclosure>
   </StaffShell>;
 }

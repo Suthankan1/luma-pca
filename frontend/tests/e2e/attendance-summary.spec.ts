@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -33,6 +34,7 @@ test.describe("Attendance summaries", () => {
     await page.getByRole("button", { name: "Create batch" }).click();
     for (const n of ["1", "2"]) {
       await page.goto("/staff/students");
+      await openSection(page, "Add a student who is not in the Academy records");
       await page.locator("#student-number").fill(`${C}-00${n}`);
       await page.locator("#student-name").fill(`Summary Student ${n}`);
       await page.locator("#student-email").fill(`summary.${p}${n}@example.invalid`);
@@ -61,7 +63,7 @@ test.describe("Attendance summaries", () => {
     await expect(rows.first()).toContainText("50%");
     await expect(rows.nth(1)).toContainText("100%");
 
-    await page.goto("/staff/attendance");
+    await page.goto("/staff/attendance?section=totals");
     await expect(page.getByRole("region", { name: "ATTENDANCE BY BATCH" }).getByRole("listitem", { name: `Batch ${C} A` }))
       .toContainText("75%");
 
@@ -72,6 +74,10 @@ test.describe("Attendance summaries", () => {
     await expect(report).not.toContainText(`${C}-001`);
     await expect(report.getByRole("link")).toHaveCount(0);
     await expect(page.getByRole("region", { name: "APPEALS" })).toHaveCount(0);
+    // Analysts read the rule under its own section; they have no to-do list or per-student reports.
+    const sections = page.getByRole("navigation", { name: "Attendance sections" });
+    await expect(sections.getByRole("link", { name: "To do" })).toHaveCount(0);
+    await sections.getByRole("link", { name: "Rule & settings" }).click();
     await expect(page.getByRole("region", { name: "ATTENDANCE RULE" })).toBeVisible();
   });
 });

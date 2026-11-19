@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -23,7 +24,7 @@ test.describe("Attendance rule and final attendance", () => {
 
   test("Only an owner records the academy's rule; other staff read it", async ({ page }) => {
     await signIn(page, "owner-enrolled@example.invalid");
-    await page.goto("/staff/attendance");
+    await page.goto("/staff/attendance?section=settings");
     await page.locator("#policy-late").fill("10");
     await page.locator("#policy-description").fill(`Approved at the staff meeting (${p})`);
     await page.locator("#policy-percent").fill("75");
@@ -36,6 +37,8 @@ test.describe("Attendance rule and final attendance", () => {
     await signIn(page, "admin-enrolled@example.invalid");
     await page.getByRole("link", { name: /Attendance$/ }).first().click();
     await expect(page).toHaveURL(/\/staff\/attendance$/);
+    await expect(page.locator(".rule-line")).toContainText("present from 75% of the class");
+    await page.getByRole("navigation", { name: "Attendance sections" }).getByRole("link", { name: "Rule & settings" }).click();
     await expect(page.locator(".rule-summary")).toContainText("75%");
     await expect(page.getByText("Only an academy owner can record or change the rule.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save rule" })).toHaveCount(0);
@@ -56,6 +59,7 @@ test.describe("Attendance rule and final attendance", () => {
     await expect(page.locator("#batch-feedback")).toHaveText("Batch A created.");
 
     await page.goto("/staff/students");
+    await openSection(page, "Add a student who is not in the Academy records");
     await page.locator("#student-number").fill(`FN-${p.toUpperCase()}-1`);
     await page.locator("#student-name").fill("Final Student");
     await page.locator("#student-email").fill(`final.student${n}@example.invalid`);

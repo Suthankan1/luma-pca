@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -53,6 +54,7 @@ test.describe("Zoom review", () => {
 
     // A manual link needs a reason; a refused one keeps what was typed.
     const weekday = n === "1" ? "Mon" : "Tue";
+    await openSection(manual, "Decide");
     await manual.getByLabel("Class").selectOption({ label: `${weekday} ${n} Mar 2027 · 18:00–20:00 · Zoom class ${p}` });
     await manual.getByLabel(/^Reason/).fill("no");
     await manual.getByRole("button", { name: "Link to class" }).click();
@@ -97,6 +99,7 @@ test.describe("Zoom review", () => {
     await page.goto("/staff/students");
     for (const [number, name, email] of [[`ZM-${P}-1`, "Zoom Student", `zoom.student${n}@example.invalid`],
       [`ZM-${P}-2`, "Guest Student", `guest.student${n}@example.invalid`]]) {
+      await openSection(page, "Add a student who is not in the Academy records");
       await page.locator("#student-number").fill(number);
       await page.locator("#student-name").fill(name);
       await page.locator("#student-email").fill(email);
@@ -125,6 +128,7 @@ test.describe("Zoom review", () => {
     await expect(unmatched.locator(".status")).toHaveText("Not matched");
 
     // A wrong number is refused and keeps what was typed; then the guest account is matched.
+    await openSection(unmatched, "Match");
     await unmatched.getByLabel("Student number").fill("NOPE-1");
     await unmatched.getByLabel(/^Reason/).fill("Confirmed with the student");
     await unmatched.getByRole("button", { name: "Match to student" }).click();
@@ -142,6 +146,7 @@ test.describe("Zoom review", () => {
     await matched.getByRole("button", { name: "Remove decision" }).click();
     await expect(people.getByRole("listitem", { name: `zoom.guest${n}@example.invalid` }).locator(".status")).toHaveText("Not matched");
     const again = people.getByRole("listitem", { name: `zoom.guest${n}@example.invalid` });
+    await openSection(again, "Match");
     await again.getByLabel("Student number").fill(`zm-${p}-2`);
     await again.getByLabel(/^Reason/).fill("Confirmed with the student");
     await again.getByRole("button", { name: "Match to student" }).click();
@@ -218,6 +223,7 @@ test.describe("Zoom review", () => {
     await page.goto("/staff/zoom");
     const receipt = page.getByRole("listitem", { name: `Participant joined received ${n} Mar 2027 18:06` });
     await expect(receipt).toContainText(`Payload has no occurrence UUID (case ${n})`);
+    await openSection(receipt, "Replay this event");
     await receipt.getByLabel(/^Reason/).fill("Parser fixed");
     await receipt.getByRole("button", { name: "Replay" }).click();
     await expect(receipt).toHaveCount(0);

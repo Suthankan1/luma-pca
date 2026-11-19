@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { test, expect, type Page } from "@playwright/test";
 import { scheduleClass } from "./support/classes";
 
@@ -27,6 +28,7 @@ async function setUp(page: Page, code: string) {
     await expect(page.locator("#batch-feedback")).toHaveText(`Batch ${batch} created.`);
   }
   await page.goto("/staff/students");
+  await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill(`${code}-001`);
   await page.locator("#student-name").fill("Class Student");
   await page.locator("#student-email").fill(`${code}.student@example.invalid`);

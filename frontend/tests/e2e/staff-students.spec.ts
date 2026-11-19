@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { test, expect, type Page } from "@playwright/test";
 
 /** Owners and administrators sign in with MFA; the mock accepts recovery code "rec-recovery". */
@@ -28,6 +29,7 @@ async function courseWithBatch(page: Page, course: string, batch: string) {
 
 async function addStudent(page: Page, number: string, name: string, email: string) {
   await page.goto("/staff/students");
+  await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill(number);
   await page.locator("#student-name").fill(name);
   await page.locator("#student-email").fill(email);

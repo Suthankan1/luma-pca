@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { scheduleClass } from "./support/classes";
 import { test, expect } from "@playwright/test";
 
@@ -13,6 +14,7 @@ test("An administrator checks a past webinar run from its link and links it to t
 
   // The student whose Zoom email appears in the mock report (shared by both browser projects).
   await page.goto("/staff/students");
+  await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill("LK-1");
   await page.locator("#student-name").fill("Lookup Student");
   await page.locator("#student-email").fill("lookup.student@example.invalid");

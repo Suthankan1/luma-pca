@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -29,7 +30,7 @@ test.describe("Engagement with consent", () => {
 
   test("An owner switches engagement on; a student consents and reacts; staff open and close a question", async ({ page }) => {
     await signInStaff(page, "owner-enrolled@example.invalid");
-    await page.goto("/staff/attendance");
+    await page.goto("/staff/attendance?section=settings");
     const settings = page.getByRole("region", { name: "ENGAGEMENT" });
     await settings.getByLabel("Engagement is on").check();
     await settings.getByRole("button", { name: "Save engagement settings" }).click();
@@ -78,6 +79,7 @@ test.describe("Engagement with consent", () => {
     // Rankings are staff-only and name only students who opted in.
     await page.getByRole("link", { name: "Roster →" }).first().click();
     const ranking = page.getByRole("region", { name: "ENGAGEMENT RANKING" });
+    await openSection(ranking, "engagement ranking");
     await ranking.getByLabel("Show", { exact: true }).selectOption("100");
     await ranking.getByLabel("Over").selectOption("course");
     await ranking.getByRole("button", { name: "Show ranking" }).click();

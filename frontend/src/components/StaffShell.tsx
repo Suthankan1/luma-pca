@@ -6,30 +6,32 @@ import type { ReactNode } from "react";
 export const staffNavGroups = [
   { label: "Overview", items: [
     { key: "overview", label: "Today", href: "/staff", icon: "◷" },
-    { key: "dashboard", label: "Dashboard", href: "/staff/dashboard", icon: "▦" },
   ] },
   { label: "Teaching", items: [
     { key: "webinars", label: "Webinars", href: "/staff/webinars", icon: "◉" },
     { key: "sessions", label: "Classes", href: "/staff/sessions", icon: "▶" },
     { key: "attendance", label: "Attendance", href: "/staff/attendance", icon: "✓" },
-    { key: "zoom", label: "Zoom review", href: "/staff/zoom", icon: "◎" },
   ] },
-  { label: "People", items: [
+  { label: "Academy", items: [
     { key: "academy", label: "Academy classes", href: "/staff/academy", icon: "⇄" },
     { key: "students", label: "Students", href: "/staff/students", icon: "☺" },
-    { key: "team", label: "Staff", href: "/staff/team", icon: "◆" },
   ] },
-  { label: "Setup", items: [
+  { label: "Administration", items: [
+    { key: "team", label: "Staff", href: "/staff/team", icon: "◆" },
     { key: "courses", label: "Courses & batches", href: "/staff/courses", icon: "▤" },
+    { key: "zoom", label: "Zoom review", href: "/staff/zoom", icon: "◎" },
     { key: "activity", label: "Activity log", href: "/staff/activity", icon: "≡" },
   ] },
 ] as const;
+
+/** Pages reached from another section's tabs light up that section in the menu. */
+const sectionOf: Record<string, string> = { dashboard: "attendance" };
 
 type NavItem = (typeof staffNavGroups)[number]["items"][number];
 
 export const staffNav: readonly NavItem[] = staffNavGroups.flatMap(group => group.items as readonly NavItem[]);
 
-export type StaffSection = NavItem["key"];
+export type StaffSection = NavItem["key"] | "dashboard";
 
 /** Staff layout: a navy menu that stays in view, then a compact page header and the page. */
 export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, actions, children }: {
@@ -49,7 +51,8 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, a
         {staffNavGroups.map(group => <div key={group.label} className="staff-navgroup" role="group" aria-label={group.label}>
           <span className="staff-navlabel" aria-hidden>{group.label}</span>
           {group.items.map(item => <Link key={item.key} href={item.href}
-            className={`staff-navitem ${item.key === active ? "active" : ""}`} aria-current={item.key === active ? "page" : undefined}>
+            className={`staff-navitem ${item.key === (sectionOf[active] ?? active) ? "active" : ""}`}
+            aria-current={item.key === (sectionOf[active] ?? active) ? "page" : undefined}>
             <span className="staff-navicon" aria-hidden>{item.icon}</span>{item.label}<LinkPending />
           </Link>)}
         </div>)}

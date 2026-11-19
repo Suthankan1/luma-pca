@@ -66,9 +66,9 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
   return <StaffShell {...shell}>
     <section className="panel" aria-labelledby="occurrences-title">
       <h2 id="occurrences-title" className="panel-title">WEBINAR OCCURRENCES</h2>
-      <p className="panel-sub">Each time a webinar runs, Zoom reports a new occurrence. It is linked automatically when exactly one scheduled class
-        on that webinar ID covers its start (±60 minutes); otherwise decide here. Automatic links are checked again whenever a class is
-        scheduled, moved, given another webinar ID or cancelled. Your decisions are never overridden automatically.</p>
+      <p className="panel-sub">Each time a webinar runs, Zoom reports an occurrence. Runs of monitored webinars become classes by themselves;
+        this list is for the rest (webinars that are not monitored, or classes from before). Link an occurrence to a class or mark it as not
+        a class; your decisions are never overridden automatically.</p>
       <nav className="filter-row" aria-label="Filter occurrences">
         {views.map(v => <Link key={v.key} href={v.key === "all" ? "/staff/zoom" : `/staff/zoom?view=${v.key}`}
           className={`chip ${v.key === view.key ? "cyan" : ""}`} aria-current={v.key === view.key ? "true" : undefined}>{v.label}</Link>)}
@@ -95,10 +95,13 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
             <p className="dir-dates"><Link className="text-link" href={occurrencePeopleHref(o)}>People in this occurrence</Link></p>
             <p className="dir-dates muted report-state">{reportState(o)}</p>
             {o.ended && <ReportForm occurrenceUuid={o.occurrenceUuid} again={o.reportStatus === "FETCHED"} />}
-            {o.linkSource ? <details className="decision">
+            {o.linkSource ? <details key="change" className="decision">
               <summary>Change decision</summary>
               <DecisionForm prefix={`occ-${index}`} occurrenceUuid={o.occurrenceUuid} candidates={candidateClasses(o, nearby)} current={o.classSessionId} />
-            </details> : <DecisionForm prefix={`occ-${index}`} occurrenceUuid={o.occurrenceUuid} candidates={candidateClasses(o, nearby)} current={null} />}
+            </details> : <details key="decide" className="decision">
+              <summary>Decide: link to a class or mark not a class</summary>
+              <DecisionForm prefix={`occ-${index}`} occurrenceUuid={o.occurrenceUuid} candidates={candidateClasses(o, nearby)} current={null} />
+            </details>}
           </li>;
         })}
         {occurrences.data.length === 0 && <li className="dir-empty muted">{view.key === "review" ? "Nothing needs review." : "No webinar occurrences yet."}</li>}
@@ -117,7 +120,10 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
               <span className="dir-dates muted"> {u.email} · {u.occurrences} occurrence{u.occurrences === 1 ? "" : "s"} · last seen {formatInstant(u.lastSeenAt)}</span></div>
             <span className="status off">Not matched</span>
           </div>
-          <IdentityForm prefix={`identity-${index}`} email={u.email} />
+          <details className="decision">
+            <summary>Match to a student or mark not a student</summary>
+            <IdentityForm prefix={`identity-${index}`} email={u.email} />
+          </details>
         </li>)}
         {unmatched.data.length === 0 && <li className="dir-empty muted">Every Zoom account seen so far is matched or decided.</li>}
       </ul>
@@ -135,7 +141,10 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
               {r.lastError && <div className="dir-dates"><code>{r.lastError}</code></div>}</div>
             <span className="status off">Failed</span>
           </div>
-          <ReplayForm prefix={`receipt-${index}`} id={r.id} />
+          <details className="decision">
+            <summary>Replay this event</summary>
+            <ReplayForm prefix={`receipt-${index}`} id={r.id} />
+          </details>
         </li>)}
         {dead.data.length === 0 && <li className="dir-empty muted">No failed events.</li>}
       </ul>
