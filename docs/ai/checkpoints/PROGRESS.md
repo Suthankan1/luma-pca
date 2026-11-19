@@ -2401,3 +2401,9 @@ Validation passed on Windows with Next.js 16.4.6: `npm test` (79 tests), `npm ru
 ## MFA Cancel button contrast (2026-11-19)
 
 Public authentication forms now keep the light secondary button background so the navy Cancel label is readable in both MFA states. Verified the computed secondary colors and primary gradient in Edge using the running sign-in page and the MFA button classes. Full MFA sign-in was not rerun. This stylesheet-only change requires no migration. Revert the commit to roll back.
+
+## Staff Home redesign (2026-11-20)
+
+Staff Home focuses on today’s schedule, confirmed live webinars and actionable attendance reviews. Analyst-only accounts get a direct link to batch totals. The Home sidebar uses a lighter palette, the overview link is labelled Home, and entry motion respects reduced-motion preferences. Removed weekly totals, recently finished webinars and Zoom troubleshooting counts from Home. The existing destination pages still provide those workflows. Role checks and API contracts are unchanged.
+
+Verified the Next.js production build and the Staff Home Playwright spec on desktop Edge and Pixel 7 emulation with the mock backend (both passed). The bundled Chromium executable was missing on this machine, so verification used installed Edge. Live Supabase sign-in was not exercised for this slice. There are no migrations or deployment settings. Revert this commit to roll back.

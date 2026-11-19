@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 /** The staff menu, in groups people think in: what is happening, teaching, people, and setup. */
 export const staffNavGroups = [
   { label: "Overview", items: [
-    { key: "overview", label: "Today", href: "/staff", icon: "◷" },
+    { key: "overview", label: "Home", href: "/staff", icon: "◷" },
   ] },
   { label: "Teaching", items: [
     { key: "webinars", label: "Webinars", href: "/staff/webinars", icon: "◉" },
@@ -45,7 +45,7 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, a
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  return <div className="shell">
+  return <div className={active === "overview" ? "shell staff-home-shell" : "shell"}>
     <aside className="aside staff-rail" aria-label="Staff navigation">
       <AcademyBrand href="/staff" />
       <nav className="staff-nav">
@@ -72,7 +72,7 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, a
     <main className="content staff-content">
       <header className="page-head">
         <div>
-          <p className="crumbs">{crumb}</p>
+          {crumb && <p className="crumbs">{crumb}</p>}
           <h1 className="heading staff-heading">{title}</h1>
           {subtitle && <p className="sub page-sub">{subtitle}</p>}
         </div>
