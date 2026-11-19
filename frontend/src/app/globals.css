@@ -550,3 +550,28 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
   .cs-student-2 .cs-arm { transform:rotate(10deg); }
   .cs-student-2 .cs-bubble { opacity:1; }
 }
+
+/* Public pages fill exactly one viewport: header, a centred main, footer. Sign-in and the other account forms
+   size themselves from the viewport height so they fit on a laptop screen without scrolling. */
+.public-shell { display:flex; flex-direction:column; }
+.public-header, .public-content, .public-footer { width:100%; margin-inline:auto; margin-block:0; }
+.public-content { flex:1 0 auto; }
+.public-footer { padding:clamp(10px,2.4vh,20px) 0 clamp(12px,2.6vh,24px); }
+.public-header { min-height:clamp(72px,12vh,114px); }
+.public-header .brand-logo { width:clamp(48px,7.5vh,65px); }
+.public-auth { min-height:0; padding:clamp(12px,3.4vh,48px) 0; }
+.public-auth .session-panel { padding:clamp(22px,4.4vh,38px) clamp(22px,3vw,38px); }
+.public-auth .heading { font-size:clamp(26px,4.2vh,34px); margin:clamp(8px,1.6vh,15px) 0 clamp(4px,1vh,12px); }
+.public-auth .sub { line-height:1.55; }
+.public-auth .session-error { margin-top:clamp(10px,1.8vh,16px); padding:clamp(9px,1.4vh,12px) 14px; font-size:14px; }
+.public-auth .session-form { margin-top:clamp(14px,2.8vh,28px); gap:clamp(6px,1.1vh,11px); }
+.public-auth .session-form input { min-height:clamp(42px,5.6vh,48px); }
+.public-auth .session-form input + label { margin-top:clamp(2px,.6vh,6px); }
+.public-auth .session-form .action { margin-top:clamp(6px,1.4vh,12px); }
+.public-auth .session-form .sub { margin:0; }
+@media (max-width:700px) { .public-header { min-height:clamp(64px,10vh,94px); } .public-header .brand-logo { width:50px; } .public-auth { padding:clamp(14px,3vh,30px) 0; } .public-auth .session-panel { padding:clamp(20px,3.4vh,26px); } .public-footer { margin-top:0; } }
+.public-home { min-height:0; padding:clamp(24px,5vh,72px) 0; display:flex; flex-direction:column; justify-content:center; }
+.public-home > .landing-grid { width:100%; }
+.public-home .attendance-intro .heading { margin:clamp(10px,2vh,18px) 0 clamp(8px,1.4vh,12px); }
+.public-home .entry-cards { margin-top:clamp(20px,4vh,40px); }
+@media (max-width:700px) { .public-home { padding-top:clamp(24px,4vh,48px); } }

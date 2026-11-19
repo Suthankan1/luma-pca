@@ -2384,3 +2384,10 @@ Next: consider collapsing the Team and Courses forms, and enlarging the inline l
 - Fixed the stale landing e2e step in `tests/e2e/student-portal.spec.ts` (it looked for the removed "I’m a student" link; now "Student sign in").
 - Passed: targeted ESLint, `npm run typecheck`. Edge (Playwright, dev server): no horizontal overflow at 1440/1024/390/320 px; loop frames inspected at 1.6/4.5/7.6 s; reduced-motion emulation reports 0 running animations. The only console error is the existing missing `/favicon.ico` (404).
 - Not run: full Playwright suite (including the edited landing step), unit tests. No backend, contract or database changes; no deployment. Rollback: revert this commit.
+
+## Public pages fit the viewport - 2026-11-19
+
+- Branch: `feat/landing-classroom-animation`. CSS only (`frontend/src/app/globals.css`). The public shell is now a full-height column (header, main, footer). The main area centres sign-in, forgot-password and the other account forms, and the landing hero, vertically and horizontally. Header, card padding, heading, inputs and gaps scale with viewport height (`clamp(..vh..)`), so the sign-in card no longer gets cut off at the bottom of laptop screens.
+- Before the change, `globals.css` in the working tree had been re-saved with CRLF line endings and about 1.5 KB of trailing NUL bytes after the previous commit. The CSS rules were identical (verified with a diff that ignores those bytes), so the file was restored from HEAD.
+- Verified in Edge (Playwright against the dev server), with no horizontal overflow anywhere: staff sign-in with the error message, student sign-in, plain sign-in and forgot-password show no vertical scroll and a card offset of 0 px from centre at 1920x969, 1536x730, 1440x900, 1366x657, 1280x600, 390x844 and 360x740. The only exception is 320x568 with the error showing (33 px of scroll). Landing: no scroll at desktop sizes; it scrolls on phones by design (scene below the cards). Screenshots reviewed.
+- Not run: the full e2e suite. Authenticated portals use `.shell`, which is unchanged. No backend changes, no deployment. Rollback: revert this commit.
