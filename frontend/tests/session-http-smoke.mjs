@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 
 let down = false;
 let identityDown = false;
+let accessRejected = false;
 let rotation = 0;
 let latestRefresh = "";
 const jwt = "fake-access-token.for-bff.integration-test";
@@ -84,7 +85,7 @@ const backend = createServer(async (req, res) => {
       break;
     case "/api/v1/auth/me":
       if (identityDown) return send(503);
-      if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+      if (accessRejected || req.headers.authorization !== `Bearer ${jwt}`) return send(401);
       return send(200, { accountId: "test-account", academyId: "test-academy", roles });
     case "/api/v1/auth/logout":
       if (body.refreshToken === latestRefresh) latestRefresh = "";
@@ -164,6 +165,15 @@ try {
   assert.match(html, /Student portal/);
   assert.equal(html.includes(jwt), false);
   assert.equal(html.includes(latestRefresh), false);
+
+  // A still-sealed access cookie must not redirect back to a portal after the API rejects it.
+  accessRejected = true;
+  const expiredSignIn = await call("/sign-in?portal=student&error=expired");
+  assert.equal(expiredSignIn.status, 200);
+  assert.match(await expiredSignIn.text(), /Your session ended/);
+  const expiredStatus = await (await call("/api/session/status")).json();
+  assert.equal(expiredStatus.authenticated, false);
+  accessRejected = false;
 
   // 2. Refresh rotation
   // 2a. The short access cookie expired: the proxy renews the session quietly and the page opens (no sign-in page).

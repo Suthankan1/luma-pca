@@ -2391,3 +2391,9 @@ Next: consider collapsing the Team and Courses forms, and enlarging the inline l
 - Before the change, `globals.css` in the working tree had been re-saved with CRLF line endings and about 1.5 KB of trailing NUL bytes after the previous commit. The CSS rules were identical (verified with a diff that ignores those bytes), so the file was restored from HEAD.
 - Verified in Edge (Playwright against the dev server), with no horizontal overflow anywhere: staff sign-in with the error message, student sign-in, plain sign-in and forgot-password show no vertical scroll and a card offset of 0 px from centre at 1920x969, 1536x730, 1440x900, 1366x657, 1280x600, 390x844 and 360x740. The only exception is 320x568 with the error showing (33 px of scroll). Landing: no scroll at desktop sizes; it scrolls on phones by design (scene below the cards). Screenshots reviewed.
 - Not run: the full e2e suite. Authenticated portals use `.shell`, which is unchanged. No backend changes, no deployment. Rollback: revert this commit.
+
+## Session redirect loop fix (2026-11-19)
+
+The BFF now validates the access token against the identity endpoint before it uses the session for portal redirects. After the local backend switched databases and signing keys, an older sealed cookie could otherwise keep sending the browser from sign-in back to a portal that rejected the token. The HTTP smoke test covers a rejected token inside a valid sealed cookie and checks both the sign-in page and the session status endpoint.
+
+Validation passed on Windows with Next.js 16.4.6: `npm test` (79 tests), `npm run build`, and `npm run test:smoke`. Targeted ESLint passed on both changed frontend files. Live Supabase sign-in and MFA were not exercised by the smoke test. The change adds an identity lookup to authenticated frontend requests. No schema or cookie format changed. Revert the frontend commit to roll back.

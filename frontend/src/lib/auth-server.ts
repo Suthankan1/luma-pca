@@ -90,7 +90,8 @@ export async function currentSession() {
     const { names, key } = config();
     const sealed = cookieJar.get(names.access)?.value;
     const session = sealed ? openAccessSession(sealed, key) : null;
-    const identity = session?.identity ?? (session?.token ? await readIdentity(session.token) : null);
+    // A sealed cookie can outlive the backend session or the key that signed its token.
+    const identity = session ? await readIdentity(session.token) : null;
     return {
       identity,
       canRefresh: cookieJar.has(names.refresh),
