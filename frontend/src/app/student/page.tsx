@@ -3,9 +3,8 @@ import { Shell } from "@/components/Shell";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
-import { AppealForm } from "@/components/AppealForm";
 import { ConsentForm } from "@/components/StudentEngagement";
-import { classTimeLabel, formatClassTime, formatDate, classOpenForEngagement, classPhase, isLiveRun, formatDuration, outcomeLabels, sessionWindow, type AttendanceRecordView, type MyConsent } from "@/lib/staff-forms";
+import { classTimeLabel, formatDate, classOpenForEngagement, classPhase, isLiveRun, formatDuration, sessionWindow, type MyConsent } from "@/lib/staff-forms";
 import { Kpis } from "@/components/insights/Kpis";
 import { formatClock, formatDay, level, presets, renderTime, type StudentOverview } from "@/lib/insights";
 import { academyToday } from "@/lib/staff-forms";
@@ -34,11 +33,10 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
   const window = sessionWindow(params.from, undefined, WINDOW_DAYS);
   const href = (from?: string) => from ? `/student?from=${from}` : "/student";
   const query = new URLSearchParams({ from: window.fromInstant, to: window.toInstant });
-  const [me, enrollments, classes, attendance, consent, overview] = await Promise.all([
+  const [me, enrollments, classes, consent, overview] = await Promise.all([
     studentApi<{ studentNumber: string; fullName: string }>("/api/v1/me/student"),
     studentApi<MyEnrollment[]>("/api/v1/me/enrollments"),
     studentApi<MyClass[]>(`/api/v1/me/class-sessions?${query}`),
-    studentApi<AttendanceRecordView[]>("/api/v1/me/attendance"),
     studentApi<MyConsent>("/api/v1/me/engagement-consent"),
     // The last 30 days, for the snapshot at the top; the full view is under My attendance.
     studentApi<StudentOverview>(`/api/v1/me/attendance-overview?from=${presets(academyToday())[1].from}&to=${academyToday()}`, undefined, 20000),
@@ -58,7 +56,6 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
           ? <>Hello, <strong>{me.data.fullName}</strong> · student ID <strong>{me.data.studentNumber}</strong></>
           : "You’re signed in to Physics Cube Academy."}</p>
       </div>
-      <div className="page-actions"><Link className="action secondary" href="/student/attendance">My attendance →</Link></div>
     </header>
 
     {classes.ok && <section className={`next-class ${nextLive ? "is-live" : ""}`} aria-labelledby="next-class-title">
@@ -79,13 +76,14 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
       </div> : <p className="next-class-when">No upcoming classes in the next four weeks.</p>}
     </section>}
 
-    {overview.ok && overview.data.overall.classes > 0 && <Kpis label="Last 30 days" items={[
+    {overview.ok && overview.data.overall.classes > 0 && <Kpis compact label="Last 30 days" items={[
       { label: "Attendance", value: `${overview.data.overall.percent}%`,
         note: overview.data.minPercent ? `the academy’s rule is ${overview.data.minPercent}%` : "share of class time",
         tone: level(overview.data.overall.percent, overview.data.minPercent) as "good" | "warn" | "bad" },
       { label: "Classes joined", value: `${overview.data.overall.joined} / ${overview.data.overall.classes}`, note: "last 30 days" },
       { label: "Time in classes", value: formatDuration(overview.data.overall.connectedSeconds), note: "last 30 days" },
     ]} />}
+    {overview.ok && <p className="link-row summary-link"><Link className="text-link" href="/student/attendance">View all attendance and appeals →</Link></p>}
 
     {!enrollments.ok || !classes.ok
       ? <p className="session-error" role="alert">We couldn’t load your classes right now. Please reload the page shortly.</p>
@@ -139,26 +137,7 @@ export default async function StudentPage({ searchParams }: { searchParams: Prom
           <ConsentForm consent={consent.data} />
         </section>}
         </div></div>
-        <section className="panel panel-gap" aria-labelledby="my-attendance-title">
-          <h2 id="my-attendance-title" className="panel-title">MY ATTENDANCE</h2>
-          <p className="panel-sub">Final attendance for your classes, decided by the academy’s rule from Zoom’s report. If something looks
-            wrong, send an appeal and the academy will review it.</p>
-          {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load your attendance right now.</p>
-            : <ul className="dir-list">
-              {attendance.data.map((r, index) => <li key={r.id} className="dir-course my-attendance" aria-label={`Attendance ${r.classTitle}`}>
-                <div className="dir-row">
-                  <div><strong>{r.classTitle}</strong>
-                    <span className="dir-dates muted"> {formatClassTime(r.classStartsAt, r.classEndsAt, r.timeZone)}</span>
-                    <div className="dir-dates muted">{formatDuration(r.connectedSeconds)} connected
-                      {r.appealStatus === "OPEN" ? " · appeal waiting for a decision" : r.appealStatus ? ` · appeal ${r.appealStatus.toLowerCase()}` : ""}</div></div>
-                  <span className={`status ${r.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[r.outcome]}</span>
-                </div>
-                {r.appealStatus !== "OPEN" && <details className="decision"><summary>Appeal this</summary>
-                  <AppealForm prefix={`appeal-${index}`} recordId={r.id} /></details>}
-              </li>)}
-              {attendance.data.length === 0 && <li className="dir-empty muted">No final attendance yet.</li>}
-            </ul>}
-        </section>
+
       </>}
   </Shell>;
 }

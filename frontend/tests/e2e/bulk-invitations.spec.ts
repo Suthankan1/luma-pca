@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { test, expect, type Page } from "@playwright/test";
 
 async function signInAsAdmin(page: Page) {
@@ -43,6 +44,7 @@ test.describe("Bulk invitation emails", () => {
     await page.goto("/staff/courses");
     await page.getByRole("link", { name: new RegExp(`${P}-WED`) }).first().click();
     const panel = page.getByRole("region", { name: "INVITE BY EMAIL" });
+    await openSection(panel, "Email sign-in links");
     await expect(panel).toContainText("Emails a sign-in link to this batch’s current students");
 
     await panel.getByRole("button", { name: "Check who will be emailed" }).click();
@@ -93,6 +95,7 @@ test.describe("Bulk invitation emails", () => {
     await page.goto("/staff/courses");
     await page.getByRole("link", { name: new RegExp(`${P}-FRI`) }).first().click();
     const panel = page.getByRole("region", { name: "INVITE BY EMAIL" });
+    await openSection(panel, "Email sign-in links");
     await panel.getByRole("button", { name: "Check who will be emailed" }).click();
     await panel.getByRole("button", { name: "Email 2 invitations" }).click();
     await expect(panel.locator("#bulk-invite-feedback")).toHaveText("2 invitations queued. They are sent in the background.");

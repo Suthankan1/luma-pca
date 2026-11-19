@@ -25,7 +25,7 @@ export function DecisionForm({ prefix, occurrenceUuid, candidates, current }: {
       <select id={`${prefix}-class`} name="sessionId" defaultValue={values?.sessionId ?? current ?? candidates[0].id}>
         {candidates.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
       </select>
-    </> : <p className="panel-sub">No scheduled class starts within a day of this webinar. Schedule it, or add the webinar ID to it and run automatic linking.</p>}
+    </> : <p className="panel-sub">No class starts within a day of this occurrence. Monitor the webinar under Webinars so its runs become classes, or mark this one as not a class.</p>}
     <label htmlFor={`${prefix}-reason`}>Reason <span className="muted">(recorded; no names or emails)</span></label>
     <input id={`${prefix}-reason`} name="reason" maxLength={300} required autoComplete="off" defaultValue={values?.reason}
       placeholder="Checked against the timetable" />
@@ -102,7 +102,7 @@ export function LinkRunForm({ webinar, occurrenceUuid, candidates, current }: {
 }) {
   const [state, action, pending] = useActionState(linkRun, null);
   const values = state && !state.ok ? state.values : undefined;
-  if (candidates.length === 0) return <p className="panel-sub">No scheduled class within a day of this run. Schedule it first, then come back.</p>;
+  if (candidates.length === 0) return <p className="panel-sub">No class within a day of this run. Monitor the webinar under Webinars so its runs become classes.</p>;
   return <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
     <input type="hidden" name="webinar" value={webinar} />
     <input type="hidden" name="occurrenceUuid" value={occurrenceUuid} />

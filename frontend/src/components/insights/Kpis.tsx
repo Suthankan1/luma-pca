@@ -1,6 +1,7 @@
 /** A row of headline numbers. Each tile: a label, the value and an optional note. */
-export function Kpis({ items, label }: { items: { label: string; value: string; note?: string; tone?: "good" | "warn" | "bad" }[]; label: string }) {
-  return <ul className="kpis" aria-label={label}>
+export function Kpis({ items, label, compact }: { items: { label: string; value: string; note?: string; tone?: "good" | "warn" | "bad" }[];
+  label: string; compact?: boolean }) {
+  return <ul className={`kpis ${compact ? "kpis-compact" : ""}`} aria-label={label}>
     {items.map(item => <li key={item.label} className={`kpi ${item.tone ? `kpi-${item.tone}` : ""}`} aria-label={`${item.label}: ${item.value}`}>
       <span className="kpi-label">{item.label}</span>
       <strong className="kpi-value">{item.value}</strong>

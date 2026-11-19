@@ -17,7 +17,7 @@ export async function appealRecord(_previous: FormState, form: FormData): Promis
     return { ok: false, values, message: result.status === 409 ? "An appeal for this class is already waiting for a decision."
       : problemMessage(result.status, result.detail) };
   }
-  revalidatePath("/student");
+  revalidatePath("/student/attendance");
   return { ok: true, message: "Appeal sent. The academy will review it." };
 }
 

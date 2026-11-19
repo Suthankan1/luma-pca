@@ -24,7 +24,9 @@ test.describe("Attendance appeals", () => {
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/student$/);
-    const record = page.getByRole("region", { name: "MY ATTENDANCE" }).getByRole("listitem", { name: "Attendance Waves and oscillations" });
+    // Final records and appeals live on My attendance (the home page shows a summary only).
+    await page.getByRole("link", { name: "View all attendance and appeals →" }).click();
+    const record = page.getByRole("region", { name: "FINAL ATTENDANCE AND APPEALS" }).getByRole("listitem", { name: "Attendance Waves and oscillations" });
     await record.getByText("Appeal this").click();
     await record.getByLabel("What should the academy know?").fill("short");
     await record.getByRole("button", { name: "Send appeal" }).click();
@@ -51,6 +53,8 @@ test.describe("Attendance appeals", () => {
     await page.fill("#email", "student@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/student$/);
+    await page.goto("/student/attendance");
     await expect(record.locator(".status")).toHaveText(accepted);
     await expect(record).toContainText("appeal accepted");
   });

@@ -1,4 +1,5 @@
 import { StaffShell } from "@/components/StaffShell";
+import { AttendanceTabs, type AttendanceSection } from "@/components/staff/AttendanceTabs";
 import { AppealDecisionForm, FinaliseAllForm, PolicyForm } from "@/components/staff/AttendanceForms";
 import { EngagementSettingsForm } from "@/components/staff/EngagementForms";
 import { requirePortal } from "@/lib/auth-server";
@@ -13,30 +14,41 @@ export const metadata = { title: "Attendance · LUMA" };
 export default async function AttendancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const identity = await requirePortal("staff");
   const owner = identity.roles.includes("ACADEMY_OWNER");
-  const shell = { active: "attendance" as const, crumb: "Oversight", title: "Attendance",
-    subtitle: "The academy’s rule for final attendance, applied only to Zoom’s official participant report.",
+  const shell = { active: "attendance" as const, crumb: "Teaching", title: "Attendance",
+    subtitle: "Finalise ended classes, answer appeals, see reports, and keep the academy’s attendance rule.",
     hasStudentPortal: hasPortal(identity, "student") };
   const manager = isAcademyManager(identity.roles);
   const reports = manager || identity.roles.includes("ANALYST");
   const query = await searchParams;
+  const analyst = identity.roles.includes("ANALYST") && !manager;
+  const wanted = query.section === "totals" || query.section === "settings" ? query.section : null;
+  // Owners and administrators start with what needs doing; analysts (no to-do list) with batch totals; others with the rule.
+  const section: AttendanceSection = wanted ?? (manager ? "todo" : reports ? "totals" : "settings");
   const isoDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
   const reportFrom = isoDate(query.from) ?? monthStart(academyToday());
   const reportTo = isoDate(query.to) ?? academyToday();
   const [policy, appeals, engagement, report, pending] = await Promise.all([
     staffApi<AttendancePolicy | null>("/api/v1/attendance-policy"),
     manager ? staffApi<AttendanceAppeal[]>("/api/v1/attendance-appeals?status=OPEN") : Promise.resolve(null),
-    manager ? staffApi<EngagementSettings | null>("/api/v1/engagement-settings") : Promise.resolve(null),
-    reports ? staffApi<AcademyAttendanceSummary>(`/api/v1/attendance/summary?${new URLSearchParams({ from: reportFrom, to: reportTo })}`)
+    manager && section === "settings" ? staffApi<EngagementSettings | null>("/api/v1/engagement-settings") : Promise.resolve(null),
+    reports && section === "totals"
+      ? staffApi<AcademyAttendanceSummary>(`/api/v1/attendance/summary?${new URLSearchParams({ from: reportFrom, to: reportTo })}`)
       : Promise.resolve(null),
     manager ? staffApi<PendingAttendance>("/api/v1/attendance/pending") : Promise.resolve(null),
   ]);
+  const todoCount = (pending?.ok ? pending.data.classes.filter(c => c.state === "READY").length : 0) + (appeals?.ok ? appeals.data.length : 0);
   if (!policy.ok) {
     return <StaffShell {...shell}><p className="session-error" role="alert">
       {policy.status === 403 ? "Your role does not include attendance." : "We couldn’t load the attendance rule right now. Please reload shortly."}</p></StaffShell>;
   }
   const rule = policy.data;
   return <StaffShell {...shell}>
-    <section className="panel" aria-labelledby="rule-title">
+    <AttendanceTabs active={section} manager={manager} analyst={analyst} todoCount={manager ? todoCount : undefined} />
+    {section === "todo" && <p className="panel-sub rule-line">{rule
+      ? <>Rule: present from {rule.minConnectedPercent}% of the class, late after {rule.lateAfterMinutes} min.</>
+      : <>No attendance rule is recorded yet, so classes can’t be finalised.</>}{" "}
+      <Link className="text-link" href="/staff/attendance?section=settings">{rule ? "Rule & settings" : "Record the rule"} →</Link></p>}
+    {section === "settings" && <section className="panel" aria-labelledby="rule-title">
       <h2 id="rule-title" className="panel-title">ATTENDANCE RULE</h2>
       {rule ? <>
         <p className="rule-summary"><strong>Present</strong> when connected for at least {rule.minConnectedPercent}% of the class time;
@@ -45,8 +57,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         <p className="panel-sub">{rule.description} · last changed {formatInstant(rule.updatedAt)}. Classes finalised earlier keep the rule they used.</p>
       </> : <p className="banner">No rule has been recorded yet, so no class can be finalised. The rule is the academy’s decision; LUMA only applies it.</p>}
       {owner ? <PolicyForm policy={rule} /> : <p className="panel-sub">Only an academy owner can record or change the rule.</p>}
-    </section>
-    {pending && <section className="panel panel-gap" aria-labelledby="pending-title">
+    </section>}
+    {section === "todo" && pending && <section className="panel" aria-labelledby="pending-title">
       <h2 id="pending-title" className="panel-title">WAITING TO BE FINALISED</h2>
       {!pending.ok ? <p className="session-error" role="alert">We couldn’t load the classes waiting to be finalised.</p> : <>
         <p className="panel-sub">Classes of the last 60 days that have ended but are not final.
@@ -64,11 +76,12 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
           : <p className="panel-sub">Record the attendance rule first.</p>}
       </>}
     </section>}
-    {report && <section className="panel panel-gap" aria-labelledby="report-title">
+    {section === "totals" && report && <section className="panel" aria-labelledby="report-title">
       <h2 id="report-title" className="panel-title">ATTENDANCE BY BATCH</h2>
       <p className="panel-sub">Final attendance totals per batch, without student names. Rate = (present + late) ÷ (present + late + absent);
         excused classes are left out.</p>
       <form method="get" className="export-range" aria-label="Report range">
+        <input type="hidden" name="section" value="totals" />
         <label htmlFor="report-from">From</label>
         <input id="report-from" name="from" type="date" required defaultValue={reportFrom} />
         <label htmlFor="report-to">To</label>
@@ -85,7 +98,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         </li>)}
           {report.data.batches.length === 0 && <li className="dir-empty muted">No classes in this range.</li>}</ul>}
     </section>}
-    {appeals && <section className="panel panel-gap" aria-labelledby="appeals-title">
+    {section === "todo" && appeals && <section className="panel panel-gap" aria-labelledby="appeals-title">
       <h2 id="appeals-title" className="panel-title">APPEALS</h2>
       {!appeals.ok ? <p className="session-error" role="alert">We couldn’t load appeals right now.</p> : <>
         <p className="panel-sub">Students’ appeals against final attendance. Accepting corrects the record; either way the student sees your note.</p>
@@ -103,7 +116,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         </ul>
       </>}
     </section>}
-    {engagement && <section className="panel panel-gap" aria-labelledby="engagement-title">
+    {section === "settings" && engagement && <section className="panel panel-gap" aria-labelledby="engagement-title">
       <h2 id="engagement-title" className="panel-title">ENGAGEMENT</h2>
       {!engagement.ok ? <p className="session-error" role="alert">We couldn’t load engagement settings right now.</p> : <>
         <p className="panel-sub">Reactions and short questions from the student portal, with each student’s consent. It is

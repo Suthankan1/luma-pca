@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
+import { Disclosure } from "@/components/Disclosure";
 import { AssignForm, UnassignButton } from "@/components/staff/TeamForms";
 import { requirePortal, studentIdLoginEnabled } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
@@ -80,9 +81,11 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
     </section>
     {manager && <section className="panel panel-gap" aria-labelledby="batch-invite-title">
       <h2 id="batch-invite-title" className="panel-title">INVITE BY EMAIL</h2>
-      {studentIdLoginEnabled() && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
-        for email sign-in. Students without an email of their own are never emailed.</p>}
-      <BulkInviteForm batchId={batchId} scope="this batch’s current students" />
+      <Disclosure summary="Email sign-in links to this batch’s students">
+        {studentIdLoginEnabled() && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
+          for email sign-in. Students without an email of their own are never emailed.</p>}
+        <BulkInviteForm batchId={batchId} scope="this batch’s current students" />
+      </Disclosure>
     </section>}
     {assignments && <section className="panel panel-gap" aria-labelledby="assigned-title">
       <h2 id="assigned-title" className="panel-title">ASSIGNED STAFF</h2>
@@ -120,6 +123,7 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
     </section>
     {manager && <section className="panel panel-gap" aria-labelledby="ranking-title">
       <h2 id="ranking-title" className="panel-title">ENGAGEMENT RANKING</h2>
+      <Disclosure summary="Show the staff-only engagement ranking" defaultOpen={!!rankingQuery}>
       <p className="panel-sub">Staff only. Students who consented to engagement, scored by portal reactions (at most 10 per class) and
         three points per question answered, divided by the classes they were expected at. Students are named only if they opted in.</p>
       <form method="get" className="export-range" aria-label="Ranking range">
@@ -144,6 +148,7 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
           </li>)}
             {ranking.data.top.length === 0 && <li className="dir-empty muted">No consenting students took part in this range.</li>}</ol>
         </>)}
+      </Disclosure>
     </section>}
   </StaffShell>;
 }

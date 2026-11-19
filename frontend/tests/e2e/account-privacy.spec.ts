@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { test, expect } from "@playwright/test";
 
 test("A student changes their password with the current one and is signed out", async ({ page }) => {
@@ -40,6 +41,7 @@ test("An owner erases a student's personal data after typing the number again", 
   await expect(page).toHaveURL(/\/staff$/);
 
   await page.goto("/staff/students");
+  await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill(`${p}-1`);
   await page.locator("#student-name").fill("Leaving Student");
   await page.locator("#student-email").fill(`leaving.${p.toLowerCase()}@example.invalid`);

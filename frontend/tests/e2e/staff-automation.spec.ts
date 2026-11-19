@@ -1,3 +1,4 @@
+import { openSection } from "./support/ui";
 import { scheduleClass } from "./support/classes";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -50,9 +51,10 @@ test.describe("Less manual work for staff", () => {
     const card = page.getByRole("listitem", { name: "Webinar 844 0000 0001" });
     await expect(card).toContainText("A/L Physics 2027");
     await expect(card).toContainText("(Asia/Colombo)");
-    await expect(card.locator(".occurrences li")).toHaveCount(3);
+    await expect(card.locator(".occurrence-list li")).toHaveCount(3);
     await expect(card).toContainText("Academy class: A/L Physics 2027 (matches the Zoom title)");
-    await card.getByText(/^Runs \(2\)$/).click();
+    await openSection(card, "Run history");
+    await expect(card.locator(".disclosure-hint").last()).toHaveText("2");
     await expect(card.getByRole("listitem").filter({ hasText: "Zoom report in" })).toHaveCount(1);
     for (const name of ["Save changes", "Schedule class", "Cancel class", "Create classes"]) {
       await expect(page.getByRole("button", { name })).toHaveCount(0);
@@ -64,6 +66,7 @@ test.describe("Less manual work for staff", () => {
     const office = page.getByRole("listitem", { name: "Webinar 844 0000 0002" });
     await expect(office).toContainText("Recurring, no fixed time in Zoom");
     await expect(office.locator(".class-note")).toContainText("Academy class unresolved");
+    await openSection(office, "Manage webinar");
     await office.getByLabel("Academy class").selectOption("Admission");
     await office.getByRole("button", { name: "Save" }).click();
     await expect(office.locator(".form-ok")).toHaveText("Academy class set to “Admission”.");
@@ -87,7 +90,7 @@ test.describe("Less manual work for staff", () => {
 
   test("Ended classes wait in one list and are finalised together; the owner can switch on automatic finalisation", async ({ page }) => {
     await signInStaff(page, "owner-enrolled@example.invalid");
-    await page.goto("/staff/attendance");
+    await page.goto("/staff/attendance?section=settings");
     const rule = page.getByRole("region", { name: "ATTENDANCE RULE" });
     await page.locator("#policy-percent").fill("75");
     await page.locator("#policy-late").fill("10");
@@ -97,7 +100,9 @@ test.describe("Less manual work for staff", () => {
     await expect(page.locator("#policy-feedback")).toHaveText("Attendance rule saved.");
     await page.reload();
     await expect(rule.getByLabel(/Finalise each class automatically/)).toBeChecked();
+    await page.goto("/staff/attendance");
     await expect(page.getByRole("region", { name: "WAITING TO BE FINALISED" })).toContainText("Automatic finalisation is on");
+    await page.goto("/staff/attendance?section=settings");
     await rule.getByLabel(/Finalise each class automatically/).uncheck();
     await page.getByRole("button", { name: "Save rule" }).click();
     await expect(page.locator("#policy-feedback")).toHaveText("Attendance rule saved.");

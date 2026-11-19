@@ -41,7 +41,7 @@ test.describe("Staying signed in", () => {
     await context.clearCookies({ name: "luma-access" });
     await page.goto("/staff/dashboard");
     await expect(page).toHaveURL(/\/staff\/dashboard$/);
-    await expect(page.getByRole("heading", { name: "Attendance dashboard" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Attendance reports" })).toBeVisible();
 
     await context.clearCookies({ name: "luma-access" });
     await page.goto("/sign-in");

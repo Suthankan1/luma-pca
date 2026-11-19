@@ -5,6 +5,7 @@ import { ClassTable } from "@/components/insights/ClassTable";
 import { Kpis } from "@/components/insights/Kpis";
 import { RangeFilter } from "@/components/insights/RangeFilter";
 import { StudentTable } from "@/components/insights/StudentTable";
+import { AttendanceTabs } from "@/components/staff/AttendanceTabs";
 import { requirePortal } from "@/lib/auth-server";
 import { dateOrNull, formatDuration, level, presets, withParams, withoutCells, type Dashboard } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
@@ -31,7 +32,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const courseId = uuidOrNull(one("course"));
   const batchId = uuidOrNull(one("batch"));
   const view = views.some(([key]) => key === one("view")) ? one("view")! : "students";
-  const shell = { active: "dashboard" as const, crumb: "Attendance", title: "Attendance dashboard",
+  const shell = { active: "dashboard" as const, crumb: "Attendance", title: "Attendance reports",
     subtitle: "Who attended, for how long, and how often they left and rejoined. Choose a course or batch and a period.",
     hasStudentPortal: hasPortal(identity, "student") };
 
@@ -46,6 +47,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const batchList = batches.ok ? batches.data : [];
   const courseCode = new Map(courseList.map(c => [c.id, c.code]));
   const keep = { course: courseId, batch: batchId, view: view === "students" ? null : view };
+  const tabs = <AttendanceTabs active="reports" manager={manager} analyst={false} />;
   const filters = <section className="panel filters-panel" aria-labelledby="filters-title">
     <h2 id="filters-title" className="sr-only">Filters</h2>
     <form method="get" action="/staff/dashboard" className="filters" role="search" aria-label="Filter attendance">
@@ -74,7 +76,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   </section>;
 
   if (!dashboard.ok) {
-    return <StaffShell {...shell}>{filters}
+    return <StaffShell {...shell}>{tabs}{filters}
       <p className="session-error" role="alert">{dashboard.status === 400 ? dashboard.detail ?? "Choose a shorter period (at most 92 days)."
         : "We couldn’t load attendance right now. Please reload the page shortly."}</p>
     </StaffShell>;
@@ -86,6 +88,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const rows = d.students.map(withoutCells);
 
   return <StaffShell {...shell}>
+    {tabs}
     {filters}
     <Kpis label="Totals" items={[
       { label: "Classes held", value: String(t.classes), note: t.classes ? `${formatDuration(t.classSeconds)} of webinars` : undefined },

@@ -15,7 +15,7 @@ async function signInStaff(page: Page, email: string) {
 test.describe("Attendance dashboard", () => {
   test("Staff see every student's time and attendance, filter, sort, and switch views", async ({ page }) => {
     await signInStaff(page, "admin-enrolled@example.invalid");
-    await page.getByRole("link", { name: "Open the attendance dashboard →" }).click();
+    await page.getByRole("link", { name: "Attendance reports →" }).click();
     await expect(page).toHaveURL(/\/staff\/dashboard$/);
     const totals = page.getByRole("list", { name: "Totals" });
     await expect(totals.getByRole("listitem", { name: "Classes held: 2" })).toBeVisible();
@@ -84,7 +84,7 @@ test.describe("My attendance (student)", () => {
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/student$/);
-    await page.getByRole("link", { name: "My attendance →" }).click();
+    await page.getByRole("link", { name: "View all attendance and appeals →" }).click();
     await expect(page.getByRole("heading", { name: "My attendance" })).toBeVisible();
     await expect(page.getByRole("list", { name: "My attendance" }).getByRole("listitem", { name: "Classes joined: 2 / 2" })).toBeVisible();
     await expect(page.getByRole("region", { name: "MY COURSES" })).toContainText("A/L Physics 2026");

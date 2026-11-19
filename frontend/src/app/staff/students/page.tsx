@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
+import { Disclosure } from "@/components/Disclosure";
 import { AddStudentForm } from "@/components/staff/StudentForms";
 import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { requirePortal, studentIdLoginEnabled } from "@/lib/auth-server";
@@ -77,16 +78,21 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
       <section className="panel" aria-labelledby="add-student-title">
         <h2 id="add-student-title" className="panel-title">ADD</h2>
         <p className="panel-sub academy-hint">Students in the Academy’s records are added for you: set up and sync their class under{" "}
-          <Link className="text-link" href="/staff/academy">Academy classes →</Link> Add a student here only if they are not in those records.</p>
-        <p className="panel-sub">Adding a student also creates their sign-in, waiting for an invitation. Student numbers are stored in capitals and cannot be changed later.</p>
-        <AddStudentForm />
-        <p><Link className="text-link" href="/staff/students/import">Import many students from a CSV file →</Link></p>
+          <Link className="text-link" href="/staff/academy">Academy classes →</Link></p>
+        <Disclosure summary="Add a student who is not in the Academy records">
+          <p className="panel-sub">This also creates their sign-in, waiting for an invitation. Student numbers are stored in capitals and
+            cannot be changed later.</p>
+          <AddStudentForm />
+        </Disclosure>
+        <p className="link-row"><Link className="text-link" href="/staff/students/import">Import many students from a CSV file →</Link></p>
       </section>
       <section className="panel panel-gap" aria-labelledby="invite-all-title">
         <h2 id="invite-all-title" className="panel-title">INVITE BY EMAIL</h2>
-        {studentIdLoginEnabled() && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
-          for email sign-in. Students without an email of their own are never emailed.</p>}
-        <BulkInviteForm batchId={null} scope="every active student" />
+        <Disclosure summary="Email sign-in links to students">
+          {studentIdLoginEnabled() && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
+            for email sign-in. Students without an email of their own are never emailed.</p>}
+          <BulkInviteForm batchId={null} scope="every active student" />
+        </Disclosure>
       </section>
       {failures.ok && failures.data.length > 0 && <section className="panel panel-gap" aria-labelledby="failed-invites-title">
         <h2 id="failed-invites-title" className="panel-title">EMAILS THAT FAILED</h2>

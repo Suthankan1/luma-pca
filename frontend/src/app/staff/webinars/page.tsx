@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { StaffShell } from "@/components/StaffShell";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { Disclosure } from "@/components/Disclosure";
 import { AddWebinarForm, WebinarActions } from "@/components/staff/WebinarForms";
 import { requirePortal } from "@/lib/auth-server";
 import { renderTime } from "@/lib/insights";
@@ -32,6 +33,46 @@ function RunRow({ run, timeZone, now }: { run: WebinarRun; timeZone: string | nu
   </li>;
 }
 
+function WebinarCard({ m, now, classOptions }: { m: WebinarMonitor; now: number; classOptions: string[] | null }) {
+  const sync = syncNote(m, now);
+  const upcoming = upcomingOccurrences(m.occurrences, now);
+  const title = m.topic ?? `Webinar ${formatWebinarId(m.webinarId)}`;
+  return <li className={`webinar-card ${m.active ? "" : "is-stopped"}`} aria-label={`Webinar ${formatWebinarId(m.webinarId)}`}>
+    <div className="webinar-head">
+      <div>
+        <p className="webinar-title">{title}</p>
+        <p className="muted">ID {formatWebinarId(m.webinarId)} · {zoomSchedule(m)}</p>
+      </div>
+      <span className="dir-meta">
+        {m.live ? <span className="pill pill-live">Live</span> : <span className="state">{m.active ? "Not live" : "Not monitored"}</span>}
+        {/* Students are expected only when the class is matched AND set up as a batch: say which step is missing. */}
+        <span className={`state ${m.classResolved && m.classBatchId ? "state-final" : "state-warn"}`}>{!m.classResolved ? "Class unresolved"
+          : m.classBatchId ? "Class matched" : "Class not set up"}</span>
+      </span>
+    </div>
+    <p className={`class-note ${m.classResolved ? "" : "is-unresolved"}`}>
+      {m.classResolved
+        ? <>Academy class: <strong>{m.academyClassName}</strong> ({m.classSource === "ADMIN" ? "chosen by staff" : "matches the Zoom title"})
+          {m.classBatchId ? <> · <Link className="text-link" href={`/staff/batches/${m.classBatchId}`}>students</Link></>
+            : <> · not set up in LUMA yet: <Link className="text-link" href="/staff/academy">set it up</Link> so its students are expected</>}</>
+        : <>Academy class unresolved: the Zoom title matches no single Academy class. Choose it under “Manage webinar”; until then
+          attendance is recorded but nobody is expected or marked absent.</>}
+    </p>
+    {upcoming.length > 0 && <Disclosure className="plain" summary="Next in Zoom" hint={`${upcoming.length} date${upcoming.length === 1 ? "" : "s"}`}>
+      <ul className="occurrence-list">{upcoming.map(o => <li key={o.occurrenceId ?? o.startTime}>{formatWhen(o.startTime!, m.timeZone)}
+        {o.durationMinutes ? ` · ${o.durationMinutes} min` : ""}</li>)}</ul>
+    </Disclosure>}
+    <Disclosure summary="Manage webinar" hint={sync.stale ? "Zoom copy not current" : undefined}>
+      <p className={`sync-note ${sync.stale ? "is-stale" : ""}`}>{sync.text}</p>
+      <WebinarActions monitorId={m.id} topic={title} active={m.active} academyClassName={m.academyClassName} classOptions={classOptions} />
+    </Disclosure>
+    <Disclosure summary="Run history" hint={m.runs.length}>
+      {m.runs.length === 0 ? <p className="muted">No run yet. Each time Zoom starts this webinar, a run appears here.</p>
+        : <ul className="dir-list">{m.runs.map(run => <RunRow key={run.occurrenceUuid} run={run} timeZone={m.timeZone} now={now} />)}</ul>}
+    </Disclosure>
+  </li>;
+}
+
 export default async function WebinarsPage() {
   const identity = await requirePortal("staff");
   const shell = { active: "webinars" as const, crumb: "Teaching", title: "Webinars",
@@ -55,6 +96,8 @@ export default async function WebinarsPage() {
     </StaffShell>;
   }
   const live = monitors.data.filter(m => m.live);
+  const active = monitors.data.filter(m => m.active);
+  const stopped = monitors.data.filter(m => !m.active);
   // Refreshes while the page is open, so a webinar Zoom starts meanwhile appears without a reload (faster while one is live).
   const refreshUntil = new Date(now + 12 * 3600_000).toISOString();
 
@@ -90,46 +133,12 @@ export default async function WebinarsPage() {
     </section>
 
     <section className="panel panel-gap" aria-labelledby="timetable-title">
-      <h2 id="timetable-title" className="panel-title">ZOOM TIMETABLE</h2>
-      <p className="panel-sub">Read-only, from Zoom. Change a webinar’s title or time in Zoom; LUMA shows the change after it next reads Zoom
-        (every 30 minutes, or Refresh from Zoom).</p>
-      {monitors.data.length === 0 && <p className="muted">No webinars monitored yet. Add one above.</p>}
-      <ul className="webinar-cards">{monitors.data.map(m => {
-        const sync = syncNote(m, now);
-        const upcoming = upcomingOccurrences(m.occurrences, now);
-        const title = m.topic ?? `Webinar ${formatWebinarId(m.webinarId)}`;
-        return <li key={m.id} className={`webinar-card ${m.active ? "" : "is-stopped"}`} aria-label={`Webinar ${formatWebinarId(m.webinarId)}`}>
-          <div className="webinar-head">
-            <div>
-              <p className="webinar-title">{title}</p>
-              <p className="muted">ID {formatWebinarId(m.webinarId)} · {zoomSchedule(m)}</p>
-            </div>
-            <span className="dir-meta">
-              {m.live ? <span className="pill pill-live">Live</span> : <span className="state">{m.active ? "Not live" : "Not monitored"}</span>}
-            </span>
-          </div>
-          {upcoming.length > 0 && <div className="occurrences">
-            <p className="occurrences-label">Next in Zoom</p>
-            <ul>{upcoming.map(o => <li key={o.occurrenceId ?? o.startTime}>{formatWhen(o.startTime!, m.timeZone)}
-              {o.durationMinutes ? ` · ${o.durationMinutes} min` : ""}</li>)}</ul>
-          </div>}
-          <p className={`sync-note ${sync.stale ? "is-stale" : ""}`}>{sync.text}</p>
-          <p className={`class-note ${m.classResolved ? "" : "is-unresolved"}`}>
-            {m.classResolved
-              ? <>Academy class: <strong>{m.academyClassName}</strong> ({m.classSource === "ADMIN" ? "chosen by staff" : "matches the Zoom title"})
-                {m.classBatchId ? <> · <Link className="text-link" href={`/staff/batches/${m.classBatchId}`}>students</Link></>
-                  : <> · not set up in LUMA yet: <Link className="text-link" href="/staff/academy">set it up</Link> so its students are expected</>}</>
-              : <>Academy class unresolved: the Zoom title matches no single Academy class. Choose it below; until then attendance is recorded
-                but nobody is expected or marked absent.</>}
-          </p>
-          <WebinarActions monitorId={m.id} topic={title} active={m.active} academyClassName={m.academyClassName} classOptions={classOptions} />
-          <details className="runs">
-            <summary>Runs ({m.runs.length})</summary>
-            {m.runs.length === 0 ? <p className="muted">No run yet. Each time Zoom starts this webinar, a run appears here.</p>
-              : <ul className="dir-list">{m.runs.map(run => <RunRow key={run.occurrenceUuid} run={run} timeZone={m.timeZone} now={now} />)}</ul>}
-          </details>
-        </li>;
-      })}</ul>
+      <h2 id="timetable-title" className="panel-title">CONNECTED WEBINARS</h2>
+      <p className="panel-sub">Titles and times come from Zoom and are read-only here. Change them in Zoom; LUMA picks the change up within
+        30 minutes (or use Refresh from Zoom under Manage webinar).</p>
+      {monitors.data.length === 0 && <p className="muted">No webinars are connected yet. Add one by its Zoom ID or link above.</p>}
+      {/* Stopped webinars stay in the list (marked "Not monitored", last) so staff see the change and can resume them. */}
+      <ul className="webinar-cards">{[...active, ...stopped].map(m => <WebinarCard key={m.id} m={m} now={now} classOptions={classOptions} />)}</ul>
       {!classOptions && monitors.data.length > 0 && <p className="panel-sub">The Academy database is not connected, so Academy classes can’t be
         chosen here yet.</p>}
     </section>
