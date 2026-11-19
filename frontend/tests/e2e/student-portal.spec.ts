@@ -58,7 +58,7 @@ test.describe("Student portal", () => {
   test("The home page offers a student and a staff way in", async ({ page }) => {
     await page.context().clearCookies();
     await page.goto("/");
-    await page.getByRole("link", { name: /I’m a student/ }).click();
+    await page.getByRole("link", { name: /Student sign in/ }).click();
     await expect(page).toHaveURL(/\/sign-in\?portal=student$/);
   });
 

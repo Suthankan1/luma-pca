@@ -493,3 +493,60 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .attendance-intro .sub { font-size:14px; }
 .public-home .entry-cards { margin-top:40px; }
 @media (max-width:700px) { .public-home { padding-top:48px; } .attendance-intro .heading { letter-spacing:-1.5px; } .public-home .entry-cards { margin-top:30px; } }
+
+/* Landing classroom loop: teacher at the board, students answer the roll one by one (ClassroomScene.tsx). */
+.public-home { max-width:1160px; }
+.landing-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-areas:"intro scene" "cards scene"; column-gap:clamp(32px,4vw,56px); align-items:center; }
+.landing-grid .attendance-intro { grid-area:intro; align-self:end; }
+.landing-grid .entry-cards { grid-area:cards; align-self:start; }
+.classroom-scene { grid-area:scene; width:100%; border-radius:26px; overflow:hidden; border:1px solid #fff; background:#f3f8fc; box-shadow:0 24px 60px #31546b14,inset 0 1px 0 #fff; animation:material-enter .8s .18s ease both; }
+.classroom-scene svg { display:block; width:100%; height:auto; }
+.cs-label { font:700 9px/1 Arial,Helvetica,sans-serif; letter-spacing:2px; fill:#7d93a6; }
+.cs-label-strong { font-size:8px; letter-spacing:1.8px; fill:#56778a; }
+.cs-formula { font:italic 600 22px/1 Georgia,"Times New Roman",serif; }
+.cs-say { font:700 11px/1 Arial,Helvetica,sans-serif; fill:#22206a; text-anchor:middle; }
+.cs-cover { transform-box:fill-box; transform-origin:100% 50%; animation:cs-write-1 10.5s linear infinite; }
+.cs-cover-2 { animation-name:cs-write-2; }
+.cs-trajectory { stroke-dashoffset:1; animation:cs-draw 10.5s ease-in-out infinite; }
+.cs-ball { opacity:0; animation:cs-ball 10.5s linear infinite; }
+.cs-register { animation:note-float 6s ease-in-out infinite alternate; }
+.cs-tick { opacity:0; animation:cs-tick-1 10.5s ease-out infinite; }
+.cs-tick-2 { animation-name:cs-tick-2; }
+.cs-tick-3 { animation-name:cs-tick-3; }
+.cs-progress { transform-box:fill-box; transform-origin:0 50%; transform:scaleX(0); animation:cs-progress 10.5s ease-out infinite; }
+.cs-teacher { animation:cs-breathe 4.5s ease-in-out infinite alternate; }
+.cs-teacher-arm { animation:cs-point 3.5s ease-in-out infinite alternate; }
+.cs-sit { animation:cs-breathe 5s ease-in-out infinite alternate; }
+.cs-student-2 .cs-sit { animation-delay:-1.6s; }
+.cs-student-3 .cs-sit { animation-delay:-3.2s; }
+.cs-arm { transform:rotate(176deg); animation:cs-raise 10.5s ease-in-out infinite; }
+.cs-bubble { opacity:0; animation:cs-bubble 10.5s ease-out infinite; }
+.cs-student-1 :is(.cs-arm,.cs-bubble) { animation-delay:.5s; }
+.cs-student-2 :is(.cs-arm,.cs-bubble) { animation-delay:3.2s; }
+.cs-student-3 :is(.cs-arm,.cs-bubble) { animation-delay:5.9s; }
+@keyframes cs-write-1 { 0%,2% { transform:scaleX(1); } 12%,93% { transform:scaleX(0); } 98%,100% { transform:scaleX(1); } }
+@keyframes cs-write-2 { 0%,12% { transform:scaleX(1); } 24%,93% { transform:scaleX(0); } 98%,100% { transform:scaleX(1); } }
+@keyframes cs-draw { 0%,24% { stroke-dashoffset:1; opacity:1; } 40%,92% { stroke-dashoffset:0; opacity:1; } 97% { stroke-dashoffset:0; opacity:0; } 100% { stroke-dashoffset:1; opacity:0; } }
+@keyframes cs-ball { 0%,40% { opacity:0; } 43%,90% { opacity:1; } 94%,100% { opacity:0; } }
+@keyframes cs-raise { 0%,3% { transform:rotate(176deg); } 9% { transform:rotate(4deg); } 12% { transform:rotate(15deg); } 15% { transform:rotate(4deg); } 18% { transform:rotate(14deg); } 22% { transform:rotate(8deg); } 28%,100% { transform:rotate(176deg); } }
+@keyframes cs-bubble { 0%,8% { opacity:0; transform:scale(.4); } 11% { opacity:1; transform:scale(1.06); } 13%,23% { opacity:1; transform:scale(1); } 27%,100% { opacity:0; transform:scale(.6); } }
+@keyframes cs-tick-1 { 0%,15% { opacity:0; transform:scale(.3); } 18% { opacity:1; transform:scale(1.18); } 20%,92% { opacity:1; transform:scale(1); } 97%,100% { opacity:0; transform:scale(.3); } }
+@keyframes cs-tick-2 { 0%,41% { opacity:0; transform:scale(.3); } 44% { opacity:1; transform:scale(1.18); } 46%,92% { opacity:1; transform:scale(1); } 97%,100% { opacity:0; transform:scale(.3); } }
+@keyframes cs-tick-3 { 0%,67% { opacity:0; transform:scale(.3); } 70% { opacity:1; transform:scale(1.18); } 72%,92% { opacity:1; transform:scale(1); } 97%,100% { opacity:0; transform:scale(.3); } }
+@keyframes cs-progress { 0%,15% { transform:scaleX(0); } 18%,41% { transform:scaleX(.333); } 44%,67% { transform:scaleX(.667); } 70%,92% { transform:scaleX(1); } 97%,100% { transform:scaleX(0); } }
+@keyframes cs-breathe { from { transform:translateY(0); } to { transform:translateY(-2px); } }
+@keyframes cs-point { from { transform:rotate(-5deg); } to { transform:rotate(6deg); } }
+@media (max-width:900px) {
+  .landing-grid { grid-template-columns:minmax(0,1fr); grid-template-areas:"intro" "cards" "scene"; }
+  .classroom-scene { max-width:560px; margin-top:28px; border-radius:20px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .classroom-scene, .classroom-scene * { animation:none !important; }
+  .cs-cover { transform:scaleX(0); }
+  .cs-trajectory { stroke-dashoffset:0; }
+  .cs-ball { display:none; }
+  .cs-tick { opacity:1; }
+  .cs-progress { transform:scaleX(1); }
+  .cs-student-2 .cs-arm { transform:rotate(10deg); }
+  .cs-student-2 .cs-bubble { opacity:1; }
+}
