@@ -2335,6 +2335,7 @@ Tests:
 
 Next: consider collapsing the Team and Courses forms, and enlarging the inline links on Zoom review.
 
+
 ## Local startup verification — 2026-11-19 (Windows)
 
 - Installed frontend dependencies with `npm ci` (397 packages audited, zero reported vulnerabilities).
@@ -2362,3 +2363,9 @@ Next: consider collapsing the Team and Courses forms, and enlarging the inline l
 - Simplified `app/page.tsx` to “Track your attendance.” and student/staff sign-in cards. Removed learning-portal messaging, slogans, explanatory paragraphs and orbital illustration. Retained the PCA logo, glass surfaces and textured background. Updated the public footer in `Shell.tsx` and compact landing spacing in `globals.css`.
 - Passed: targeted ESLint; Edge checks at 1440/390/320px for heading, removal of old copy and no horizontal overflow; both portal links reach sign-in.
 - No backend/contracts changed; full suite and authenticated views not rerun. No deployment or database changes; rollback by reverting this slice's UI edits.
+
+## Local version history workflow - 2026-11-19
+
+- Created `feat/pca-attendance-ui` from main and recorded the prior local startup, logo reuse, visual refresh and attendance copy cleanup as four focused commits.
+- Added the owner's standing instruction to `AGENTS.md`: use a descriptive branch and automatically commit each small verified change; push only on explicit request.
+- Verified commit scope and whitespace with Git; no application behavior changed in this workflow slice. Prior UI checks remain recorded above. No deployment. All commits are local.

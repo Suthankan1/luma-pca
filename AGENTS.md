@@ -27,5 +27,11 @@ You are working on **LUMA for Physics Cube Academy**, an intended production sys
 ## Completion criteria for every slice
 State changed files, important decisions, tests actually run/passed, untested work, rollout and rollback concerns. Update `docs/ai/checkpoints/PROGRESS.md` and any affected diagrams/contracts. Avoid huge commits.
 
+## Version history (owner instruction)
+- Start new work on a descriptive feature or fix branch, never directly on `main`.
+- Commit each finished, verified small change automatically with a clear, scoped message; do not wait for the owner to request a commit.
+- Keep commits focused and include the relevant checkpoint evidence. Stage only the intended files or hunks; preserve unrelated work.
+- Keep commits local unless the owner explicitly requests a push. Do not include secrets, local environment files or generated build artifacts.
+
 ## Prototype source handling
 `references/legacy-frontend-demo/` is a **visual and interaction reference**, not secure application code and not a source of truth. Port its visual design gradually to Next.js, replacing simulated API logic with typed services.
