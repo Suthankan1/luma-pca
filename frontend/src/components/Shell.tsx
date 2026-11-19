@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { AcademyBrand } from "./AcademyBrand";
 import type { ReactNode } from "react";
 import type { Portal } from "@/lib/session-policy";
 
@@ -22,7 +22,7 @@ export function Shell({ children, active, otherPortal, studentSection }: {
   if (active === "student") {
     return <div className="shell">
       <aside className="aside staff-rail student-rail" aria-label="Academy navigation">
-        <Link href="/student" className="brand"><span className="brand-dot" aria-hidden /> luma</Link>
+        <AcademyBrand href="/student" />
         <nav className="staff-nav" aria-label="Student portal">
           {studentNav.map(item => <Link key={item.key} href={item.href}
             className={`staff-navitem ${(studentSection ?? "home") === item.key ? "active" : ""}`}
@@ -53,7 +53,6 @@ export function Shell({ children, active, otherPortal, studentSection }: {
         {otherPortal && <Link className="navitem" href={`/${otherPortal}`}>Student portal</Link>}
       </> : <Link className={`navitem ${active === "home" ? "active" : ""}`} href="/"
         aria-current={active === "home" ? "page" : undefined}>Platform home</Link>}
-      <Image className="brandtile" src="/physics-cube-academy-logo.jpg" alt="Physics Cube Academy" width={560} height={300} priority />
     </aside>
     <main className="content">{children}</main>
   </div>;

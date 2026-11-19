@@ -2343,3 +2343,10 @@ Next: consider collapsing the Team and Courses forms, and enlarging the inline l
 - Existing root environment points to hosted services. The first backend attempt loaded it and was stopped; subsequent startup explicitly overrides config import and uses local database settings with Academy payments, mail and Zoom integrations disabled.
 - No application code or contracts changed. No full test suite run; verification covers startup and HTTP availability only. Fresh local database has no owner account, so sign-in requires owner bootstrap. Integrations were not verified.
 - No deployment performed. Stop the local development processes/container to roll back; the local database volume persists. Development signing/MFA keys are ephemeral.
+
+## PCA logo reuse — 2026-11-19
+
+- Reused the existing unchanged PCA image as the sole navigation logo across public, staff and student shells through `AcademyBrand.tsx`; removed the separate LUMA symbols/wordmarks and duplicate public logo tile. Updated shared logo sizing in `globals.css`.
+- Verified sign-in in Edge at 1440px and 390px: one decoded logo and no horizontal overflow; inspected the mobile screenshot. ESLint passed. TypeScript verification recorded below after completion.
+- No API, authorization, contracts or diagrams changed. Authenticated staff/student views were not exercised in the browser; both use the same shared logo component. No deployment; rollback is reverting the component/shell/style changes.
+- Typecheck: `npm run typecheck` passed.

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LinkPending } from "./LinkPending";
+import { AcademyBrand } from "./AcademyBrand";
 import type { ReactNode } from "react";
 
 /** The staff menu, in groups people think in: what is happening, teaching, people, and setup. */
@@ -46,7 +47,7 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, a
 }) {
   return <div className="shell">
     <aside className="aside staff-rail" aria-label="Staff navigation">
-      <Link href="/staff" className="brand"><span className="brand-dot" aria-hidden /> luma</Link>
+      <AcademyBrand href="/staff" />
       <nav className="staff-nav">
         {staffNavGroups.map(group => <div key={group.label} className="staff-navgroup" role="group" aria-label={group.label}>
           <span className="staff-navlabel" aria-hidden>{group.label}</span>
