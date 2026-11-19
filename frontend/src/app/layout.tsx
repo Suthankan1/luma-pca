@@ -15,7 +15,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const destination = identity ? portalPath(identity) : null;
 
   return (
-    <html lang="en" data-scroll-behavior="smooth">
+    // Browser extensions may add root attributes before hydration (e.g. crxlauncher).
+    // Limit suppression to this element; descendants still report hydration mismatches.
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body>
         <SessionSync authenticated={authenticated} destination={destination} />
         {children}

@@ -2369,3 +2369,10 @@ Next: consider collapsing the Team and Courses forms, and enlarging the inline l
 - Created `feat/pca-attendance-ui` from main and recorded the prior local startup, logo reuse, visual refresh and attendance copy cleanup as four focused commits.
 - Added the owner's standing instruction to `AGENTS.md`: use a descriptive branch and automatically commit each small verified change; push only on explicit request.
 - Verified commit scope and whitespace with Git; no application behavior changed in this workflow slice. Prior UI checks remain recorded above. No deployment. All commits are local.
+
+## Extension root-attribute hydration warning - 2026-11-19
+
+- Branch: `fix/extension-hydration-warning`. The reported stack points to an extension content script adding `crxlauncher` / `crxlauncher-bridged` on the document root before React hydration.
+- Changed only `frontend/src/app/layout.tsx` to suppress unavoidable hydration warnings on the root HTML element, with a comment explaining the scope. No application content or authentication behavior changed.
+- Passed: targeted ESLint and TypeScript. Edge response-mutation verification injected both reported attributes before hydration: zero hydration warnings on HTML; the same injected attributes on a nested H1 still produced a hydration warning. Test browser disabled Edge local-network checks after the initial control failed to hydrate under that browser restriction. Actual installed extension was not controlled or modified.
+- No full suite, deployment or database changes. Limitation: other root-attribute mismatches are also suppressed. Rollback: remove the root suppression and explanatory comment.
