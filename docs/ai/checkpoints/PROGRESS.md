@@ -2397,3 +2397,7 @@ Next: consider collapsing the Team and Courses forms, and enlarging the inline l
 The BFF now validates the access token against the identity endpoint before it uses the session for portal redirects. After the local backend switched databases and signing keys, an older sealed cookie could otherwise keep sending the browser from sign-in back to a portal that rejected the token. The HTTP smoke test covers a rejected token inside a valid sealed cookie and checks both the sign-in page and the session status endpoint.
 
 Validation passed on Windows with Next.js 16.4.6: `npm test` (79 tests), `npm run build`, and `npm run test:smoke`. Targeted ESLint passed on both changed frontend files. Live Supabase sign-in and MFA were not exercised by the smoke test. The change adds an identity lookup to authenticated frontend requests. No schema or cookie format changed. Revert the frontend commit to roll back.
+
+## MFA Cancel button contrast (2026-11-19)
+
+Public authentication forms now keep the light secondary button background so the navy Cancel label is readable in both MFA states. Verified the computed secondary colors and primary gradient in Edge using the running sign-in page and the MFA button classes. Full MFA sign-in was not rerun. This stylesheet-only change requires no migration. Revert the commit to roll back.
