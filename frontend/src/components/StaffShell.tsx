@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 const staffNav = [
   { key: "overview", label: "Home", href: "/staff", icon: "◷" },
   { key: "sessions", label: "Classes", href: "/staff/sessions", icon: "▶" },
+  { key: "class-types", label: "Class Types", href: "/staff/class-types", icon: "▦" },
   { key: "students", label: "Students", href: "/staff/students", icon: "☺" },
 ] as const;
 

@@ -16,9 +16,11 @@ type Enrolment = { studentId: string; studentName: string; studentNumber: string
 type SessionRate = { session: ClassSession; percent: number | null };
 const timeout = 25000;
 
-export default async function ClassTypePage({ searchParams }: { searchParams: Promise<{ type?: string | string[]; month?: string | string[] }> }) {
+export default async function ClassTypePage({ searchParams }: {
+  searchParams: Promise<{ type?: string | string[]; month?: string | string[]; source?: string | string[] }>;
+}) {
   const identity = await requirePortal("staff");
-  const { type, month: requestedMonth } = await searchParams;
+  const { type, month: requestedMonth, source } = await searchParams;
   if (typeof type !== "string" || !type) notFound();
   const now = renderTime();
   const today = academyToday(new Date(now));
@@ -26,8 +28,11 @@ export default async function ClassTypePage({ searchParams }: { searchParams: Pr
   if (!through) notFound();
   const range = new URLSearchParams({ from: fromInstant, to: toInstant });
   const sessions = await staffApi<ClassSession[]>(`/api/v1/class-sessions?${range}`, undefined, timeout);
-  const shell = { active: "sessions" as const, crumb: "Teaching / Classes", hasStudentPortal: hasPortal(identity, "student"),
-    actions: <Link href={`/staff/sessions?month=${month}`} className="text-link">← Back to Classes</Link> };
+  const standalone = source === "class-types";
+  const label = standalone ? "Class Types" : "Classes";
+  const shell = { active: standalone ? "class-types" as const : "sessions" as const, crumb: `Teaching / ${label}`,
+    hasStudentPortal: hasPortal(identity, "student"),
+    actions: <Link href={`/staff/${standalone ? "class-types" : "sessions"}?month=${month}`} className="text-link">← Back to {label}</Link> };
   if (!sessions.ok) return <StaffShell {...shell} title="Class type attendance" subtitle={monthLabel(month)}>
     <p className="session-error">Class history couldn’t load. Please reload.</p>
   </StaffShell>;

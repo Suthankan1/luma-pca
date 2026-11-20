@@ -2670,3 +2670,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The class chart includes every ended class record from the selected month through today. Classes without a rate show a dash. Upcoming schedule entries do not appear in the attendance chart. Both panels share one schedule and one attendance totals request. Legacy date links still select the corresponding month.
 - Passed 78 frontend unit tests, TypeScript, targeted ESLint, the structure check, and desktop/mobile mock browser checks for the legacy schedule and the new month picker, scroll position, leap-month boundaries, chart coverage, and detail links. API readiness and sign-in smoke passed. Signed-in verification with original data was not run.
 - Frontend-only change with existing APIs. Revert this commit to roll back. No migration is needed.
+
+## Standalone Class Types page (2026-11-21)
+
+- Added Class Types to staff navigation. The standalone page reuses the monthly class-type list, attendance chart, and staff data requests from Classes. Opening a detail from the new tab preserves the month and returns to Class Types. The Classes panel still opens details in the Classes navigation context.
+- Passed 78 unit tests, TypeScript, targeted ESLint, the structure check, and all six desktop and mobile mock browser checks. The live route redirected an unauthenticated request to staff sign-in and API readiness was UP. Signed-in verification with original data was not run.
+- Frontend-only change with existing APIs. Revert this commit to roll back. No migration is needed.

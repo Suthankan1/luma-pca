@@ -123,5 +123,19 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await types.getByRole("link", { name: /February review/ }).click();
     await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: /Back to Classes/ })).toHaveAttribute("href", `/staff/sessions?month=${year}-02`);
+
+    const menuLink = page.getByRole("navigation", { name: "Staff sections" }).getByRole("link", { name: "Class Types", exact: true });
+    await menuLink.click();
+    await expect(page.getByRole("heading", { name: "Class Types", level: 1 })).toBeVisible();
+    await expect(menuLink).toHaveAttribute("aria-current", "page");
+    await expect(schedule).toHaveCount(0);
+    await page.getByLabel("Class month", { exact: true }).fill(`${year}-02`);
+    await page.getByRole("button", { name: "View", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));
+    await page.getByRole("region", { name: "Completed class types" }).getByRole("link", { name: /February review/ }).click();
+    await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
+    await expect(menuLink).toHaveAttribute("aria-current", "page");
+    await page.getByRole("link", { name: /Back to Class Types/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));
   });
 });

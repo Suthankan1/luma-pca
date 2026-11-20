@@ -11,6 +11,7 @@ const sections: Record<string, { active: StaffSection; crumb: string; title: str
   courses: { active: "courses", crumb: "Academic setup", title: "Courses & batches" },
   batches: { active: "courses", crumb: "Academic setup", title: "Batch" },
   sessions: { active: "sessions", crumb: "Teaching", title: "Classes" },
+  "class-types": { active: "class-types", crumb: "Teaching", title: "Class Types" },
   students: { active: "students", crumb: "People", title: "Students" },
   attendance: { active: "attendance", crumb: "Oversight", title: "Attendance" },
   zoom: { active: "zoom", crumb: "Zoom", title: "Zoom review" },

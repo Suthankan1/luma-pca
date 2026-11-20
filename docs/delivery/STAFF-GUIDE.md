@@ -5,7 +5,7 @@ Every staff account signs in with its email and password. Choose a strong passwo
 Change your password with **Change password** at the top of every staff page; you are signed out everywhere afterwards.
 
 ## Every day
-The staff sidebar has **Home**, **Classes**, and **Students**. Use links inside those pages or an existing bookmark to reach supporting screens.
+The staff sidebar has **Home**, **Classes**, **Class Types**, and **Students**. Use links inside those pages or an existing bookmark to reach supporting screens.
 
 The **Staff portal** home shows today's classes and what needs attention (classes to finalise, appeals, Zoom
 accounts to match, failed Zoom events); each line opens the page where it is handled.
@@ -19,6 +19,8 @@ accounts to match, failed Zoom events); each line opens the page where it is han
    a colleague or block someone who left, ask the operator (`docs/delivery/runbooks/STAFF-ACCOUNTS.md`).
 
 ## Timetable and Zoom
+- **Class Types** opens the monthly class-type list and attendance chart on their own page. Choose a month and open a
+  class type for its session and student attendance.
 - **Classes** shows a calendar month in Sri Lanka time and opens the current schedule at today. Change the month to
   update the schedule, attendance charts, and class types together. The attendance chart shows each completed class
   in that month through today. **Track a Zoom link** sits below the panels. Paste a join link or webinar ID and press
