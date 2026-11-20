@@ -2604,3 +2604,8 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Kept the two-week Classes schedule and added an adjacent month-to-date list of class types. Narrow screens stack the panels. Expanding a type shows its completed session dates and times in Sri Lanka time, newest first. Grouping uses the visible class and batch title and ignores suffixes after the second pipe. Older timetable entries keep their scheduled-time label.
 - Uses the existing academy-scoped class-sessions API. Passed 76 frontend unit tests, regenerated route types and TypeScript, targeted lint, and the structure check. The original Supabase-backed API reported UP, and sign-in returned 200. Signed-in browser rendering of the new panel was not verified.
 - Frontend-only change. Revert the commit to roll back. No migration is needed.
+
+## Classes panel order and scrolling (2026-11-20)
+
+- The two equal-height Classes panels sit above the Zoom tracking form. Each list scrolls independently with its heading and controls still visible. On narrow screens the panels stack.
+- TypeScript, targeted lint, and the structure check passed. Supabase-backed API readiness was UP and sign-in returned 200. A signed-in visual check was not run. Frontend-only change, reversible by reverting the commit.

@@ -51,17 +51,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   const count = days.reduce((n, day) => n + (byDay.get(day)?.length ?? 0), 0);
 
   return <StaffShell {...shell}>
-    <section className="panel" aria-labelledby="track-title">
-      <h2 id="track-title" className="panel-title">TRACK A ZOOM LINK</h2>
-      <AddWebinarForm />
-      {monitors.ok && monitorList.length > 0 && <Suspense fallback={<p className="panel-sub">Loading tracked links…</p>}>
-        <TrackedLinks monitors={monitorList} />
-      </Suspense>}
-      {!monitors.ok && <p className="session-error" role="alert">Tracked Zoom links couldn’t load, so Zoom’s scheduled classes are
-        missing below. Please reload shortly.</p>}
-    </section>
-
-    <div className="classes-overview panel-gap">
+    <div className="classes-overview">
       <section className="panel" aria-labelledby="classes-title">
         <h2 id="classes-title" className="panel-title">CLASSES</h2>
         <p className="panel-sub">{formatDate(window.from)} – {formatDate(window.lastDay)} · Sri Lanka time · {count} class{count === 1 ? "" : "es"}</p>
@@ -70,30 +60,40 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
           <Link className="text-link" href={sessionListHref({})}>From today</Link>
           <Link className="text-link" href={sessionListHref({ from: window.next })}>Next two weeks →</Link>
         </nav>
-        {!sessions.ok && <p className="session-error" role="alert">We couldn’t load classes right now. Please reload the page shortly.</p>}
-        {sessions.ok && days.length === 0 && <p className="dir-empty muted">No classes in these two weeks.
-          {monitorList.length === 0 ? " Track a Zoom link above to see its classes here." : ""}</p>}
-        {days.map(day => <div key={day} className="class-day" role="group" aria-label={longDayLabel(day)}>
-          <h3 className="class-day-title">{longDayLabel(day)}</h3>
-          <ul className="home-day-list">{byDay.get(day)!.map(entry => {
-            const body = <>
-              <span className="home-entry-time">{timeRange(entry)}</span>
-              <span className="home-entry-copy">
-                <OneLineTitle text={entry.title} />
-                <span className="home-entry-meta">{entryNote(entry)}</span>
-              </span>
-              <span className={`home-state home-state-${entry.state}`}>{stateLabels[entry.state]}</span>
-            </>;
-            return <li key={entry.key} className={`home-entry home-entry-${entry.state}`} aria-label={`${entry.title}, ${stateLabels[entry.state]}`}>
-              {entry.sessionId ? <Link href={entry.href}>{body}</Link> : <div className="home-entry-static">{body}</div>}
-            </li>;
-          })}</ul>
+        <div className="classes-panel-scroll" tabIndex={0} role="region" aria-label="Two-week schedule">
+          {!sessions.ok && <p className="session-error" role="alert">We couldn’t load classes right now. Please reload the page shortly.</p>}
+          {sessions.ok && days.length === 0 && <p className="dir-empty muted">No classes in these two weeks.
+            {monitorList.length === 0 ? " Track a Zoom link below to see its classes here." : ""}</p>}
+          {days.map(day => <div key={day} className="class-day" role="group" aria-label={longDayLabel(day)}>
+            <h3 className="class-day-title">{longDayLabel(day)}</h3>
+            <ul className="home-day-list">{byDay.get(day)!.map(entry => {
+              const body = <>
+                <span className="home-entry-time">{timeRange(entry)}</span>
+                <span className="home-entry-copy">
+                  <OneLineTitle text={entry.title} />
+                  <span className="home-entry-meta">{entryNote(entry)}</span>
+                </span>
+                <span className={`home-state home-state-${entry.state}`}>{stateLabels[entry.state]}</span>
+              </>;
+              return <li key={entry.key} className={`home-entry home-entry-${entry.state}`} aria-label={`${entry.title}, ${stateLabels[entry.state]}`}>
+                {entry.sessionId ? <Link href={entry.href}>{body}</Link> : <div className="home-entry-static">{body}</div>}
+              </li>;
+            })}</ul>
         </div>)}
+        </div>
       </section>
       <Suspense fallback={<section className="panel"><p className="panel-sub">Loading class types…</p></section>}>
         <ClassTypes month={month} today={today} now={now} />
       </Suspense>
     </div>
+    <section className="panel panel-gap" aria-labelledby="track-title">
+      <h2 id="track-title" className="panel-title">TRACK A ZOOM LINK</h2>
+      <AddWebinarForm />
+      {monitors.ok && monitorList.length > 0 && <Suspense fallback={<p className="panel-sub">Loading tracked links…</p>}>
+        <TrackedLinks monitors={monitorList} />
+      </Suspense>}
+      {!monitors.ok && <p className="session-error" role="alert">Tracked Zoom links couldn’t load. Please reload to see Zoom’s scheduled classes.</p>}
+    </section>
   </StaffShell>;
 }
 
@@ -106,19 +106,21 @@ async function ClassTypes({ month, today, now }: { month: string; today: string;
   return <section className="panel" aria-labelledby="class-types-title">
     <h2 className="panel-title" id="class-types-title">CLASS TYPES THIS MONTH</h2>
     <p className="panel-sub">{monthLabel(month)} · through {formatDate(today)}</p>
-    {!result.ok ? <p className="session-error" role="alert">Class types couldn’t load. Please reload shortly.</p>
-      : groups.length === 0 ? <p className="dir-empty muted">No completed class entries this month.</p>
-      : <div className="class-type-list">{groups.map(([key, group]) => <details className="class-type" key={key}>
-        <summary>
-          <span>{group.title}</span>
-          <span className="class-type-count">{group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}</span>
-        </summary>
-        <ul>{group.sessions.map(session => <li key={session.id}>
-          <span>{longDayLabel(instantParts(session.startsAt, ACADEMY_TIME_ZONE).date)}</span>
-          <span className="muted">{timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })}
-            {session.origin !== "ZOOM_RUN" && " · Scheduled time"}</span>
-        </li>)}</ul>
-      </details>)}</div>}
+    <div className="classes-panel-scroll" tabIndex={0} role="region" aria-label="Monthly class types and dates">
+      {!result.ok ? <p className="session-error" role="alert">Class types couldn’t load. Please reload shortly.</p>
+        : groups.length === 0 ? <p className="dir-empty muted">No completed class entries this month.</p>
+        : <div className="class-type-list">{groups.map(([key, group]) => <details className="class-type" key={key}>
+          <summary>
+            <span>{group.title}</span>
+            <span className="class-type-count">{group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}</span>
+          </summary>
+          <ul>{group.sessions.map(session => <li key={session.id}>
+            <span>{longDayLabel(instantParts(session.startsAt, ACADEMY_TIME_ZONE).date)}</span>
+            <span className="muted">{timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })}
+              {session.origin !== "ZOOM_RUN" && " · Scheduled time"}</span>
+          </li>)}</ul>
+        </details>)}</div>}
+    </div>
   </section>;
 }
 
