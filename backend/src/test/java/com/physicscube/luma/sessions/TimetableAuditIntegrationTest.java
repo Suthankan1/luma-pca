@@ -24,7 +24,7 @@ class TimetableAuditIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String course = fixtures.course("PHY-2027");
         batchA = fixtures.batch(course, "A");

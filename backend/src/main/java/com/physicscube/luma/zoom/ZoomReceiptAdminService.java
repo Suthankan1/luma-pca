@@ -32,7 +32,7 @@ public class ZoomReceiptAdminService {
     /** Newest first. */
     @Transactional(readOnly = true)
     public List<ZoomReceiptView> list(CurrentAccount caller, String status, int limit) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (!STATUSES.contains(status)) {
             throw new InvalidRequestException("status must be RECEIVED, PROCESSED or DEAD");
         }
@@ -55,7 +55,7 @@ public class ZoomReceiptAdminService {
      */
     @Transactional
     public void replay(CurrentAccount caller, UUID receiptId, String reason) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String why = reason == null ? "" : reason.strip();
         if (why.length() < 3 || why.length() > 300) {
             throw new InvalidRequestException("A reason of 3 to 300 characters is required");

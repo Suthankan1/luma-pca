@@ -34,7 +34,7 @@ class StudentHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
     }
 
@@ -93,7 +93,7 @@ class StudentHttpIntegrationTest extends StaffApiIntegrationTest {
 
         assertEquals(1, count("students"));
         assertEquals(accountsBefore, count("accounts"), "a rejected student must not leave an account behind");
-        String otherAdmin = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(academy("Other Academy"), Role.STAFF);
         assertEquals(201, new AcademyFixtures(api, otherAdmin).postStudent("PCA-001", "Other", "other@example.invalid").statusCode(),
                 "another academy may reuse the student number");
     }
@@ -185,7 +185,7 @@ class StudentHttpIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void studentsOfAnotherAcademyAreInvisibleAndUntouchable() {
         Map<String, Object> ours = fixtures.student("PCA-001", "s@example.invalid");
-        String outsider = tokenFor(academy("Other Academy"), Role.ACADEMY_OWNER);
+        String outsider = tokenFor(academy("Other Academy"), Role.STAFF);
         String path = "/api/v1/students/" + ours.get("id");
 
         assertEquals(404, api.get(path, outsider).statusCode());
@@ -195,13 +195,13 @@ class StudentHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void nonManagersCannotUseStaffStudentRoutes() {
+    void studentsCannotUseStaffStudentRoutes() {
         Map<String, Object> student = fixtures.student("PCA-001", "s@example.invalid");
         String path = "/api/v1/students/" + student.get("id");
         activate(UUID.fromString((String) student.get("accountId")));
         String self = login("s@example.invalid");
 
-        for (Role role : List.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST, Role.STUDENT)) {
+        for (Role role : List.of(Role.STUDENT)) {
             String token = tokenFor(academyId, role);
             assertEquals(403, api.get("/api/v1/students", token).statusCode(), role.name());
             assertEquals(403, api.get(path, token).statusCode(), role.name());
@@ -262,7 +262,7 @@ class StudentHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(201, fixtures.postStudent("PCA-203", "Ann 100% Sure_Thing", "ann@example.invalid").statusCode());
         assertEquals(201, fixtures.postStudent("ZX-9", "Someone Else", "someone@example.invalid").statusCode());
         UUID other = academy("Other Academy");
-        assertEquals(201, new AcademyFixtures(api, tokenFor(other, Role.ACADEMY_ADMIN))
+        assertEquals(201, new AcademyFixtures(api, tokenFor(other, Role.STAFF))
                 .postStudent("PCA-104", "Other Perera", "other.perera@example.invalid").statusCode());
 
         assertEquals(List.of("PCA-101", "PCA-102"), numbers(page("?q=perera")), "any letter case, other academies never");
@@ -282,6 +282,6 @@ class StudentHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(200, api.put("/api/v1/students/" + id, updateBody("Nimal Perera", false, 0), admin).statusCode());
         assertEquals(List.of("PCA-102"), numbers(page("?q=perera&active=true")));
         assertEquals(400, api.get("/api/v1/students?q=" + "x".repeat(101), admin).statusCode());
-        assertEquals(403, api.get("/api/v1/students?q=perera", tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+        assertEquals(403, api.get("/api/v1/students?q=perera", tokenFor(academyId, Role.STUDENT)).statusCode());
     }
 }

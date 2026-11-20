@@ -50,7 +50,7 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         course = fixtures.course("PHY-2027");
         batch = fixtures.batch(course, "MON");
@@ -179,12 +179,13 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void staffSeeOnlyTheirBatchesAndOtherAcademiesNothing() {
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(0, map(ok(api.get("/api/v1/attendance/dashboard", instructor)).get("totals")).get("classes"),
-                "not assigned to any batch");
+    void everyStaffMemberSeesTheWholeAcademyAndOtherAcademiesNothing() {
+        String colleague = tokenFor(academyId, Role.STAFF);
+        assertEquals(map(ok(api.get("/api/v1/attendance/dashboard", admin)).get("totals")),
+                map(ok(api.get("/api/v1/attendance/dashboard", colleague)).get("totals")), "no batch assignments any more");
+        assertEquals(200, api.get("/api/v1/students/" + amaya + "/attendance-overview", colleague).statusCode());
         UUID other = academy("Other academy");
-        String otherAdmin = tokenFor(other, Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(other, Role.STAFF);
         assertEquals(0, map(ok(api.get("/api/v1/attendance/dashboard", otherAdmin)).get("totals")).get("classes"));
         assertEquals(404, api.get("/api/v1/students/" + amaya + "/attendance-overview", otherAdmin).statusCode());
         assertTrue(api.get("/api/v1/attendance/dashboard", null).statusCode() == 401);
@@ -199,22 +200,15 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
 
         assertEquals(List.of(Map.of("id", classId, "expected", 2, "joined", 1)), classTotals(admin));
 
-        String instructorEmail = "teacher@example.test";
-        accountIdOf(instructorEmail, academyId, Role.INSTRUCTOR);
-        String instructor = login(instructorEmail);
-        assertEquals(List.of(), classTotals(instructor), "no assigned batches");
-        assertEquals(201, api.post("/api/v1/batches/" + otherBatch + "/assignments",
-                HttpApi.json(Map.of("email", instructorEmail, "role", "INSTRUCTOR")), admin).statusCode());
-        assertEquals(List.of(Map.of("id", classId, "expected", 1, "joined", 0)), classTotals(instructor),
-                "Amaya is outside the instructor's batch even though she joined the shared class");
+        assertEquals(classTotals(admin), classTotals(tokenFor(academyId, Role.STAFF)),
+                "every staff member sees the whole shared class");
     }
 
     @Test
     void classTotalsRequireStaffAndStayInsideTheAcademy() {
         assertEquals(401, api.get(CLASS_TOTALS, null).statusCode());
         assertEquals(403, api.get(CLASS_TOTALS, tokenFor(academyId, Role.STUDENT)).statusCode());
-        assertEquals(403, api.get(CLASS_TOTALS, tokenFor(academyId, Role.ANALYST)).statusCode());
-        assertEquals(List.of(), classTotals(tokenFor(academy("Other academy"), Role.ACADEMY_ADMIN)));
+        assertEquals(List.of(), classTotals(tokenFor(academy("Other academy"), Role.STAFF)));
     }
 
     @Test

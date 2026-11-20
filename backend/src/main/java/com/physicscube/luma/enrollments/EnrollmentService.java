@@ -24,9 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Batch enrollments. Owners and administrators manage them; staff assigned to a
- * batch may read its roster. A student reads only their
- * own enrollments, never a roster. Records of another academy are reported as not found.
+ * Batch enrollments. Staff manage them and read every roster of their academy. A student
+ * reads only their own enrollments, never a roster. Records of another academy are reported as not found.
  */
 @Service
 public class EnrollmentService {
@@ -49,7 +48,7 @@ public class EnrollmentService {
 
     @Transactional(readOnly = true)
     public List<EnrollmentView> forStudent(CurrentAccount caller, UUID studentId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         students.requireInAcademy(caller.academyId(), studentId);
         return views(caller.academyId(), enrollments.findByAcademyIdAndStudentId(caller.academyId(), studentId));
     }
@@ -65,7 +64,7 @@ public class EnrollmentService {
 
     @Transactional
     public EnrollmentView enroll(CurrentAccount caller, UUID batchId, UUID studentId, LocalDate enrolledOn) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         BatchView batch = batches.requireInAcademy(caller.academyId(), batchId);
         StudentView student = students.requireInAcademy(caller.academyId(), studentId);
         if (!batch.active()) {
@@ -88,7 +87,7 @@ public class EnrollmentService {
     /** Checks the batch can take enrolments: in the caller's academy (else not found) and active. */
     @Transactional(readOnly = true)
     public BatchView requireOpenBatch(CurrentAccount caller, UUID batchId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         BatchView batch = batches.requireInAcademy(caller.academyId(), batchId);
         if (!batch.active()) {
             throw new ConflictException("Students cannot be enrolled in an inactive batch");
@@ -109,7 +108,7 @@ public class EnrollmentService {
     @Transactional
     public EnrollmentView update(CurrentAccount caller, UUID enrollmentId, LocalDate enrolledOn, LocalDate withdrawnOn,
                                  long expectedVersion) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (withdrawnOn != null && withdrawnOn.isBefore(enrolledOn)) {
             throw new InvalidRequestException("withdrawnOn must not be before enrolledOn");
         }

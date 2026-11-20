@@ -36,7 +36,7 @@ class InvitationEmailHttpIntegrationTest extends StaffApiIntegrationTest {
     void seed() {
         CapturedMail.SENT.clear();
         academyId = academy("Mail Academy");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
     }
 
     private UUID pendingTeacher(String email) {
@@ -113,9 +113,9 @@ class InvitationEmailHttpIntegrationTest extends StaffApiIntegrationTest {
     void refusedInvitationsSendNothing() throws Exception {
         UUID teacher = pendingTeacher("teacher@example.invalid");
         assertEquals(400, invite(admin, teacher, "{\"delivery\":\"SMS\"}").statusCode());
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(403, invite(instructor, teacher, "{\"delivery\":\"EMAIL\"}").statusCode());
-        UUID active = accountIdOf("active@example.invalid", academyId, Role.INSTRUCTOR);
+        String student = tokenFor(academyId, Role.STUDENT);
+        assertEquals(403, invite(student, teacher, "{\"delivery\":\"EMAIL\"}").statusCode());
+        UUID active = accountIdOf("active@example.invalid", academyId, Role.STAFF);
         assertEquals(409, invite(admin, active, "{\"delivery\":\"EMAIL\"}").statusCode());
         assertEquals(404, invite(admin, UUID.randomUUID(), "{\"delivery\":\"EMAIL\"}").statusCode());
         assertNoMail();

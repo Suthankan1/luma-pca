@@ -6,9 +6,7 @@ import com.physicscube.luma.identity.StaffAccountView;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.time.Instant;
@@ -21,7 +19,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,10 +30,8 @@ class StaffAccountController {
         this.staff = staff;
     }
 
-    record CreateStaffRequest(@NotBlank @Size(max = 254) String email, @NotNull @Size(max = 5) List<String> roles) {
-    }
-
-    record ReplaceRolesRequest(@NotNull @Size(max = 5) List<String> roles, @NotNull @PositiveOrZero Long version) {
+    /** Every staff account has the one STAFF role, so only the email is given. */
+    record CreateStaffRequest(@NotBlank @Size(max = 254) String email) {
     }
 
     record InviteRequest(@Pattern(regexp = "LINK|EMAIL") String delivery) {
@@ -63,14 +58,8 @@ class StaffAccountController {
 
     @PostMapping("/api/v1/staff-accounts")
     ResponseEntity<StaffAccountView> create(JwtAuthenticationToken authentication, @Valid @RequestBody CreateStaffRequest request) {
-        StaffAccountView created = staff.create(CurrentAccount.from(authentication), request.email(), request.roles());
+        StaffAccountView created = staff.create(CurrentAccount.from(authentication), request.email());
         return ResponseEntity.created(URI.create("/api/v1/staff-accounts/" + created.id())).body(created);
-    }
-
-    @PutMapping("/api/v1/staff-accounts/{accountId}/roles")
-    StaffAccountView replaceRoles(JwtAuthenticationToken authentication, @PathVariable UUID accountId,
-                                  @Valid @RequestBody ReplaceRolesRequest request) {
-        return staff.replaceRoles(CurrentAccount.from(authentication), accountId, request.roles(), request.version());
     }
 
     record EnableRequest(Boolean requireNewPassword) {
@@ -92,7 +81,7 @@ class StaffAccountController {
     /** For any pending account of the academy, staff or student. Replaces any earlier invitation. */
     /**
      * {@code delivery} LINK (the default, also with no body) returns the link for the
-     * administrator to send. EMAIL emails it to the account's address and does not return
+     * staff member to send. EMAIL emails it to the account's address and does not return
      * it, so the token reaches only the invitee; 503 when email is not set up.
      */
     @PostMapping("/api/v1/accounts/{accountId}/invitations")

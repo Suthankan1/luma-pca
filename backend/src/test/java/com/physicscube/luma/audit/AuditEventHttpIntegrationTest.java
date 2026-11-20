@@ -26,7 +26,7 @@ class AuditEventHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        accountIdOf("owner@example.invalid", academyId, Role.ACADEMY_OWNER);
+        accountIdOf("owner@example.invalid", academyId, Role.STAFF);
         owner = login("owner@example.invalid");
         HttpResponse<String> created = api.post("/api/v1/staff-accounts",
                 "{\"email\":\"teacher@example.invalid\",\"roles\":[\"INSTRUCTOR\"]}", owner);
@@ -104,12 +104,11 @@ class AuditEventHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void onlyOwnersAndAdministratorsOfTheAcademySeeIt() {
-        assertEquals(4, items("", tokenFor(academyId, Role.ACADEMY_ADMIN)).size());
-        assertEquals(403, api.get("/api/v1/audit-events", tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
-        assertEquals(403, api.get("/api/v1/audit-events", tokenFor(academyId, Role.ANALYST)).statusCode());
+    void onlyStaffOfTheAcademySeeIt() {
+        assertEquals(4, items("", tokenFor(academyId, Role.STAFF)).size());
+        assertEquals(403, api.get("/api/v1/audit-events", tokenFor(academyId, Role.STUDENT)).statusCode());
         assertEquals(401, api.get("/api/v1/audit-events", null).statusCode());
-        assertEquals(List.of(), items("", tokenFor(academy("Other Academy"), Role.ACADEMY_OWNER)), "another academy sees none of it");
+        assertEquals(List.of(), items("", tokenFor(academy("Other Academy"), Role.STAFF)), "another academy sees none of it");
         for (String bad : List.of("?limit=0", "?limit=201", "?before=yesterday", "?before=1_not-a-uuid", "?targetId=nope")) {
             assertEquals(400, api.get("/api/v1/audit-events" + bad, owner).statusCode(), bad);
         }

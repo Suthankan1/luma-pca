@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Check any of the academy's webinars by its join link or ID, including runs LUMA never received
  * live events for: list the webinar's past runs from Zoom, fetch Zoom's participant report for one
  * (stored like any other report), show who attended matched to students, and link the run to a class
- * so its attendance can be finalised there. Owners and administrators only; read-only Zoom calls.
+ * so its attendance can be finalised there. Staff only; read-only Zoom calls.
  */
 @Service
 public class ZoomLookupService {
@@ -100,7 +100,7 @@ public class ZoomLookupService {
 
     @Transactional(readOnly = true)
     public WebinarLookup lookup(CurrentAccount caller, String input) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String id = webinarId(input);
         ZoomApiClient client = client();
         ZoomApiClient.Webinar webinar;
@@ -129,7 +129,7 @@ public class ZoomLookupService {
 
     /** Fetches (or re-fetches) Zoom's participant report for one past run of the webinar. Audited. */
     public RunAttendance fetch(CurrentAccount caller, String input, String occurrenceUuid) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String id = webinarId(input);
         requirePastRun(id, occurrenceUuid);
         ZoomReportService.FetchResult result = reports.fetch(caller.academyId(), occurrenceUuid, id);
@@ -145,7 +145,7 @@ public class ZoomLookupService {
     /** Who attended a run, from its stored report. 404 until the report has been fetched. */
     @Transactional(readOnly = true)
     public RunAttendance attendance(CurrentAccount caller, String webinarId, String occurrenceUuid) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         Integer fetched = jdbc.queryForObject("SELECT count(*) FROM zoom_report_fetches WHERE academy_id = ? AND occurrence_uuid = ? "
                 + "AND status = 'FETCHED'", Integer.class, caller.academyId(), occurrenceUuid);
         if (fetched == null || fetched == 0) {
@@ -199,7 +199,7 @@ public class ZoomLookupService {
      */
     @Transactional
     public RunAttendance link(CurrentAccount caller, String input, String occurrenceUuid, UUID sessionId, String reason) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String id = webinarId(input);
         String why = reason == null ? "" : reason.strip();
         if (why.length() < 3 || why.length() > 300) {

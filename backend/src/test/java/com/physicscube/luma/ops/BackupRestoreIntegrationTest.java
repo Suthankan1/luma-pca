@@ -32,7 +32,7 @@ class BackupRestoreIntegrationTest extends StaffApiIntegrationTest {
 
     private void seed() {
         UUID academyId = academy("Restore Drill Academy");
-        accountIdOf("owner@example.invalid", academyId, Role.ACADEMY_OWNER);
+        accountIdOf("owner@example.invalid", academyId, Role.STAFF);
         String owner = login("owner@example.invalid");
         String teacher = (String) com.physicscube.luma.support.HttpApi.parse(api.post("/api/v1/staff-accounts",
                 "{\"email\":\"teacher@example.invalid\",\"roles\":[\"INSTRUCTOR\"]}", owner)).get("id");

@@ -50,7 +50,7 @@ class StudentInvitationHttpIntegrationTest extends StaffApiIntegrationTest {
         CapturedMail.SENT.clear();
         CapturedMail.FAIL_NEXT.set(0);
         academyId = academy("Invite Academy");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2027"), "MON");
     }
@@ -189,7 +189,7 @@ class StudentInvitationHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals("pca-2@example.invalid", failure.get("email"));
         assertEquals("IllegalStateException", failure.get("reason"));
         assertEquals(5, ((Number) failure.get("attempts")).intValue());
-        assertEquals(403, api.get("/api/v1/student-invitations/failures", tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+        assertEquals(403, api.get("/api/v1/student-invitations/failures", tokenFor(academyId, Role.STUDENT)).statusCode());
         assertEquals(counts(2, 1, 0, 1), invite("{}"), "a failed email does not count as invited");
         assertEquals(List.of(), HttpApi.parseList(api.get("/api/v1/student-invitations/failures", admin)), "queued again: no longer listed");
         sender.runOnce();
@@ -235,12 +235,12 @@ class StudentInvitationHttpIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void refusals() {
         String body = "{\"dryRun\":true}";
-        assertEquals(403, api.post("/api/v1/student-invitations", body, tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
-        assertEquals(403, api.get("/api/v1/student-invitations/progress", tokenFor(academyId, Role.ANALYST)).statusCode());
+        assertEquals(403, api.post("/api/v1/student-invitations", body, tokenFor(academyId, Role.STUDENT)).statusCode());
+        assertEquals(403, api.get("/api/v1/student-invitations/progress", tokenFor(academyId, Role.STUDENT)).statusCode());
         assertEquals(401, api.post("/api/v1/student-invitations", body, null).statusCode());
 
         UUID other = academy("Other Academy");
-        AcademyFixtures otherFixtures = new AcademyFixtures(api, tokenFor(other, Role.ACADEMY_ADMIN));
+        AcademyFixtures otherFixtures = new AcademyFixtures(api, tokenFor(other, Role.STAFF));
         String otherBatch = otherFixtures.batch(otherFixtures.course("OTH-1"), "X");
         assertEquals(404, api.post("/api/v1/student-invitations", "{\"batchId\":\"" + otherBatch + "\"}", admin).statusCode());
 

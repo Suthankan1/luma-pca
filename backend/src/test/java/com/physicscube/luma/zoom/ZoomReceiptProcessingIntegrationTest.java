@@ -282,7 +282,7 @@ class ZoomReceiptProcessingIntegrationTest extends StaffApiIntegrationTest {
         FAILURES_LEFT.set(100);
         UUID id = store(FLAKY, 1L, "{\"event\":\"test.flaky\",\"event_ts\":1,\"payload\":{\"name\":\"PRIVATE-NAME-42\"}}");
         jdbc.update("UPDATE zoom_webhook_receipts SET processing_status = 'DEAD', attempts = 10, last_error = 'IllegalStateException' WHERE id = ?", id);
-        String admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        String admin = tokenFor(academyId, Role.STAFF);
 
         HttpResponse<String> listed = api.get("/api/v1/zoom/receipts?status=DEAD", admin);
 
@@ -308,22 +308,22 @@ class ZoomReceiptProcessingIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void receiptToolsAreForOwnersAndAdministratorsOfTheSameAcademyOnly() {
+    void receiptToolsAreForStaffOfTheSameAcademyOnly() {
         UUID id = store(FLAKY, 1L, "{\"event\":\"test.flaky\",\"event_ts\":1}");
         jdbc.update("UPDATE zoom_webhook_receipts SET processing_status = 'DEAD', attempts = 10 WHERE id = ?", id);
         String path = "/api/v1/zoom/receipts/" + id + "/replay";
         String body = HttpApi.json(Map.of("reason", "operator retry"));
 
-        for (Role role : List.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST, Role.STUDENT)) {
+        for (Role role : List.of(Role.STUDENT)) {
             String token = tokenFor(academyId, role);
             assertEquals(403, api.get("/api/v1/zoom/receipts", token).statusCode(), role.name());
             assertEquals(403, api.post(path, body, token).statusCode(), role.name());
         }
-        String outsider = tokenFor(academy("Other Academy"), Role.ACADEMY_OWNER);
+        String outsider = tokenFor(academy("Other Academy"), Role.STAFF);
         assertEquals(404, api.post(path, body, outsider).statusCode());
         assertEquals("[]", api.get("/api/v1/zoom/receipts?status=DEAD", outsider).body());
         assertEquals(401, api.get("/api/v1/zoom/receipts", null).statusCode());
-        String owner = tokenFor(academyId, Role.ACADEMY_OWNER);
+        String owner = tokenFor(academyId, Role.STAFF);
         assertEquals(400, api.get("/api/v1/zoom/receipts?status=GONE", owner).statusCode());
         assertEquals(400, api.get("/api/v1/zoom/receipts?limit=0", owner).statusCode());
         assertEquals(404, api.post("/api/v1/zoom/receipts/" + UUID.randomUUID() + "/replay", body, owner).statusCode());

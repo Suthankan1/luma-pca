@@ -43,7 +43,7 @@ class OccurrenceLinkingIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2027"), "A");
     }
@@ -162,10 +162,10 @@ class OccurrenceLinkingIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(200, api.put("/api/v1/class-sessions/" + cancelled,
                 sessionBody("2027-03-04T08:30:00Z", "2027-03-04T10:30:00Z", WEBINAR, "CANCELLED", 0, batch), admin).statusCode());
         UUID otherAcademy = academy("Other Academy");
-        AcademyFixtures theirs = new AcademyFixtures(api, tokenFor(otherAcademy, Role.ACADEMY_ADMIN));
+        AcademyFixtures theirs = new AcademyFixtures(api, tokenFor(otherAcademy, Role.STAFF));
         String theirBatch = theirs.batch(theirs.course("THEIRS"), "X");
         assertEquals(201, api.post("/api/v1/class-sessions", sessionBody("2027-03-05T08:30:00Z", "2027-03-05T10:30:00Z", WEBINAR,
-                null, null, theirBatch), tokenFor(otherAcademy, Role.ACADEMY_OWNER)).statusCode());
+                null, null, theirBatch), tokenFor(otherAcademy, Role.STAFF)).statusCode());
 
         deliver("webinar.started", WEBINAR, "TooLate==", "2027-03-01T11:31:00Z");
         deliver("webinar.started", "99999999999", "OtherWebinar==", "2027-03-01T08:31:00Z");
@@ -219,7 +219,7 @@ class OccurrenceLinkingIntegrationTest extends StaffApiIntegrationTest {
         deliver("webinar.started", WEBINAR, "Occ1==", "2027-03-01T08:31:00Z");
         String cancelled = session("2027-03-02T08:30:00Z", "2027-03-02T10:30:00Z", null);
         api.put("/api/v1/class-sessions/" + cancelled, sessionBody("2027-03-02T08:30:00Z", "2027-03-02T10:30:00Z", null, "CANCELLED", 0, batch), admin);
-        String theirAdmin = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
+        String theirAdmin = tokenFor(academy("Other Academy"), Role.STAFF);
         AcademyFixtures theirs = new AcademyFixtures(api, theirAdmin);
         HttpResponse<String> created = api.post("/api/v1/class-sessions", sessionBody("2027-03-01T08:30:00Z", "2027-03-01T10:30:00Z",
                 null, null, null, theirs.batch(theirs.course("T"), "X")), theirAdmin);
@@ -289,17 +289,17 @@ class OccurrenceLinkingIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void occurrenceToolsAreForOwnersAndAdministratorsOfTheSameAcademyOnly() {
+    void occurrenceToolsAreForStaffOfTheSameAcademyOnly() {
         String lesson = session("2027-03-01T08:30:00Z", "2027-03-01T10:30:00Z", null);
         deliver("webinar.started", WEBINAR, "Occ1==", "2027-03-01T08:31:00Z");
 
-        for (Role role : List.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST, Role.STUDENT)) {
+        for (Role role : List.of(Role.STUDENT)) {
             String token = tokenFor(academyId, role);
             assertEquals(403, api.get("/api/v1/zoom/occurrences", token).statusCode(), role.name());
             assertEquals(403, decide(token, "Occ1==", lesson, "valid reason").statusCode(), role.name());
             assertEquals(403, api.post("/api/v1/zoom/occurrences/auto-link", "", token).statusCode(), role.name());
         }
-        String outsider = tokenFor(academy("Other Academy"), Role.ACADEMY_OWNER);
+        String outsider = tokenFor(academy("Other Academy"), Role.STAFF);
         assertEquals("[]", api.get("/api/v1/zoom/occurrences", outsider).body());
         assertEquals(404, decide(outsider, "Occ1==", null, "valid reason").statusCode());
         assertEquals(401, api.get("/api/v1/zoom/occurrences", null).statusCode());

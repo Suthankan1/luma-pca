@@ -40,7 +40,7 @@ class AttendanceInsightsController {
         return insights.classTotals(CurrentAccount.from(authentication), AttendanceInsightsService.range(from, to));
     }
 
-    /** Owners and administrators: one student's courses and every class, with each join and leave. */
+    /** Staff: one student's courses and every class, with each join and leave. */
     @GetMapping("/api/v1/students/{studentId}/attendance-overview")
     StudentOverview student(JwtAuthenticationToken authentication, @PathVariable UUID studentId,
                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

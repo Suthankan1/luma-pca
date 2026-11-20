@@ -6,7 +6,7 @@ import java.util.UUID;
 /**
  * A Zoom webinar occurrence seen in webhook events and its link decision.
  *
- * @param classSessionId {@code null} when undecided, or when an administrator marked it "not a class"
+ * @param classSessionId {@code null} when undecided, or when staff marked it "not a class"
  * @param linkSource {@code null} (undecided), AUTOMATIC or MANUAL
  * @param ended a webinar.ended event has arrived
  * @param reportStatus {@code null} (not fetched), FETCHED or FAILED: Zoom's participant report (004B)

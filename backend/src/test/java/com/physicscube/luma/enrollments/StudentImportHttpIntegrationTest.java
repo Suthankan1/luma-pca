@@ -29,7 +29,7 @@ class StudentImportHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2027"), "MON");
     }
@@ -160,8 +160,7 @@ class StudentImportHttpIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void refusals() {
         List<Map<String, Object>> one = rows(1);
-        assertEquals(403, send(one, null, null, true, tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
-        assertEquals(403, send(one, null, null, true, tokenFor(academyId, Role.ANALYST)).statusCode());
+        assertEquals(403, send(one, null, null, true, tokenFor(academyId, Role.STUDENT)).statusCode());
         assertEquals(401, send(one, null, null, true, null).statusCode());
         assertEquals(400, send(List.of(), null, null, true, admin).statusCode());
         assertEquals(400, send(rows(1001), null, null, true, admin).statusCode());
@@ -169,8 +168,8 @@ class StudentImportHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(400, send(one, null, "2027-01-10", true, admin).statusCode(), "date without a batch");
 
         UUID otherAcademy = academy("Other Academy");
-        String otherBatch = new AcademyFixtures(api, tokenFor(otherAcademy, Role.ACADEMY_ADMIN)).batch(
-                new AcademyFixtures(api, tokenFor(otherAcademy, Role.ACADEMY_ADMIN)).course("OTH-1"), "X");
+        String otherBatch = new AcademyFixtures(api, tokenFor(otherAcademy, Role.STAFF)).batch(
+                new AcademyFixtures(api, tokenFor(otherAcademy, Role.STAFF)).course("OTH-1"), "X");
         assertEquals(404, send(one, otherBatch, "2027-01-10", false, admin).statusCode(), "another academy's batch");
         jdbc.update("UPDATE batches SET active = false WHERE id = ?::uuid", batch);
         assertEquals(409, send(one, batch, "2027-01-10", false, admin).statusCode(), "inactive batch");

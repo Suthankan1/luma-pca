@@ -50,7 +50,7 @@ public class StudentInvitationService {
 
     @Transactional
     public QueueResult invite(CurrentAccount caller, UUID batchId, boolean resend, boolean dryRun) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<UUID> accountIds;
         if (batchId == null) {
             accountIds = students.activeAccountIds(caller.academyId(), null);

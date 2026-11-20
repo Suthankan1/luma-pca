@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
  * reports (the same across rejoins; registration with Zoom sign-in makes it the person's own),
  * never by display name. A participant is matched to a student by, in order:
  * <ol>
- *   <li>an administrator's decision for that email (a student, or "not a student"), which
+ *   <li>a staff member's decision for that email (a student, or "not a student"), which
  *       applies to every webinar and is audited;</li>
  *   <li>the email being a student's LUMA sign-in email.</li>
  * </ol>
@@ -88,7 +88,7 @@ public class ZoomParticipantService {
 
     @Transactional(readOnly = true)
     public OccurrenceParticipants participants(CurrentAccount caller, String occurrenceUuid) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT event_type, event_ts, visit_key, participant_email, participant_name, host, registrant_id
                 FROM zoom_occurrence_events
@@ -163,7 +163,7 @@ public class ZoomParticipantService {
      */
     @Transactional(readOnly = true)
     public List<UnmatchedIdentity> unmatched(CurrentAccount caller, int limit) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (limit < 1 || limit > 200) {
             throw new InvalidRequestException("limit must be between 1 and 200");
         }
@@ -212,7 +212,7 @@ public class ZoomParticipantService {
     /** Every decision, newest first. */
     @Transactional(readOnly = true)
     public List<IdentityDecision> decisions(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT email, student_id, reason, linked_at FROM zoom_identity_links "
                 + "WHERE academy_id = ? ORDER BY linked_at DESC, email LIMIT 1000", caller.academyId());
         Map<UUID, StudentView> named = students.viewsInAcademy(caller.academyId(),
@@ -227,7 +227,7 @@ public class ZoomParticipantService {
      */
     @Transactional
     public IdentityDecision decide(CurrentAccount caller, String email, UUID studentId, String reason) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String normalized = email == null ? "" : email.strip().toLowerCase(Locale.ROOT);
         if (normalized.isEmpty() || normalized.length() > 254 || normalized.indexOf('@') < 1) {
             throw new InvalidRequestException("A Zoom email address is required");
@@ -261,12 +261,12 @@ public class ZoomParticipantService {
     }
 
     /**
-     * Removes an administrator's decision about a Zoom email, so the automatic match by sign-in or
+     * Removes a staff member's decision about a Zoom email, so the automatic match by sign-in or
      * registration email applies again. Audited with the reason.
      */
     @Transactional
     public void removeDecision(CurrentAccount caller, String email, String reason) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String normalized = email == null ? "" : email.strip().toLowerCase(Locale.ROOT);
         String why = reason == null ? "" : reason.strip();
         if (why.length() < 3 || why.length() > 300) {

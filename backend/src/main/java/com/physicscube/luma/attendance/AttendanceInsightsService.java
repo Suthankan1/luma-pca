@@ -150,8 +150,7 @@ public class AttendanceInsightsService {
     }
 
     /**
-     * Owners and administrators see every batch; instructors and attendance officers only their own (the class list and
-     * expected students are already limited to the caller's batches).
+     * Staff see every batch of their academy.
      */
     public Dashboard dashboard(CurrentAccount caller, Range range, UUID courseId, UUID batchId) {
         Instant now = DbTime.now();
@@ -301,9 +300,9 @@ public class AttendanceInsightsService {
                                   List<ClassAttendance> classes) {
     }
 
-    /** Owners and administrators: one student's courses, batches and every class in the range. */
+    /** Staff: one student's courses, batches and every class in the range. */
     public StudentOverview forStudent(CurrentAccount caller, UUID studentId, Range range) {
-        StudentView student = students.get(caller, studentId); // managers only; 404 outside the academy
+        StudentView student = students.get(caller, studentId); // staff only; 404 outside the academy
         var enrolled = Parallel.start(() -> enrollments.forStudent(caller, studentId));
         List<StudentClassView> classes = sessions.forStudent(caller, studentId, range.start(), range.end());
         return overview(caller.academyId(), student.id(), student.studentNumber(), student.fullName(), range,

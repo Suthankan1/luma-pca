@@ -75,17 +75,17 @@ public class OwnerBootstrapService {
 
         List<Map<String, Object>> owners = jdbc.queryForList("""
                 SELECT a.id, a.email, a.status FROM accounts a JOIN account_roles r ON r.account_id = a.id
-                WHERE a.academy_id = ? AND r.role = 'ACADEMY_OWNER' AND a.status <> 'DISABLED'
+                WHERE a.academy_id = ? AND r.role = 'STAFF' AND a.status <> 'DISABLED'
                 """, academyId);
         if (owners.stream().anyMatch(o -> "ACTIVE".equals(o.get("status")))) {
-            throw new RefusedException("This academy already has an active owner. Owners invite other owners from the Staff screen.");
+            throw new RefusedException("This academy already has active staff. Staff invite other staff from the Team screen.");
         }
         UUID ownerId;
         boolean ownerCreated;
         if (!owners.isEmpty()) {
             Map<String, Object> pending = owners.get(0);
             if (owners.size() > 1 || !email.equals(pending.get("email"))) {
-                throw new RefusedException("An owner invitation is already pending for another address. Re-run with that address "
+                throw new RefusedException("A staff invitation is already pending for another address. Re-run with that address "
                         + "to send a new invitation.");
             }
             ownerId = (UUID) pending.get("id");
@@ -94,7 +94,7 @@ public class OwnerBootstrapService {
             if (accounts.findByEmail(email).isPresent()) {
                 throw new RefusedException("That address already belongs to another LUMA account. Use a different address.");
             }
-            ownerId = accounts.register(academyId, email, Set.of(Role.ACADEMY_OWNER)).id();
+            ownerId = accounts.register(academyId, email, Set.of(Role.STAFF)).id();
             ownerCreated = true;
         }
         IssuedInvitation issued = invitations.issue(ownerId, null);

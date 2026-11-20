@@ -10,7 +10,6 @@ import com.physicscube.luma.shared.api.InvalidRequestException;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
 import com.physicscube.luma.shared.api.ServiceUnavailableException;
 import com.physicscube.luma.shared.security.CurrentAccount;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,22 +22,19 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Staff accounts of the caller's academy and activation invitations.
  *
- * <p>Rules against privilege escalation and lock-out:
+ * <p>There is one staff role (owner decision 2026-11-20): every active staff member manages
+ * staff. Rules against lock-out:
  * <ul>
- *   <li>Owners and administrators manage staff; only an owner may grant, change or
- *       remove the owner or administrator role, or disable or invite such an account.</li>
- *   <li>Nobody changes their own roles or disables themselves.</li>
- *   <li>An academy always keeps at least one active owner.</li>
+ *   <li>Nobody disables themselves.</li>
+ *   <li>An academy always keeps at least one active staff account.</li>
  *   <li>Students are managed through student records, never here.</li>
  * </ul>
- * Every change locks the academy row and re-reads the caller's roles under that lock,
- * so two concurrent changes cannot each rely on authority the other just removed.
+ * Every change locks the academy row and re-reads the caller under that lock, so two
+ * concurrent changes (two staff disabling each other) cannot both succeed.
  */
 @Service
 public class StaffAccountService {
-    public static final Set<Role> STAFF_ROLES =
-            EnumSet.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN, Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST);
-    private static final Set<Role> ELEVATED = EnumSet.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN);
+    private static final Set<Role> STAFF_ONLY = Set.of(Role.STAFF);
 
     private final AccountRepository accounts;
     private final AccountService accountService;
@@ -66,23 +62,21 @@ public class StaffAccountService {
 
     @Transactional(readOnly = true)
     public List<StaffAccountView> list(CurrentAccount caller) {
-        caller.requireAcademyManager();
-        return accounts.withAnyRole(caller.academyId(), STAFF_ROLES).stream()
+        caller.requireStaff();
+        return accounts.withAnyRole(caller.academyId(), STAFF_ONLY).stream()
                 .filter(account -> !account.getRoles().contains(Role.STUDENT)).map(this::view).toList();
     }
 
     @Transactional(readOnly = true)
     public StaffAccountView get(CurrentAccount caller, UUID accountId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         return view(staff(caller, accountId));
     }
 
     /** Creates a staff account pending activation; issue an invitation to let the person set a password. */
     @Transactional
-    public StaffAccountView create(CurrentAccount caller, String email, List<String> requestedRoles) {
-        Set<Role> roles = staffRoles(requestedRoles);
+    public StaffAccountView create(CurrentAccount caller, String email) {
         Account me = lockAndReloadCaller(caller);
-        requireMayGrant(me, roles);
         String normalized;
         try {
             normalized = EmailAddress.normalize(email);
@@ -91,40 +85,13 @@ public class StaffAccountService {
         }
         AccountSummary created;
         try {
-            created = accountService.register(caller.academyId(), normalized, roles);
+            created = accountService.register(caller.academyId(), normalized, STAFF_ONLY);
         } catch (DuplicateEmailException e) {
             throw new ConflictException("An account with this email already exists");
         }
         audit.record(caller.academyId(), me.getId(), "STAFF_ACCOUNT_CREATED", "ACCOUNT", created.id(),
-                Map.of("roles", names(roles)));
+                Map.of("roles", names(STAFF_ONLY)));
         return view(accounts.findById(created.id()).orElseThrow());
-    }
-
-    /** Replaces the target's roles. Removing a role takes effect on the target's next request. */
-    @Transactional
-    public StaffAccountView replaceRoles(CurrentAccount caller, UUID accountId, List<String> requestedRoles,
-                                         long expectedVersion) {
-        Set<Role> roles = staffRoles(requestedRoles);
-        Account me = lockAndReloadCaller(caller);
-        Account target = staff(caller, accountId);
-        if (target.getId().equals(me.getId())) {
-            throw new AccessDeniedException("You cannot change your own roles");
-        }
-        if (target.getVersion() != expectedVersion) {
-            throw new ConflictException("The record was changed by someone else; reload and retry");
-        }
-        requireMayManage(me, target);
-        requireMayGrant(me, roles);
-        Set<Role> before = target.getRoles();
-        if (before.contains(Role.ACADEMY_OWNER) && !roles.contains(Role.ACADEMY_OWNER)) {
-            requireAnotherActiveOwner(caller.academyId(), target);
-        }
-        target.replaceRoles(roles);
-        Account saved = accounts.saveAndFlush(target);
-        AccountJwtAuthenticationConverter.evictAccount(target.getId());
-        audit.record(caller.academyId(), me.getId(), "STAFF_ROLES_CHANGED", "ACCOUNT", target.getId(),
-                Map.of("before", names(before), "after", names(roles)));
-        return view(saved);
     }
 
     /** Blocks sign-in, ends every session and rejects existing tokens. {@link #enable} undoes it. */
@@ -135,13 +102,10 @@ public class StaffAccountService {
         if (target.getId().equals(me.getId())) {
             throw new AccessDeniedException("You cannot disable your own account");
         }
-        requireMayManage(me, target);
         if (target.getStatus() == AccountStatus.DISABLED) {
             return view(target);
         }
-        if (target.getRoles().contains(Role.ACADEMY_OWNER)) {
-            requireAnotherActiveOwner(caller.academyId(), target);
-        }
+        requireAnotherActiveStaff(caller.academyId(), target);
         target.disable();
         Account saved = accounts.saveAndFlush(target);
         sessions.revokeAll(target.getId());
@@ -150,8 +114,7 @@ public class StaffAccountService {
     }
 
     /**
-     * Lets a disabled staff member sign in again, under the same rules as disabling (only an
-     * owner may re-enable an owner or administrator). With {@code requireNewPassword} the
+     * Lets a disabled staff member sign in again. With {@code requireNewPassword} the
      * account returns to pending activation, its old password removed and any open invitation
      * revoked, so they set a new password from a fresh invitation. Sessions ended by the
      * disable stay ended. Enabling an account that is not disabled changes nothing.
@@ -160,7 +123,6 @@ public class StaffAccountService {
     public StaffAccountView enable(CurrentAccount caller, UUID accountId, boolean requireNewPassword) {
         Account me = lockAndReloadCaller(caller);
         Account target = staff(caller, accountId);
-        requireMayManage(me, target);
         if (target.getStatus() != AccountStatus.DISABLED) {
             return view(target);
         }
@@ -195,7 +157,6 @@ public class StaffAccountService {
         Account me = lockAndReloadCaller(caller);
         Account target = accounts.findByIdAndAcademyId(accountId, caller.academyId())
                 .orElseThrow(() -> new ResourceNotFoundException("Account"));
-        requireMayManage(me, target);
         if (target.getStatus() != AccountStatus.PENDING_ACTIVATION) {
             throw new ConflictException("Only an account pending activation can be invited");
         }
@@ -215,13 +176,13 @@ public class StaffAccountService {
      * after any change committed by a concurrent request.
      */
     private Account lockAndReloadCaller(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         jdbc.queryForObject("SELECT id FROM academies WHERE id = ? FOR UPDATE", UUID.class, caller.academyId());
         Account me = accounts.findByIdAndAcademyId(caller.accountId(), caller.academyId())
                 .filter(account -> account.getStatus() == AccountStatus.ACTIVE)
                 .orElseThrow(() -> new AccessDeniedException("Caller is no longer active"));
-        if (me.getRoles().stream().noneMatch(ELEVATED::contains)) {
-            throw new AccessDeniedException("Academy owner or administrator role required");
+        if (!me.getRoles().contains(Role.STAFF)) {
+            throw new AccessDeniedException("Staff role required");
         }
         return me;
     }
@@ -229,49 +190,14 @@ public class StaffAccountService {
     private Account staff(CurrentAccount caller, UUID accountId) {
         return accounts.findByIdAndAcademyId(accountId, caller.academyId())
                 .filter(account -> !account.getRoles().contains(Role.STUDENT))
-                .filter(account -> account.getRoles().stream().anyMatch(STAFF_ROLES::contains))
+                .filter(account -> account.getRoles().contains(Role.STAFF))
                 .orElseThrow(() -> new ResourceNotFoundException("Staff account"));
     }
 
-    private static void requireMayGrant(Account me, Set<Role> roles) {
-        if (roles.stream().anyMatch(ELEVATED::contains) && !me.getRoles().contains(Role.ACADEMY_OWNER)) {
-            throw new AccessDeniedException("Only an academy owner may grant the owner or administrator role");
+    private void requireAnotherActiveStaff(UUID academyId, Account target) {
+        if (accounts.activeStaffOtherThan(academyId, target.getId()) == 0) {
+            throw new ConflictException("The academy must keep at least one active staff account");
         }
-    }
-
-    private static void requireMayManage(Account me, Account target) {
-        if (target.getRoles().stream().anyMatch(ELEVATED::contains) && !me.getRoles().contains(Role.ACADEMY_OWNER)) {
-            throw new AccessDeniedException("Only an academy owner may manage an owner or administrator account");
-        }
-    }
-
-    private void requireAnotherActiveOwner(UUID academyId, Account target) {
-        if (accounts.activeOwnersOtherThan(academyId, target.getId()) == 0) {
-            throw new ConflictException("The academy must keep at least one active owner");
-        }
-    }
-
-    private static Set<Role> staffRoles(List<String> requested) {
-        if (requested == null || requested.isEmpty()) {
-            throw new InvalidRequestException("At least one role is required");
-        }
-        Set<Role> roles = EnumSet.noneOf(Role.class);
-        for (String name : requested) {
-            Role role;
-            try {
-                role = Role.valueOf(String.valueOf(name));
-            } catch (IllegalArgumentException e) {
-                throw new InvalidRequestException("Unknown role");
-            }
-            if (!STAFF_ROLES.contains(role)) {
-                throw new InvalidRequestException("Students are managed through student records, not staff accounts");
-            }
-            roles.add(role);
-        }
-        if (roles.size() != requested.size()) {
-            throw new InvalidRequestException("roles must not repeat a role");
-        }
-        return roles;
     }
 
     private static List<String> names(Set<Role> roles) {

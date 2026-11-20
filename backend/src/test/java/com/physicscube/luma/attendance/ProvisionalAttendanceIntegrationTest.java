@@ -40,7 +40,7 @@ class ProvisionalAttendanceIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         for (String n : List.of("1", "2", "3", "4")) {
@@ -164,22 +164,15 @@ class ProvisionalAttendanceIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void assignedStaffSeeTheirClassOnlyAndNoStudentsFromOtherBatches() {
+    void everyStaffMemberSeesTheWholeClassAndOtherAcademiesNothing() {
         runClass(true);
-        accountIdOf("teacher.a@example.invalid", academyId, Role.INSTRUCTOR);
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("email", "teacher.a@example.invalid");
-        fields.put("role", "INSTRUCTOR");
-        assertEquals(201, api.post("/api/v1/batches/" + batch + "/assignments", HttpApi.json(fields), admin).statusCode());
-        String assigned = login("teacher.a@example.invalid");
-        assertEquals(List.of("S-001", "S-002", "S-004"), List.copyOf(byNumber(attendance(assigned)).keySet()),
-                "a student outside the instructor's batches is not shown");
+        String colleague = tokenFor(academyId, Role.STAFF);
+        assertEquals(List.copyOf(byNumber(attendance(admin)).keySet()), List.copyOf(byNumber(attendance(colleague)).keySet()),
+                "no batch assignments: every staff member sees the same rows, including students seen but not expected");
 
-        String unassigned = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(404, api.get("/api/v1/class-sessions/" + session + "/attendance", unassigned).statusCode());
         String student = tokenFor(academyId, Role.STUDENT);
         assertEquals(403, api.get("/api/v1/class-sessions/" + session + "/attendance", student).statusCode());
-        String otherAdmin = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
-        assertEquals(404, api.get("/api/v1/class-sessions/" + session + "/attendance", otherAdmin).statusCode());
+        String otherAcademy = tokenFor(academy("Other Academy"), Role.STAFF);
+        assertEquals(404, api.get("/api/v1/class-sessions/" + session + "/attendance", otherAcademy).statusCode());
     }
 }

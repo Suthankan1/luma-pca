@@ -28,7 +28,7 @@ class PasswordResetDisabledIntegrationTest extends PostgresIntegrationTest {
         HttpResponse<String> response = api.post("/api/v1/auth/password-reset/request",
                 HttpApi.json(Map.of("email", "anyone@example.invalid")));
         assertEquals(503, response.statusCode());
-        assertEquals("Password reset by email is not available. Ask an academy administrator for help.",
+        assertEquals("Password reset by email is not available. Ask academy staff for help.",
                 HttpApi.parse(response).get("detail"));
         assertEquals(400, api.post("/api/v1/auth/password-reset/confirm",
                 HttpApi.json(Map.of("token", "x".repeat(43), "password", "bright lantern over harbour"))).statusCode());

@@ -49,7 +49,7 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
     }
 
     protected UUID accountIdOf(String email, UUID academyId, Role... roles) {
-        UUID id = accounts.register(academyId, email, Set.of(roles)).id();
+        UUID id = accounts.register(academyId, email, Set.copyOf(java.util.Arrays.asList(roles))).id();
         accounts.setPassword(id, PASSPHRASE);
         return id;
     }

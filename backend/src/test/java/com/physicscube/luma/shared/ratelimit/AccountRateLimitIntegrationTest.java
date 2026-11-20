@@ -19,8 +19,8 @@ class AccountRateLimitIntegrationTest extends StaffApiIntegrationTest {
     void exportsAreLimitedPerAccount() {
         resetDatabase();
         UUID academyId = academy("Physics Cube Test");
-        String admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
-        String other = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        String admin = tokenFor(academyId, Role.STAFF);
+        String other = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         String path = "/api/v1/batches/" + batch + "/attendance/export?from=2026-02-01&to=2026-02-28";

@@ -31,10 +31,10 @@ interface AccountRepository extends JpaRepository<Account, UUID> {
 
     @Query("""
             select count(distinct a) from Account a join a.roles r
-            where a.academyId = :academyId and r = com.physicscube.luma.identity.domain.Role.ACADEMY_OWNER
+            where a.academyId = :academyId and r = com.physicscube.luma.identity.domain.Role.STAFF
               and a.status = com.physicscube.luma.identity.domain.AccountStatus.ACTIVE and a.id <> :excluded
             """)
-    long activeOwnersOtherThan(@Param("academyId") UUID academyId, @Param("excluded") UUID excluded);
+    long activeStaffOtherThan(@Param("academyId") UUID academyId, @Param("excluded") UUID excluded);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Account> findWithLockById(UUID id);

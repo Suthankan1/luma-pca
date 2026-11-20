@@ -59,7 +59,7 @@ public class PasswordResetService {
     @Transactional
     public void request(String rawEmail) {
         if (!available()) {
-            throw new ServiceUnavailableException("Password reset by email is not available. Ask an academy administrator for help.");
+            throw new ServiceUnavailableException("Password reset by email is not available. Ask academy staff for help.");
         }
         String email;
         try {

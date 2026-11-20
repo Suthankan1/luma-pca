@@ -43,7 +43,7 @@ class ClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         physics = fixtures.course("PHY-2027");
         batchA = fixtures.batch(physics, "A");
@@ -91,16 +91,6 @@ class ClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
             }
         }
         return id;
-    }
-
-    /** An activated staff member assigned to the batch, signed in. */
-    private String assignedStaff(String email, Role role, String batch) {
-        accountIdOf(email, academyId, role);
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("email", email);
-        fields.put("role", role.name());
-        assertEquals(201, api.post("/api/v1/batches/" + batch + "/assignments", HttpApi.json(fields), admin).statusCode());
-        return login(email);
     }
 
     @SuppressWarnings("unchecked")
@@ -210,7 +200,7 @@ class ClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
 
     @Test
     void foreignAndInactiveBatchesAreRefused() {
-        String outsiderAdmin = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
+        String outsiderAdmin = tokenFor(academy("Other Academy"), Role.STAFF);
         AcademyFixtures theirs = new AcademyFixtures(api, outsiderAdmin);
         String theirBatch = theirs.batch(theirs.course("THEIRS"), "X");
         assertEquals(404, post(admin, body("Lesson", START, END, null, null, null, batchA, theirBatch)).statusCode());
@@ -308,43 +298,31 @@ class ClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void instructorsSeeOnlyTheirBatchesPartOfASharedClass() {
+    void everyStaffMemberSeesAndManagesEveryClassWithAllItsBatches() {
         enrolledStudent("PCA-001", "2027-01-10", null, batchA, batchB);
         enrolledStudent("PCA-002", "2027-01-10", null, batchA);
         enrolledStudent("PCA-003", "2027-01-10", null, batchB);
         String shared = (String) create(START, END, batchA, batchB).get("id");
         String onlyB = (String) create("2027-03-02T08:30:00Z", "2027-03-02T10:30:00Z", batchB).get("id");
-        String instructor = assignedStaff("teacher.a@example.invalid", Role.INSTRUCTOR, batchA);
-        String officer = assignedStaff("officer.b@example.invalid", Role.ATTENDANCE_OFFICER, batchB);
+        String colleague = tokenFor(academyId, Role.STAFF);
         String march = window("2027-03-01T00:00:00Z", "2027-03-05T00:00:00Z");
 
-        List<Map<String, Object>> visible = list(api.get(march, instructor));
-        assertEquals(List.of(shared), field(visible, "id"));
-        assertEquals(List.of(batchA), batchIdsOf(visible.get(0)), "batch B's participation is not revealed");
-        assertFalse(api.get("/api/v1/class-sessions/" + shared, instructor).body().contains(batchB));
-        assertEquals(404, api.get("/api/v1/class-sessions/" + onlyB, instructor).statusCode());
-        assertEquals(404, api.get("/api/v1/class-sessions/" + onlyB + "/students", instructor).statusCode());
-        assertEquals(List.of("PCA-001", "PCA-002"),
-                field(list(api.get("/api/v1/class-sessions/" + shared + "/students", instructor)), "studentNumber"));
-        assertFalse(api.get("/api/v1/class-sessions/" + shared + "/students", instructor).body().contains(batchB),
-                "a shared student's other batch is not revealed either");
-        assertEquals(404, api.get(march + "&batchId=" + batchB, instructor).statusCode());
-
-        assertEquals(List.of(shared, onlyB), field(list(api.get(march, officer)), "id"));
-        assertEquals(List.of("PCA-001", "PCA-003"),
-                field(list(api.get("/api/v1/class-sessions/" + shared + "/students", officer)), "studentNumber"));
-
-        assertEquals(403, post(instructor, body("Mine", START, END, null, null, null, batchA)).statusCode());
-        assertEquals(403, api.put("/api/v1/class-sessions/" + shared, body("X", START, END, null, "CANCELLED", 0, batchA), instructor)
-                .statusCode());
-        assertEquals(List.of(), list(api.get(march, tokenFor(academyId, Role.INSTRUCTOR))), "no assignment, no sessions");
+        List<Map<String, Object>> visible = list(api.get(march, colleague));
+        assertEquals(List.of(shared, onlyB), field(visible, "id"));
+        assertEquals(List.of(batchA, batchB).stream().sorted().toList(), batchIdsOf(visible.get(0)).stream().sorted().toList());
+        assertEquals(List.of("PCA-001", "PCA-002", "PCA-003"),
+                field(list(api.get("/api/v1/class-sessions/" + shared + "/students", colleague)), "studentNumber"));
+        assertEquals(List.of(shared, onlyB), field(list(api.get(march + "&batchId=" + batchB, colleague)), "id"));
+        assertEquals(200, api.put("/api/v1/class-sessions/" + onlyB,
+                body("Moved", "2027-03-02T08:30:00Z", "2027-03-02T10:30:00Z", null, "CANCELLED", 0, batchB), colleague).statusCode(),
+                "any staff member manages any class");
     }
 
     @Test
-    void otherAcademiesStudentsAndAnalystsCannotReachSessions() {
+    void otherAcademiesAndStudentsCannotReachSessions() {
         String session = (String) create(START, END, batchA).get("id");
         String march = window("2027-03-01T00:00:00Z", "2027-03-05T00:00:00Z");
-        String outsider = tokenFor(academy("Other Academy"), Role.ACADEMY_OWNER);
+        String outsider = tokenFor(academy("Other Academy"), Role.STAFF);
 
         assertEquals(404, api.get("/api/v1/class-sessions/" + session, outsider).statusCode());
         assertEquals(404, api.get("/api/v1/class-sessions/" + session + "/students", outsider).statusCode());
@@ -355,7 +333,7 @@ class ClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
 
         String studentId = enrolledStudent("PCA-001", "2027-01-10", null, batchA);
         activate(UUID.fromString((String) HttpApi.parse(api.get("/api/v1/students/" + studentId, admin)).get("accountId")));
-        for (String token : List.of(login("pca-001@example.invalid"), tokenFor(academyId, Role.ANALYST))) {
+        for (String token : List.of(login("pca-001@example.invalid"))) {
             assertEquals(403, api.get(march, token).statusCode());
             assertEquals(403, api.get("/api/v1/class-sessions/" + session, token).statusCode());
             assertEquals(403, api.get("/api/v1/class-sessions/" + session + "/students", token).statusCode());

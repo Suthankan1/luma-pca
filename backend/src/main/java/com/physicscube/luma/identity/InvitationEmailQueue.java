@@ -53,7 +53,7 @@ public class InvitationEmailQueue {
     @Transactional
     public QueueResult queue(CurrentAccount caller, Collection<UUID> accountIds, boolean resend, boolean dryRun,
                              String targetType, UUID targetId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (!mail.enabled()) {
             throw new ServiceUnavailableException("Email is not set up for this academy yet. Create invitation links one by one instead.");
         }
@@ -130,7 +130,7 @@ public class InvitationEmailQueue {
     /** Accounts of the academy whose latest invitation email (in the last 14 days) failed, newest first, at most 200. */
     @Transactional(readOnly = true)
     public List<Failure> failures(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         return jdbc.query("""
                 SELECT q.account_id, q.last_error, q.finished_at, q.attempts FROM invitation_emails q
                 JOIN accounts a ON a.id = q.account_id AND a.status = 'PENDING_ACTIVATION'
@@ -143,7 +143,7 @@ public class InvitationEmailQueue {
 
     @Transactional(readOnly = true)
     public Progress progress(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         return jdbc.queryForObject("""
                 SELECT count(*) FILTER (WHERE status = 'QUEUED') AS waiting,
                        count(*) FILTER (WHERE status = 'SENT' AND created_at > ?) AS sent,

@@ -101,15 +101,6 @@ public class Account {
         authVersion++;
     }
 
-    /** Replaces every role grant. Callers enforce who may grant which role. */
-    public void replaceRoles(Set<Role> newRoles) {
-        if (newRoles == null || newRoles.isEmpty()) {
-            throw new IllegalArgumentException("At least one role is required");
-        }
-        roles.clear();
-        roles.addAll(newRoles);
-    }
-
     /**
      * Lets a disabled account sign in again: ACTIVE with its existing password, or back to
      * PENDING_ACTIVATION (password removed, so a new invitation is needed) when

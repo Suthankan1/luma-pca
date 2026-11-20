@@ -44,7 +44,7 @@ class OwnerBootstrapIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void aNewAcademyGetsAPendingOwnerWhoActivatesAndMustEnrolTwoStepSignIn() {
+    void aNewAcademyGetsAPendingFirstStaffAccountThatSignsInWithAPassword() {
         OwnerBootstrapService.Result result = bootstrap.bootstrap("  " + ACADEMY + " ", " Owner@Example.INVALID ");
 
         assertTrue(result.academyCreated());
@@ -53,7 +53,7 @@ class OwnerBootstrapIntegrationTest extends StaffApiIntegrationTest {
         Map<String, Object> owner = jdbc.queryForMap("SELECT email, status, academy_id FROM accounts WHERE id = ?", result.ownerId());
         assertEquals(OWNER, owner.get("email"));
         assertEquals("PENDING_ACTIVATION", owner.get("status"));
-        assertEquals(List.of("ACADEMY_OWNER"),
+        assertEquals(List.of("STAFF"),
                 jdbc.queryForList("SELECT role FROM account_roles WHERE account_id = ?", String.class, result.ownerId()));
         assertFalse(result.toString().contains(result.token()), "the token is redacted from toString");
 
@@ -84,12 +84,12 @@ class OwnerBootstrapIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void anActiveOwnerIsNeverReplaced() {
+    void anAcademyWithActiveStaffIsRefused() {
         OwnerBootstrapService.Result result = bootstrap.bootstrap(ACADEMY, OWNER);
         activateWithInvitation(result.token());
 
         var refused = assertThrows(OwnerBootstrapService.RefusedException.class, () -> bootstrap.bootstrap(ACADEMY, "other@example.invalid"));
-        assertTrue(refused.getMessage().startsWith("This academy already has an active owner."));
+        assertTrue(refused.getMessage().startsWith("This academy already has active staff."));
         assertThrows(OwnerBootstrapService.RefusedException.class, () -> bootstrap.bootstrap(ACADEMY, OWNER));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM accounts WHERE email = 'other@example.invalid'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM account_invitations WHERE account_id = ?",
@@ -102,7 +102,7 @@ class OwnerBootstrapIntegrationTest extends StaffApiIntegrationTest {
         bootstrap.bootstrap(ACADEMY, OWNER);
         var pendingForOther = assertThrows(OwnerBootstrapService.RefusedException.class,
                 () -> bootstrap.bootstrap(ACADEMY, "someone.else@example.invalid"));
-        assertTrue(pendingForOther.getMessage().startsWith("An owner invitation is already pending for another address."));
+        assertTrue(pendingForOther.getMessage().startsWith("A staff invitation is already pending for another address."));
 
         UUID other = academy("Other Academy");
         accountIdOf("taken@example.invalid", other, Role.STUDENT);
@@ -120,9 +120,11 @@ class OwnerBootstrapIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void anExistingAcademyWithoutAnOwnerGetsOne() {
+    void anExistingAcademyWithoutActiveStaffGetsItsFirstStaffAccount() {
         UUID existing = academy(ACADEMY);
-        accountIdOf("admin@example.invalid", existing, Role.ACADEMY_ADMIN);
+        accountIdOf("learner@example.invalid", existing, Role.STUDENT);
+        UUID gone = accountIdOf("former@example.invalid", existing, Role.STAFF);
+        jdbc.update("UPDATE accounts SET status = 'DISABLED' WHERE id = ?", gone);
         OwnerBootstrapService.Result result = bootstrap.bootstrap(ACADEMY, OWNER);
         assertEquals(existing, result.academyId());
         assertFalse(result.academyCreated());
@@ -130,7 +132,7 @@ class OwnerBootstrapIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void concurrentRunsCreateOneAcademyAndOneOwner() throws Exception {
+    void concurrentRunsCreateOneAcademyAndOneStaffAccount() throws Exception {
         int threads = 6;
         CyclicBarrier start = new CyclicBarrier(threads);
         ExecutorService pool = Executors.newFixedThreadPool(threads);
@@ -196,7 +198,7 @@ class OwnerBootstrapIntegrationTest extends StaffApiIntegrationTest {
 
         Run again = command(ACADEMY, OWNER, "PRINT", "", NO_MAIL, failingMailer());
         assertEquals(1, again.code());
-        assertTrue(again.output().startsWith("LUMA owner bootstrap refused: This academy already has an active owner."));
+        assertTrue(again.output().startsWith("LUMA owner bootstrap refused: This academy already has active staff."));
     }
 
     @Test

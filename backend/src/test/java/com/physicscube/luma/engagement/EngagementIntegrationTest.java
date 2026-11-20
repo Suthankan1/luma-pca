@@ -33,8 +33,8 @@ class EngagementIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        owner = tokenFor(academyId, Role.ACADEMY_OWNER);
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        owner = tokenFor(academyId, Role.STAFF);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         for (String n : List.of("1", "2", "3")) {
@@ -75,10 +75,10 @@ class EngagementIntegrationTest extends StaffApiIntegrationTest {
     private static final String WORDING = "LUMA records the reactions and answers you send from this portal during classes.";
 
     @Test
-    void nothingIsRecordedUntilAnOwnerSwitchesItOnAndTheStudentConsents() {
+    void nothingIsRecordedUntilStaffSwitchItOnAndTheStudentConsents() {
         assertEquals(409, react("1", "UNDERSTOOD").statusCode(), "off by default");
         assertEquals(204, api.get("/api/v1/engagement-settings", admin).statusCode());
-        assertEquals(403, configure(admin, true, WORDING, null).statusCode(), "owners only");
+        assertEquals(403, configure(tokenFor(academyId, Role.STUDENT), true, WORDING, null).statusCode(), "staff only");
         assertEquals(400, configure(owner, true, "too short", null).statusCode());
         assertEquals(200, configure(owner, true, WORDING, null).statusCode());
 
@@ -185,7 +185,7 @@ class EngagementIntegrationTest extends StaffApiIntegrationTest {
                 Integer.class, academyId));
         assertEquals(403, api.get("/api/v1/courses/" + course + "/engagement-ranking/export" + range, studentTokens.get("1")).statusCode());
         assertEquals(403, api.get(path, studentTokens.get("1")).statusCode());
-        assertEquals(403, api.get(path, tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+        assertEquals(403, api.get(path, tokenFor(academyId, Role.STUDENT)).statusCode());
     }
 
     private static String toJson(Object value) {

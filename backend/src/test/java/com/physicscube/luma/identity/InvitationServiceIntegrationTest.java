@@ -89,7 +89,7 @@ class InvitationServiceIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void issueReturnsRandomTokenAndStoresOnlyItsDigest() {
-        UUID adminId = accounts.register(academyId, "admin@example.invalid", Set.of(Role.ACADEMY_ADMIN)).id();
+        UUID adminId = accounts.register(academyId, "admin@example.invalid", Set.of(Role.STAFF)).id();
         Instant before = Instant.now();
 
         IssuedInvitation issued = invitations.issue(studentId, adminId);

@@ -4,16 +4,16 @@
 owner level, across every course and batch). `STUDENT` is unchanged. The five staff roles (`ACADEMY_OWNER`,
 `ACADEMY_ADMIN`, `INSTRUCTOR`, `ATTENDANCE_OFFICER`, `ANALYST`) and batch assignments go away.
 
-**Progress: 5 %** (S0 done). Updated after every slice. Work happens on branch `feat/two-roles` in the worktree `.claude/worktrees/two-roles`, branched from `0674ff1`, so the open work in the main checkout is untouched.
+**Progress: 65 %** (S0 to S4 done: backend complete, 402 backend tests pass). Updated after every slice. Work happens on branch `feat/two-roles` in the worktree `.claude/worktrees/two-roles`, branched from `0674ff1`, so the open work in the main checkout is untouched.
 
 | # | Slice | Weight | Status |
 |---|---|---|---|
 | S0 | Analysis, plan, branch | 5 % | Done |
-| S1 | Database migration + `Role` enum + `CurrentAccount` + `SecurityConfig` | 15 % | Not started |
-| S2 | Remove batch scoping and staff assignments (backend) | 15 % | Not started |
-| S3 | Identity: staff accounts, bootstrap, notices, owner-only actions | 10 % | Not started |
-| S4 | Backend tests rewritten; full `mvn test` green | 20 % | Not started |
-| S5 | Frontend: role helpers, every staff page, team page, batches page, mock API, unit + e2e tests | 20 % | Not started |
+| S1 | Database migration + `Role` enum + `CurrentAccount` + `SecurityConfig` | 15 % | Done |
+| S2 | Remove batch scoping and staff assignments (backend) | 15 % | Done |
+| S3 | Identity: staff accounts, bootstrap, notices, owner-only actions | 10 % | Done |
+| S4 | Backend tests rewritten; full `mvn test` green | 20 % | Done: 402 tests, 0 failures (Testcontainers PostgreSQL 17) |
+| S5 | Frontend: role helpers, every staff page, team page, batches page, mock API, unit + e2e tests | 20 % | In progress: code, 79 unit tests, typecheck and lint done; e2e next |
 | S6 | Contracts, docs, scripts, checkpoint | 10 % | Not started |
 | S7 | Final verification (all suites, smoke, live local check) | 5 % | Not started |
 

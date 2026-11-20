@@ -150,7 +150,7 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         SCHEDULED_TOPIC.set(PHYSICS);
         SCHEDULED_START.set(SCHEDULED_AT);
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2027"), "MON");
     }
@@ -367,7 +367,7 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void stoppingMonitoringKeepsRunsAndOnlyAdministratorsManageMonitors() {
+    void stoppingMonitoringKeepsRunsAndOnlyStaffManageMonitors() {
         Map<String, Object> monitor = add(SCHEDULED);
         started(SCHEDULED, "Kept==", SCHEDULED_AT);
         process();
@@ -378,20 +378,19 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         process();
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM zoom_webinar_runs WHERE occurrence_uuid = 'AfterStop=='", Integer.class));
 
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
         String student = tokenFor(academyId, Role.STUDENT);
-        for (String token : List.of(instructor, student)) {
+        for (String token : List.of(student)) {
             assertEquals(403, api.get("/api/v1/zoom/monitors", token).statusCode());
             assertEquals(403, api.post("/api/v1/zoom/monitors", HttpApi.json(Map.of("webinar", SCHEDULED)), token).statusCode());
         }
         UUID other = academy("Other academy");
-        String otherAdmin = tokenFor(other, Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(other, Role.STAFF);
         assertEquals(404, api.post("/api/v1/zoom/monitors/" + monitor.get("id") + "/sync", "{}", otherAdmin).statusCode());
         assertTrue(HttpApi.parseList(api.get("/api/v1/zoom/monitors", otherAdmin)).isEmpty());
     }
 
     @Test
-    void anAmbiguousTitleStaysUnresolvedUntilAnAdministratorDecides() {
+    void anAmbiguousTitleStaysUnresolvedUntilStaffDecide() {
         // Two Academy classes normalise to the same name: not guessed.
         SCHEDULED_TOPIC.set("Physics Revision");
         Map<String, Object> monitor = add(SCHEDULED);
@@ -448,7 +447,7 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void anUnresolvedRunsClassIsOpenToAdministratorsWithItsEvidenceButNotToBatchStaff() {
+    void anUnresolvedRunsClassIsOpenToEveryStaffMemberWithItsEvidence() {
         SCHEDULED_TOPIC.set("Physics Revision"); // ambiguous: no Academy class, so no batches
         add(SCHEDULED);
         Instant start = SCHEDULED_AT.minus(1, ChronoUnit.HOURS);
@@ -462,8 +461,9 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(false, amaya.get("expected"), "seen, not expected: nobody can be marked absent");
         assertEquals(1800, ((Number) amaya.get("connectedSeconds")).intValue());
         assertEquals(200, api.get("/api/v1/class-sessions/" + session + "/zoom-run", admin).statusCode());
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(404, api.get("/api/v1/class-sessions/" + session, instructor).statusCode());
+        assertEquals(200, api.get("/api/v1/class-sessions/" + session, tokenFor(academyId, Role.STAFF)).statusCode(),
+                "no batch assignments: every staff member opens it");
+        assertEquals(403, api.get("/api/v1/class-sessions/" + session, tokenFor(academyId, Role.STUDENT)).statusCode());
     }
 
     @Test

@@ -33,7 +33,7 @@ class BatchHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         courseId = course(admin, "PHY-2027");
     }
 
@@ -160,7 +160,7 @@ class BatchHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(409, post(admin, courseId, "A", "2027-01-10", null).statusCode());
 
         UUID otherAcademy = academy("Other Academy");
-        String otherAdmin = tokenFor(otherAcademy, Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(otherAcademy, Role.STAFF);
         String theirCourse = course(otherAdmin, "THEIRS");
         HttpResponse<String> foreign = post(admin, theirCourse, "A", "2027-01-10", null);
         assertEquals(404, foreign.statusCode(), "another academy's course must look nonexistent");
@@ -211,7 +211,7 @@ class BatchHttpIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void batchesOfAnotherAcademyAreInvisibleAndUntouchable() {
         Map<String, Object> ours = create(courseId, "MON");
-        String outsider = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
+        String outsider = tokenFor(academy("Other Academy"), Role.STAFF);
         String path = "/api/v1/batches/" + ours.get("id");
 
         assertEquals(404, api.get(path, outsider).statusCode());
@@ -222,27 +222,24 @@ class BatchHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void aStaffRoleAloneGrantsNoBatch() {
+    void anyStaffMemberManagesBatchesAndStudentsReachNone() {
         Map<String, Object> batch = create(courseId, "MON");
         String path = "/api/v1/batches/" + batch.get("id");
 
-        for (Role role : List.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST, Role.STUDENT)) {
-            String token = tokenFor(academyId, role);
-            boolean batchScoped = role == Role.INSTRUCTOR || role == Role.ATTENDANCE_OFFICER;
-            if (batchScoped) {
-                assertEquals(List.of(), codes(api.get("/api/v1/batches", token)), role + " without an assignment sees no batch");
-                assertEquals(404, api.get(path, token).statusCode(), role.name());
-            } else {
-                assertEquals(403, api.get("/api/v1/batches", token).statusCode(), role.name());
-                assertEquals(403, api.get(path, token).statusCode(), role.name());
-            }
-            assertEquals(403, post(token, courseId, "NEW", "2027-01-10", null).statusCode(), role.name());
-            assertEquals(403, api.put(path, updateBody("MON", "Changed", "2027-01-10", null, false, 0), token).statusCode(), role.name());
-        }
+        String colleague = tokenFor(academyId, Role.STAFF);
+        assertEquals(List.of("MON"), codes(api.get("/api/v1/batches", colleague)), "no batch assignments any more");
+        assertEquals(200, api.get(path, colleague).statusCode());
+        assertEquals(201, post(colleague, courseId, "TUE", "2027-01-10", null).statusCode());
+
+        String student = tokenFor(academyId, Role.STUDENT);
+        assertEquals(403, api.get("/api/v1/batches", student).statusCode());
+        assertEquals(403, api.get(path, student).statusCode());
+        assertEquals(403, post(student, courseId, "NEW", "2027-01-10", null).statusCode());
+        assertEquals(403, api.put(path, updateBody("MON", "Changed", "2027-01-10", null, false, 0), student).statusCode());
         assertEquals(401, api.get("/api/v1/batches", null).statusCode());
         int deleted = api.delete(path, admin).statusCode();
         assertTrue(deleted == 405 || deleted == 403, "DELETE returned " + deleted);
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM batches", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM batches", Integer.class));
         assertEquals("Batch MON", HttpApi.parse(api.get(path, admin)).get("name"));
     }
 

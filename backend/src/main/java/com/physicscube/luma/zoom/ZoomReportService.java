@@ -64,7 +64,7 @@ public class ZoomReportService {
 
     /** An owner or administrator fetches (or re-fetches) the report of an ended occurrence now. Audited. */
     public FetchResult fetchNow(CurrentAccount caller, String occurrenceUuid) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         Integer known = jdbc.queryForObject("SELECT count(*) FROM (SELECT 1 FROM zoom_occurrence_events WHERE academy_id = ? "
                 + "AND occurrence_uuid = ? LIMIT 1) s", Integer.class, caller.academyId(), occurrenceUuid);
         if (known == null || known == 0) {

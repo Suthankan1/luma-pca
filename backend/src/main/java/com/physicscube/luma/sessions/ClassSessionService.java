@@ -1,6 +1,5 @@
 package com.physicscube.luma.sessions;
 
-import com.physicscube.luma.batches.BatchScope;
 import com.physicscube.luma.batches.BatchService;
 import com.physicscube.luma.batches.BatchView;
 import com.physicscube.luma.enrollments.EnrollmentService;
@@ -25,10 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Scheduled classes. Owners and administrators manage them. Instructors and
- * attendance officers read only sessions that include a batch they are assigned
- * to, and see only those batches and their students. Anything outside the caller's
- * academy or scope is reported as not found.
+ * Classes of the caller's academy. Staff read and manage every class of their academy;
+ * students read only their own classes through {@link #mine}. Anything outside the
+ * caller's academy is reported as not found.
  */
 @Service
 public class ClassSessionService {
@@ -76,18 +74,15 @@ public class ClassSessionService {
         if (!to.isAfter(from) || Duration.between(from, to).compareTo(MAX_WINDOW) > 0) {
             throw new InvalidRequestException("to must be after from and at most " + MAX_WINDOW.toDays() + " days later");
         }
-        BatchScope scope = batches.scope(caller);
+        caller.requireStaff();
         List<ClassSession> found;
         if (batchId != null) {
             batches.requireReadable(caller, batchId);
             found = sessions.inWindowForBatches(caller.academyId(), from, to, Set.of(batchId));
-        } else if (scope.all()) {
-            found = sessions.inWindow(caller.academyId(), from, to);
         } else {
-            found = scope.batchIds().isEmpty() ? List.of()
-                    : sessions.inWindowForBatches(caller.academyId(), from, to, scope.batchIds());
+            found = sessions.inWindow(caller.academyId(), from, to);
         }
-        return views(caller, found, scope);
+        return views(caller, found);
     }
 
     /**
@@ -105,12 +100,12 @@ public class ClassSessionService {
     }
 
     /**
-     * A student's classes starting in [from, to), by the same rule as {@link #mine}: for owners and administrators looking
+     * A student's classes starting in [from, to), by the same rule as {@link #mine}: for staff looking
      * at one student's attendance.
      */
     @Transactional(readOnly = true)
     public List<StudentClassView> forStudent(CurrentAccount caller, UUID studentId, Instant from, Instant to) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (!to.isAfter(from) || Duration.between(from, to).compareTo(MAX_WINDOW) > 0) {
             throw new InvalidRequestException("to must be after from and at most " + MAX_WINDOW.toDays() + " days later");
         }
@@ -142,13 +137,12 @@ public class ClassSessionService {
 
     @Transactional(readOnly = true)
     public SessionView get(CurrentAccount caller, UUID sessionId) {
-        BatchScope scope = batches.scope(caller);
-        return views(caller, List.of(readable(caller, sessionId, scope)), scope).get(0);
+        return views(caller, List.of(readable(caller, sessionId))).get(0);
     }
 
     /**
      * As {@link #expectedStudents(CurrentAccount, UUID)} for a class the caller already read with {@link #get}: that view
-     * lists only the batches the caller may see, so the class is not read again (one round trip fewer).
+     * lists the class's batches, so the class is not read again (one round trip fewer).
      */
     @Transactional(readOnly = true)
     public List<ExpectedStudent> expectedStudents(CurrentAccount caller, SessionView readByCaller) {
@@ -156,19 +150,17 @@ public class ClassSessionService {
         return enrollments.expectedOn(caller.academyId(), visible, readByCaller.localDate());
     }
 
-    /** Students expected at the class, each once, limited to the batches the caller may see. */
+    /** Students expected at the class (enrolled in any of its batches on its date), each once. */
     @Transactional(readOnly = true)
     public List<ExpectedStudent> expectedStudents(CurrentAccount caller, UUID sessionId) {
-        BatchScope scope = batches.scope(caller);
-        ClassSession session = readable(caller, sessionId, scope);
-        Set<UUID> visible = session.batchIds().stream().filter(scope::includes).collect(Collectors.toSet());
-        return enrollments.expectedOn(caller.academyId(), visible, session.localDate());
+        ClassSession session = readable(caller, sessionId);
+        return enrollments.expectedOn(caller.academyId(), session.batchIds(), session.localDate());
     }
 
     @Transactional
     public SessionView create(CurrentAccount caller, String title, Instant startsAt, Instant endsAt, String timeZone,
                               List<UUID> batchIds, String zoomWebinarId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         manualScheduling.require();
         ZoneId zone = zone(timeZone);
         checkTimes(startsAt, endsAt);
@@ -179,7 +171,7 @@ public class ClassSessionService {
         audited(caller, "CLASS_SCHEDULED", "CLASS_SESSION", saved.getId(), Map.of("startsAt", saved.getStartsAt().toString(),
                 "endsAt", saved.getEndsAt().toString(), "timeZone", saved.getTimeZone(), "batches", String.valueOf(saved.batchIds().size()),
                 "webinar", saved.getZoomWebinarId() == null ? "none" : "set"));
-        return views(caller, List.of(saved), new BatchScope(true, Set.of())).get(0);
+        return views(caller, List.of(saved)).get(0);
     }
 
     public static final int MAX_SERIES = 100;
@@ -197,7 +189,7 @@ public class ClassSessionService {
                                      List<String> weekdays, java.time.LocalTime startTime, java.time.LocalTime endTime,
                                      String timeZone, List<UUID> batchIds, String zoomWebinarId, List<java.time.LocalDate> skipDates,
                                      boolean dryRun) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         manualScheduling.require();
         ZoneId zone = zone(timeZone);
         if (lastDate.isBefore(firstDate) || java.time.temporal.ChronoUnit.DAYS.between(firstDate, lastDate) > MAX_SERIES_SPAN_DAYS) {
@@ -279,7 +271,7 @@ public class ClassSessionService {
     public SeriesEditResult editSeriesFrom(CurrentAccount caller, UUID seriesId, java.time.LocalDate fromDate, String title,
                                            java.time.LocalTime startTime, java.time.LocalTime endTime, String zoomWebinarId,
                                            boolean clearWebinar, boolean dryRun) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         manualScheduling.require();
         String newTitle = title == null || title.isBlank() ? null : title.strip();
         if (newTitle != null && newTitle.length() > 200) {
@@ -374,7 +366,7 @@ public class ClassSessionService {
     /** Cancels the series' scheduled classes on or after {@code fromDate} (their own local dates); returns how many. */
     @Transactional
     public int cancelSeriesFrom(CurrentAccount caller, UUID seriesId, java.time.LocalDate fromDate) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         manualScheduling.require();
         List<ClassSession> series = sessions.findByAcademyIdAndSeriesIdOrderByStartsAt(caller.academyId(), seriesId);
         if (series.isEmpty()) {
@@ -396,7 +388,7 @@ public class ClassSessionService {
     public SessionView update(CurrentAccount caller, UUID sessionId, String title, Instant startsAt, Instant endsAt,
                               String timeZone, List<UUID> batchIds, String status, String zoomWebinarId,
                               long expectedVersion) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         manualScheduling.require();
         ZoneId zone = zone(timeZone);
         checkTimes(startsAt, endsAt);
@@ -450,7 +442,7 @@ public class ClassSessionService {
             }
             audited(caller, action, "CLASS_SESSION", saved.getId(), details);
         }
-        return views(caller, List.of(saved), new BatchScope(true, Set.of())).get(0);
+        return views(caller, List.of(saved)).get(0);
     }
 
     /**
@@ -485,11 +477,10 @@ public class ClassSessionService {
         return digits;
     }
 
-    private ClassSession readable(CurrentAccount caller, UUID sessionId, BatchScope scope) {
+    /** Staff read every class of their academy, including a Zoom run whose Academy class is not resolved yet (no batches). */
+    private ClassSession readable(CurrentAccount caller, UUID sessionId) {
+        caller.requireStaff();
         return sessions.findByIdAndAcademyId(sessionId, caller.academyId())
-                // Owners and administrators see every class, including a Zoom run whose Academy class is not resolved yet
-                // (it has no batches); batch-scoped staff only classes of their batches.
-                .filter(session -> scope.all() || session.batchIds().stream().anyMatch(scope::includes))
                 .orElseThrow(() -> new ResourceNotFoundException("Class session"));
     }
 
@@ -528,12 +519,12 @@ public class ClassSessionService {
         }
     }
 
-    private List<SessionView> views(CurrentAccount caller, List<ClassSession> found, BatchScope scope) {
+    private List<SessionView> views(CurrentAccount caller, List<ClassSession> found) {
         Map<UUID, BatchView> batchViews = batches.viewsInAcademy(caller.academyId(),
-                found.stream().flatMap(s -> s.batchIds().stream()).filter(scope::includes).collect(Collectors.toSet()));
+                found.stream().flatMap(s -> s.batchIds().stream()).collect(Collectors.toSet()));
         return found.stream().map(s -> new SessionView(s.getId(), s.getTitle(), s.getStartsAt(), s.getEndsAt(),
                 s.getTimeZone(), s.localDate(), s.getStatus(), s.getZoomWebinarId(), s.getSeriesId(),
-                s.batchIds().stream().filter(scope::includes).map(batchViews::get)
+                s.batchIds().stream().map(batchViews::get)
                         .map(b -> new SessionView.Batch(b.id(), b.courseId(), b.code(), b.name()))
                         .sorted(Comparator.comparing(SessionView.Batch::code).thenComparing(SessionView.Batch::batchId))
                         .toList(),

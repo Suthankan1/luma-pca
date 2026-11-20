@@ -38,7 +38,7 @@ class EnrollmentServiceAuthorizationIntegrationTest extends StaffApiIntegrationT
     @Test
     void servicesEnforceRolesAcademiesAndOwnership() {
         UUID academyId = academy("Physics Cube Test");
-        CurrentAccount admin = caller(academyId, UUID.randomUUID(), "ACADEMY_ADMIN");
+        CurrentAccount admin = caller(academyId, UUID.randomUUID(), "STAFF");
         UUID batch = batches.create(admin, courses.create(admin, "PHY", "Physics").id(), "A", "A", DAY, null).id();
         StudentView me = students.create(admin, "PCA-1", "Me", "me@example.invalid");
         StudentView classmate = students.create(admin, "PCA-2", "Classmate", "classmate@example.invalid");
@@ -51,12 +51,7 @@ class EnrollmentServiceAuthorizationIntegrationTest extends StaffApiIntegrationT
             assertThrows(AccessDeniedException.class, () -> students.get(denied, me.id()));
             assertThrows(AccessDeniedException.class, () -> students.create(denied, "X", "X", "x@example.invalid"));
             assertThrows(AccessDeniedException.class, () -> students.update(denied, me.id(), "X", true, 0));
-            if (denied.batchScopedRoles().isEmpty()) {
-                assertThrows(AccessDeniedException.class, () -> enrollments.roster(denied, batch));
-            } else {
-                assertThrows(ResourceNotFoundException.class, () -> enrollments.roster(denied, batch),
-                        "an unassigned instructor gets not found");
-            }
+            assertThrows(AccessDeniedException.class, () -> enrollments.roster(denied, batch));
             assertThrows(AccessDeniedException.class, () -> enrollments.forStudent(denied, me.id()));
             assertThrows(AccessDeniedException.class, () -> enrollments.enroll(denied, batch, me.id(), DAY));
             assertThrows(AccessDeniedException.class, () -> enrollments.update(denied, enrollment, DAY, null, 0));
@@ -68,9 +63,9 @@ class EnrollmentServiceAuthorizationIntegrationTest extends StaffApiIntegrationT
         CurrentAccount sameAccountOtherAcademy = caller(academy("Other Academy"), me.accountId(), "STUDENT");
         assertThrows(ResourceNotFoundException.class, () -> students.mine(sameAccountOtherAcademy),
                 "ownership is matched on account and academy together");
-        assertThrows(AccessDeniedException.class, () -> enrollments.mine(caller(academyId, me.accountId(), "INSTRUCTOR")));
+        assertThrows(AccessDeniedException.class, () -> enrollments.mine(caller(academyId, me.accountId(), "STAFF")));
 
-        CurrentAccount outsider = caller(academy("Third Academy"), UUID.randomUUID(), "ACADEMY_OWNER");
+        CurrentAccount outsider = caller(academy("Third Academy"), UUID.randomUUID(), "STAFF");
         assertThrows(ResourceNotFoundException.class, () -> students.get(outsider, me.id()));
         assertThrows(ResourceNotFoundException.class, () -> enrollments.roster(outsider, batch));
         assertThrows(ResourceNotFoundException.class, () -> enrollments.forStudent(outsider, me.id()));

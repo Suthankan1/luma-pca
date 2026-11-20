@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Classes that have ended but are not final: what each is waiting for, finalising every ready one at once, and the
- * owner's optional automatic finalisation once Zoom's report is in. Finalisation itself is
+ * optional automatic finalisation (switched on by staff) once Zoom's report is in. Finalisation itself is
  * {@link AttendanceFinalisationService#finalise}, unchanged: the same rule, checks and audit.
  */
 @Service
@@ -57,7 +57,7 @@ public class AttendanceQueueService {
 
     /** Ended, scheduled classes of the last {@value #LOOKBACK_DAYS} days with no final attendance, oldest first. */
     public Pending pending(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         Instant now = DbTime.now();
         List<PendingClass> result = new ArrayList<>();
         for (Object[] row : candidates(caller.academyId(), now)) {
@@ -73,7 +73,7 @@ public class AttendanceQueueService {
 
     /** Finalises every ready class; the others are left as they are. Each class is its own transaction. */
     public BulkResult finaliseReady(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (policies.find(caller.academyId()).isEmpty()) {
             throw new ConflictException("The academy has not recorded its attendance rule yet");
         }
@@ -96,8 +96,8 @@ public class AttendanceQueueService {
     }
 
     /**
-     * For academies whose owner switched automatic finalisation on: finalises every ready class in that owner's name, as
-     * long as they are still an active owner. Returns how many classes were finalised.
+     * For academies where a staff member switched automatic finalisation on: finalises every ready class in that staff
+     * member's name, as long as they are still active staff. Returns how many classes were finalised.
      */
     public int autoFinaliseOnce() {
         int done = 0;
@@ -105,11 +105,11 @@ public class AttendanceQueueService {
         for (var row : jdbc.queryForList("""
                 SELECT p.academy_id, p.auto_finalise_by FROM attendance_policies p
                 JOIN accounts a ON a.id = p.auto_finalise_by AND a.academy_id = p.academy_id AND a.status = 'ACTIVE'
-                JOIN account_roles r ON r.account_id = a.id AND r.role = 'ACADEMY_OWNER'
+                JOIN account_roles r ON r.account_id = a.id AND r.role = 'STAFF'
                 WHERE p.auto_finalise
                 """)) {
             UUID academy = (UUID) row.get("academy_id");
-            CurrentAccount owner = new CurrentAccount((UUID) row.get("auto_finalise_by"), academy, Set.of("ACADEMY_OWNER"));
+            CurrentAccount owner = new CurrentAccount((UUID) row.get("auto_finalise_by"), academy, Set.of(CurrentAccount.STAFF));
             for (Object[] c : candidates(academy, now)) {
                 UUID id = (UUID) c[0];
                 try {

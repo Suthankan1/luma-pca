@@ -214,7 +214,7 @@ class PasswordResetHttpIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void administratorsSignInWithTheNewPasswordAfterAReset() throws Exception {
-        UUID admin = accounts.register(academyId, "admin@example.invalid", Set.of(Role.ACADEMY_ADMIN)).id();
+        UUID admin = accounts.register(academyId, "admin@example.invalid", Set.of(Role.STAFF)).id();
         accounts.setPassword(admin, OLD);
         request("admin@example.invalid");
         assertEquals(204, confirm(nextToken("admin@example.invalid"), NEW).statusCode());

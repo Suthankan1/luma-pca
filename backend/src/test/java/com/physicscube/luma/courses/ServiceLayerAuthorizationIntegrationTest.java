@@ -34,41 +34,37 @@ class ServiceLayerAuthorizationIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void servicesRejectCallersWithoutAManagerRole() {
+    void servicesRejectCallersWithoutTheStaffRole() {
         UUID academyId = academy("Physics Cube Test");
-        CurrentAccount admin = caller(academyId, "ACADEMY_ADMIN");
+        CurrentAccount admin = caller(academyId, "STAFF");
         CourseView course = courses.create(admin, "PHY", "Physics");
         BatchView batch = batches.create(admin, course.id(), "MON", "Monday", START, null);
 
-        for (CurrentAccount denied : List.of(caller(academyId, "INSTRUCTOR"), caller(academyId, "ATTENDANCE_OFFICER"),
-                caller(academyId, "ANALYST"), caller(academyId, "STUDENT"), caller(academyId),
-                caller(academyId, "INSTRUCTOR", "STUDENT"), caller(academyId, "academy_admin"))) {
+        // A former role name left in a token or test must grant nothing; only STAFF opens staff services.
+        for (CurrentAccount denied : List.of(caller(academyId, "STUDENT"), caller(academyId),
+                caller(academyId, "ACADEMY_OWNER"), caller(academyId, "INSTRUCTOR"), caller(academyId, "ANALYST"),
+                caller(academyId, "staff"))) {
             assertThrows(AccessDeniedException.class, () -> courses.list(denied, null));
             assertThrows(AccessDeniedException.class, () -> courses.get(denied, course.id()));
             assertThrows(AccessDeniedException.class, () -> courses.create(denied, "NEW", "New"));
             assertThrows(AccessDeniedException.class, () -> courses.update(denied, course.id(), "PHY", "Changed", false, 0));
-            if (denied.batchScopedRoles().isEmpty()) {
-                assertThrows(AccessDeniedException.class, () -> batches.list(denied, null));
-                assertThrows(AccessDeniedException.class, () -> batches.get(denied, batch.id()));
-            } else {
-                assertEquals(List.of(), batches.list(denied, null), "a staff role alone grants no batch");
-                assertThrows(ResourceNotFoundException.class, () -> batches.get(denied, batch.id()));
-            }
+            assertThrows(AccessDeniedException.class, () -> batches.list(denied, null));
+            assertThrows(AccessDeniedException.class, () -> batches.get(denied, batch.id()));
             assertThrows(AccessDeniedException.class, () -> batches.create(denied, course.id(), "NEW", "New", START, null));
             assertThrows(AccessDeniedException.class,
                     () -> batches.update(denied, batch.id(), "MON", "Changed", START, null, false, 0));
         }
         assertEquals("Physics", courses.get(admin, course.id()).title());
         assertEquals("Monday", batches.get(admin, batch.id()).name());
-        assertEquals(1, courses.list(caller(academyId, "ACADEMY_OWNER", "INSTRUCTOR"), null).size());
+        assertEquals(1, courses.list(caller(academyId, "STAFF"), null).size());
     }
 
     @Test
-    void servicesNeverCrossAcademiesEvenForManagers() {
+    void servicesNeverCrossAcademiesEvenForStaff() {
         UUID ours = academy("Physics Cube Test");
         UUID theirs = academy("Other Academy");
-        CurrentAccount admin = caller(ours, "ACADEMY_ADMIN");
-        CurrentAccount outsider = caller(theirs, "ACADEMY_OWNER");
+        CurrentAccount admin = caller(ours, "STAFF");
+        CurrentAccount outsider = caller(theirs, "STAFF");
         CourseView course = courses.create(admin, "PHY", "Physics");
         BatchView batch = batches.create(admin, course.id(), "MON", "Monday", START, null);
 
@@ -89,7 +85,7 @@ class ServiceLayerAuthorizationIntegrationTest extends StaffApiIntegrationTest {
     /** Guards against platform clocks finer than the database: a write must return exactly what a read returns. */
     @Test
     void valuesReturnedByWritesEqualWhatIsReadBack() {
-        CurrentAccount admin = caller(academy("Physics Cube Test"), "ACADEMY_ADMIN");
+        CurrentAccount admin = caller(academy("Physics Cube Test"), "STAFF");
 
         CourseView created = courses.create(admin, "PHY", "Physics");
         assertEquals(created, courses.get(admin, created.id()));
