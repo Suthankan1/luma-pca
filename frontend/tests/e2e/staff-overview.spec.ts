@@ -60,6 +60,23 @@ test.describe("Staff home", () => {
       await expect(recents.getByRole("definition").nth(2)).toHaveText(percent);
       const nextCard = page.getByRole("region", { name: long, exact: true });
       await expect(nextCard.getByText("Next class", { exact: true })).toBeVisible();
+      const nextBox = (await nextCard.boundingBox())!;
+      const lastBox = (await recents.boundingBox())!;
+      expect(Math.abs(nextBox.width - lastBox.width)).toBeLessThanOrEqual(1);
+      if (test.info().project.name === "mobile") {
+        expect(Math.abs(nextBox.x - lastBox.x)).toBeLessThanOrEqual(1);
+        expect(nextBox.y + nextBox.height).toBeLessThan(lastBox.y);
+      } else {
+        expect(Math.abs(nextBox.y - lastBox.y)).toBeLessThanOrEqual(1);
+        expect(nextBox.x + nextBox.width).toBeLessThan(lastBox.x);
+      }
+      for (const metric of await recents.getByRole("term").or(recents.getByRole("definition")).all()) {
+        const metricBox = (await metric.boundingBox())!;
+        expect(metricBox.x).toBeGreaterThanOrEqual(lastBox.x);
+        expect(metricBox.y).toBeGreaterThanOrEqual(lastBox.y);
+        expect(metricBox.x + metricBox.width).toBeLessThanOrEqual(lastBox.x + lastBox.width);
+        expect(metricBox.y + metricBox.height).toBeLessThanOrEqual(lastBox.y + lastBox.height);
+      }
       if (test.info().project.name === "chromium") {
         await nextCard.getByRole("link", { name: long, exact: true }).hover();
         const tooltip = nextCard.locator(".one-line-full");

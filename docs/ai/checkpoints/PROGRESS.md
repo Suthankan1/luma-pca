@@ -2458,3 +2458,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Passed 20 targeted Testcontainers tests, 79 frontend unit tests, TypeScript, targeted lint, an isolated production build, and four mock API Playwright tests on Edge desktop and Pixel 7 emulation. Browser coverage includes class order across dates, calendar independence, displayed rates, and empty rosters. The OpenAPI contract parsed and the structure check passed.
 - The local API restarted with the original Supabase database. Readiness returned UP, the new route returned 401 without a session, and the sign-in page returned 200. The signed-in chart against Supabase was not verified.
 - No migration is needed. Roll out the backend before or alongside the frontend so Staff Home can use the new route. Revert both together to roll back.
+
+## Compact Staff Home class cards (2026-11-20)
+
+- Next class and Last completed class use equal-width columns when the content area can fit both cards and stack on narrow screens. The class title uses smaller type and one line. The existing full-title popover stays available on hover and keyboard focus.
+- The next card puts its time and countdown in a separate row. The last completed card keeps Expected, Joined, and Attendance in three columns below the title and end time. Live rows and the five-class chart retain their layouts.
+- TypeScript, targeted lint, the structure check, and an isolated production build passed. Four Staff Home Playwright cases passed on Edge desktop and Pixel 7 emulation with the mock API, covering card alignment, metric containment, title tooltips, and the live view. Checked the desktop screenshot. The local API reported UP and the sign-in page returned 200. The signed-in Supabase layout was not verified.
+- This change is frontend-only and needs no migration. Revert the commit to roll back.
