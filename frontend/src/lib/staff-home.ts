@@ -174,7 +174,7 @@ export function liveNumbers(rows: readonly AttendanceRow[], zoomConnectedNow: nu
   return { expected, joined, connectedNow, percent: expected ? Math.round((joined * 100) / expected) : null };
 }
 
-/** "18 of 24 joined · 75%", from the attendance dashboard's per-class numbers. */
+/** "18 of 24 joined · 75%", from the per-class attendance totals. */
 export function joinedLabel(c: { expected: number; joined: number }) {
   if (!c.expected) return c.joined ? `${c.joined} joined` : "No students expected";
   return `${c.joined} of ${c.expected} joined · ${Math.round((c.joined * 100) / c.expected)}%`;
@@ -195,7 +195,7 @@ export function homeHref(options: { day?: string | null; month?: string | null }
   return `/staff${query ? `?${query}` : ""}`;
 }
 
-/** The days of a month that have already started at the academy: the attendance dashboard's range, or null for a future month. */
+/** The days of a month that have already started at the academy, or null for a future month. */
 export function heldRange(month: string, today: string) {
   const first = `${month}-01`;
   if (first > today) return null;
@@ -203,21 +203,17 @@ export function heldRange(month: string, today: string) {
   return { from: first, to: last < today ? last : today };
 }
 
-export type ClassBar = { id: string; title: string; day: string; startsAt: string; timeZone: string; expected: number; joined: number;
-  percent: number };
+export type ClassAttendanceTotal = { id: string; expected: number; joined: number };
 
 /**
- * One bar per class held in the month, in time order: the share of expected students who joined. Classes with nobody
- * expected (not linked to a batch) have no attendance to show and are counted apart. The average weighs every class equally.
+ * Average the unrounded share of expected students who joined, giving each class equal weight.
+ * Classes without expected students have no rate.
  */
-export function monthBars(classes: readonly { id: string; title: string; startsAt: string; timeZone: string; expected: number;
-                            joined: number }[]) {
-  const bars: ClassBar[] = classes.filter(c => c.expected > 0)
-    .map(c => ({ id: c.id, title: c.title, day: instantParts(c.startsAt, c.timeZone).date, startsAt: c.startsAt, timeZone: c.timeZone,
-      expected: c.expected, joined: c.joined, percent: Math.round((Math.min(c.joined, c.expected) * 100) / c.expected) }))
-    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
-  const average = bars.length ? Math.round(bars.reduce((sum, bar) => sum + bar.percent, 0) / bars.length) : null;
-  return { bars, average, withoutStudents: classes.length - bars.length };
+export function monthlyAttendance(totals: readonly Pick<ClassAttendanceTotal, "expected" | "joined">[]) {
+  const counted = totals.filter(c => c.expected > 0);
+  const sum = counted.reduce((total, c) => total + (Math.min(c.joined, c.expected) * 100) / c.expected, 0);
+  const average = counted.length ? Math.round(sum / counted.length) : null;
+  return { average, classes: counted.length, withoutStudents: totals.length - counted.length };
 }
 
 /** "Fri 20 Nov". */

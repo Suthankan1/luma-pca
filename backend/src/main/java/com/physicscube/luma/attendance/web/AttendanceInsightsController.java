@@ -1,10 +1,12 @@
 package com.physicscube.luma.attendance.web;
 
 import com.physicscube.luma.attendance.AttendanceInsightsService;
+import com.physicscube.luma.attendance.AttendanceInsightsService.ClassTotals;
 import com.physicscube.luma.attendance.AttendanceInsightsService.Dashboard;
 import com.physicscube.luma.attendance.AttendanceInsightsService.StudentOverview;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -29,6 +31,13 @@ class AttendanceInsightsController {
                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                         @RequestParam(required = false) UUID courseId, @RequestParam(required = false) UUID batchId) {
         return insights.dashboard(CurrentAccount.from(authentication), AttendanceInsightsService.range(from, to), courseId, batchId);
+    }
+
+    @GetMapping("/api/v1/attendance/class-totals")
+    List<ClassTotals> classTotals(JwtAuthenticationToken authentication,
+                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return insights.classTotals(CurrentAccount.from(authentication), AttendanceInsightsService.range(from, to));
     }
 
     /** Owners and administrators: one student's courses and every class, with each join and leave. */

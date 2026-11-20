@@ -3,24 +3,28 @@ import { Suspense } from "react";
 import { StaffShell } from "@/components/StaffShell";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { OneLineTitle } from "@/components/staff/OneLineTitle";
-import { AttendanceBars } from "@/components/staff/AttendanceBars";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { ACADEMY_TIME_ZONE, academyToday, addDays, isAcademyManager, zonedToInstant, type ClassSession,
   type ProvisionalAttendance } from "@/lib/staff-forms";
-import { renderTime, type Dashboard } from "@/lib/insights";
+import { renderTime } from "@/lib/insights";
 import { type WebinarMonitor } from "@/lib/webinars";
 import { calendarEntries, chosenDay, chosenMonth, entryStateLabels, greeting, gridRange, heldRange, homeHref, joinedLabel,
-  liveNumbers, longDayLabel, monthBars, monthLabel, monthWeeks, nextEntry, relativeDayName, shiftMonth, shortDayLabel,
-  startedAgoLabel, startsInLabel, timeRange, type DayEntry, type LiveNumbers } from "@/lib/staff-home";
+  liveNumbers, longDayLabel, monthLabel, monthWeeks, monthlyAttendance, nextEntry, relativeDayName, shiftMonth, shortDayLabel,
+  startedAgoLabel, startsInLabel, timeRange, type ClassAttendanceTotal, type DayEntry, type LiveNumbers } from "@/lib/staff-home";
 
 const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 /** At most this many classes running at once get their own live row (each costs one attendance request). */
 const MAX_LIVE = 3;
+const MONTH_ATTENDANCE_TIMEOUT_MS = 25_000;
 
 function sessionsIn(fromInstant: string, toInstant: string) {
   return staffApi<ClassSession[]>(`/api/v1/class-sessions?${new URLSearchParams({ from: fromInstant, to: toInstant })}`);
+}
+
+function classTotals(range: { from: string; to: string }, timeoutMs?: number) {
+  return staffApi<ClassAttendanceTotal[]>(`/api/v1/attendance/class-totals?${new URLSearchParams(range)}`, undefined, timeoutMs);
 }
 
 /** The academy date an entry starts on. */
@@ -80,13 +84,13 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const endedOnDay = day <= today && dayEntries.some(e => e.state === "ended" && e.sessionId);
 
   // Second round: live numbers for running classes, and joined/expected for the chosen day's finished classes.
-  const [liveAttendance, dayDashboard] = await Promise.all([
+  const [liveAttendance, dayTotals] = await Promise.all([
     Promise.all(running.map(e => staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${e.sessionId}/attendance`))),
-    endedOnDay ? staffApi<Dashboard>(`/api/v1/attendance/dashboard?${new URLSearchParams({ from: day, to: day })}`) : null,
+    endedOnDay ? classTotals({ from: day, to: day }) : null,
   ]);
   const live = running.map((entry, i) => ({ entry, numbers: liveAttendance[i].ok
     ? liveNumbers(liveAttendance[i].data.students, liveRuns.get(entry.sessionId!)?.connectedNow ?? null) : null }));
-  const finished = new Map(dayDashboard?.ok ? dayDashboard.data.classes.map(c => [c.id, c] as const) : []);
+  const finished = new Map(dayTotals?.ok ? dayTotals.data.map(c => [c.id, c] as const) : []);
   const href = (options: { day?: string; month?: string }) => homeHref({ day: options.day ?? day, month: options.month ?? month }, today);
   const previousDay = addDays(day, -1), nextDay = addDays(day, 1);
 
@@ -202,22 +206,28 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   </StaffShell>;
 }
 
-/** The month's attendance chart; streamed in after the rest of the page, since a month of attendance takes longer to add up. */
 async function MonthAttendance({ month, today }: { month: string; today: string }) {
   const range = heldRange(month, today);
-  const result = range ? await staffApi<Dashboard>(`/api/v1/attendance/dashboard?${new URLSearchParams(range)}`) : null;
-  const chart = result?.ok ? monthBars(result.data.classes) : null;
+  const result = range ? await classTotals(range, MONTH_ATTENDANCE_TIMEOUT_MS) : null;
+  const totals = result?.ok ? monthlyAttendance(result.data) : null;
   return <section className="home-card home-chart" aria-labelledby="chart-title">
     <div className="home-card-head">
       <h2 id="chart-title">Attendance in {monthLabel(month)}</h2>
-      <p>Share of expected students who joined each class</p>
+      <p>Average share of expected students who joined each completed class</p>
     </div>
-    {!range && <p className="home-empty">No classes have been held this month yet.</p>}
-    {range && !result?.ok && <p className="home-empty">{result?.status === 403 ? "Your role has no attendance figures." : "Attendance couldn’t load. Please reload shortly."}</p>}
-    {chart && chart.average == null && <p className="home-empty">No classes with expected students have been held this month yet.</p>}
-    {chart && chart.average != null && <AttendanceBars bars={chart.bars} average={chart.average} />}
-    {chart && chart.withoutStudents > 0 && <p className="home-note">{chart.withoutStudents} class{chart.withoutStudents === 1 ? " has" : "es have"} no
-      expected students (not linked to a batch) and {chart.withoutStudents === 1 ? "isn’t" : "aren’t"} shown.</p>}
+    {result && !result.ok && <p className="home-empty">{result.status === 403 ? "Your role has no attendance figures." : "Attendance couldn’t load. Please reload shortly."}</p>}
+    {(!range || (result?.ok && result.data.length === 0)) && <p className="home-empty">No completed classes this month.</p>}
+    {totals && totals.average == null && totals.withoutStudents > 0 && <p className="home-empty">No completed classes with expected students this month.</p>}
+    {totals && totals.average != null && <div className="month-attendance">
+      <p className="month-attendance-summary">
+        <strong>{totals.average}%</strong>
+        <span>{totals.classes} {totals.classes === 1 ? "class" : "classes"} counted</span>
+      </p>
+      <meter className="month-attendance-bar" min={0} max={100} value={totals.average} aria-label="Average attendance" />
+      {totals.withoutStudents > 0 && <p className="home-note">
+        {totals.withoutStudents} {totals.withoutStudents === 1 ? "class had" : "classes had"} no expected students.
+      </p>}
+    </div>}
   </section>;
 }
 

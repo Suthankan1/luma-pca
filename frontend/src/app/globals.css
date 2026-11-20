@@ -655,33 +655,14 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .home-state-upcoming { color:var(--pca-blue); }
 .home-state-upcoming::before { background:var(--pca-blue); }
 
-/* Attendance this month: one column per class, the average as a line */
-.bars { margin-top:12px; }
-.bars-readout { display:flex; align-items:center; gap:12px; min-height:50px; padding:6px 12px; border-radius:8px; background:#f5f8fc; }
-.bars-readout strong { min-width:56px; color:var(--ink); font-size:22px; font-weight:700; }
-.bars-readout-copy { display:grid; min-width:0; color:var(--ink-3); font-size:12px; }
-.bars-readout-copy > span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.bars-readout-title { color:var(--ink); font-size:13px; font-weight:600; }
-.bars-scroll { overflow-x:auto; padding:14px 2px 0 38px; }
-.bars-plot { position:relative; height:180px; min-width:calc(var(--count) * 12px); margin-bottom:24px; }
-.bars-grid, .bars-average { position:absolute; inset-inline:0; bottom:calc(var(--at) * 1%); pointer-events:none; }
-.bars-grid { border-top:1px solid #e6ebf1; }
-.bars-grid > span { position:absolute; inset-inline-end:calc(100% + 8px); top:-8px; color:var(--ink-3); font-size:11px; font-variant-numeric:tabular-nums; }
-.bars-average { z-index:2; border-top:2px solid var(--pca-navy); }
-.bars-average > span { position:absolute; inset-inline-end:0; bottom:4px; padding:0 4px; border-radius:4px; background:#ffffffe0; color:var(--ink); font-size:11px; font-weight:700; }
-.bars-list { position:absolute; inset:0; display:flex; gap:2px; }
-.bars-col { position:relative; display:flex; flex:1 1 0; min-width:10px; }
-.bars-bar { display:flex; align-items:flex-end; justify-content:center; width:100%; border-radius:4px; }
-.bars-bar:focus-visible { outline:2px solid var(--pca-blue); outline-offset:1px; }
-.bars-fill { width:min(100%,24px); height:max(2px,calc(var(--v) * 1%)); border-radius:4px 4px 0 0; background:var(--pca-blue); transform-origin:bottom; transition:background-color .15s ease; }
-.bars-bar:is(:hover,:focus-visible) .bars-fill { background:#3b8ad0; }
-.bars-day { position:absolute; top:calc(100% + 6px); left:50%; translate:-50% 0; color:var(--ink-3); font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.bars-table { margin-top:4px; }
-.bars-table summary { display:inline-flex; align-items:center; min-height:32px; color:var(--pca-blue); font-size:13px; font-weight:600; cursor:pointer; }
-.bars-table table { width:100%; margin-top:6px; border-collapse:collapse; font-size:13px; }
-.bars-table th { padding:6px; border-bottom:1px solid var(--line); color:var(--ink-3); font-weight:600; text-align:start; }
-.bars-table td { padding:6px; border-bottom:1px solid var(--line-soft); color:var(--ink); }
-.bars-table td:nth-child(n+3) { font-variant-numeric:tabular-nums; white-space:nowrap; }
+/* Monthly attendance average */
+.month-attendance { margin-top:16px; }
+.month-attendance-summary { display:flex; align-items:baseline; gap:12px; margin-bottom:8px; color:var(--ink-3); font-size:13px; }
+.month-attendance-summary strong { color:var(--ink); font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; }
+.month-attendance-bar { appearance:none; display:block; width:100%; height:14px; overflow:hidden; border:0; border-radius:999px; background:#e6ebf1; }
+.month-attendance-bar::-webkit-meter-bar { height:100%; background:#e6ebf1; border:0; border-radius:999px; }
+.month-attendance-bar::-webkit-meter-optimum-value { background:var(--pca-blue); border-radius:999px; }
+.month-attendance-bar::-moz-meter-bar { background:var(--pca-blue); border-radius:999px; }
 
 /* Titles kept to one line; the full title shows in a small card on hover or keyboard focus when it is cut off */
 .one-line { position:relative; display:block; min-width:0; }
@@ -745,12 +726,10 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
   .staff-home > :nth-child(2) { animation-delay:.05s; }
   .staff-home > :nth-child(3) { animation-delay:.1s; }
   .home-day-list { animation:home-slide .3s ease-out both; }
-  .bars-fill { animation:bar-grow .6s cubic-bezier(.2,.8,.2,1) both; }
   .live-dot::after { content:""; position:absolute; inset:0; border-radius:50%; background:currentColor; animation:live-ping 1.4s ease-out 3; }
   :is(a,button):is(:hover,:focus-visible) .one-line[data-truncated]:not([data-dismissed]) .one-line-full { animation:tip-in .15s ease-out; }
   @keyframes home-rise { from { translate:0 10px; } }
   @keyframes home-slide { from { translate:8px 0; } }
-  @keyframes bar-grow { from { scale:1 0; } }
   @keyframes live-ping { from { opacity:.7; scale:1; } to { opacity:0; scale:2.6; } }
   @keyframes tip-in { from { opacity:0; translate:0 -3px; } }
 }

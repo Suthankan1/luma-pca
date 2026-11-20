@@ -19,12 +19,12 @@ interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
 
     boolean existsByBatchIdAndStudentId(UUID batchId, UUID studentId);
 
-    /** Enrollments in force on the day: started on or before it and not withdrawn by it. */
+    /** Enrollments in force on at least one day of the inclusive period. */
     @Query("""
             select e from Enrollment e
             where e.academyId = :academyId and e.batchId in :batchIds
-              and e.enrolledOn <= :day and (e.withdrawnOn is null or e.withdrawnOn > :day)
+              and e.enrolledOn <= :lastDay and (e.withdrawnOn is null or e.withdrawnOn > :firstDay)
             """)
-    List<Enrollment> inForceOn(@Param("academyId") UUID academyId, @Param("batchIds") Collection<UUID> batchIds,
-                               @Param("day") LocalDate day);
+    List<Enrollment> overlapping(@Param("academyId") UUID academyId, @Param("batchIds") Collection<UUID> batchIds,
+                                 @Param("firstDay") LocalDate firstDay, @Param("lastDay") LocalDate lastDay);
 }

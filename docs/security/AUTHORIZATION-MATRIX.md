@@ -48,3 +48,6 @@ Attendance Officer; the class list and expected students are limited to the call
 only their batches' students. `GET /api/v1/students/{id}/attendance-overview` for Owner and Admin (404 outside the
 academy). `GET /api/v1/me/attendance-overview` for Students, resolved from the token only; students get 403 on the
 staff routes.
+
+`GET /api/v1/attendance/class-totals` uses the same staff roles and academy/batch scope as the attendance dashboard.
+It returns completed class IDs and counts of expected and joined students. For a shared class, each student is counted once across the caller's visible batches.

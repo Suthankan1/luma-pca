@@ -47,7 +47,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/class-sessions", "/api/v1/class-sessions/*",
                             "/api/v1/class-sessions/*/students", "/api/v1/class-sessions/*/attendance",
                             "/api/v1/class-sessions/*/attendance/export", "/api/v1/batches/*/attendance/export",
-                            "/api/v1/batches/*/attendance/summary", "/api/v1/attendance/dashboard",
+                            "/api/v1/batches/*/attendance/summary", "/api/v1/attendance/dashboard", "/api/v1/attendance/class-totals",
                             "/api/v1/class-sessions/*/zoom-run")
                         .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/assignments").hasAnyRole("INSTRUCTOR", "ATTENDANCE_OFFICER")

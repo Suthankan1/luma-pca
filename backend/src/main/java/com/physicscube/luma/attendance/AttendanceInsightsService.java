@@ -5,6 +5,7 @@ import com.physicscube.luma.attendance.ProvisionalAttendanceService.FinalOutcome
 import com.physicscube.luma.attendance.ProvisionalAttendanceService.StudentFacts;
 import com.physicscube.luma.attendance.ProvisionalAttendanceService.Visit;
 import com.physicscube.luma.enrollments.EnrollmentService;
+import com.physicscube.luma.enrollments.EnrollmentService.RosterRequest;
 import com.physicscube.luma.enrollments.EnrollmentView;
 import com.physicscube.luma.enrollments.ExpectedStudent;
 import com.physicscube.luma.sessions.ClassSessionService;
@@ -122,6 +123,27 @@ public class AttendanceInsightsService {
 
     public record Dashboard(LocalDate from, LocalDate to, UUID courseId, UUID batchId, boolean truncated, Totals totals,
                             List<ClassSummary> classes, List<StudentSummary> students) {
+    }
+
+    public record ClassTotals(UUID id, int expected, int joined) {
+    }
+
+    /** Counts for every completed class, limited to the caller's academy and visible batches. */
+    public List<ClassTotals> classTotals(CurrentAccount caller, Range range) {
+        Instant now = DbTime.now();
+        List<SessionView> completed = sessions.list(caller, range.start(), range.end(), null).stream()
+                .filter(session -> !"CANCELLED".equals(session.status()) && !session.endsAt().isAfter(now))
+                .toList();
+        List<RosterRequest> requests = completed.stream().map(session -> new RosterRequest(session.id(), session.localDate(),
+                session.batches().stream().map(SessionView.Batch::batchId).collect(Collectors.toSet()))).toList();
+        Map<UUID, Set<UUID>> expectedByClass = enrollments.expectedStudentIds(caller.academyId(), requests);
+
+        Semaphore permits = new Semaphore(CONCURRENCY);
+        List<CompletableFuture<ClassTotals>> tasks = completed.stream().map(session -> Parallel.start(limited(permits, () -> {
+            Set<UUID> expected = expectedByClass.getOrDefault(session.id(), Set.of());
+            return new ClassTotals(session.id(), expected.size(), facts.countJoined(caller.academyId(), session.id(), expected));
+        }))).toList();
+        return tasks.stream().map(Parallel::join).toList();
     }
 
     private record Selected(SessionView session, List<ExpectedStudent> expected, ClassFacts facts) {

@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 interface ClassSessionRepository extends JpaRepository<ClassSession, UUID> {
     Optional<ClassSession> findByIdAndAcademyId(UUID id, UUID academyId);
 
+    @EntityGraph(attributePaths = "batches")
     @Query("""
             select s from ClassSession s
             where s.academyId = :academyId and s.startsAt >= :from and s.startsAt < :to
@@ -29,6 +31,7 @@ interface ClassSessionRepository extends JpaRepository<ClassSession, UUID> {
     List<UUID> scheduledOnWebinarAround(@Param("academyId") UUID academyId, @Param("webinarId") String webinarId,
                                         @Param("latestStart") Instant latestStart, @Param("earliestEnd") Instant earliestEnd);
 
+    @EntityGraph(attributePaths = "batches")
     @Query("""
             select distinct s from ClassSession s join s.batches b
             where s.academyId = :academyId and s.startsAt >= :from and s.startsAt < :to and b.batchId in :batchIds

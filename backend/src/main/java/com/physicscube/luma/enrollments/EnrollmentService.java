@@ -16,7 +16,9 @@ import java.util.Comparator;
 import java.util.TreeMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -134,7 +136,7 @@ public class EnrollmentService {
             return List.of();
         }
         Map<UUID, List<UUID>> batchesByStudent = new TreeMap<>();
-        for (Enrollment e : enrollments.inForceOn(academyId, batchIds, day)) {
+        for (Enrollment e : enrollments.overlapping(academyId, batchIds, day, day)) {
             batchesByStudent.computeIfAbsent(e.getStudentId(), id -> new ArrayList<>()).add(e.getBatchId());
         }
         Map<UUID, StudentView> people = students.viewsInAcademy(academyId, batchesByStudent.keySet());
@@ -143,6 +145,27 @@ public class EnrollmentService {
                         people.get(entry.getKey()).fullName(), entry.getValue().stream().sorted().toList()))
                 .sorted(Comparator.comparing(ExpectedStudent::studentNumber))
                 .toList();
+    }
+
+    public record RosterRequest(UUID sessionId, LocalDate day, Set<UUID> batchIds) {
+    }
+
+    /** Expected student IDs per session, without names. The caller supplies only batches the requester may see. */
+    @Transactional(readOnly = true)
+    public Map<UUID, Set<UUID>> expectedStudentIds(UUID academyId, List<RosterRequest> requests) {
+        Set<UUID> batchIds = requests.stream().flatMap(request -> request.batchIds().stream()).collect(Collectors.toSet());
+        if (batchIds.isEmpty()) {
+            return Map.of();
+        }
+        List<LocalDate> days = requests.stream().map(RosterRequest::day).sorted().toList();
+        Map<UUID, List<Enrollment>> byBatch = enrollments.overlapping(academyId, batchIds, days.getFirst(), days.getLast()).stream()
+                .collect(Collectors.groupingBy(Enrollment::getBatchId));
+        return requests.stream().collect(Collectors.toMap(RosterRequest::sessionId, request -> request.batchIds().stream()
+                .flatMap(batchId -> byBatch.getOrDefault(batchId, List.of()).stream())
+                .filter(enrollment -> !enrollment.getEnrolledOn().isAfter(request.day())
+                        && (enrollment.getWithdrawnOn() == null || enrollment.getWithdrawnOn().isAfter(request.day())))
+                .map(Enrollment::getStudentId)
+                .collect(Collectors.toSet())));
     }
 
     private List<EnrollmentView> views(UUID academyId, List<Enrollment> found) {

@@ -169,6 +169,15 @@ public class ProvisionalAttendanceService {
     public record FinalOutcome(String outcome, long connectedSeconds) {
     }
 
+    /** Count expected students with a matched visit, using the same evidence as the detailed dashboard. */
+    int countJoined(UUID academyId, UUID sessionId, Set<UUID> expected) {
+        if (expected.isEmpty()) {
+            return 0;
+        }
+        return (int) zoom.activityForClass(academyId, sessionId).visits().stream()
+                .map(StudentVisit::studentId).filter(expected::contains).distinct().count();
+    }
+
     /**
      * For other services in this module: attendance facts of every matched student of one class. No access check: the
      * caller has checked the class and filters the students it may show.

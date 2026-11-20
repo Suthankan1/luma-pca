@@ -76,17 +76,6 @@ test.describe("Staff home", () => {
     await expect(page).toHaveURL(/month=\d{4}-\d{2}/);
     await page.getByRole("link", { name: "Back to this month" }).click();
 
-    // This month's attendance: one column per class held, the average, and the same values as a table.
-    const chart = page.getByRole("region", { name: /^Attendance in / });
-    await expect(chart).toBeVisible();
-    const columns = chart.locator(".bars-bar");
-    if (await columns.count() > 0) {
-      await expect(chart.getByText(/^Avg \d+%$/)).toBeVisible();
-      await expect(columns.first()).toHaveAttribute("aria-label", /: \d+%, \d+ of \d+ joined$/);
-      await chart.getByText("Show as table").click();
-      await expect(chart.getByRole("table")).toBeVisible();
-    }
-
     // A webinar Zoom reports live: its numbers replace the next-class card.
     await api(page, "POST", "/api/v1/zoom/monitors", { webinar: "84400000001" });
     await page.goto("/staff");
@@ -106,5 +95,20 @@ test.describe("Staff home", () => {
     await signInStaff(page, "analyst@example.invalid");
     await page.getByRole("region", { name: "Attendance by batch" }).getByRole("link", { name: "Open reports" }).click();
     await expect(page.getByRole("region", { name: "ATTENDANCE BY BATCH" })).toBeVisible();
+  });
+
+  test("shows one average attendance bar for the selected month", async ({ page }) => {
+    await signInStaff(page, "admin-enrolled@example.invalid");
+    // The mock has a completed class three days ago with two of three expected students joining.
+    const latest = new Date(Date.now() - 3 * 86400_000);
+    latest.setUTCHours(3, 30, 0, 0);
+    const month = colomboDate(latest.getTime()).slice(0, 7);
+    await page.goto(`/staff?month=${month}`);
+    const chart = page.getByRole("region", { name: /^Attendance in / });
+    await expect(chart.getByRole("meter", { name: "Average attendance" })).toHaveCount(1);
+    await expect(chart.getByRole("meter")).toHaveAttribute("value", "67");
+    await expect(chart.getByText("67%", { exact: true })).toBeVisible();
+    await expect(chart.getByText(/\d+ class(?:es)? counted/)).toBeVisible();
+    await expect(chart.getByText("Attendance couldn’t load.", { exact: false })).toHaveCount(0);
   });
 });

@@ -29,6 +29,7 @@ import org.springframework.context.ApplicationContext;
  */
 class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     private static final String WEBINAR = "81234500077";
+    private static final String CLASS_TOTALS = "/api/v1/attendance/class-totals";
 
     @Autowired
     ZoomReceiptProcessor processor;
@@ -99,6 +100,12 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     private Map<String, Object> ok(HttpResponse<String> response) {
         assertEquals(200, response.statusCode(), response.body());
         return HttpApi.parse(response);
+    }
+
+    private List<Object> classTotals(String token) {
+        HttpResponse<String> response = api.get(CLASS_TOTALS, token);
+        assertEquals(200, response.statusCode(), response.body());
+        return HttpApi.parseList(response);
     }
 
     @Test
@@ -181,5 +188,56 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(0, map(ok(api.get("/api/v1/attendance/dashboard", otherAdmin)).get("totals")).get("classes"));
         assertEquals(404, api.get("/api/v1/students/" + amaya + "/attendance-overview", otherAdmin).statusCode());
         assertTrue(api.get("/api/v1/attendance/dashboard", null).statusCode() == 401);
+    }
+
+    @Test
+    void classTotalsCountEachExpectedStudentAndTheirRejoinsOnce() {
+        String otherBatch = fixtures.batch(course, "TUE");
+        assertEquals(201, fixtures.enroll(otherBatch, kavin, "2026-01-01").statusCode());
+        jdbc.update("INSERT INTO session_batches (session_id, batch_id, academy_id) VALUES (?::uuid, ?::uuid, ?)",
+                classId, otherBatch, academyId);
+
+        assertEquals(List.of(Map.of("id", classId, "expected", 2, "joined", 1)), classTotals(admin));
+
+        String instructorEmail = "teacher@example.test";
+        accountIdOf(instructorEmail, academyId, Role.INSTRUCTOR);
+        String instructor = login(instructorEmail);
+        assertEquals(List.of(), classTotals(instructor), "no assigned batches");
+        assertEquals(201, api.post("/api/v1/batches/" + otherBatch + "/assignments",
+                HttpApi.json(Map.of("email", instructorEmail, "role", "INSTRUCTOR")), admin).statusCode());
+        assertEquals(List.of(Map.of("id", classId, "expected", 1, "joined", 0)), classTotals(instructor),
+                "Amaya is outside the instructor's batch even though she joined the shared class");
+    }
+
+    @Test
+    void classTotalsRequireStaffAndStayInsideTheAcademy() {
+        assertEquals(401, api.get(CLASS_TOTALS, null).statusCode());
+        assertEquals(403, api.get(CLASS_TOTALS, tokenFor(academyId, Role.STUDENT)).statusCode());
+        assertEquals(403, api.get(CLASS_TOTALS, tokenFor(academyId, Role.ANALYST)).statusCode());
+        assertEquals(List.of(), classTotals(tokenFor(academy("Other academy"), Role.ACADEMY_ADMIN)));
+    }
+
+    @Test
+    void classTotalsOmitFutureRunningAndCancelledClassesAndKeepEmptyRosters() {
+        String emptyBatch = fixtures.batch(course, "EMPTY");
+        Instant now = Instant.now();
+        String empty = createClass("Empty roster", start.plus(1, ChronoUnit.DAYS), emptyBatch);
+        String cancelled = createClass("Cancelled", start.plus(2, ChronoUnit.DAYS), batch);
+        jdbc.update("UPDATE class_sessions SET status = 'CANCELLED' WHERE id = ?::uuid", cancelled);
+        createClass("Running", now.minus(1, ChronoUnit.HOURS), batch);
+        createClass("Future", now.plus(1, ChronoUnit.DAYS), batch);
+
+        List<Object> totals = classTotals(admin);
+        assertEquals(2, totals.size());
+        assertTrue(totals.contains(Map.of("id", classId, "expected", 2, "joined", 1)));
+        assertTrue(totals.contains(Map.of("id", empty, "expected", 0, "joined", 0)));
+        assertEquals(400, api.get(CLASS_TOTALS + "?from=2026-01-01&to=2026-12-31", admin).statusCode());
+    }
+
+    private String createClass(String title, Instant startsAt, String batchId) {
+        HttpResponse<String> response = api.post("/api/v1/class-sessions", "{\"title\":\"" + title + "\",\"startsAt\":\"" + startsAt
+                + "\",\"endsAt\":\"" + startsAt.plus(2, ChronoUnit.HOURS) + "\",\"batchIds\":[\"" + batchId + "\"]}", admin);
+        assertEquals(201, response.statusCode(), response.body());
+        return (String) HttpApi.parse(response).get("id");
     }
 }
