@@ -23,12 +23,11 @@ export default async function StudentAttendancePage({ params, searchParams }: {
   const now = renderTime();
   const today = academyToday(new Date(now));
   const range = classMonthRange(query.month, today, dateOrNull(query.from));
-  const [student, reports] = await Promise.all([
-    staffApi<StudentDirectoryEntry>(`/api/v1/students/${studentId}`),
-    readAttendanceWindows(range.first, range.through ?? range.last, (from, to) => staffApi<StudentOverview>(
-      `/api/v1/students/${studentId}/attendance-overview?${new URLSearchParams({ from, to })}`, undefined, 30000),
-    data => data.classes.length >= 80),
-  ]);
+  const studentRequest = staffApi<StudentDirectoryEntry>(`/api/v1/students/${studentId}`);
+  const reports = readAttendanceWindows(range.first, range.through ?? range.last, (from, to) => staffApi<StudentOverview>(
+    `/api/v1/students/${studentId}/attendance-overview?${new URLSearchParams({ from, to })}`, undefined, 30000),
+  data => data.classes.length >= 80);
+  const student = await studentRequest;
   if (!student.ok && student.status === 404) notFound();
   const back = withParams("/staff/students", { month: range.month, q: typeof query.q === "string" ? query.q : null,
     type: typeof query.type === "string" ? query.type : null, sort: typeof query.sort === "string" ? query.sort : null });

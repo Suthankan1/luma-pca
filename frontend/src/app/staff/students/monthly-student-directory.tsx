@@ -83,7 +83,7 @@ export function MonthlyStudentDirectory({ students, classTypes, month, attendanc
       <div className="student-month-list" tabIndex={0} role="region" aria-label="Scrollable student directory">
         {rows.length ? <ul className="dir-list">
           {rows.map(row => <li key={row.id} className="student-month-row">
-            <Link href={detailHref(row.id)} prefetch={false}>
+            <Link href={detailHref(row.id)}>
               <span><strong>{row.fullName}</strong><small>{row.studentNumber}</small></span>
               <strong className="class-attendance-percent" aria-label={row.percent == null ? "Attendance unavailable" : `${rateLabel(row.percent)} attendance`}>{rateLabel(row.percent)}</strong>
             </Link>

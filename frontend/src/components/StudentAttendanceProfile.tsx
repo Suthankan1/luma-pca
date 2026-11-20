@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { ClassMonthPicker } from "./staff/ClassMonthPicker";
+import { PanelRetry } from "./staff/PanelRetry";
 import { StudentMonthDetails } from "./StudentMonthDetails";
 import { formatDuration, type StudentOverview, type ClassAttendance, type Enrolment } from "@/lib/insights";
 import { formatDate, instantParts, ACADEMY_TIME_ZONE } from "@/lib/staff-forms";
@@ -7,13 +9,42 @@ import { attendancePercentFor, completedForStudent, participationFor, type Parti
 
 type Month = ReturnType<typeof classMonthRange>;
 
+type Reports = StudentOverview[] | null | Promise<StudentOverview[] | null>;
+
 export function StudentAttendanceProfile({ range, today, now, reports, href, staff }: {
-  range: Month; today: string; now: number; reports: StudentOverview[] | null; href: string; staff?: boolean;
+  range: Month; today: string; now: number; reports: Reports; href: string; staff?: boolean;
 }) {
+  return <div className="profile-overview">
+    <ClassMonthPicker href={href} month={range.month} currentMonth={today.startsWith(range.month)} label="Attendance month" />
+    <Suspense key={range.month} fallback={<StudentProfileSkeleton />}>
+      <StudentProfilePanels range={range} now={now} reports={reports} staff={staff} />
+    </Suspense>
+  </div>;
+}
+
+export function StudentProfileSkeleton() {
+  return <div className="profile-overview" role="status" aria-label="Loading student profile attendance">
+    <div className="profile-metrics" aria-hidden="true">
+      {[0, 1, 2, 3].map(index => <div key={index} className="panel">
+        <div className="skeleton skeleton-line" /><div className="skeleton skeleton-title" />
+      </div>)}
+    </div>
+    <div className="profile-panels" aria-hidden="true">
+      <div className="panel"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-card" /></div>
+      <div className="panel"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-line" /></div>
+    </div>
+  </div>;
+}
+
+async function StudentProfilePanels({ range, now, reports, staff }: {
+  range: Month; now: number; reports: Reports; staff?: boolean;
+}) {
+  const loaded = await reports;
+  if (!loaded) return <p className="session-error" role="alert">Monthly attendance couldn’t load. <PanelRetry /></p>;
   const { month, first, last, through } = range;
   const classes = new Map<string, ClassAttendance>();
   const enrolments = new Map<string, Enrolment>();
-  for (const report of reports ?? []) {
+  for (const report of loaded) {
     for (const session of report.classes) {
       const day = instantParts(session.startsAt, ACADEMY_TIME_ZONE).date;
       if (through && day >= first && day <= through && completedForStudent(session, now)) classes.set(session.id, session);
@@ -38,9 +69,7 @@ export function StudentAttendanceProfile({ range, today, now, reports, href, sta
     groups.set(key, group);
   }
   const rate = attendancePercentFor(totals);
-  return <div className="profile-overview">
-    <ClassMonthPicker href={href} month={month} currentMonth={today.startsWith(month)} label="Attendance month" />
-    {!reports ? <p className="session-error" role="alert">Monthly attendance couldn’t load.</p> : <>
+  return <>
       <dl className="profile-metrics" aria-label={`Attendance summary for ${monthLabel(month)}`}>
         <div className="panel profile-rate"><dt>Average attendance</dt><dd>{rate == null ? "—" : `${Math.round(rate)}%`}</dd></div>
         <div className="panel"><dt>Classes joined</dt><dd>{totals.joined}<small> / {totals.expected}</small></dd></div>
@@ -54,6 +83,5 @@ export function StudentAttendanceProfile({ range, today, now, reports, href, sta
           <small>{formatDate(item.enrolledOn)}{item.withdrawnOn ? ` – ${formatDate(item.withdrawnOn)}` : " onward"}</small>
         </li>)}</ul> : <p className="panel-sub">No enrolments in {monthLabel(month)}.</p>}
       </>} />
-    </>}
-  </div>;
+  </>;
 }

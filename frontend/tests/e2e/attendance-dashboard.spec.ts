@@ -25,7 +25,7 @@ test("the Home report shortcut uses Reports and sidebar collapse survives naviga
   await expect(page).toHaveURL(/\/staff\/reports$/);
 });
 
-test("the staff directory opens a selected student's monthly profile", async ({ page }) => {
+test("the staff directory opens the selected profile while monthly attendance is still loading", async ({ page }) => {
   await signIn(page, "staff");
   const created = await page.request.post(`${mockApiBase()}/api/v1/students`, {
     data: { studentNumber: "PROFILE-77", fullName: "Monthly Profile Student", email: "profile77@example.invalid" },
@@ -34,8 +34,18 @@ test("the staff directory opens a selected student's monthly profile", async ({ 
   expect(created.ok()).toBeTruthy();
   await page.getByRole("link", { name: "Students", exact: true }).click();
   await page.getByRole("searchbox", { name: "Search students" }).fill("PROFILE-77");
-  await page.getByRole("link", { name: /Monthly Profile Student/ }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Monthly Profile Student");
+  const setOverview = (mode: "hold" | "release") => page.request.put(`${mockApiBase()}/__test__/student-overview-response`, {
+    data: { mode }, headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" },
+  });
+  expect((await setOverview("hold")).status()).toBe(204);
+  try {
+    await page.getByRole("link", { name: /Monthly Profile Student/ }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Monthly Profile Student");
+    await expect(page.getByLabel("Attendance month")).toBeVisible();
+    await expect(page.getByRole("status", { name: "Loading student profile attendance" })).toBeVisible();
+  } finally {
+    await setOverview("release");
+  }
   await expect(page.getByRole("region", { name: "Enrolled this month" })).toBeVisible();
   await page.getByRole("link", { name: "Previous month" }).click();
   await expect(page).toHaveURL(/\/attendance\?month=\d{4}-\d{2}$/);

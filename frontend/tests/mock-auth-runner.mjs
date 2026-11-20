@@ -15,6 +15,8 @@ const usedResetTokens = new Set();
 let blockedMonitors;
 let releaseMonitors;
 let monitorsUnavailable = false;
+let blockedStudentOverview;
+let releaseStudentOverview;
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -63,6 +65,13 @@ const backend = createServer(async (req, res) => {
   if (req.url.startsWith("/api/v1/zoom/monitors") || /^\/api\/v1\/class-sessions\/[^/]+\/zoom-run$/.test(req.url)) {
     return monitorsApi(req, body, send);
   }
+  if (req.method === "PUT" && req.url === "/__test__/student-overview-response") {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    releaseStudentOverview?.();
+    blockedStudentOverview = body.mode === "hold" ? new Promise(resolve => { releaseStudentOverview = resolve; }) : undefined;
+    return send(204);
+  }
+  if (/^\/api\/v1\/students\/[^/]+\/attendance-overview\?/.test(req.url)) await blockedStudentOverview;
   if (/^\/api\/v1\/attendance\/(dashboard|class-totals|latest-completed|recent-completed)(\?|$)/.test(req.url) || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
     return insightsApi(req, send);
   }
