@@ -98,6 +98,18 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
         return api.get("/api/v1/auth/me", token).statusCode();
     }
 
+    @Test
+    void timingHeaderSurvivesSuccessfulAndRefusedApiResponses() {
+        var allowed = api.get("/api/v1/auth/me", accessToken());
+        var refused = api.get("/api/v1/auth/me", null);
+        assertEquals(200, allowed.statusCode());
+        assertEquals(401, refused.statusCode());
+        for (var response : List.of(allowed, refused)) {
+            assertEquals(1, response.headers().allValues("Server-Timing").size());
+            assertTrue(response.headers().firstValue("Server-Timing").orElseThrow().matches("api;dur=[0-9]+\\.[0-9]"));
+        }
+    }
+
     /** A token signed with the real key whose claims start valid and are then altered. */
     private String forged(JWSSigner signer, JWSHeader header, Consumer<JWTClaimsSet.Builder> change) throws Exception {
         String sessionId = decoder.decode(accessToken()).getClaimAsString("sid");

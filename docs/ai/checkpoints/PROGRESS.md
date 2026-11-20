@@ -2702,3 +2702,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Each report uses a scrollable single-selection list with a search field. Students can be found by name or registration ID, including IDs entered without separators. The selected record remains visible in the footer while searching, and the download uses the same validated report route.
 - Passed 81 unit tests, TypeScript, targeted ESLint, and the structure check. Four desktop and mobile mock browser checks covered student search, selection during filtering, all three Excel downloads, and access guards. Live API readiness and the signed-out Reports redirect passed. Signed-in original data was not tested.
 - Frontend-only change. Revert this commit to roll back.
+
+## Staff performance instrumentation (2026-11-21)
+
+- Added the [staff performance checklist](../../testing/STAFF-PERFORMANCE.md), HTTP timing at the Next proxy and API response commit, and current Classes, Class Types, Students and Reports paths in the staff load scenario.
+- Verified the Next timing header on a production build. The Testcontainers HTTP test passed for both successful and refused API requests. All 81 frontend unit tests, k6 scenario inspection, and the structure check passed. Signed-in load measurements are still pending.
+- No database or permission changes. Revert this commit to remove the headers and scenario updates.

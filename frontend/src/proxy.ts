@@ -26,6 +26,13 @@ const inFlight = new Map<string, Promise<Renewed>>();
  *    on every request, and sign-out revokes it and clears both cookies.
  */
 export async function proxy(request: NextRequest) {
+  const started = performance.now();
+  const response = await routeRequest(request);
+  response.headers.append("Server-Timing", `next-proxy;dur=${(performance.now() - started).toFixed(1)}`);
+  return response;
+}
+
+async function routeRequest(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (RECORD_PAGES.test(pathname)) {
     const id = pathname.split("/")[3];
