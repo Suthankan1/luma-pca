@@ -177,6 +177,26 @@ export function liveNumbers(rows: readonly AttendanceRow[], observedOnline: numb
 
 export type ClassAttendanceTotal = { id: string; expected: number; joined: number };
 
+export function compactClassTitle(text: string) {
+  const [title, batch, extra] = text.split("|", 3).map(part => part.trim());
+  return extra !== undefined && title && batch ? `${title} | ${batch}` : text;
+}
+
+/** Group completed timetable entries by the class and batch name shown to staff. */
+export function monthlyClassTypes(sessions: readonly ClassSession[], now: number) {
+  const groups = new Map<string, { title: string; sessions: ClassSession[] }>();
+  const completed = sessions.filter(session => session.status === "SCHEDULED" && Date.parse(session.endsAt) <= now)
+    .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
+  for (const session of completed) {
+    const title = compactClassTitle(session.title);
+    const key = title.trim().replace(/\s+/g, " ").toLowerCase();
+    const group = groups.get(key);
+    if (group) group.sessions.push(session);
+    else groups.set(key, { title, sessions: [session] });
+  }
+  return [...groups.entries()];
+}
+
 export function attendancePercent({ expected, joined }: Pick<ClassAttendanceTotal, "expected" | "joined">) {
   return expected > 0 ? Math.round(joined * 100 / expected) : null;
 }

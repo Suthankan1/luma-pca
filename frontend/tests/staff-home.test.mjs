@@ -1,12 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calendarEntries, chosenDay, chosenMonth, gridRange, homeHref, joinedLabel, liveNumbers, longDayLabel, monthLabel,
-  monthWeeks, nextEntry, relativeDayName, shiftMonth, shortDayLabel, startedAgoLabel, startsInLabel, timeRange } from "../src/lib/staff-home.ts";
+  monthWeeks, monthlyClassTypes, nextEntry, relativeDayName, shiftMonth, shortDayLabel, startedAgoLabel, startsInLabel, timeRange } from "../src/lib/staff-home.ts";
 
 const session = (over) => ({ id: "s1", title: "Class", startsAt: "2026-11-20T10:30:00Z", endsAt: "2026-11-20T12:00:00Z",
   timeZone: "Asia/Colombo", localDate: "2026-11-20", status: "SCHEDULED", zoomWebinarId: null, batches: [], version: 0, origin: "LUMA", ...over });
 const row = (expected, seen, openVisits = 0) => ({ studentId: String(Math.random()), studentNumber: "P", fullName: "S", expected, seen,
   visits: seen ? 1 : 0, openVisits, connectedSeconds: 0, firstJoinAt: null, secondsAfterStart: null });
+
+test("month-to-date class types group title variants and show completed sessions newest first", () => {
+  const title = "Model Paper Class | 2027 Batch";
+  const groups = monthlyClassTypes([
+    session({ id: "older", title: `${title} | Former suffix`, startsAt: "2026-11-19T10:30:00Z", endsAt: "2026-11-19T12:00:00Z" }),
+    session({ id: "newer", title: `${title} | New suffix` }),
+    session({ id: "other", title: "Model Paper Class | 2028 Batch" }),
+    session({ id: "ongoing", title, endsAt: "2026-11-20T14:00:00Z" }),
+    session({ id: "cancelled", title, status: "CANCELLED" }),
+  ], Date.parse("2026-11-20T13:00:00Z"));
+  assert.deepEqual(groups.map(([, group]) => [group.title, group.sessions.map(entry => entry.id)]),
+    [[title, ["newer", "older"]], ["Model Paper Class | 2028 Batch", ["other"]]]);
+});
 
 test("the chosen day and month fall back to today and the day's month", () => {
   assert.equal(chosenDay("2026-02-30", "2026-11-20"), "2026-11-20");

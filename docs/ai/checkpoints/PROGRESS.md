@@ -2598,3 +2598,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - After the owner requested the combined version on the original Supabase database, exported and verified a pre-V30 snapshot of all 289 `account_roles` rows outside the repository. The snapshot preserves the role names, account IDs, and grant timestamps for an exact role rollback. Retain it privately alongside the rollback runbook.
 - The combined backend applied V30 through Flyway. Verified that the final `STAFF` account count matches the distinct former staff account count, the `STUDENT` count matches the snapshot, and no former role names remain. API readiness returned UP and the sign-in page returned 200. Signed-in access with an existing Supabase account was not tested.
 - The frontend and API still run on loopback. Stopped the isolated demo database. Local background processing for Zoom, mail, retention, and auto-finalisation was disabled for this run.
+
+## Classes month-to-date overview (2026-11-20)
+
+- Kept the two-week Classes schedule and added an adjacent month-to-date list of class types. Narrow screens stack the panels. Expanding a type shows its completed session dates and times in Sri Lanka time, newest first. Grouping uses the visible class and batch title and ignores suffixes after the second pipe. Older timetable entries keep their scheduled-time label.
+- Uses the existing academy-scoped class-sessions API. Passed 76 frontend unit tests, regenerated route types and TypeScript, targeted lint, and the structure check. The original Supabase-backed API reported UP, and sign-in returned 200. Signed-in browser rendering of the new panel was not verified.
+- Frontend-only change. Revert the commit to roll back. No migration is needed.

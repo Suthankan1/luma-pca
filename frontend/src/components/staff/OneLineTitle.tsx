@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { compactClassTitle } from "@/lib/staff-home";
 
 /**
  * A title kept to one line. Titles with extra pipe-separated details show their first two parts. The full text is
@@ -8,8 +9,7 @@ import { useEffect, useRef } from "react";
  * Escape hides that card until the pointer or focus leaves. On touch, the link's own page shows the full title.
  */
 export function OneLineTitle({ text }: { text: string }) {
-  const parts = text.split("|", 3).map(part => part.trim());
-  const displayText = parts.length === 3 && parts[0] && parts[1] ? `${parts[0]} | ${parts[1]}` : text;
+  const displayText = compactClassTitle(text);
   const shortened = displayText !== text;
   const line = useRef<HTMLSpanElement>(null);
   const full = useRef<HTMLSpanElement>(null);

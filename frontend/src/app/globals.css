@@ -661,6 +661,18 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .home-entry-static { display:grid; grid-template-columns:92px minmax(0,1fr) auto; align-items:center; gap:12px; padding:11px 6px; color:var(--ink); }
 .class-day + .class-day { margin-top:14px; }
 .class-day-title { margin:12px 0 2px; color:var(--ink-2); font-size:13px; font-weight:700; }
+.classes-overview { display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:16px; align-items:start; }
+.classes-overview > .panel { min-width:0; }
+.class-type-list { display:grid; gap:8px; margin-top:14px; }
+.class-type { border:1px solid #dce5ee; border-radius:9px; background:#fff; }
+.class-type summary { cursor:pointer; padding:11px 12px; color:var(--pca-navy); font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+.class-type summary:hover, .class-type[open] summary { background:#edf5fc; border-radius:8px; }
+.class-type summary:focus-visible { outline:2px solid var(--pca-blue); outline-offset:2px; }
+.class-type-count { display:block; margin-top:4px; color:#52677d; font-size:12px; }
+.class-type ul { padding:0 12px; }
+.class-type li { display:grid; gap:2px; padding:8px 0; font-size:13px; }
+.class-type li + li { border-top:1px solid #eaf0f5; }
+@media (max-width:1140px) { .classes-overview { grid-template-columns:minmax(0,1fr); } }
 .tracked-link .webinar-actions { margin-top:8px; }
 .home-entry-time { color:var(--ink-2); font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
 .home-entry-copy { display:grid; gap:1px; min-width:0; }
