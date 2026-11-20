@@ -5,7 +5,7 @@
 | Group | Planned tables | Main constraints |
 | --- | --- | --- |
 | Auth | accounts, account_roles/scopes, refresh_sessions, invitations, recovery_tokens | globally unique normalized email (implemented in V2; stricter than academy+email so email-only sign-in is unambiguous), token hash uniqueness, session family revoke |
-| Academy | academies, courses, batches, students, enrollments, staff_assignments | one student identity; effective membership dates; course→batch |
+| Academy | academies, courses, batches, students, enrollments (staff_assignments retired by V30, kept for history) | one student identity; effective membership dates; course→batch |
 | Timetable | class_sessions, session_batches, webinar_occurrences, webinar_registrations | session:batch many-to-many; Zoom instance UUID separate; no duplicate shared attendance |
 | Attendance | attendance_intervals, attendance_records, attendance_corrections | `UNIQUE(class_session_id, student_id)`; intervals overlap/merge; reasoned manual overrides |
 | Webhook/async | webhook_receipts, outbox_events, processed_event_receipts, dead_letter_reviews | canonical event identity, idempotence, payload retention controls |

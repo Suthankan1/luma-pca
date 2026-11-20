@@ -4,8 +4,12 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/refresh/logout/logout-all/activate/me, JWKS, courses, batches, students, enrollments, staff assignments, class sessions, staff administration, invitations, own-record routes, the Zoom webhook ingress, receipt operations and occurrence linking. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me, JWKS, courses, batches, students, enrollments, class sessions, staff administration, invitations, own-record routes, the Zoom webhook ingress, receipt operations and occurrence linking. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
+
+    Roles (owner decision 2026-11-20): STAFF and STUDENT only. Every staff route needs STAFF and is limited to the
+    caller's academy (another academy's records answer 404); students get 403 on staff routes and reach only their own
+    records through /api/v1/me/... routes.
 servers:
   - url: http://localhost:8080
 paths:
@@ -176,7 +180,7 @@ paths:
         '401': {description: Missing or invalid access token}
   /api/v1/courses:
     get:
-      summary: Courses of the caller's academy, sorted by code (implemented; owner/admin only)
+      summary: Courses of the caller's academy, sorted by code (implemented; staff only)
       operationId: listCourses
       tags: [Courses]
       security: [{bearerAuth: []}]
@@ -189,9 +193,9 @@ paths:
             application/json:
               schema: {type: array, items: {$ref: '#/components/schemas/Course'}}
         '401': {description: Not signed in}
-        '403': {description: Not an academy owner or administrator}
+        '403': {description: Not staff}
     post:
-      summary: Create a course (implemented; owner/admin only)
+      summary: Create a course (implemented; staff only)
       operationId: createCourse
       tags: [Courses]
       security: [{bearerAuth: []}]
@@ -217,7 +221,7 @@ paths:
     parameters:
       - {in: path, name: courseId, required: true, schema: {type: string, format: uuid}}
     get:
-      summary: Read a course (implemented; owner/admin only)
+      summary: Read a course (implemented; staff only)
       operationId: getCourse
       tags: [Courses]
       security: [{bearerAuth: []}]
@@ -229,7 +233,7 @@ paths:
               schema: {$ref: '#/components/schemas/Course'}
         '404': {description: Not found, or belongs to another academy}
     put:
-      summary: Replace a course's code, title and active flag (implemented; owner/admin only)
+      summary: Replace a course's code, title and active flag (implemented; staff only)
       description: Courses are deactivated, not deleted.
       operationId: updateCourse
       tags: [Courses]
@@ -256,7 +260,7 @@ paths:
         '409': {description: Stale version, or code already used}
   /api/v1/batches:
     get:
-      summary: Batches the caller may see, newest start first (implemented; owner/admin see all, instructors and attendance officers only assigned batches)
+      summary: Batches the caller may see, newest start first (implemented; staff see every batch of their academy)
       operationId: listBatches
       tags: [Batches]
       security: [{bearerAuth: []}]
@@ -270,7 +274,7 @@ paths:
               schema: {type: array, items: {$ref: '#/components/schemas/Batch'}}
         '404': {description: courseId not found in this academy}
     post:
-      summary: Create a batch in a course (implemented; owner/admin only)
+      summary: Create a batch in a course (implemented; staff only)
       operationId: createBatch
       tags: [Batches]
       security: [{bearerAuth: []}]
@@ -300,7 +304,7 @@ paths:
     parameters:
       - {in: path, name: batchId, required: true, schema: {type: string, format: uuid}}
     get:
-      summary: Read a batch (implemented; owner/admin, or staff assigned to it)
+      summary: Read a batch (implemented; staff)
       operationId: getBatch
       tags: [Batches]
       security: [{bearerAuth: []}]
@@ -312,7 +316,7 @@ paths:
               schema: {$ref: '#/components/schemas/Batch'}
         '404': {description: Not found, or belongs to another academy}
     put:
-      summary: Replace a batch's details (implemented; owner/admin only)
+      summary: Replace a batch's details (implemented; staff only)
       description: A batch cannot be moved to another course and is deactivated, not deleted.
       operationId: updateBatch
       tags: [Batches]
@@ -341,7 +345,7 @@ paths:
         '409': {description: Stale version, or code already used}
   /api/v1/students:
     get:
-      summary: Students of the caller's academy, by student number (implemented; owner/admin only)
+      summary: Students of the caller's academy, by student number (implemented; staff only)
       operationId: listStudents
       tags: [Students]
       security: [{bearerAuth: []}]
@@ -362,9 +366,9 @@ paths:
                   items: {type: array, items: {$ref: '#/components/schemas/Student'}}
                   nextAfter: {type: [string, 'null']}
         '400': {description: Invalid limit or filter}
-        '403': {description: Not an academy owner or administrator}
+        '403': {description: Not staff}
     post:
-      summary: Create a student and their pending STUDENT sign-in account (implemented; owner/admin only)
+      summary: Create a student and their pending STUDENT sign-in account (implemented; staff only)
       operationId: createStudent
       tags: [Students]
       security: [{bearerAuth: []}]
@@ -391,7 +395,7 @@ paths:
     parameters:
       - {in: path, name: studentId, required: true, schema: {type: string, format: uuid}}
     get:
-      summary: Read a student (implemented; owner/admin only)
+      summary: Read a student (implemented; staff only)
       operationId: getStudent
       tags: [Students]
       security: [{bearerAuth: []}]
@@ -403,7 +407,7 @@ paths:
               schema: {$ref: '#/components/schemas/Student'}
         '404': {description: Not found, or belongs to another academy}
     put:
-      summary: Change a student's name or active flag (implemented; owner/admin only)
+      summary: Change a student's name or active flag (implemented; staff only)
       operationId: updateStudent
       tags: [Students]
       security: [{bearerAuth: []}]
@@ -428,7 +432,7 @@ paths:
         '409': {description: Stale version}
   /api/v1/students/{studentId}/enrollments:
     get:
-      summary: A student's enrollments (implemented; owner/admin only)
+      summary: A student's enrollments (implemented; staff only)
       operationId: listStudentEnrollments
       tags: [Enrollments]
       security: [{bearerAuth: []}]
@@ -445,7 +449,7 @@ paths:
     parameters:
       - {in: path, name: batchId, required: true, schema: {type: string, format: uuid}}
     get:
-      summary: Batch roster, withdrawn included, by student number (implemented; owner/admin, or staff assigned to the batch)
+      summary: Batch roster, withdrawn included, by student number (implemented; staff)
       operationId: listBatchEnrollments
       tags: [Enrollments]
       security: [{bearerAuth: []}]
@@ -457,7 +461,7 @@ paths:
               schema: {type: array, items: {$ref: '#/components/schemas/Enrollment'}}
         '404': {description: Batch not found in this academy}
     post:
-      summary: Enrol a student in the batch (implemented; owner/admin only)
+      summary: Enrol a student in the batch (implemented; staff only)
       operationId: enrollStudent
       tags: [Enrollments]
       security: [{bearerAuth: []}]
@@ -481,7 +485,7 @@ paths:
         '409': {description: Already enrolled, or batch or student inactive}
   /api/v1/enrollments/{enrollmentId}:
     put:
-      summary: Change enrolment dates; a withdrawal date withdraws, clearing it re-enrols (implemented; owner/admin only)
+      summary: Change enrolment dates; a withdrawal date withdraws, clearing it re-enrols (implemented; staff only)
       operationId: updateEnrollment
       tags: [Enrollments]
       security: [{bearerAuth: []}]
@@ -507,72 +511,9 @@ paths:
         '400': {description: withdrawnOn before enrolledOn}
         '404': {description: Not found, or belongs to another academy}
         '409': {description: Stale version}
-  /api/v1/batches/{batchId}/assignments:
-    parameters:
-      - {in: path, name: batchId, required: true, schema: {type: string, format: uuid}}
-    get:
-      summary: Staff assigned to the batch (implemented; owner/admin only)
-      operationId: listBatchAssignments
-      tags: [Batches]
-      security: [{bearerAuth: []}]
-      responses:
-        '200':
-          description: Assignments
-          content:
-            application/json:
-              schema: {type: array, items: {$ref: '#/components/schemas/Assignment'}}
-        '404': {description: Batch not found in this academy}
-    post:
-      summary: Assign an instructor or attendance officer to the batch (implemented; owner/admin only)
-      operationId: assignStaff
-      tags: [Batches]
-      security: [{bearerAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, role]
-              properties:
-                email: {type: string, maxLength: 254}
-                role: {type: string, enum: [INSTRUCTOR, ATTENDANCE_OFFICER]}
-      responses:
-        '201':
-          description: Assigned
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/Assignment'}
-        '400': {description: Role is not assignable}
-        '404': {description: Batch, or an account with that email, not found in this academy}
-        '409': {description: Already assigned, account disabled, or account does not hold the role}
-  /api/v1/assignments/{assignmentId}:
-    delete:
-      summary: Remove an assignment; access ends on the next request (implemented; owner/admin only)
-      operationId: unassignStaff
-      tags: [Batches]
-      security: [{bearerAuth: []}]
-      parameters:
-        - {in: path, name: assignmentId, required: true, schema: {type: string, format: uuid}}
-      responses:
-        '204': {description: Removed}
-        '404': {description: Not found, or belongs to another academy}
-  /api/v1/me/assignments:
-    get:
-      summary: The signed-in instructor's or attendance officer's own assignments (implemented)
-      operationId: listMyAssignments
-      tags: [Batches]
-      security: [{bearerAuth: []}]
-      responses:
-        '200':
-          description: Assignments in roles the caller currently holds
-          content:
-            application/json:
-              schema: {type: array, items: {$ref: '#/components/schemas/Assignment'}}
-        '403': {description: Caller is not an instructor or attendance officer}
   /api/v1/staff-accounts:
     get:
-      summary: Staff accounts of the caller's academy, by email; students are never listed (implemented; owner/admin)
+      summary: Staff accounts of the caller's academy, by email; students are never listed (implemented; staff)
       operationId: listStaffAccounts
       tags: [Identity]
       security: [{bearerAuth: []}]
@@ -582,9 +523,9 @@ paths:
           content:
             application/json:
               schema: {type: array, items: {$ref: '#/components/schemas/StaffAccount'}}
-        '403': {description: Not an owner or administrator}
+        '403': {description: Not staff}
     post:
-      summary: Create a staff account pending activation (implemented; owner/admin; only owners grant OWNER or ADMIN)
+      summary: Create a staff account pending activation; it gets the STAFF role (implemented; staff)
       operationId: createStaffAccount
       tags: [Identity]
       security: [{bearerAuth: []}]
@@ -594,22 +535,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [email, roles]
+              required: [email]
               properties:
                 email: {type: string, maxLength: 254}
-                roles: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/StaffRole'}}
       responses:
         '201':
           description: Created
           content:
             application/json:
               schema: {$ref: '#/components/schemas/StaffAccount'}
-        '400': {description: Invalid email or roles (STUDENT is not a staff role)}
-        '403': {description: An administrator tried to grant OWNER or ADMIN}
+        '400': {description: Invalid email}
+        '403': {description: Not staff}
         '409': {description: Email already used}
   /api/v1/staff-accounts/{accountId}:
     get:
-      summary: Read a staff account (implemented; owner/admin)
+      summary: Read a staff account (implemented; staff)
       operationId: getStaffAccount
       tags: [Identity]
       security: [{bearerAuth: []}]
@@ -622,36 +562,9 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/StaffAccount'}
         '404': {description: Not a staff account of this academy}
-  /api/v1/staff-accounts/{accountId}/roles:
-    put:
-      summary: Replace a staff account's roles; takes effect on its next request (implemented; owner/admin)
-      operationId: replaceStaffRoles
-      tags: [Identity]
-      security: [{bearerAuth: []}]
-      parameters:
-        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [roles, version]
-              properties:
-                roles: {type: array, minItems: 1, uniqueItems: true, items: {$ref: '#/components/schemas/StaffRole'}}
-                version: {type: integer}
-      responses:
-        '200':
-          description: Updated
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/StaffAccount'}
-        '403': {description: 'Own account, or an administrator touching OWNER/ADMIN'}
-        '404': {description: Not a staff account of this academy}
-        '409': {description: 'Stale version, or it would leave no active owner'}
   /api/v1/staff-accounts/{accountId}/enable:
     post:
-      summary: Re-enable a disabled staff account (implemented; owner/admin, only an owner for owner or administrator accounts)
+      summary: Re-enable a disabled staff account (implemented; staff)
       description: >-
         The account becomes ACTIVE with its existing password, or PENDING_ACTIVATION when requireNewPassword is true or it never had a
         password; then the old password is removed and any open invitation revoked, so an
@@ -676,7 +589,7 @@ paths:
         '404': {description: No such staff account in the caller's academy (students are not staff accounts)}
   /api/v1/staff-accounts/{accountId}/disable:
     post:
-      summary: Disable a staff account and end all its sessions; repeating is harmless (implemented; owner/admin)
+      summary: Disable a staff account and end all its sessions; repeating is harmless (implemented; staff)
       operationId: disableStaffAccount
       tags: [Identity]
       security: [{bearerAuth: []}]
@@ -688,12 +601,12 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/StaffAccount'}
-        '403': {description: 'Own account, or an administrator disabling an owner or administrator'}
+        '403': {description: Own account}
         '404': {description: Not a staff account of this academy}
-        '409': {description: It would leave no active owner}
+        '409': {description: It would leave no active staff account}
   /api/v1/accounts/{accountId}/invitations:
     post:
-      summary: Issue an activation invitation for a pending staff or student account (implemented; owner/admin)
+      summary: Issue an activation invitation for a pending staff or student account (implemented; staff)
       description: >
         Replaces any earlier invitation. With delivery LINK (the default, also with no body) the token
         is returned once, is not stored, and is sent with Cache-Control no-store. With delivery EMAIL
@@ -727,7 +640,7 @@ paths:
                   expiresAt: {type: string, format: date-time}
                   delivery: {type: string, enum: [LINK, EMAIL]}
         '400': {description: Unknown delivery method}
-        '403': {description: An administrator inviting an owner or administrator}
+        '403': {description: Not staff}
         '404': {description: Account not in this academy}
         '409': {description: The account is not pending activation}
         '503': {description: delivery EMAIL while email is not configured; nothing was changed}
@@ -747,7 +660,7 @@ paths:
         '404': {description: The account has no student record}
   /api/v1/students/import:
     post:
-      summary: Create many students at once, optionally enrolling them all in one batch (implemented; owner/admin)
+      summary: Create many students at once, optionally enrolling them all in one batch (implemented; staff)
       description: >-
         Every row is checked first (format, repeats within the request, student numbers already
         used in the academy, emails already used by any account). If any row has a problem,
@@ -800,12 +713,12 @@ paths:
                         field: {type: string, enum: [studentNumber, fullName, email]}
                         message: {type: string}
         '400': {description: No rows, more than 1000, or batchId and enrolledOn not given together}
-        '403': {description: Caller is not an academy owner or administrator}
+        '403': {description: Caller is not staff}
         '404': {description: The batch is not in the caller's academy}
         '409': {description: The batch is inactive, or a number or email was taken by a concurrent change}
   /api/v1/student-invitations:
     post:
-      summary: Queue activation invitation emails for many students (implemented; owner/admin)
+      summary: Queue activation invitation emails for many students (implemented; staff)
       description: >-
         Covers the active students currently enrolled in batchId (not withdrawn as of today in
         Asia/Colombo), or every active student of the academy when batchId is absent. Only
@@ -840,12 +753,12 @@ paths:
                   queued: {type: integer, description: 'Queued now (dry run: would be queued)'}
                   alreadyQueued: {type: integer}
                   alreadyInvited: {type: integer, description: Skipped because they hold a usable link (resend false)}
-        '403': {description: Caller is not an academy owner or administrator}
+        '403': {description: Caller is not staff}
         '404': {description: The batch is not in the caller's academy}
         '503': {description: Email is not set up}
   /api/v1/student-invitations/failures:
     get:
-      summary: Students whose latest invitation email failed in the last 14 days and who still have not activated (implemented; owner/admin)
+      summary: Students whose latest invitation email failed in the last 14 days and who still have not activated (implemented; staff)
       operationId: studentInvitationFailures
       tags: [Students]
       security: [{bearerAuth: []}]
@@ -866,10 +779,10 @@ paths:
                     reason: {type: string, description: The kind of failure (exception class), never the mail server's message}
                     failedAt: {type: string, format: date-time}
                     attempts: {type: integer}
-        '403': {description: Caller is not an academy owner or administrator}
+        '403': {description: Caller is not staff}
   /api/v1/student-invitations/progress:
     get:
-      summary: Invitation emails of the academy waiting now, and sent, failed or cancelled in the last 14 days (implemented; owner/admin)
+      summary: Invitation emails of the academy waiting now, and sent, failed or cancelled in the last 14 days (implemented; staff)
       operationId: studentInvitationProgress
       tags: [Students]
       security: [{bearerAuth: []}]
@@ -886,10 +799,10 @@ paths:
                   sent: {type: integer}
                   failed: {type: integer}
                   cancelled: {type: integer}
-        '403': {description: Caller is not an academy owner or administrator}
+        '403': {description: Caller is not staff}
   /api/v1/audit-events:
     get:
-      summary: The academy's activity log, newest first (implemented; owner/admin, read-only)
+      summary: The academy's activity log, newest first (implemented; staff, read-only)
       description: >-
         Audited actions with the acting account's email and a readable target label (an
         account's email, a batch code or a class title) where those still exist. Details never
@@ -928,7 +841,7 @@ paths:
                         targetLabel: {type: string, nullable: true}
                         details: {type: object, additionalProperties: true}
         '400': {description: Unknown category, bad cursor or limit}
-        '403': {description: Caller is not an academy owner or administrator}
+        '403': {description: Caller is not staff}
   /api/v1/me/enrollments:
     get:
       summary: The signed-in student's own enrollments (implemented; STUDENT role)
@@ -966,7 +879,7 @@ paths:
         '403': {description: Caller is not a student}
   /api/v1/class-sessions/series:
     post:
-      summary: Create a weekly series of classes, or preview it (implemented; owner/admin)
+      summary: Create a weekly series of classes, or preview it (implemented; staff)
       description: >-
         One class on each chosen weekday from firstDate to lastDate (inclusive, at most 366 days
         apart), at startTime–endTime local time in timeZone (default Asia/Colombo; times follow
@@ -1026,12 +939,12 @@ paths:
                         startsAt: {type: string, format: date-time}
                         endsAt: {type: string, format: date-time}
         '400': {description: Invalid dates, times, weekdays, webinar ID, or not 1–100 classes}
-        '403': {description: Caller is not an academy owner or administrator}
+        '403': {description: Caller is not staff}
         '404': {description: A batch is not in the caller's academy}
         '409': {description: A batch is inactive}
   /api/v1/class-sessions/series/{seriesId}/changes:
     post:
-      summary: Change the title, time or webinar of a series' scheduled classes from a date, or preview it (implemented; owner/admin)
+      summary: Change the title, time or webinar of a series' scheduled classes from a date, or preview it (implemented; staff)
       description: >-
         Applies to the series' SCHEDULED classes whose local date is on or after fromDate. Omitted fields
         are kept; startTime and endTime go together and are applied in each class's own zone;
@@ -1071,11 +984,11 @@ paths:
                   occurrences: {type: array, items: {type: object}}
                   conflicts: {type: array, items: {type: object}}
         '400': {description: Nothing to change, invalid times or webinar, or no scheduled classes from that date}
-        '403': {description: Caller is not an academy owner or administrator}
+        '403': {description: Caller is not staff}
         '404': {description: No such series in the caller's academy}
   /api/v1/class-sessions/series/{seriesId}/cancellations:
     post:
-      summary: Cancel the series' scheduled classes on or after a date (implemented; owner/admin)
+      summary: Cancel the series' scheduled classes on or after a date (implemented; staff)
       operationId: cancelClassSeries
       tags: [Sessions]
       security: [{bearerAuth: []}]
@@ -1096,11 +1009,11 @@ paths:
           content:
             application/json:
               schema: {type: object, required: [cancelled], properties: {cancelled: {type: integer}}}
-        '403': {description: Caller is not an academy owner or administrator}
+        '403': {description: Caller is not staff}
         '404': {description: No such series in the caller's academy}
   /api/v1/class-sessions:
     get:
-      summary: Sessions starting in a window, by start time (implemented; owner/admin see all, assigned staff only sessions with their batches)
+      summary: Sessions starting in a window, by start time (implemented; staff see every class of their academy)
       operationId: listClassSessions
       tags: [Sessions]
       security: [{bearerAuth: []}]
@@ -1117,7 +1030,7 @@ paths:
         '400': {description: Missing or invalid window}
         '404': {description: batchId not readable}
     post:
-      summary: Schedule a class for one or more batches (implemented; owner/admin only)
+      summary: Schedule a class for one or more batches (implemented; staff only)
       operationId: createClassSession
       tags: [Sessions]
       security: [{bearerAuth: []}]
@@ -1148,7 +1061,7 @@ paths:
     parameters:
       - {in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}
     get:
-      summary: Read a session (implemented; owner/admin, or staff assigned to one of its batches)
+      summary: Read a session (implemented; staff)
       operationId: getClassSession
       tags: [Sessions]
       security: [{bearerAuth: []}]
@@ -1160,7 +1073,7 @@ paths:
               schema: {$ref: '#/components/schemas/ClassSession'}
         '404': {description: 'Not found, other academy, or none of its batches is the caller''s'}
     put:
-      summary: Replace a session, including its batch set and status (implemented; owner/admin only)
+      summary: Replace a session, including its batch set and status (implemented; staff only)
       operationId: updateClassSession
       description: >-
         In the same transaction, automatic Zoom occurrence links near the class's old and new
@@ -1196,7 +1109,7 @@ paths:
         '409': {description: Stale version, or an inactive batch is being added}
   /api/v1/class-sessions/{sessionId}/students:
     get:
-      summary: Students expected at the class, each listed once (implemented; owner/admin, or assigned staff for their batches only)
+      summary: Students expected at the class, each listed once (implemented; staff)
       description: A student is expected if enrolled in one of the session's batches on the session's local date; a withdrawal date is the first day no longer enrolled.
       operationId: listExpectedStudents
       tags: [Sessions]
@@ -1221,7 +1134,7 @@ paths:
         '404': {description: Not found or not readable}
   /api/v1/zoom/receipts:
     get:
-      summary: Webhook receipts by processing status, newest first, without payloads (implemented; owner/admin)
+      summary: Webhook receipts by processing status, newest first, without payloads (implemented; staff)
       operationId: listZoomReceipts
       tags: [Zoom]
       security: [{bearerAuth: []}]
@@ -1251,7 +1164,7 @@ paths:
         '400': {description: Invalid status or limit}
   /api/v1/zoom/receipts/{receiptId}/replay:
     post:
-      summary: Requeue a dead-lettered receipt; the reason is audited (implemented; owner/admin)
+      summary: Requeue a dead-lettered receipt; the reason is audited (implemented; staff)
       operationId: replayZoomReceipt
       tags: [Zoom]
       security: [{bearerAuth: []}]
@@ -1273,7 +1186,7 @@ paths:
         '409': {description: Not a dead letter}
   /api/v1/zoom/occurrences:
     get:
-      summary: Zoom webinar occurrences seen in events and their class links, newest first (implemented; owner/admin)
+      summary: Zoom webinar occurrences seen in events and their class links, newest first (implemented; staff)
       operationId: listZoomOccurrences
       tags: [Zoom]
       security: [{bearerAuth: []}]
@@ -1289,7 +1202,7 @@ paths:
               schema: {type: array, items: {$ref: '#/components/schemas/ZoomOccurrence'}}
   /api/v1/zoom/occurrence-links:
     post:
-      summary: Record an administrator's decision for an occurrence; audited (implemented; owner/admin)
+      summary: Record a staff decision for an occurrence; audited (implemented; staff)
       description: Replaces any earlier decision. sessionId null marks the occurrence "not a class". The matcher never changes a manual decision.
       operationId: decideZoomOccurrence
       tags: [Zoom]
@@ -1315,7 +1228,7 @@ paths:
         '409': {description: The class session is cancelled}
   /api/v1/zoom/occurrences/auto-link:
     post:
-      summary: Re-run automatic matching for undecided occurrences (implemented; owner/admin)
+      summary: Re-run automatic matching for undecided occurrences (implemented; staff)
       operationId: autoLinkZoomOccurrences
       tags: [Zoom]
       security: [{bearerAuth: []}]
@@ -1332,7 +1245,7 @@ paths:
                   stillUndecided: {type: integer}
   /api/v1/zoom/reports:
     post:
-      summary: Fetch Zoom's participant report for an ended occurrence now (implemented, 004B; owner/admin; audited)
+      summary: Fetch Zoom's participant report for an ended occurrence now (implemented, 004B; staff; audited)
       description: |
         Reports are also fetched automatically for ended occurrences linked to a class (luma.zoom.reports.*), retried
         with backoff and Zoom's Retry-After. A fetched report replaces the live events in attendance; a later failure
@@ -1366,11 +1279,11 @@ paths:
         '409': {description: The webinar has not ended, or the Zoom API is not configured}
   /api/v1/zoom/participants:
     get:
-      summary: People in a Zoom occurrence and the student each is matched to (implemented; owner/admin)
+      summary: People in a Zoom occurrence and the student each is matched to (implemented; staff)
       description: |
         Provisional live data, not attendance. A person is identified by the email Zoom reports (lower-cased),
         never by display name; a visitor without email is listed alone and stays unmatched. Matching order: an
-        administrator's decision for the email, then a student's LUMA sign-in email. The host is listed as HOST.
+        staff decision for the email, then a student's LUMA sign-in email. The host is listed as HOST.
         Unmatched people come first.
       operationId: listZoomParticipants
       tags: [Zoom]
@@ -1409,7 +1322,7 @@ paths:
         '404': {description: No such occurrence in the caller's academy}
   /api/v1/zoom/participants/unmatched:
     get:
-      summary: Zoom emails matching no student and with no decision, most recently seen first (implemented; owner/admin)
+      summary: Zoom emails matching no student and with no decision, most recently seen first (implemented; staff)
       operationId: listUnmatchedZoomParticipants
       tags: [Zoom]
       security: [{bearerAuth: []}]
@@ -1432,7 +1345,7 @@ paths:
                     lastSeenAt: {type: string, format: date-time}
   /api/v1/zoom/identity-links:
     get:
-      summary: Administrators' decisions about Zoom emails, newest first (implemented; owner/admin)
+      summary: Staff decisions about Zoom emails, newest first (implemented; staff)
       operationId: listZoomIdentityLinks
       tags: [Zoom]
       security: [{bearerAuth: []}]
@@ -1445,7 +1358,7 @@ paths:
                 type: array
                 items: {$ref: '#/components/schemas/ZoomIdentityDecision'}
     post:
-      summary: Record which student a Zoom email belongs to, or that it is not a student (implemented; owner/admin; audited)
+      summary: Record which student a Zoom email belongs to, or that it is not a student (implemented; staff; audited)
       description: Replaces any earlier decision for the email and applies to every webinar. The email must have been seen in the academy's Zoom events.
       operationId: decideZoomIdentity
       tags: [Zoom]
@@ -1476,8 +1389,7 @@ paths:
         Recalculated on every read. Facts only, never present/absent: time connected within the class time with rejoins
         merged, first join and seconds after the start, visits and visits with no leave yet (counted to the webinar's end,
         or to now while it runs). Expected students are listed even if not seen; not seen is not proof of absence.
-        Owners/admins also see matched students who were not expected. Batch-scoped staff see only their classes and
-        students; others get 404.
+        Staff also see matched students who were not expected. A class of another academy answers 404.
       operationId: getProvisionalAttendance
       security: [{bearerAuth: []}]
       tags: [Attendance]
@@ -1575,7 +1487,7 @@ paths:
               schema: {$ref: '#/components/schemas/AttendancePolicy'}
         '204': {description: No rule recorded yet; nothing can be finalised}
     put:
-      summary: Record or change the rule (owners only; versioned; audited ATTENDANCE_POLICY_SET)
+      summary: Record or change the rule (staff; versioned; audited ATTENDANCE_POLICY_SET)
       operationId: setAttendancePolicy
       tags: [Attendance]
       security: [{bearerAuth: []}]
@@ -1598,11 +1510,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/AttendancePolicy'}
-        '403': {description: Not an owner}
+        '403': {description: Not staff}
         '409': {description: Changed by someone else}
   /api/v1/class-sessions/{sessionId}/attendance/finalisation:
     post:
-      summary: Finalise a class's attendance by the academy's rule (implemented, 004B; owners/admins; audited ATTENDANCE_FINALISED)
+      summary: Finalise a class's attendance by the academy's rule (implemented, 004B; staff; audited ATTENDANCE_FINALISED)
       description: |
         Only when a rule is recorded, the class is scheduled and over, and every linked occurrence is counted from Zoom's
         participant report (RECONCILED). One record per expected student (PRESENT, LATE or ABSENT), with the facts and the
@@ -1637,7 +1549,7 @@ paths:
       responses:
         '200': {description: "Corrections: previousOutcome, newOutcome, reason, appealId, correctedAt"}
     post:
-      summary: Correct a final record with a reason (owners, admins, attendance officers for their batches; audited ATTENDANCE_CORRECTED)
+      summary: Correct a final record with a reason (staff; audited ATTENDANCE_CORRECTED)
       description: Append-only history; the computed outcome is kept. Optimistic version.
       operationId: correctAttendance
       tags: [Attendance]
@@ -1660,7 +1572,7 @@ paths:
         '409': {description: Changed by someone else}
   /api/v1/students/{studentId}/attendance:
     get:
-      summary: A student's final attendance history (implemented, 004C; owners/admins)
+      summary: A student's final attendance history (implemented, 004C; staff)
       operationId: studentAttendanceHistory
       tags: [Attendance]
       security: [{bearerAuth: []}]
@@ -1699,7 +1611,7 @@ paths:
         '409': {description: An appeal is already open}
   /api/v1/attendance-appeals:
     get:
-      summary: Appeals, newest first (implemented, 004C; owners/admins)
+      summary: Appeals, newest first (implemented, 004C; staff)
       operationId: listAttendanceAppeals
       tags: [Attendance]
       security: [{bearerAuth: []}]
@@ -1730,8 +1642,8 @@ paths:
         '200': {description: The decided appeal}
         '409': {description: Already decided}
   /api/v1/engagement-settings:
-    get: {summary: "Engagement settings (managers; 204 when never set) — implemented, 006", operationId: getEngagementSettings, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: "enabled, consentText, consentVersion, version, updatedAt"}, '204': {description: Never set; engagement is off}}}
-    put: {summary: "Switch engagement on/off with the consent wording (owners; audited)", operationId: setEngagementSettings, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: The settings}, '403': {description: Not an owner}, '409': {description: Changed by someone else}}}
+    get: {summary: "Engagement settings (staff; 204 when never set) — implemented, 006", operationId: getEngagementSettings, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: "enabled, consentText, consentVersion, version, updatedAt"}, '204': {description: Never set; engagement is off}}}
+    put: {summary: "Switch engagement on/off with the consent wording (staff; audited)", operationId: setEngagementSettings, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: The settings}, '403': {description: Not staff}, '409': {description: Changed by someone else}}}
   /api/v1/me/engagement-consent:
     get: {summary: "The student's own consent state", operationId: myEngagementConsent, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: "enabled, consentText, consentVersion, granted (null = not asked for this wording), leaderboardOptIn"}}}
     put: {summary: "Opt in or out; leaderboardOptIn needs granted (audited)", operationId: decideEngagementConsent, tags: [Engagement], security: [{bearerAuth: []}], responses: {'200': {description: The consent state}, '409': {description: Off, or the wording changed}}}
@@ -1744,37 +1656,37 @@ paths:
   /api/v1/class-sessions/{sessionId}/engagement:
     get: {summary: "Reaction counts and question results for staff who see the class", operationId: classEngagement, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: "reactions by kind, reactingStudents, pulses with counts, source"}}}
   /api/v1/class-sessions/{sessionId}/pulses:
-    post: {summary: "Open a question for 1-10 minutes during the class (instructors, managers; audited)", operationId: openPulse, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'201': {description: The question}, '409': {description: Off, not running, or 20 questions already}}}
+    post: {summary: "Open a question for 1-10 minutes during the class (staff; audited)", operationId: openPulse, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'201': {description: The question}, '409': {description: Off, not running, or 20 questions already}}}
   /api/v1/class-sessions/{sessionId}/pulses/{questionId}/closure:
     post: {summary: "Close a question early", operationId: closePulse, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}, {in: path, name: questionId, required: true, schema: {type: string, format: uuid}}], responses: {'204': {description: Closed}}}
   /api/v1/batches/{batchId}/engagement-ranking:
-    get: {summary: "Staff-only top 10/100 over a date range (managers); consenting students only, named only with opt-in", operationId: engagementRanking, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: batchId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}, {in: query, name: limit, schema: {type: integer, enum: [10, 100]}}], responses: {'200': {description: "limit, classes, studentsCounted, top[], method"}}}
+    get: {summary: "Staff-only top 10/100 over a date range (staff); consenting students only, named only with opt-in", operationId: engagementRanking, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: batchId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}, {in: query, name: limit, schema: {type: integer, enum: [10, 100]}}], responses: {'200': {description: "limit, classes, studentsCounted, top[], method"}}}
   /api/v1/courses/{courseId}/engagement-ranking:
-    get: {summary: "Staff-only top 10/100 over every batch of a course (managers); consenting students only, named only with opt-in", operationId: courseEngagementRanking, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: courseId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}, {in: query, name: limit, schema: {type: integer, enum: [10, 100]}}], responses: {'200': {description: "limit, classes, studentsCounted, top[], method"}}}
+    get: {summary: "Staff-only top 10/100 over every batch of a course (staff); consenting students only, named only with opt-in", operationId: courseEngagementRanking, tags: [Engagement], security: [{bearerAuth: []}], parameters: [{in: path, name: courseId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}, {in: query, name: limit, schema: {type: integer, enum: [10, 100]}}], responses: {'200': {description: "limit, classes, studentsCounted, top[], method"}}}
   /api/v1/auth/password:
     post: {summary: "Change one's own password with the current one; every session ends (audited, rate limited like sign-in)", operationId: changePassword, tags: [Auth], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [currentPassword, newPassword], properties: {currentPassword: {type: string}, newPassword: {type: string}}}}}}, responses: {'204': {description: Changed; sign in again}, '400': {description: Current password is wrong}, '401': {description: Not signed in}, '422': {description: New password fails the policy}, '429': {description: Too many attempts}}}
   /api/v1/class-sessions/{sessionId}/attendance/recalculation:
-    post: {summary: "Recalculate a final class from the latest report, decisions and rule (managers; audited); corrected records keep their outcome", operationId: recalculateAttendance, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [reason], properties: {reason: {type: string, maxLength: 300}}}}}}, responses: {'200': {description: What changed (records recalculated, kept as corrected, added)}, '409': {description: Not final yet, or no report}}}
+    post: {summary: "Recalculate a final class from the latest report, decisions and rule (staff; audited); corrected records keep their outcome", operationId: recalculateAttendance, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [reason], properties: {reason: {type: string, maxLength: 300}}}}}}, responses: {'200': {description: What changed (records recalculated, kept as corrected, added)}, '409': {description: Not final yet, or no report}}}
   /api/v1/students/{studentId}/erasure:
-    post: {summary: "Erase a student's personal data on request (owners only; attendance kept anonymised; audited without personal data)", operationId: eraseStudent, tags: [Students], security: [{bearerAuth: []}], parameters: [{in: path, name: studentId, required: true, schema: {type: string, format: uuid}}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [confirmStudentNumber, reason], properties: {confirmStudentNumber: {type: string, maxLength: 60}, reason: {type: string, maxLength: 300}}}}}}, responses: {'200': {description: "placeholderNumber"}, '400': {description: The typed student number does not match}, '403': {description: Not an owner}}}
+    post: {summary: "Erase a student's personal data on request (staff; attendance kept anonymised; audited without personal data)", operationId: eraseStudent, tags: [Students], security: [{bearerAuth: []}], parameters: [{in: path, name: studentId, required: true, schema: {type: string, format: uuid}}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [confirmStudentNumber, reason], properties: {confirmStudentNumber: {type: string, maxLength: 60}, reason: {type: string, maxLength: 300}}}}}}, responses: {'200': {description: "placeholderNumber"}, '400': {description: The typed student number does not match}, '403': {description: Not staff}}}
   /api/v1/zoom/identity-links/removals:
-    post: {summary: "Remove a staff decision about a Zoom email (managers; audited); the email goes back to review", operationId: removeZoomIdentityDecision, tags: [Zoom], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email, reason], properties: {email: {type: string, maxLength: 254}, reason: {type: string, maxLength: 300}}}}}}, responses: {'204': {description: Removed}, '404': {description: No decision for this email}}}
+    post: {summary: "Remove a staff decision about a Zoom email (staff; audited); the email goes back to review", operationId: removeZoomIdentityDecision, tags: [Zoom], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email, reason], properties: {email: {type: string, maxLength: 254}, reason: {type: string, maxLength: 300}}}}}}, responses: {'204': {description: Removed}, '404': {description: No decision for this email}}}
   /api/v1/batches/{batchId}/attendance/summary:
-    get: {summary: "Each enrolled student's final attendance in a batch over a period, lowest rate first (managers, assigned staff)", operationId: batchAttendanceSummary, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: path, name: batchId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}], responses: {'200': {description: "finalClasses, classesNotFinal, totals, students[] (counts with ratePercent), method"}, '400': {description: Bad range (at most 366 days)}, '404': {description: Not a batch the caller may read}}}
+    get: {summary: "Each enrolled student's final attendance in a batch over a period, lowest rate first (staff)", operationId: batchAttendanceSummary, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: path, name: batchId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}], responses: {'200': {description: "finalClasses, classesNotFinal, totals, students[] (counts with ratePercent), method"}, '400': {description: Bad range (at most 366 days)}, '404': {description: Not a batch the caller may read}}}
   /api/v1/attendance/summary:
-    get: {summary: "Final attendance totals per batch over a period, without student names (owners, administrators, analysts)", operationId: academyAttendanceSummary, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}], responses: {'200': {description: "batches[] with finalClasses, classesNotFinal, totals; method"}, '403': {description: Not an owner, administrator or analyst}}}
+    get: {summary: "Final attendance totals per batch over a period, without student names (staff)", operationId: academyAttendanceSummary, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: query, name: from, required: true, schema: {type: string, format: date}}, {in: query, name: to, required: true, schema: {type: string, format: date}}], responses: {'200': {description: "batches[] with finalClasses, classesNotFinal, totals; method"}, '403': {description: Not an owner, administrator or analyst}}}
   /api/v1/zoom/upcoming-webinars:
-    get: {summary: "The academy's upcoming webinars from one Zoom listing call, soonest first, with LUMA classes already scheduled (owners/admins)", operationId: upcomingWebinars, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: query, name: q, schema: {type: string, maxLength: 100}, description: Topic or webinar ID}], responses: {'200': {description: "webinarId, topic, nextStart, durationMinutes, timeZone, recurring, upcomingClasses, liveEvents"}, '409': {description: "Zoom API not configured, scope missing, or unreachable"}}}
+    get: {summary: "The academy's upcoming webinars from one Zoom listing call, soonest first, with LUMA classes already scheduled (staff)", operationId: upcomingWebinars, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: query, name: q, schema: {type: string, maxLength: 100}, description: Topic or webinar ID}], responses: {'200': {description: "webinarId, topic, nextStart, durationMinutes, timeZone, recurring, upcomingClasses, liveEvents"}, '409': {description: "Zoom API not configured, scope missing, or unreachable"}}}
   /api/v1/zoom/upcoming-webinars/{webinarId}:
-    get: {summary: "One webinar's upcoming runs (next 120 days), marking runs that already have a class (owners/admins)", operationId: upcomingWebinarRuns, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: webinarId, required: true, schema: {type: string}}], responses: {'200': {description: "webinarId, topic, timeZone, recurring, runs[] (occurrenceId, startsAt, endsAt, classId), note, liveEvents"}, '400': {description: Not a webinar ID}, '404': {description: Not in the academy's Zoom account}}}
+    get: {summary: "One webinar's upcoming runs (next 120 days), marking runs that already have a class (staff)", operationId: upcomingWebinarRuns, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: webinarId, required: true, schema: {type: string}}], responses: {'200': {description: "webinarId, topic, timeZone, recurring, runs[] (occurrenceId, startsAt, endsAt, classId), note, liveEvents"}, '400': {description: Not a webinar ID}, '404': {description: Not in the academy's Zoom account}}}
   /api/v1/zoom/webinar-imports:
     post: {summary: "Create a class for each chosen upcoming run of a webinar for the chosen batches; times re-read from Zoom; all or nothing (audited)", operationId: importWebinarRuns, tags: [Zoom], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [webinarId, batchIds], properties: {webinarId: {type: string}, batchIds: {type: array, items: {type: string, format: uuid}}, occurrenceIds: {type: array, items: {type: string}, description: "Empty or absent: every upcoming run"}, title: {type: string, maxLength: 200}}}}}}, responses: {'201': {description: "webinarId, created, alreadyScheduled, classIds"}, '400': {description: No batch, bad ID or no upcoming runs}, '404': {description: Not a webinar in the academy's Zoom account}}}
   /api/v1/attendance/pending:
-    get: {summary: "Ended classes of the last 60 days that are not final, each READY, WAITING_FOR_REPORT or NO_ZOOM_RUN (owners/admins)", operationId: pendingAttendance, tags: [Attendance], security: [{bearerAuth: []}], responses: {'200': {description: "ruleRecorded, autoFinalise, classes[]"}}}
+    get: {summary: "Ended classes of the last 60 days that are not final, each READY, WAITING_FOR_REPORT or NO_ZOOM_RUN (staff)", operationId: pendingAttendance, tags: [Attendance], security: [{bearerAuth: []}], responses: {'200': {description: "ruleRecorded, autoFinalise, classes[]"}}}
   /api/v1/attendance/finalisations:
-    post: {summary: "Finalise every READY class by the academy's rule, each as its own finalisation (owners/admins)", operationId: finaliseReadyClasses, tags: [Attendance], security: [{bearerAuth: []}], responses: {'200': {description: "finalised, notReady, problems[]"}, '409': {description: No rule recorded}}}
+    post: {summary: "Finalise every READY class by the academy's rule, each as its own finalisation (staff)", operationId: finaliseReadyClasses, tags: [Attendance], security: [{bearerAuth: []}], responses: {'200': {description: "finalised, notReady, problems[]"}, '409': {description: No rule recorded}}}
   /api/v1/zoom/webinar-lookup:
-    get: {summary: "Find a webinar by join link or ID and list its past runs (implemented; owners/admins; read-only Zoom calls)", operationId: lookupWebinar, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: query, name: webinar, required: true, description: "Join link (/j/, /w/, /s/, /wc/join/) or ID; registration links (WN_…) are refused with guidance", schema: {type: string, maxLength: 500}}], responses: {'200': {description: "webinarId, topic, durationMinutes, timezone, runs[] (occurrenceUuid, startTime, reported, linkedSessionId), newest first"}, '400': {description: Not a join link or ID}, '404': {description: Not in the academy's Zoom account}, '409': {description: Zoom API not configured or unreachable}}}
+    get: {summary: "Find a webinar by join link or ID and list its past runs (implemented; staff; read-only Zoom calls)", operationId: lookupWebinar, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: query, name: webinar, required: true, description: "Join link (/j/, /w/, /s/, /wc/join/) or ID; registration links (WN_…) are refused with guidance", schema: {type: string, maxLength: 500}}], responses: {'200': {description: "webinarId, topic, durationMinutes, timezone, runs[] (occurrenceUuid, startTime, reported, linkedSessionId), newest first"}, '400': {description: Not a join link or ID}, '404': {description: Not in the academy's Zoom account}, '409': {description: Zoom API not configured or unreachable}}}
   /api/v1/zoom/webinar-lookup/reports:
     post: {summary: "Fetch Zoom's participant report for one past run (stored like any report; audited)", operationId: fetchWebinarRunReport, tags: [Zoom], security: [{bearerAuth: []}], responses: {'200': {description: The run's attendance}, '404': {description: Not a run of this webinar}}}
   /api/v1/zoom/webinar-lookup/attendance:
@@ -1821,11 +1733,11 @@ paths:
     get: {summary: "Whether the Academy-requested student ID sign-in is switched on (ACAD-2)", operationId: studentIdLoginAvailability, tags: [Identity], responses: {'200': {description: "enabled"}}}
     post: {summary: "Academy-requested student sign-in: the student ID is username and password. Weak by design; off unless LUMA_STUDENT_ID_LOGIN_ENABLED; students only (ACAD-2)", operationId: studentIdLogin, tags: [Identity], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [studentId, password], properties: {studentId: {type: string, maxLength: 60}, password: {type: string, maxLength: 60, writeOnly: true}}}}}}, responses: {'200': {description: "Tokens (as /auth/login)"}, '400': {description: Malformed request}, '401': {description: "Refused. Identical for unknown ID, wrong password, deactivated student, staff account and another academy"}, '404': {description: Switched off}, '429': {description: Too many attempts from this client}}}
   /api/v1/academy/classes:
-    get: {summary: "The Academy's classes from its own database (read-only): distinct-student counts and the linked LUMA batch (managers; ACAD-1)", operationId: listAcademyClasses, tags: [Academy], security: [{bearerAuth: []}], responses: {'200': {description: "className, studentCount, batch (null until linked)"}, '403': {description: Not an owner or administrator}, '503': {description: The Academy database is not connected or unreachable}}}
+    get: {summary: "The Academy's classes from its own database (read-only): distinct-student counts and the linked LUMA batch (staff; ACAD-1)", operationId: listAcademyClasses, tags: [Academy], security: [{bearerAuth: []}], responses: {'200': {description: "className, studentCount, batch (null until linked)"}, '403': {description: Not staff}, '503': {description: The Academy database is not connected or unreachable}}}
   /api/v1/academy/classes/link:
-    put: {summary: "Link an Academy class to an active batch of the academy; one class per batch (managers; audited)", operationId: linkAcademyClass, tags: [Academy], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [className, batchId], properties: {className: {type: string, maxLength: 200}, batchId: {type: string, format: uuid}}}}}}, responses: {'200': {description: The class with its batch}, '404': {description: No such Academy class or batch}, '409': {description: Batch inactive or linked to another class}}}
+    put: {summary: "Link an Academy class to an active batch of the academy; one class per batch (staff; audited)", operationId: linkAcademyClass, tags: [Academy], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [className, batchId], properties: {className: {type: string, maxLength: 200}, batchId: {type: string, format: uuid}}}}}}, responses: {'200': {description: The class with its batch}, '404': {description: No such Academy class or batch}, '409': {description: Batch inactive or linked to another class}}}
   /api/v1/academy/classes/sync:
-    post: {summary: "Bring the linked batch's enrolments in step with the Academy class: create missing students, enrol; never withdraws (managers; audited with counts only)", operationId: syncAcademyClass, tags: [Academy], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [className], properties: {className: {type: string, maxLength: 200}}}}}}, responses: {'200': {description: "academyStudents, created, enrolled, alreadyEnrolled, withoutName, withoutEmail, withdrawnInLuma, inactiveInLuma, invalidIds, notInAcademyClass"}, '404': {description: Not linked}, '503': {description: The Academy database is not connected or unreachable}}}
+    post: {summary: "Bring the linked batch's enrolments in step with the Academy class: create missing students, enrol; never withdraws (staff; audited with counts only)", operationId: syncAcademyClass, tags: [Academy], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [className], properties: {className: {type: string, maxLength: 200}}}}}}, responses: {'200': {description: "academyStudents, created, enrolled, alreadyEnrolled, withoutName, withoutEmail, withdrawnInLuma, inactiveInLuma, invalidIds, notInAcademyClass"}, '404': {description: Not linked}, '503': {description: The Academy database is not connected or unreachable}}}
   /api/v1/attendance/dashboard:
     get: {summary: "Attendance dashboard: every student of a course or batch over the classes held in a date range — time in the webinar (rejoins merged), share of class time, outcomes, per-class cells (staff; batch-scoped staff see their batches)", operationId: attendanceDashboard, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: query, name: from, schema: {type: string, format: date}}, {in: query, name: to, schema: {type: string, format: date}}, {in: query, name: courseId, schema: {type: string, format: uuid}}, {in: query, name: batchId, schema: {type: string, format: uuid}}], responses: {'200': {description: "from, to, truncated, totals, classes[], students[] with cells[] in class order"}, '400': {description: Range over 92 days or reversed}}}
   /api/v1/attendance/class-totals:
@@ -1856,12 +1768,12 @@ paths:
         '401': {description: Sign-in required}
         '403': {description: Staff role with class access required}
   /api/v1/students/{studentId}/attendance-overview:
-    get: {summary: "One student's courses, batches and every class in a date range with each join and leave (managers)", operationId: studentAttendanceOverview, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: path, name: studentId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, schema: {type: string, format: date}}, {in: query, name: to, schema: {type: string, format: date}}], responses: {'200': {description: "overall, byBatch[], enrolments[], classes[] with timeline[]"}, '404': {description: No such student in the academy}}}
+    get: {summary: "One student's courses, batches and every class in a date range with each join and leave (staff)", operationId: studentAttendanceOverview, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: path, name: studentId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, schema: {type: string, format: date}}, {in: query, name: to, schema: {type: string, format: date}}], responses: {'200': {description: "overall, byBatch[], enrolments[], classes[] with timeline[]"}, '404': {description: No such student in the academy}}}
   /api/v1/me/attendance-overview:
     get: {summary: "The signed-in student's own attendance overview, as the staff one", operationId: myAttendanceOverview, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: query, name: from, schema: {type: string, format: date}}, {in: query, name: to, schema: {type: string, format: date}}], responses: {'200': {description: "overall, byBatch[], enrolments[], classes[] with timeline[]"}}}
   /api/v1/zoom/monitors:
-    get: {summary: "Monitored Zoom webinars with Zoom's read-only title and schedule, the live run and recent runs (managers; WID)", operationId: listWebinarMonitors, tags: [Zoom], security: [{bearerAuth: []}], responses: {'200': {description: "id, webinarId, topic, timeZone, scheduledStartAt (null = no Zoom schedule), occurrences, syncStatus, syncedAt, academyClassName, classResolved, active, live, runs[]"}}}
-    post: {summary: "Monitor a webinar by its ID or join link only; title and schedule are read from Zoom (managers; audited). LUMA never changes the webinar", operationId: addWebinarMonitor, tags: [Zoom], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [webinar], properties: {webinar: {type: string, maxLength: 500, description: "Webinar ID or join link"}}}}}}, responses: {'200': {description: The monitored webinar}, '400': {description: Not a webinar ID or supported link}, '404': {description: Not in the academy's Zoom account}, '503': {description: Zoom API not configured}}}
+    get: {summary: "Monitored Zoom webinars with Zoom's read-only title and schedule, the live run and recent runs (staff; WID)", operationId: listWebinarMonitors, tags: [Zoom], security: [{bearerAuth: []}], responses: {'200': {description: "id, webinarId, topic, timeZone, scheduledStartAt (null = no Zoom schedule), occurrences, syncStatus, syncedAt, academyClassName, classResolved, active, live, runs[]"}}}
+    post: {summary: "Monitor a webinar by its ID or join link only; title and schedule are read from Zoom (staff; audited). LUMA never changes the webinar", operationId: addWebinarMonitor, tags: [Zoom], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [webinar], properties: {webinar: {type: string, maxLength: 500, description: "Webinar ID or join link"}}}}}}, responses: {'200': {description: The monitored webinar}, '400': {description: Not a webinar ID or supported link}, '404': {description: Not in the academy's Zoom account}, '503': {description: Zoom API not configured}}}
   /api/v1/zoom/monitors/{monitorId}/sync:
     post: {summary: "Read the webinar's title and schedule from Zoom again", operationId: syncWebinarMonitor, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: The monitored webinar (syncStatus FAILED/NOT_FOUND keeps the last known values)}, '404': {description: Not monitored}}}
   /api/v1/zoom/monitors/{monitorId}/stop:
@@ -1869,7 +1781,7 @@ paths:
   /api/v1/zoom/monitors/{monitorId}/resume:
     post: {summary: "Resume collecting the webinar (audited)", operationId: resumeWebinarMonitor, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: The monitored webinar}}}
   /api/v1/zoom/monitors/{monitorId}/academy-class:
-    put: {summary: "An administrator's explicit choice of the Academy class the webinar teaches, or null for unresolved (audited)", operationId: setWebinarAcademyClass, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}], requestBody: {required: true, content: {application/json: {schema: {type: object, properties: {academyClassName: {type: string, maxLength: 200, nullable: true}}}}}}, responses: {'200': {description: The monitored webinar}, '404': {description: No such Academy class}, '503': {description: Academy database not connected}}}
+    put: {summary: "A staff member's explicit choice of the Academy class the webinar teaches, or null for unresolved (audited)", operationId: setWebinarAcademyClass, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}], requestBody: {required: true, content: {application/json: {schema: {type: object, properties: {academyClassName: {type: string, maxLength: 200, nullable: true}}}}}}, responses: {'200': {description: The monitored webinar}, '404': {description: No such Academy class}, '503': {description: Academy database not connected}}}
   /api/v1/class-sessions/{sessionId}/zoom-run:
     get: {summary: "The Zoom run behind a class: Zoom's schedule (display only) beside the actual start and end, live counts and report status (staff who may open the class)", operationId: classZoomRun, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: "webinarId, topic, occurrenceUuid, state, firstSeenAt, actualStartedAt, actualEndedAt, scheduledStartAt, reported, connectedNow, people, academyClassName, classResolved"}, '204': {description: Not created by a Zoom run}, '404': {description: No such class or not visible}}}
 components:
@@ -1923,7 +1835,7 @@ components:
         academyId: {type: string, format: uuid}
         roles:
           type: array
-          items: {type: string, enum: [ACADEMY_OWNER, ACADEMY_ADMIN, INSTRUCTOR, ATTENDANCE_OFFICER, ANALYST, STUDENT]}
+          items: {type: string, enum: [STAFF, STUDENT]}
       required: [accountId, academyId, roles]
     Course:
       type: object
@@ -1980,19 +1892,6 @@ components:
         withdrawnOn: {type: [string, 'null'], format: date}
         status: {type: string, enum: [ENROLLED, WITHDRAWN]}
         version: {type: integer}
-    Assignment:
-      type: object
-      required: [id, batchId, courseId, batchCode, batchName, accountId, role, createdAt]
-      properties:
-        id: {type: string, format: uuid}
-        batchId: {type: string, format: uuid}
-        courseId: {type: string, format: uuid}
-        batchCode: {type: string}
-        batchName: {type: string}
-        accountId: {type: string, format: uuid}
-        email: {type: [string, 'null']}
-        role: {type: string, enum: [INSTRUCTOR, ATTENDANCE_OFFICER]}
-        createdAt: {type: string, format: date-time}
     StudentClass:
       type: object
       required: [id, title, startsAt, endsAt, timeZone, localDate, status, batches]
@@ -2042,7 +1941,7 @@ components:
         updatedAt: {type: string, format: date-time}
     StaffRole:
       type: string
-      enum: [ACADEMY_OWNER, ACADEMY_ADMIN, INSTRUCTOR, ATTENDANCE_OFFICER, ANALYST]
+      enum: [STAFF]
     StaffAccount:
       type: object
       required: [id, email, roles, status, version, createdAt]

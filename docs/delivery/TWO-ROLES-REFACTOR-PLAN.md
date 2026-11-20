@@ -4,7 +4,7 @@
 owner level, across every course and batch). `STUDENT` is unchanged. The five staff roles (`ACADEMY_OWNER`,
 `ACADEMY_ADMIN`, `INSTRUCTOR`, `ATTENDANCE_OFFICER`, `ANALYST`) and batch assignments go away.
 
-**Progress: 65 %** (S0 to S4 done: backend complete, 402 backend tests pass). Updated after every slice. Work happens on branch `feat/two-roles` in the worktree `.claude/worktrees/two-roles`, branched from `0674ff1`, so the open work in the main checkout is untouched.
+**Progress: 100 %** (all slices done; live run on the Supabase database waits for the owner). Updated after every slice. Work happens on branch `feat/two-roles` in the worktree `.claude/worktrees/two-roles`, branched from `0674ff1`, so the open work in the main checkout is untouched.
 
 | # | Slice | Weight | Status |
 |---|---|---|---|
@@ -13,9 +13,9 @@ owner level, across every course and batch). `STUDENT` is unchanged. The five st
 | S2 | Remove batch scoping and staff assignments (backend) | 15 % | Done |
 | S3 | Identity: staff accounts, bootstrap, notices, owner-only actions | 10 % | Done |
 | S4 | Backend tests rewritten; full `mvn test` green | 20 % | Done: 402 tests, 0 failures (Testcontainers PostgreSQL 17) |
-| S5 | Frontend: role helpers, every staff page, team page, batches page, mock API, unit + e2e tests | 20 % | In progress: code, 79 unit tests, typecheck and lint done; e2e next |
-| S6 | Contracts, docs, scripts, checkpoint | 10 % | Not started |
-| S7 | Final verification (all suites, smoke, live local check) | 5 % | Not started |
+| S5 | Frontend: role helpers, every staff page, team page, batches page, mock API, unit + e2e tests | 20 % | Done: 79 unit tests; Playwright Edge desktop + Pixel 7: 126 passed, 2 skipped |
+| S6 | Contracts, docs, scripts, checkpoint | 10 % | Done: contract (115 endpoints match), matrix, ADR-0007, guides, scripts, checkpoint |
+| S7 | Final verification (all suites, smoke, live local check) | 5 % | Done except the live run on the Supabase database (needs the owner's go-ahead: it applies V30 to real accounts) |
 
 ## 1. Analysis (what exists today)
 

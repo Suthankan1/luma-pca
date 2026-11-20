@@ -95,7 +95,7 @@ echo "--- database after the run"
 docker exec $PG psql -At -U luma -d luma -c "SELECT 'courses=' || count(*) FROM courses" -c "SELECT 'batches=' || count(*) FROM batches" \
   -c "SELECT 'students=' || count(*) FROM students" -c "SELECT 'enrollments=' || count(*) || ' withdrawn=' || count(withdrawn_on) FROM enrollments" \
   -c "SELECT 'active accounts=' || count(*) FROM accounts WHERE status = 'ACTIVE'" \
-  -c "SELECT 'staff assignments=' || count(*) FROM staff_assignments" \
+\
   -c "SELECT 'class sessions=' || string_agg(starts_at::text || ' to ' || ends_at::text || ' webinar ' || zoom_webinar_id, ';') FROM class_sessions" \
   -c "SELECT 'occurrence links=' || string_agg(occurrence_uuid || ':' || link_source || ':' || coalesce(class_session_id::text, 'not a class'), ',') FROM zoom_occurrence_links" \
   -c "SELECT 'receipts=' || string_agg(processing_status || ':' || attempts, ',' ORDER BY id) FROM zoom_webhook_receipts" \

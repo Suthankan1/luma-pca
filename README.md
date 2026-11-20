@@ -8,25 +8,26 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
 
 - **Accounts and access:** staff and student sign-in with email and password, no second factor (RS256 JWTs, rotating
   refresh sessions in HttpOnly cookies), invitations, password reset and password change, per-visitor and per-account
-  rate limits, account lockout; roles scoped to the academy, assigned batches, or the student's own data on every route.
+  rate limits, account lockout; two roles (STAFF and STUDENT, ADR-0007): staff work within their academy, students see only
+  their own data, checked on every route.
 - **Academic data:** courses, batches, students (CSV import, or synced read-only from the Academy's own database by class),
-  enrolments, staff assignments, bulk invitation emails, an append-only activity log.
+  enrolments, bulk invitation emails, an append-only activity log.
 - **Zoom owns schedules (Academy decision 2026-11-18):** staff add a webinar by its ID or join link only; LUMA reads its
   title, schedule and occurrences from Zoom (read-only) and has no scheduling, editing or import controls. Every run Zoom
   actually starts (early, late or unscheduled) becomes its own attendance class, keyed by the occurrence UUID, from the
   actual start to the actual end; a missed end is closed from Zoom's report. See `docs/integration/ZOOM-RULES.md`.
 - **Less manual work:** a home page of what needs attention, an attendance dashboard by course, batch and period, every
   ready class finalised at once or automatically once Zoom's report is in.
-- **Zoom:** signed webhook receipt (proven with a real test webinar), a retrying worker, participants matched to students by Zoom email (or an administrator's audited decision), Zoom's
+- **Zoom:** signed webhook receipt (proven with a real test webinar), a retrying worker, participants matched to students by Zoom email (or a staff member's audited decision), Zoom's
   participant report fetched after each webinar (host marked, registrants matched by their registration email); "Check a
   webinar" by join link or ID shows any past run, even ones LUMA never received live; IP/device data is never stored.
 - **Attendance:** provisional facts live (time connected with rejoins merged, lateness), then final present/late/absent
   from Zoom's report by the academy's own recorded rule; corrections with reasons, recalculation after a late report or a
-  rule change, student appeals, email notices to students and managers, histories, per-student attendance
-  rates per batch, academy totals per batch for analysts, CSV exports.
-- **Engagement (off by default, consent-based):** portal reactions, instructor pulse questions, staff-only top 10/100 per class, batch
+  rule change, student appeals, email notices to students and staff, histories, per-student attendance
+  rates per batch, academy totals per batch, CSV exports.
+- **Engagement (off by default, consent-based):** portal reactions, staff pulse questions, staff-only top 10/100 per class, batch
   or course, with CSV download.
-- **Privacy:** an owner can erase a student on request (attendance kept, anonymised); a nightly job removes emails from
+- **Privacy:** staff can erase a student on request (attendance kept, anonymised); a nightly job removes emails from
   old Zoom event payloads.
 - **Operations:** Terraform for the AWS design with WAF, alarms and daily backups (validated in CI, not applied), tested
   restore drill, image builds in CI, load-test tooling, deploy/rollback/incident runbooks.
@@ -92,7 +93,7 @@ npm --prefix frontend run build
 python3 scripts/verify_structure.py
 scripts/auth-stack-smoke.sh            # real backend + database + Next.js sign-in flow
 scripts/staff-ui-real-stack.sh         # real stack + Playwright, end to end (also the "Real-stack browser test" CI workflow)
-scripts/bootstrap-owner.sh "Academy" owner@example.com   # create an academy's first owner (operator command)
+scripts/bootstrap-owner.sh "Academy" owner@example.com   # create an academy's first staff account (operator command)
 STUDENTS=150 scripts/load-test-local.sh   # k6 load scenarios on this machine (baseline only; see docs/testing/LOAD-TEST-PLAN.md)
 ```
 

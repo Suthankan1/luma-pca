@@ -7,11 +7,11 @@ Replace manual roll call in Zoom Webinars with secure, auditable **connected-dur
 Academy has multiple courses and batches, uses Zoom Webinars, staff currently manually call student names at start/end, wants monthly attendance/engagement and top 10/top 100 participation reports, and plans a live deployment. The production backend choice is Spring Boot; both students and staff need first-party JWT authentication.
 
 ## Users
-Academy owner/admin; attendance officer; instructor assigned to batches; analyst (optional); student; system operator. Privacy-sensitive student dashboards require own-record-only access and approved ranking visibility.
+Staff (one role since 2026-11-20, ADR-0007: every staff member does every staff task in the academy); student; system operator. Privacy-sensitive student dashboards require own-record-only access and approved ranking visibility.
 
 ## In-scope release R1
 1. Secure invite/account activation, login, recovery, role/scope enforcement, session revocation and MFA for admins.
-2. Courses, batches, students, enrollments, staff assignments and class sessions (shared sessions allowed).
+2. Courses, batches, students, enrollments and class sessions (shared sessions allowed).
 3. Academy-owned authorized Zoom account integration, participant identity registration/mapping and occurrence identity.
 4. Signed webhook capture and replay handling; provisional live dashboard; report reconciliation, attendance rules and correction workflow.
 5. Student own attendance history, course/batch views, scoped monthly CSV exports, audit trail, observability, backups and operator runbooks.

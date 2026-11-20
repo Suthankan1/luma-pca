@@ -1,7 +1,7 @@
-# Operator runbook — Creating an academy's first owner
+# Operator runbook — Creating an academy's first staff account
 
-Owners and administrators invite everyone else from the staff screens. The one account
-nobody can invite is an academy's first owner, so it is created with an operator command.
+Staff invite everyone else from the staff screens (there is one STAFF role, ADR-0007). The one account
+nobody can invite is an academy's first staff account, so it is created with an operator command.
 There is no HTTP route for this: the command needs the same database access as the API.
 
 ## Steps
@@ -29,7 +29,7 @@ There is no HTTP route for this: the command needs the same database access as t
   refused), and a pending owner account with that email.
 - Run again **before** the owner activates (for example after the link expired), it issues
   a new link for the same address and cancels the old one.
-- It **refuses** when the academy already has an active owner, when an invitation is pending
+- It **refuses** when the academy already has an active staff account, when an invitation is pending
   for a different address, or when the address belongs to another account. It never
   replaces, re-enables or resets an existing owner.
 - It records `OWNER_BOOTSTRAPPED` in the audit trail with no actor (the operator) and

@@ -97,9 +97,7 @@ INSERT INTO enrollments (id, academy_id, batch_id, student_id, enrolled_on)
 INSERT INTO accounts (id, academy_id, email, password_hash, status, password_changed_at)
   SELECT gen_random_uuid(), '$ACADEMY', 'load.instructor' || g || '@example.invalid', (SELECT hash FROM seed), 'ACTIVE', now()
   FROM generate_series(1, $STAFF) g;
-INSERT INTO account_roles (account_id, role) SELECT id, 'INSTRUCTOR' FROM accounts WHERE email LIKE 'load.instructor%';
-INSERT INTO staff_assignments (id, academy_id, account_id, batch_id, role)
-  SELECT gen_random_uuid(), '$ACADEMY', a.id, b.id, 'INSTRUCTOR' FROM accounts a CROSS JOIN batches b WHERE a.email LIKE 'load.instructor%';
+INSERT INTO account_roles (account_id, role) SELECT id, 'STAFF' FROM accounts WHERE email LIKE 'load.instructor%';
 INSERT INTO class_sessions (id, academy_id, title, starts_at, ends_at, time_zone, zoom_webinar_id)
   VALUES (gen_random_uuid(), '$ACADEMY', 'Load test class', TIMESTAMPTZ '2027-01-13 12:30Z', TIMESTAMPTZ '2027-01-13 15:00Z', 'Asia/Colombo', '81234567890');
 INSERT INTO session_batches (session_id, batch_id, academy_id) SELECT (SELECT id FROM class_sessions), id, '$ACADEMY' FROM batches;

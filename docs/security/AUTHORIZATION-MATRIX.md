@@ -1,19 +1,40 @@
 # Roles and scoped authorization
 
-**Enforcement:** Spring backend checks academy ownership + action-specific role + course/batch/class membership + record owner. This matrix is a starting proposal and academy owner must approve it.
+**Current model (owner decision 2026-11-20): two roles, `STAFF` and `STUDENT`.** The five staff roles (owner,
+administrator, instructor, attendance officer, analyst) and batch assignments are gone; migration V30 gave every former
+staff account the one `STAFF` role. See `docs/delivery/TWO-ROLES-REFACTOR-PLAN.md`.
 
-| Capability | Owner/Admin | Instructor (assigned) | Attendance Officer (assigned) | Analyst (approved) | Student (self) |
-| --- | --- | --- | --- | --- | --- |
-| Academy settings / Zoom credentials | Owner/Admin | — | — | — | — |
-| Create courses/batches/enrollments | Admin | — | — | — | — |
-| View scoped batch roster | Admin | Assigned batch | Assigned batch | Aggregate only | — |
-| View class attendance | Admin | Assigned class | Assigned class | Aggregate permitted | Own only |
-| Correct attendance | Admin | No by default | Assigned class + reason | — | Request only |
-| Create pulse questions | Admin | Assigned class | — | — | — |
-| Submit portal reactions | — | — | — | — | Enrolled class only |
-| Monthly report/export | Admin | Assigned batch | Assigned batch | Approved aggregate | Own history |
-| View leaderboard | Policy-dependent | Assigned batch | Policy-dependent | Approved aggregate | Opt-in/consented |
-| Change roles | Owner/Admin with escalation | — | — | — | — |
+**Enforcement:** the Spring backend checks, on every request, the academy (always from the verified token) + the role
+(read from the database, never from the token) + record ownership for students. `SecurityConfig` sends every staff route
+through one `hasRole("STAFF")` rule; services repeat the check (`CurrentAccount.requireStaff()`) and bind every query to
+the caller's academy, so records of another academy answer 404.
+
+| Capability | Staff | Student (self) |
+| --- | --- | --- |
+| Courses, batches, students, enrollments, imports, invitations | Every record of their academy | — (403) |
+| Classes, rosters, expected students, attendance, corrections, exports, reports, batch totals | Every class and batch of their academy | Own classes and own records only |
+| Attendance rule, finalisation, recalculation, appeals | Yes | Appeal own record |
+| Zoom: webinar monitoring, occurrences, participants, receipts, reports | Yes | — |
+| Engagement switch, pulse questions, rankings | Yes | Own consent, reactions and answers (enrolled class only) |
+| Student erasure | Yes (student number typed again, reason, audited) | — |
+| Staff accounts: list, add (email only), invite, disable, re-enable | Yes, except disabling themselves | — |
+| Activity log | Yes | — |
+
+**Guards kept:** nobody disables their own account; the academy always keeps at least one active staff account (staff
+administration locks the academy row and re-reads the caller, so two staff disabling each other at once leave one).
+Students are never managed through staff routes; staff routes return 404 for a student account. Every change is
+audited (actor, action, target id; no email or token). A former role name in any request or token grants nothing.
+
+**Accepted risk (owner):** every staff member has full staff access, including disabling colleagues, erasing a student's
+data and changing the attendance rule. The audit log records who did what.
+
+**Negative acceptance examples:** student A cannot request student B's record by guessing an ID; a student gets 403 on
+every staff route; staff of one academy cannot read or change another academy's records (404); guest or unregistered
+Zoom users are not counted as students; a student in two batches sees only classes of their enrollments.
+
+## History (superseded by the two-role model)
+
+The notes below describe the role model before 2026-11-20 and are kept for the record.
 
 **As built (002A):** only the first two "Admin" capabilities for courses and batches exist. Owner and Admin may list, read, create and update courses and batches of their own academy through any live session (the MFA-session requirement of 001F was removed on 2026-11-20). Instructor, Attendance Officer, Analyst and Student are refused on all of those routes until staff assignments and enrollments (002B) give them scoped access. The academy is always taken from the verified token.
 
