@@ -162,9 +162,21 @@ test.describe("Staff home", () => {
 
     // The month calendar marks today and its classes; choosing a day shows it in the list.
     const calendar = page.getByRole("region", { name: /^[A-Z][a-z]+ \d{4}$/ });
-    await expect(calendar.getByRole("link", { name: /, today: \d+ class/ })).toBeVisible();
-    await calendar.getByRole("link", { name: new RegExp(`^${new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", weekday: "long", day: "numeric", month: "long", year: "numeric" })
-      .format(new Date(later + 24 * 3600_000)).replace(",", "")}`) }).click();
+    const todayLink = calendar.getByRole("link", { name: /, today: \d+ class/ });
+    const clock = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+    expect((await todayLink.getAttribute("title"))?.split("\n")).toContain(`${clock.format(later)}–${clock.format(later + 3600_000)} · ${long}`);
+    const tomorrowStart = later + 24 * 3600_000;
+    const tomorrowLink = calendar.getByRole("link", { name: new RegExp(`^${new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      .format(new Date(tomorrowStart)).replace(",", "")}: \\d+ class`) });
+    expect((await tomorrowLink.getAttribute("title"))?.split("\n")).toContain(`${clock.format(tomorrowStart)}–${clock.format(tomorrowStart + 3600_000)} · Theory ${p}`);
+    const compactTimes = tomorrowLink.locator("..").locator(".cal-compact-times");
+    if (test.info().project.name === "mobile") {
+      await expect(compactTimes).toBeHidden();
+      await expect(tomorrowLink.locator("..").locator(".cal-count")).toBeVisible();
+    } else {
+      await expect(compactTimes.getByText(clock.format(tomorrowStart), { exact: true })).toBeVisible();
+    }
+    await tomorrowLink.click();
     await expect(page).toHaveURL(/#day-schedule$/);
     await expect(page.getByRole("region", { name: /^Classes on Tomorrow/ })).toBeVisible();
     await calendar.getByRole("link", { name: "Next month" }).click();

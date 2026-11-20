@@ -193,14 +193,22 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
             <div className="cal-grid">
               {monthWeeks(month).flat().map(cell => {
                 const entries = calendarDays.get(cell.date) ?? [];
+                const preview = entries.map(entry => `${timeRange(entry)} · ${entry.title}`).join("\n");
                 const classes = ["cal-day", cell.inMonth ? "" : "cal-out", cell.date === today ? "cal-today" : "",
                   cell.date === day ? "cal-selected" : ""].filter(Boolean).join(" ");
                 return <div key={cell.date} className={classes}>
                   <Link className="cal-date" href={`${href({ day: cell.date })}#day-schedule`} aria-current={cell.date === day ? "date" : undefined}
+                    title={preview || undefined}
                     aria-label={`${longDayLabel(cell.date)}${cell.date === today ? ", today" : ""}: ${entries.length ? `${entries.length} class${entries.length === 1 ? "" : "es"}` : "no classes"}`}>
                     {Number(cell.date.slice(8))}
                   </Link>
                   {entries.length > 0 && <span className="cal-count" aria-hidden="true">{entries.length}</span>}
+                  {entries.length > 0 && <span className="cal-compact-times" aria-hidden="true">
+                    {entries.slice(0, 2).map(entry => <time key={entry.key} dateTime={entry.startsAt}>
+                      {instantParts(entry.startsAt, entry.timeZone).time}
+                    </time>)}
+                    {entries.length > 2 && <span>+{entries.length - 2}</span>}
+                  </span>}
                   <ul className="cal-entries">
                     {entries.slice(0, 2).map(entry => <li key={entry.key}>
                       <Link href={entry.href} className={`cal-entry cal-entry-${entry.state} cal-entry-${entry.source}`}>

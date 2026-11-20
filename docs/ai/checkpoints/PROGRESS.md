@@ -2480,3 +2480,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Today’s schedule and the last-five attendance chart stack on the left at desktop widths, with the calendar on the right. The two columns align at the bottom. Narrow screens use one column, and the live chart moves below the figures when space is limited.
 - Passed 79 frontend unit tests, TypeScript, targeted lint, the structure check, and an isolated production build. Six Staff Home cases passed in desktop Edge and Pixel 7 emulation with the mock API, including an observed count change from 12 to 17 after resuming refresh and the two-column alignment. Two focused browser checks verified the final live row width. Reviewed desktop and mobile screenshots. The local API reported UP and sign-in returned 200. A signed-in Supabase webinar was not tested.
 - Frontend-only change. Revert the commit to roll back. No database migration is needed.
+
+## Staff Home calendar class previews (2026-11-20)
+
+- Date links show a hover preview with each scheduled class title and time range. Medium-width calendar cells show the first two class start times and an overflow count. Narrow cells keep the number of classes, and wide cells keep their class links. Selecting the date still opens that day’s schedule.
+- TypeScript, targeted lint, the structure check, and two targeted Staff Home Playwright cases passed with the mock API on desktop Edge and Pixel 7 emulation. The local API reported UP. The signed-in Supabase calendar was not verified.
+- Frontend-only change. Revert the commit to roll back. No migration or schedule data changes.
