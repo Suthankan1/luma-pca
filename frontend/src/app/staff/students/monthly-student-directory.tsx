@@ -35,24 +35,6 @@ export function MonthlyStudentDirectory({ students, classTypes, month, attendanc
 
   return <>
     <section className="panel">
-      <div className="class-student-tools student-month-tools">
-        <label>Search students
-          <input type="search" value={search} maxLength={100} placeholder="Name or registration ID" onChange={event => setSearch(event.target.value)} />
-        </label>
-        <label>Class type
-          <select value={type} onChange={event => setType(event.target.value)}>
-            <option value="">All class types</option>
-            {classTypes.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
-          </select>
-        </label>
-        <label>Sort by
-          <select value={sort} onChange={event => setSort(event.target.value)}>
-            <option value="name">Name A–Z</option>
-            <option value="low">Attendance low to high</option>
-            <option value="high">Attendance high to low</option>
-          </select>
-        </label>
-      </div>
       <div className="student-month-average" aria-live="polite">
         <div><span>Overall average attendance</span><strong>{rateLabel(average)}</strong></div>
         <p>{rows.length} {rows.length === 1 ? "student" : "students"} · {scored.length} with attendance data</p>
@@ -78,6 +60,24 @@ export function MonthlyStudentDirectory({ students, classTypes, month, attendanc
     </figure>
     <section className="panel panel-gap" aria-labelledby="student-month-directory">
       <h2 id="student-month-directory" className="panel-title">Student directory</h2>
+      <div className="class-student-tools student-month-tools">
+        <label>Search students
+          <input type="search" value={search} maxLength={100} placeholder="Name or registration ID" onChange={event => setSearch(event.target.value)} />
+        </label>
+        <label>Class type
+          <select value={type} onChange={event => setType(event.target.value)}>
+            <option value="">All class types</option>
+            {classTypes.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+          </select>
+        </label>
+        <label>Sort by
+          <select value={sort} onChange={event => setSort(event.target.value)}>
+            <option value="name">Name A–Z</option>
+            <option value="low">Attendance low to high</option>
+            <option value="high">Attendance high to low</option>
+          </select>
+        </label>
+      </div>
       <div className="student-month-list" tabIndex={0} role="region" aria-label="Scrollable student directory">
         {rows.length ? <ul className="dir-list">
           {rows.map(row => <li key={row.id} className="student-month-row">

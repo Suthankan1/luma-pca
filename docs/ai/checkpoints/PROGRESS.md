@@ -2683,3 +2683,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Student details group completed expected sessions by class type and show connected time and final outcomes. Pending and unavailable records are identified separately. The rate is the share of tracked expected sessions the student joined. Returning to the directory retains the month and filters. Capped attendance reports are read in smaller date ranges rather than showing partial totals.
 - Passed 79 unit tests, TypeScript, full frontend lint, and the structure check. The new flow passed two focused desktop/mobile mock checks with 208 student records, including pagination, search, chart labels, averages, sorting, drill-down and return. All 18 existing attendance, student and navigation browser checks in the regression run passed. Live API readiness and staff sign-in redirects passed. Signed-in original data and the full real-stack suite were not verified.
 - Student management, invitations, and import remain available separately. The monthly routes call the existing staff APIs and require no migration. Revert this commit to roll back.
+
+## Student directory filter placement (2026-11-21)
+
+- Search, class type, and sort controls sit above the scrolling list inside Student directory. Their selection drives the directory, bar chart, and overall average.
+- TypeScript, targeted ESLint, and the structure check passed. Desktop and mobile mock browser checks verified the controls inside the directory and their effect on attendance. Signed-in verification with original data was not run.
+- Frontend-only layout change. Revert this commit to roll back.

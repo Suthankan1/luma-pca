@@ -675,9 +675,8 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .classes-chart-value { position:absolute; inset-inline:0; top:4px; width:max-content; margin-inline:auto; padding:0 3px; border-radius:4px; background:#f7fbff; color:#17365b; font-size:10px; font-weight:700; }
 .classes-chart-label { display:block; margin-top:4px; overflow:hidden; color:#425972; font-size:10px; white-space:nowrap; text-overflow:ellipsis; }
 .class-attendance-percent { color:#116d70; font-variant-numeric:tabular-nums; }
-.student-month-tools { margin-top:0; }
 .student-month-tools label:first-child { flex-grow:2; }
-.student-month-average { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:8px 16px; margin-top:18px; }
+.student-month-average { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:8px 16px; }
 .student-month-average span { display:block; font-size:13px; color:var(--ink-2); }
 .student-month-average strong, .student-month-summary strong { display:block; color:#116d70; font-size:clamp(24px,4vw,36px); font-variant-numeric:tabular-nums; }
 .student-month-average p { color:var(--ink-3); font-size:12px; }
