@@ -29,6 +29,7 @@ export const options = {
     "http_req_duration{name:students}": ["p(95)<1000"],
     "http_req_duration{name:reports}": ["p(95)<1000"],
     "http_req_duration{name:refresh}": ["p(95)<1000"],
+    http_req_failed: ["rate<0.001"],
     checks: ["rate>0.999"],
   },
   summaryTrendStats: ["count", "avg", "p(50)", "p(95)", "p(99)", "max"],
@@ -73,7 +74,8 @@ export default function () {
       check(refreshed, { "session refreshed": r => r.status === 303 && /\/staff$/.test(r.headers.Location || "") });
       page = http.get(`${BASE}${path}`, { headers, redirects: 0, tags: { name } });
     }
-    const ok = check(page, { [`${name} loads`]: r => r.status === 200 && r.body.includes(marker) });
+    const ok = check(page, { [`${name} loads`]: r => r.status === 200 && r.body.includes(marker)
+      && !/attendance couldn.t load/i.test(r.body) });
     if (!ok && reported++ < 3) console.warn(`${name}: status ${page.status} location ${page.headers.Location || "-"} ${page.error || ""}`.trim());
     if (page.status !== 200) signedIn = false;
     sleep(2 + Math.random() * 3);

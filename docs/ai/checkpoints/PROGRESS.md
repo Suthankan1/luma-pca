@@ -2761,3 +2761,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Silent renewal leaves one current identity check in the protected render. Backend permission, role and revocation checks remain in the request path. Browser cache settings stay at their previous lifetimes.
 - The first full Maven suite detected that Spring MVC body debugging could print sensitive request or response fields when debug was enabled. Kept MVC body-processor logs at INFO. All 403 Maven tests passed on rerun with the same environment. The Next HTTP session smoke passed and asserted one identity call during renewal. Two browser projects verified private no-store behavior, logout and switching to a student account.
 - No migration or credentials change for this slice. The benchmark recorded `/auth/me` at p95 58 ms. Revert without re-enabling MVC request-body debug logging.
+
+## Staff performance regression gates (2026-11-21)
+
+- The pull-request load workflow runs the synthetic signed-in staff scenario with warmed projections. Frontend checks include the signed-in Lighthouse budgets. The Lighthouse harness uses loopback mock data and a temporary tool install. No student data or browser logs are uploaded by the Lighthouse harness.
+- The exact targeted k6 scenario passed all 60 checks with zero failures. The local Edge Lighthouse run passed all nine route and metric assertions using the median of three runs per route. The [performance checklist](../../testing/STAFF-PERFORMANCE.md) records numbers, budgets, the hosted verification gate and rollback.
+- GitHub workflows have yet to run remotely. No hosted metrics, database settings, or deployments were changed. Revert the workflow and harness commit to remove the new gates.

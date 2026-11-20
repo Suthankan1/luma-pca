@@ -57,6 +57,8 @@ psql_q() { docker exec -i $PG psql -At -q -U luma -d luma -v ON_ERROR_STOP=1 "$@
 export DB_URL=jdbc:postgresql://localhost:55434/luma DB_USERNAME=luma DB_PASSWORD=$DBPASS LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true
 export LUMA_ACADEMY_PAYMENTS_ENABLED=false LUMA_MAIL_ENABLED=false
 export LUMA_ZOOM_API_ACCOUNT_ID= LUMA_ZOOM_API_CLIENT_ID= LUMA_ZOOM_API_CLIENT_SECRET=
+export LUMA_ATTENDANCE_PROJECTION_ENABLED=${LUMA_LOAD_PROJECTION:-false}
+export LUMA_ATTENDANCE_PROJECTION_INITIAL_DELAY=PT2S LUMA_ATTENDANCE_PROJECTION_INTERVAL=PT2S
 # Run Java outside the checkout so the app cannot import a developer's database or Zoom settings from .env.
 cd "$S"
 
@@ -132,6 +134,12 @@ BATCH_IDS=$(psql_q -c "SELECT string_agg(id::text, ',') FROM batches")
 SESSION_ID=$(psql_q -c "SELECT id FROM class_sessions WHERE zoom_webinar_id = '81234567891' ORDER BY starts_at LIMIT 1")
 MONTH=$(psql_q -c "SELECT to_char(min(starts_at) AT TIME ZONE 'Asia/Colombo', 'YYYY-MM') FROM class_sessions WHERE zoom_webinar_id = '81234567891'")
 echo "students=$(psql_q -c 'SELECT count(*) FROM students') enrollments=$(psql_q -c 'SELECT count(*) FROM enrollments')"
+if [ "$LUMA_ATTENDANCE_PROJECTION_ENABLED" = true ]; then
+  projected() { psql_q -c 'SELECT count(*) FROM attendance_projection_jobs WHERE published_revision = source_revision'; }
+  for i in $(seq 1 60); do [ "$(projected)" = 28 ] && break; sleep 1; done
+  [ "$(projected)" = 28 ] || { echo "Completed attendance projection did not finish warming"; exit 1; }
+  echo "--- 28 completed attendance projections ready"
+fi
 
 cd "$ROOT/frontend"
 LUMA_TRUSTED_PROXY_HOPS=1 LUMA_WEB_ORIGIN=$ORIGIN LUMA_SESSION_KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=') \

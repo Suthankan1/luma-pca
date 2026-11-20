@@ -20,7 +20,8 @@ class AttendanceProjectionSchedule {
         this.attendance = attendance;
     }
 
-    @Scheduled(fixedDelayString = "PT15S", initialDelayString = "PT1M")
+    @Scheduled(fixedDelayString = "${luma.attendance.projection.interval:PT15S}",
+            initialDelayString = "${luma.attendance.projection.initial-delay:PT1M}")
     void rebuild() {
         for (var job : store.claim(8)) {
             try {

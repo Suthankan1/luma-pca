@@ -13,7 +13,7 @@ Progress is the number of verified local items divided by the ten local items be
 | 7 | Poll live data independently of the page and preserve timeline recovery and completion. | Pending |
 | 8 | Load Reports options on demand and verify all export types. | Verified |
 | 9 | Measure auth overhead and verify any auth or cache changes against logout and account switching. | Verified |
-| 10 | Automate regression checks, repeat the baseline and document release and rollback. | Pending |
+| 10 | Automate regression checks, repeat the baseline and document release and rollback. | Verified locally |
 
 ## Measurement
 
@@ -75,3 +75,5 @@ The final local `/auth/me` p95 was 58 ms. Silent renewal now avoids a duplicate 
 5. If data or latency deviates, set the flag to `false` and recycle the canary. Existing source-backed behavior resumes immediately on the replacement process. Leave V31 in place for an application rollback and verify the same representative session totals again.
 
 The browser smoke reads the mock backend. It budgets median desktop LCP, CLS and total blocking time over three runs per page. Record real-user LCP, CLS and INP separately during the hosted pilot. Keep protected responses private and no-store, and use aggregate telemetry without student identifiers.
+
+The local signed-in Lighthouse checks passed on Edge. Median LCP was 123 ms for Classes, 171 ms for Class Types and 175 ms for Students. Median CLS and total blocking time were zero on all three mock routes. These lab samples cover the mock browser setup. The GitHub workflow definition was validated locally and has yet to run on GitHub.

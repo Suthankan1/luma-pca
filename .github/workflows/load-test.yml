@@ -1,7 +1,13 @@
 name: Load test (local baseline)
-# Manual only: runs scripts/load-test-local.sh on one GitHub runner. A baseline for the
-# scripts and for regressions, never capacity evidence (see docs/testing/LOAD-TEST-PLAN.md).
+# Synthetic regression measurements on one GitHub runner.
 on:
+  pull_request:
+    paths:
+      - 'backend/src/**'
+      - 'frontend/src/**'
+      - 'load-tests/**'
+      - 'scripts/load-test-local.sh'
+      - '.github/workflows/load-test.yml'
   workflow_dispatch:
     inputs:
       students:
@@ -33,6 +39,9 @@ jobs:
         run: npm --prefix frontend ci --no-audit --no-fund && npm --prefix frontend run build
       - name: Load test
         env:
-          STUDENTS: ${{ inputs.students }}
-          SCENARIOS: ${{ inputs.scenarios }}
+          STUDENTS: ${{ inputs.students || '150' }}
+          SCENARIOS: ${{ inputs.scenarios || 'staff' }}
+          STAFF: ${{ github.event_name == 'pull_request' && '4' || '20' }}
+          STAFF_DURATION_S: ${{ github.event_name == 'pull_request' && '55' || '' }}
+          LUMA_LOAD_PROJECTION: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
         run: bash scripts/load-test-local.sh
