@@ -88,3 +88,18 @@ test("home links leave out what would only repeat today", () => {
   assert.equal(homeHref({ day: "2026-11-21", month: "2026-11" }, "2026-11-20"), "/staff?day=2026-11-21");
   assert.equal(homeHref({ day: "2026-11-20", month: "2026-12" }, "2026-11-20"), "/staff?month=2026-12");
 });
+
+test("the month's attendance bars: classes held so far, share of expected who joined, and the average", async () => {
+  const { heldRange, monthBars, shortDayLabel } = await import("../src/lib/staff-home.ts");
+  assert.deepEqual(heldRange("2026-11", "2026-11-20"), { from: "2026-11-01", to: "2026-11-20" });
+  assert.deepEqual(heldRange("2026-10", "2026-11-20"), { from: "2026-10-01", to: "2026-10-31" });
+  assert.equal(heldRange("2026-12", "2026-11-20"), null);
+  const c = (id, startsAt, expected, joined) => ({ id, title: id, startsAt, timeZone: "Asia/Colombo", expected, joined });
+  const { bars, average, withoutStudents } = monthBars([c("b", "2026-11-12T12:30:00Z", 20, 15), c("a", "2026-11-05T12:30:00Z", 24, 18),
+    c("x", "2026-11-06T12:30:00Z", 0, 3), c("d", "2026-11-19T19:00:00Z", 10, 12)]);
+  assert.deepEqual(bars.map(b => [b.id, b.percent, b.day]), [["a", 75, "2026-11-05"], ["b", 75, "2026-11-12"], ["d", 100, "2026-11-20"]]);
+  assert.equal(average, 83);
+  assert.equal(withoutStudents, 1);
+  assert.equal(monthBars([]).average, null);
+  assert.equal(shortDayLabel("2026-11-20"), "Fri 20 Nov");
+});

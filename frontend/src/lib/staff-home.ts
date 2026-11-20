@@ -194,3 +194,34 @@ export function homeHref(options: { day?: string | null; month?: string | null }
   const query = params.toString();
   return `/staff${query ? `?${query}` : ""}`;
 }
+
+/** The days of a month that have already started at the academy: the attendance dashboard's range, or null for a future month. */
+export function heldRange(month: string, today: string) {
+  const first = `${month}-01`;
+  if (first > today) return null;
+  const last = addDays(`${shiftMonth(month, 1)}-01`, -1);
+  return { from: first, to: last < today ? last : today };
+}
+
+export type ClassBar = { id: string; title: string; day: string; startsAt: string; timeZone: string; expected: number; joined: number;
+  percent: number };
+
+/**
+ * One bar per class held in the month, in time order: the share of expected students who joined. Classes with nobody
+ * expected (not linked to a batch) have no attendance to show and are counted apart. The average weighs every class equally.
+ */
+export function monthBars(classes: readonly { id: string; title: string; startsAt: string; timeZone: string; expected: number;
+                            joined: number }[]) {
+  const bars: ClassBar[] = classes.filter(c => c.expected > 0)
+    .map(c => ({ id: c.id, title: c.title, day: instantParts(c.startsAt, c.timeZone).date, startsAt: c.startsAt, timeZone: c.timeZone,
+      expected: c.expected, joined: c.joined, percent: Math.round((Math.min(c.joined, c.expected) * 100) / c.expected) }))
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  const average = bars.length ? Math.round(bars.reduce((sum, bar) => sum + bar.percent, 0) / bars.length) : null;
+  return { bars, average, withoutStudents: classes.length - bars.length };
+}
+
+/** "Fri 20 Nov". */
+export function shortDayLabel(day: string) {
+  const [, m, d] = day.split("-").map(Number);
+  return `${weekdayNames[weekdayIndex(day)].slice(0, 3)} ${d} ${monthNames[m - 1].slice(0, 3)}`;
+}

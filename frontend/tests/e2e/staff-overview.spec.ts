@@ -27,7 +27,7 @@ test.describe("Staff home", () => {
     await signInStaff(page, "admin-enrolled@example.invalid");
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("region", { name: /^Classes on Today/ })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Needs attention" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Needs attention" })).toHaveCount(0);
 
     // A long-titled class later today and one tomorrow.
     const course = await api(page, "POST", "/api/v1/courses", { code: `HOME-${p}`, title: "Home page course" });
@@ -42,6 +42,8 @@ test.describe("Staff home", () => {
     const day = page.getByRole("region", { name: /^Classes on Today/ });
     const row = day.getByRole("link", { name: new RegExp(long.replace(/[|]/g, "\\|")) });
     await expect(row).toBeVisible();
+    // A long title never widens the page, on any screen.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
     // One line; on a pointer device the full title shows on hover, and Escape hides it again.
     const box = await row.locator(".one-line-text").boundingBox();
     expect(box!.height).toBeLessThan(30);
@@ -54,14 +56,14 @@ test.describe("Staff home", () => {
     }
 
     // The top card shows what is live, or the next class when nothing is (another test may have started a live webinar).
-    await expect(page.getByRole("region", { name: "Live now" }).or(page.getByText("No class is live right now"))).toBeVisible();
+    await expect(page.getByRole("region", { name: "Live now" }).or(page.getByText(/^(Next class|No class is live right now)$/))).toBeVisible();
 
     // Next and previous day.
     await day.getByRole("link", { name: "Next day" }).click();
     await expect(page).toHaveURL(new RegExp(`day=${colomboDate(later + 24 * 3600_000)}`));
     const tomorrow = page.getByRole("region", { name: /^Classes on Tomorrow/ });
     await expect(tomorrow.getByRole("link", { name: new RegExp(`Theory ${p}`) })).toBeVisible();
-    await tomorrow.getByRole("link", { name: "Today" }).click();
+    await tomorrow.getByRole("link", { name: "Back to today" }).click();
     await expect(page).toHaveURL(/\/staff$/);
 
     // The month calendar marks today and its classes; choosing a day shows it in the list.
@@ -72,7 +74,18 @@ test.describe("Staff home", () => {
     await expect(page.getByRole("region", { name: /^Classes on Tomorrow/ })).toBeVisible();
     await calendar.getByRole("link", { name: "Next month" }).click();
     await expect(page).toHaveURL(/month=\d{4}-\d{2}/);
-    await page.getByRole("link", { name: "This month" }).click();
+    await page.getByRole("link", { name: "Back to this month" }).click();
+
+    // This month's attendance: one column per class held, the average, and the same values as a table.
+    const chart = page.getByRole("region", { name: /^Attendance in / });
+    await expect(chart).toBeVisible();
+    const columns = chart.locator(".bars-bar");
+    if (await columns.count() > 0) {
+      await expect(chart.getByText(/^Avg \d+%$/)).toBeVisible();
+      await expect(columns.first()).toHaveAttribute("aria-label", /: \d+%, \d+ of \d+ joined$/);
+      await chart.getByText("Show as table").click();
+      await expect(chart.getByRole("table")).toBeVisible();
+    }
 
     // A webinar Zoom reports live: its numbers replace the next-class card.
     await api(page, "POST", "/api/v1/zoom/monitors", { webinar: "84400000001" });

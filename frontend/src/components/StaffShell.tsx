@@ -1,5 +1,9 @@
 import Link from "next/link";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { LinkPending } from "./LinkPending";
+
+/** The staff portal's typeface, served from this site (no request to Google from the browser). */
+const staffFont = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap", variable: "--font-staff" });
 import { AcademyBrand } from "./AcademyBrand";
 import type { ReactNode } from "react";
 
@@ -45,7 +49,7 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, a
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  return <div className={active === "overview" ? "shell staff-home-shell" : "shell"}>
+  return <div className={`shell staff-shell ${staffFont.variable}${active === "overview" ? " staff-home-shell" : ""}`}>
     <aside className="aside staff-rail" aria-label="Staff navigation">
       <AcademyBrand href="/staff" />
       <nav className="staff-nav">
