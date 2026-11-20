@@ -2493,3 +2493,11 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The timeline starts at class start and shows the scheduled end when known. For an open-ended class it extends to the latest observation, labeled to the second. The chart retains observations from the current page for the run, bounded to 1,441 points. Time before the first observation stays empty.
 - Passed 79 frontend unit tests, TypeScript, targeted lint, the structure check, an isolated production build, and the live chart Playwright case in desktop Edge and Pixel 7 emulation with the mock API. A focused check verified the actual axis boundary for a run that started only seconds earlier. The local API reported UP and sign-in returned 200. A signed-in Supabase webinar was not tested.
 - Frontend-only change. Revert the commit to roll back. No database migration is needed.
+
+## Staff Home current-time chart and compact calendar times (2026-11-20)
+
+- The live chart now runs from class start to the latest refresh time, labeled `Now` to the second. If a count is unavailable, the time axis still advances and the chart ends at the last observed count. Existing scaling and reduced-motion behavior apply.
+- Compact calendar cells now show up to two actual class start times at all widths and an overflow count when needed. Hovering the date displays the names and times. Selecting it still opens the day schedule. Wide calendar cells keep their class links.
+- Passed 79 frontend unit tests, TypeScript, targeted lint, the structure check, an isolated production build, and four targeted Staff Home Playwright cases in desktop Edge and Pixel 7 emulation against the mock API. The cases cover both current-time axes, the refresh animation, compact start times, hover preview text, and date navigation. Layout measurements use reduced motion so they check the settled card positions.
+- Restarted the local frontend and the API with the original Supabase connection. API readiness returned UP and the sign-in page returned HTTP 200. The signed-in Supabase dashboard was not verified.
+- Frontend-only change. Revert the commit to roll back. No migration or schedule data changes.

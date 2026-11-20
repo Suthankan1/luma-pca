@@ -202,7 +202,6 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
                     aria-label={`${longDayLabel(cell.date)}${cell.date === today ? ", today" : ""}: ${entries.length ? `${entries.length} class${entries.length === 1 ? "" : "es"}` : "no classes"}`}>
                     {Number(cell.date.slice(8))}
                   </Link>
-                  {entries.length > 0 && <span className="cal-count" aria-hidden="true">{entries.length}</span>}
                   {entries.length > 0 && <span className="cal-compact-times" aria-hidden="true">
                     {entries.slice(0, 2).map(entry => <time key={entry.key} dateTime={entry.startsAt}>
                       {instantParts(entry.startsAt, entry.timeZone).time}
@@ -296,7 +295,7 @@ function LiveRow({ entry, numbers, now, sampledAt }: { entry: DayEntry; numbers:
     </dl> : <p className="live-row-note">Live numbers couldn’t load.</p>}
     {entry.sessionId && <div className="live-online-slot">
       <LiveOnlineChart sessionId={entry.sessionId} connectedNow={numbers?.connectedNow ?? null} sampledAt={sampledAt}
-        startsAt={entry.startsAt} endsAt={entry.endsAt} />
+        startsAt={entry.startsAt} />
     </div>}
   </article>;
 }

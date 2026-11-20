@@ -24,6 +24,7 @@ type CompletedClass = { id: string; title: string; endsAt: string; timeZone: str
 
 test.describe("Staff home", () => {
   test("Managers see the day's classes, move between days, the month calendar and live numbers; other roles see their own", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     const p = test.info().project.name.toUpperCase();
     await signInStaff(page, "admin-enrolled@example.invalid");
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
@@ -169,12 +170,17 @@ test.describe("Staff home", () => {
     const tomorrowLink = calendar.getByRole("link", { name: new RegExp(`^${new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", weekday: "long", day: "numeric", month: "long", year: "numeric" })
       .format(new Date(tomorrowStart)).replace(",", "")}: \\d+ class`) });
     expect((await tomorrowLink.getAttribute("title"))?.split("\n")).toContain(`${clock.format(tomorrowStart)}–${clock.format(tomorrowStart + 3600_000)} · Theory ${p}`);
-    const compactTimes = tomorrowLink.locator("..").locator(".cal-compact-times");
-    if (test.info().project.name === "mobile") {
+    const cell = tomorrowLink.locator("..");
+    const compactTimes = cell.locator(".cal-compact-times");
+    const tomorrowTime = compactTimes.getByText(clock.format(tomorrowStart), { exact: true });
+    await expect(tomorrowTime).toBeVisible();
+    await expect(tomorrowTime).toHaveAttribute("datetime", new Date(tomorrowStart).toISOString());
+    if (test.info().project.name === "chromium") {
+      const viewport = page.viewportSize()!;
+      await page.setViewportSize({ width: 900, height: viewport.height });
       await expect(compactTimes).toBeHidden();
-      await expect(tomorrowLink.locator("..").locator(".cal-count")).toBeVisible();
-    } else {
-      await expect(compactTimes.getByText(clock.format(tomorrowStart), { exact: true })).toBeVisible();
+      await expect(cell.getByRole("link", { name: `${clock.format(tomorrowStart)} Theory ${p}` })).toBeVisible();
+      await page.setViewportSize(viewport);
     }
     await tomorrowLink.click();
     await expect(page).toHaveURL(/#day-schedule$/);
@@ -233,14 +239,19 @@ test.describe("Staff home", () => {
     await expect(newestSegment).toHaveCount(0);
     const zoomBounds = figure.locator("time");
     await expect(zoomBounds.first()).toHaveAttribute("datetime", run.actualStartedAt);
-    const latestObservedAt = Date.parse((await zoomBounds.last().getAttribute("datetime"))!);
+    await expect(zoomBounds.first().locator("..")).toHaveText(/^Start /);
+    await expect(zoomBounds.last().locator("..")).toHaveText(/^Now /);
+    const sampledAt = (await zoomBounds.last().getAttribute("datetime"))!;
+    const latestObservedAt = Date.parse(sampledAt);
     expect(latestObservedAt).toBeGreaterThan(Date.parse(run.actualStartedAt));
     expect(latestObservedAt).toBeLessThanOrEqual(Date.now());
 
     const scheduledBounds = live.getByRole("article", { name: "In progress: Scheduled live class" })
       .getByRole("figure", { name: "Online over time" }).locator("time");
     await expect(scheduledBounds.first()).toHaveAttribute("datetime", startsAt);
-    await expect(scheduledBounds.last()).toHaveAttribute("datetime", endsAt);
+    await expect(scheduledBounds.last().locator("..")).toHaveText(/^Now /);
+    await expect(scheduledBounds.last()).toHaveAttribute("datetime", sampledAt);
+    expect(latestObservedAt).toBeLessThan(Date.parse(endsAt));
     const articleBox = (await article.boundingBox())!;
     const innerWidth = await live.evaluate(el => {
       const style = getComputedStyle(el);
@@ -264,6 +275,7 @@ test.describe("Staff home", () => {
       await expect(pause).toBeVisible();
       await page.clock.fastForward(31_000);
       await expect(chart).toHaveAccessibleName(/2 observations · 12 online at .* · 17 online at /);
+      expect(Date.parse((await zoomBounds.last().getAttribute("datetime"))!)).toBeGreaterThan(latestObservedAt);
       await expect(chart.locator("text")).toHaveText(["19", "10"]);
       await expect(chart.locator("circle")).toHaveCount(2);
       await expect(newestSegment).toHaveAttribute("pathLength", "1");

@@ -19,12 +19,11 @@ const LINE = { fill: "none", stroke: "#116d70", strokeWidth: 2, strokeLinecap: "
   vectorEffect: "non-scaling-stroke" } as const;
 
 /** Chart the counts observed by this tab as the live page refreshes. */
-export function LiveOnlineChart({ sessionId, connectedNow, sampledAt, startsAt, endsAt }: {
+export function LiveOnlineChart({ sessionId, connectedNow, sampledAt, startsAt }: {
   sessionId: string;
   connectedNow: number | null;
   sampledAt: number;
   startsAt: string;
-  endsAt: string | null;
 }) {
   const labelId = useId();
   const incoming = connectedNow === null ? [] : [{ at: sampledAt, online: connectedNow }];
@@ -45,17 +44,17 @@ export function LiveOnlineChart({ sessionId, connectedNow, sampledAt, startsAt, 
 
   return <figure className="live-online-chart w-full min-w-0 max-w-[320px] text-[var(--ink-3)]" aria-labelledby={labelId}>
     <figcaption id={labelId} className="text-xs font-semibold text-[var(--ink-2)]">Online over time</figcaption>
-    {latest ? <OnlinePlot observations={observations} animateAt={animateAt} startsAt={startsAt} endsAt={endsAt} />
+    {latest ? <OnlinePlot observations={observations} animateAt={animateAt} startsAt={startsAt} sampledAt={sampledAt} />
       : <p className="text-xs">No online counts available yet.</p>}
     {latest && connectedNow === null && <p className="mt-1 text-xs">Current count unavailable. Showing the last observations.</p>}
   </figure>;
 }
 
-function OnlinePlot({ observations, animateAt, startsAt, endsAt }: {
+function OnlinePlot({ observations, animateAt, startsAt, sampledAt }: {
   observations: Observation[];
   animateAt: number | null;
   startsAt: string;
-  endsAt: string | null;
+  sampledAt: number;
 }) {
   const scaleId = useId();
   const first = observations[0];
@@ -71,13 +70,10 @@ function OnlinePlot({ observations, animateAt, startsAt, endsAt }: {
 
   const started = Date.parse(startsAt);
   const start = Number.isFinite(started) ? started : first.at;
-  const scheduledEnd = endsAt ? Date.parse(endsAt) : NaN;
-  const hasScheduledEnd = scheduledEnd > start && scheduledEnd >= latest.at;
-  const end = hasScheduledEnd ? scheduledEnd : latest.at;
+  const end = Math.max(sampledAt, latest.at);
   const duration = Math.max(1, end - start);
   const axisClock = end - start < 60_000 ? TIME : AXIS_TIME;
-  const endLabel = hasScheduledEnd ? "Scheduled end" : "Latest";
-  const endTime = (hasScheduledEnd ? axisClock : TIME).format(end);
+  const endTime = TIME.format(end);
   const points = observations.map(point => ({
     at: point.at,
     x: (PLOT.left + (PLOT.right - PLOT.left) * Math.max(0, point.at - start) / duration).toFixed(2),
@@ -92,7 +88,7 @@ function OnlinePlot({ observations, animateAt, startsAt, endsAt }: {
 
   return <>
     <svg className="block h-auto w-full" viewBox="0 0 320 56" role="img" aria-label={description} aria-describedby={scaleId}>
-      <desc id={scaleId}>Online count scale from {floor} to {ceiling}. Class start at {axisClock.format(start)}. {endLabel} at {endTime}.</desc>
+      <desc id={scaleId}>Online count scale from {floor} to {ceiling}. Class start at {axisClock.format(start)}. Current time {endTime}.</desc>
       <path d={`M${PLOT.left} ${PLOT.top}H${PLOT.right} M${PLOT.left} ${PLOT.bottom}H${PLOT.right}`} stroke="#d6e4ec" fill="none" />
       <text x="23" y="13" textAnchor="end" className="fill-current text-[10px]">{ceiling}</text>
       <text x="23" y="53" textAnchor="end" className="fill-current text-[10px]">{floor}</text>
@@ -104,7 +100,7 @@ function OnlinePlot({ observations, animateAt, startsAt, endsAt }: {
     </svg>
     <div className="flex justify-between gap-2 pl-[9%] pr-[3%] text-[11px] tabular-nums" aria-hidden="true">
       <span>Start <time dateTime={new Date(start).toISOString()}>{axisClock.format(start)}</time></span>
-      <span>{endLabel} <time dateTime={new Date(end).toISOString()}>{endTime}</time></span>
+      <span>Now <time dateTime={new Date(end).toISOString()}>{endTime}</time></span>
     </div>
   </>;
 }
