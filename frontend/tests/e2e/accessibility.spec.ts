@@ -26,8 +26,7 @@ test("public pages have no serious accessibility problems", async ({ page }) => 
 test("staff pages have no serious accessibility problems", async ({ page }) => {
   await signInAsAdmin(page);
   for (const path of ["/staff", "/staff/courses", "/staff/sessions", "/staff/students", "/staff/attendance", "/staff/zoom",
-    "/staff/zoom/check", "/staff/activity", "/account/password", "/staff/dashboard",
-    "/staff/dashboard?view=grid", "/staff/dashboard?view=classes", "/staff/academy",
+    "/staff/zoom/check", "/staff/activity", "/account/password", "/staff/reports", "/staff/academy",
     "/staff/students/00000000-0000-4000-8000-0000000000b1/attendance"]) {
     await page.goto(path);
     await check(page, path);
@@ -41,6 +40,6 @@ test("student pages have no serious accessibility problems", async ({ page }) =>
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/student$/);
   await check(page, "/student");
-  await page.goto("/student/attendance");
-  await check(page, "/student/attendance");
+  await page.goto("/student/classes");
+  await check(page, "/student/classes");
 });

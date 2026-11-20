@@ -1,56 +1,52 @@
-import Link from "next/link";
 import { Shell } from "@/components/Shell";
-import { AttendanceOverview } from "@/components/insights/AttendanceOverview";
-import { RangeFilter } from "@/components/insights/RangeFilter";
+import { StudentAttendanceProfile } from "@/components/StudentAttendanceProfile";
+import { AppealForm } from "@/components/AppealForm";
 import { requirePortal } from "@/lib/auth-server";
-import { dateOrNull, presets, withParams, type StudentOverview } from "@/lib/insights";
+import { dateOrNull, renderTime, type StudentOverview } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
-import { academyToday, formatClassTime, formatDuration, outcomeLabels, type AttendanceRecordView } from "@/lib/staff-forms";
-import { AppealForm } from "@/components/AppealForm";
+import { academyToday, formatClassTime, formatDuration, outcomeLabels, instantParts, ACADEMY_TIME_ZONE,
+  type AttendanceRecordView } from "@/lib/staff-forms";
+import { classMonthRange, monthLabel } from "@/lib/staff-home";
+import { readAttendanceWindows } from "@/lib/student-month-api";
 
 export const metadata = { title: "My attendance · LUMA" };
 
-/** The student's own attendance: the API takes the student from the sign-in, so nobody else's can be shown here. */
 export default async function MyAttendancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const identity = await requirePortal("student");
   const query = await searchParams;
-  const today = academyToday();
-  const fallback = presets(today)[1];
-  let from = dateOrNull(query.from) ?? fallback.from;
-  let to = dateOrNull(query.to) ?? fallback.to;
-  if (from > to) [from, to] = [to, from];
-  const [result, records] = await Promise.all([
-    studentApi<StudentOverview>(withParams("/api/v1/me/attendance-overview", { from, to }) as `/api/v1/me/${string}`, undefined, 30000),
+  const now = renderTime();
+  const today = academyToday(new Date(now));
+  const range = classMonthRange(query.month, today, dateOrNull(query.from));
+  const [me, reports, records] = await Promise.all([
+    studentApi<{ fullName: string; studentNumber: string }>("/api/v1/me/student"),
+    readAttendanceWindows(range.first, range.through ?? range.last, (from, to) => studentApi<StudentOverview>(
+      `/api/v1/me/attendance-overview?${new URLSearchParams({ from, to })}`, undefined, 30000), data => data.classes.length >= 80),
     studentApi<AttendanceRecordView[]>("/api/v1/me/attendance"),
   ]);
+  const finalRecords = records.ok ? records.data.filter(record => {
+    const day = instantParts(record.classStartsAt, ACADEMY_TIME_ZONE).date;
+    return day >= range.first && day <= range.last;
+  }) : [];
   return <Shell active="student" studentSection="attendance" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
-    <p className="link-row"><Link className="text-link" href="/student">← Student portal</Link></p>
-    <h1 className="heading">My attendance</h1>
-    {result.ok && <p className="sub"><strong>{result.data.fullName}</strong> · student ID <strong>{result.data.studentNumber}</strong></p>}
-    <RangeFilter path="/student/attendance" from={from} to={to} today={today} />
-    {result.ok ? <AttendanceOverview overview={result.data} self />
-      : <p className="session-error" role="alert">We couldn’t load your attendance right now. Please reload the page shortly.</p>}
-    <section className="panel panel-gap" aria-labelledby="my-attendance-title">
-      <h2 id="my-attendance-title" className="panel-title">FINAL ATTENDANCE AND APPEALS</h2>
-      <p className="panel-sub">Your final attendance for each class, decided by the academy’s rule from Zoom’s report. If something looks
-        wrong, send an appeal and the academy will review it.</p>
-      {!records.ok ? <p className="session-error" role="alert">We couldn’t load your final attendance right now.</p>
-        : <ul className="dir-list">
-          {records.data.map((r, index) => <li key={r.id} className="dir-course my-attendance" aria-label={`Attendance ${r.classTitle}`}>
-            <div className="dir-row">
-              <div><strong>{r.classTitle}</strong>
-                <span className="dir-dates muted"> {formatClassTime(r.classStartsAt, r.classEndsAt, r.timeZone)}</span>
-                <div className="dir-dates muted">{formatDuration(r.connectedSeconds)} connected
-                  {r.appealStatus === "OPEN" ? " · appeal waiting for a decision" : r.appealStatus ? ` · appeal ${r.appealStatus.toLowerCase()}` : ""}</div></div>
-              <span className={`status ${r.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[r.outcome]}</span>
-            </div>
-            {r.appealStatus !== "OPEN" && <details className="decision"><summary>Appeal this</summary>
-              <AppealForm prefix={`appeal-${index}`} recordId={r.id} /></details>}
-          </li>)}
-          {records.data.length === 0 && <li className="dir-empty muted">No final attendance yet. Classes become final after Zoom’s report
-            and the academy’s check.</li>}
-        </ul>}
-    </section>
+    <header className="page-head"><div><p className="crumbs">Student portal / My attendance</p>
+      <h1 className="heading staff-heading">{me.ok ? me.data.fullName : "My attendance"}</h1>
+      <p className="sub page-sub">{me.ok ? `${me.data.studentNumber} · ` : ""}{monthLabel(range.month)}</p>
+    </div></header>
+    <StudentAttendanceProfile range={range} today={today} now={now} reports={reports} href="/student" />
+    {!records.ok && <p className="session-error panel-gap" role="alert">Attendance appeals couldn’t load.</p>}
+    {finalRecords.length > 0 && <details className="panel panel-gap profile-appeals">
+      <summary>Attendance appeals</summary>
+      <ul className="dir-list">{finalRecords.map((record, index) => <li key={record.id} className="dir-course my-attendance" aria-label={`Attendance ${record.classTitle}`}>
+        <div className="dir-row"><div><strong>{record.classTitle}</strong>
+          <span className="dir-dates muted"> {formatClassTime(record.classStartsAt, record.classEndsAt, record.timeZone)}</span>
+          <div className="dir-dates muted">{formatDuration(record.connectedSeconds)} connected
+            {record.appealStatus === "OPEN" ? " · appeal waiting for a decision" : record.appealStatus ? ` · appeal ${record.appealStatus.toLowerCase()}` : ""}</div></div>
+          <span className={`status ${record.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[record.outcome]}</span>
+        </div>
+        {record.appealStatus !== "OPEN" && <details className="decision"><summary>Appeal this</summary>
+          <AppealForm prefix={`appeal-${index}`} recordId={record.id} /></details>}
+      </li>)}</ul>
+    </details>}
   </Shell>;
 }

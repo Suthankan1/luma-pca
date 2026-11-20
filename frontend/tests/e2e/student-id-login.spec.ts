@@ -8,7 +8,7 @@ test.describe("Student ID sign-in (Academy request)", () => {
     await students.getByLabel("Password").fill("PCA001");
     await students.getByRole("button", { name: "Open my student portal" }).click();
     await expect(page).toHaveURL(/\/student$/);
-    await expect(page.getByRole("heading", { name: "Student portal" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
   });
 
   test("A wrong password is refused with a student-specific message", async ({ page }) => {

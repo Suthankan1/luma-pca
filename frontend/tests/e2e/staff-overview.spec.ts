@@ -201,7 +201,7 @@ test.describe("Staff home", () => {
     await expect(live.getByRole("button", { name: "Pause" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
     await page.getByRole("link", { name: "Attendance reports" }).click();
-    await expect(page).toHaveURL(/\/staff\/dashboard$/);
+    await expect(page).toHaveURL(/\/staff\/reports$/);
   });
 
   test("the live online chart shows recorded samples on arrival and reload, and refresh can pause", async ({ page }) => {

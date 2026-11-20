@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { AcademyBrand } from "./AcademyBrand";
+import { PortalFrame, PortalIcon, PortalRail } from "./PortalRail";
 import type { ReactNode } from "react";
 import type { Portal } from "@/lib/session-policy";
 
 const studentNav = [
-  { key: "home", label: "My classes", href: "/student", icon: "▶" },
-  { key: "attendance", label: "My attendance", href: "/student/attendance", icon: "✓" },
+  { key: "attendance", label: "My attendance", href: "/student", icon: "chart" },
+  { key: "home", label: "My classes", href: "/student/classes", icon: "calendar" },
 ] as const;
 
 /**
@@ -20,29 +21,22 @@ export function Shell({ children, active, otherPortal, studentSection }: {
   studentSection?: (typeof studentNav)[number]["key"];
 }) {
   if (active === "student") {
-    return <div className="shell">
-      <aside className="aside staff-rail student-rail" aria-label="Academy navigation">
-        <AcademyBrand href="/student" />
+    return <PortalFrame className="student-shell">
+      <PortalRail portal="student">
         <nav className="staff-nav" aria-label="Student portal">
-          {studentNav.map(item => <Link key={item.key} href={item.href}
+          {studentNav.map(item => <Link key={item.key} href={item.href} title={item.label} aria-label={item.label}
             className={`staff-navitem ${(studentSection ?? "home") === item.key ? "active" : ""}`}
             aria-current={(studentSection ?? "home") === item.key ? "page" : undefined}>
-            <span className="staff-navicon" aria-hidden>{item.icon}</span>{item.label}
+            <PortalIcon name={item.icon} /><span className="portal-rail-copy">{item.label}</span>
           </Link>)}
-          {otherPortal && <Link className="staff-navitem" href={`/${otherPortal}`}>
-            <span className="staff-navicon" aria-hidden>↗</span>{otherPortal === "staff" ? "Staff portal" : "Student portal"}
+          {otherPortal && <Link className="staff-navitem" href={`/${otherPortal}`} title={otherPortal === "staff" ? "Staff portal" : "Student portal"}
+            aria-label={otherPortal === "staff" ? "Staff portal" : "Student portal"}>
+            <PortalIcon name="external" /><span className="portal-rail-copy">{otherPortal === "staff" ? "Staff portal" : "Student portal"}</span>
           </Link>}
         </nav>
-        <div className="staff-railfoot">
-          <p className="staff-academy">PHYSICS CUBE ACADEMY</p>
-          <Link href="/account/password" className="staff-signout staff-password">Change password</Link>
-          <form method="post" action="/api/session/logout">
-            <button className="staff-signout" type="submit">Sign out</button>
-          </form>
-        </div>
-      </aside>
+      </PortalRail>
       <main className="content staff-content">{children}</main>
-    </div>;
+    </PortalFrame>;
   }
   return <div className="public-shell">
     <header className="public-header" aria-label="Academy navigation">

@@ -1,92 +1,63 @@
 import { expect, test, type Page } from "@playwright/test";
+import { mockApiBase } from "./support/classes";
 
-async function signInStaff(page: Page, email: string) {
-  await page.context().clearCookies();
-  await page.goto("/sign-in?portal=staff");
-  await page.fill("#email", email);
+async function signIn(page: Page, portal: "staff" | "student") {
+  await page.goto(`/sign-in?portal=${portal}`);
+  await page.fill("#email", portal === "staff" ? "admin-enrolled@example.invalid" : "student@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/staff$/);
+  await expect(page).toHaveURL(new RegExp(`/${portal}$`));
 }
 
-test.describe("Attendance dashboard", () => {
-  test("Staff see every student's time and attendance, filter, sort, and switch views", async ({ page }) => {
-    await signInStaff(page, "admin-enrolled@example.invalid");
-    await page.getByRole("link", { name: "Attendance reports" }).click();
-    await expect(page).toHaveURL(/\/staff\/dashboard$/);
-    const totals = page.getByRole("list", { name: "Totals" });
-    await expect(totals.getByRole("listitem", { name: "Classes held: 2" })).toBeVisible();
-    await expect(totals.getByRole("listitem", { name: "Students: 3" })).toBeVisible();
-
-    const table = page.getByRole("table", { name: "Students" });
-    const amaya = table.getByRole("row").filter({ hasText: "PCA101" });
-    await expect(amaya).toContainText("Amaya Perera");
-    await expect(amaya).toContainText("2 / 2");
-    await expect(amaya).toContainText("3 h 10 min");
-    await expect(amaya).toContainText("79%");
-    await expect(amaya.getByRole("cell").last()).toHaveText("2");
-
-    await page.getByLabel("Find a student").fill("kavin");
-    await expect(table.locator("tbody tr")).toHaveCount(1);
-    await page.getByLabel("Find a student").fill("");
-    await page.getByRole("button", { name: /Never joined/ }).click();
-    await expect(table.getByRole("row").filter({ hasText: "PCA103" })).toBeVisible();
-    await expect(table.locator("tbody tr")).toHaveCount(1);
-    await page.getByRole("button", { name: /^All/ }).click();
-    await page.getByLabel("Sort by").selectOption("percent:desc");
-    await expect(table.locator("tbody tr").first()).toContainText("PCA101");
-
-    await page.getByRole("navigation", { name: "View" }).getByRole("link", { name: "Classes" }).click();
-    const classes = page.getByRole("table", { name: "Classes" });
-    await expect(classes.getByRole("row").filter({ hasText: "Waves and oscillations" })).toContainText("2 / 3");
-    await expect(classes.getByRole("row").filter({ hasText: "Electric fields" })).toContainText("Final");
-
-    await page.getByRole("navigation", { name: "View" }).getByRole("link", { name: "Grid" }).click();
-    await expect(page.getByRole("table", { name: "Attendance grid" })).toContainText("PCA101");
-
-    await page.getByRole("navigation", { name: "Period" }).getByRole("link", { name: "Last 7 days" }).click();
-    await expect(page).toHaveURL(/from=\d{4}-\d{2}-\d{2}&to=/);
-    await expect(page.getByRole("list", { name: "Totals" }).getByRole("listitem", { name: "Classes held: 1" })).toBeVisible();
-  });
-
-  test("Opening a student shows their courses and each leave and rejoin", async ({ page }) => {
-    await signInStaff(page, "admin-enrolled@example.invalid");
-    await page.goto("/staff/dashboard");
-    await page.getByRole("table", { name: "Students" }).getByRole("link", { name: "Amaya Perera" }).click();
-    await expect(page).toHaveURL(/\/staff\/students\/[0-9a-f-]+\/attendance\?from=/);
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Amaya Perera");
-    await expect(page.getByRole("region", { name: "COURSES AND BATCHES" })).toContainText("PHY-2026");
-    const waves = page.locator("details").filter({ hasText: "Waves and oscillations" });
-    await expect(waves).toContainText("1 h 10 min");
-    await expect(waves).toContainText("2 rejoins");
-    await waves.locator("summary").click();
-    const connections = waves.getByRole("list", { name: "Connections" });
-    await expect(connections.getByRole("listitem")).toHaveCount(3);
-    await expect(connections).toContainText("Away 10 min, then rejoined");
-    await expect(connections.getByRole("listitem").first()).toContainText("25 min in class time");
-  });
-
-  test("A period over 92 days is refused with a clear message", async ({ page }) => {
-    await signInStaff(page, "admin-enrolled@example.invalid");
-    await page.goto("/staff/dashboard?from=2026-01-01&to=2026-09-01");
-    await expect(page.locator(".session-error")).toContainText("at most 92 days");
-  });
+test("the Home report shortcut uses Reports and sidebar collapse survives navigation", async ({ page }) => {
+  await signIn(page, "staff");
+  const rail = page.getByRole("complementary", { name: "Staff navigation" });
+  await rail.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(rail.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute("aria-expanded", "false");
+  await expect(rail.getByText("Classes", { exact: true })).toBeHidden();
+  await page.getByRole("link", { name: "Attendance reports", exact: true }).click();
+  await expect(page).toHaveURL(/\/staff\/reports$/);
+  await expect(rail.getByRole("link", { name: "Reports", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(rail.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+  await rail.getByRole("button", { name: "Expand sidebar" }).click();
+  await expect(rail.getByText("Classes", { exact: true })).toBeVisible();
+  await page.goto("/staff/dashboard");
+  await expect(page).toHaveURL(/\/staff\/reports$/);
 });
 
-test.describe("My attendance (student)", () => {
-  test("A student sees their own time in each class and every rejoin", async ({ page }) => {
-    await page.context().clearCookies();
-    await page.goto("/sign-in?portal=student");
-    await page.fill("#email", "student@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/student$/);
-    await page.getByRole("link", { name: "View all attendance and appeals →" }).click();
-    await expect(page.getByRole("heading", { name: "My attendance" })).toBeVisible();
-    await expect(page.getByRole("list", { name: "My attendance" }).getByRole("listitem", { name: "Classes joined: 2 / 2" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "MY COURSES" })).toContainText("A/L Physics 2026");
-    const waves = page.locator("details").filter({ hasText: "Waves and oscillations" });
-    await waves.locator("summary").click();
-    await expect(waves.getByRole("list", { name: "Connections" }).getByRole("listitem")).toHaveCount(3);
+test("the staff directory opens a selected student's monthly profile", async ({ page }) => {
+  await signIn(page, "staff");
+  const created = await page.request.post(`${mockApiBase()}/api/v1/students`, {
+    data: { studentNumber: "PROFILE-77", fullName: "Monthly Profile Student", email: "profile77@example.invalid" },
+    headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" },
   });
+  expect(created.ok()).toBeTruthy();
+  await page.getByRole("link", { name: "Students", exact: true }).click();
+  await page.getByRole("searchbox", { name: "Search students" }).fill("PROFILE-77");
+  await page.getByRole("link", { name: /Monthly Profile Student/ }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Monthly Profile Student");
+  await expect(page.getByRole("region", { name: "Enrolled this month" })).toBeVisible();
+  await page.getByRole("link", { name: "Previous month" }).click();
+  await expect(page).toHaveURL(/\/attendance\?month=\d{4}-\d{2}$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Monthly Profile Student");
+});
+
+test("a verified student lands on their own profile and can filter the attendance history", async ({ page }) => {
+  await signIn(page, "student");
+  const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo", year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(new Date(Date.now() - 8 * 86_400_000)).slice(0, 7);
+  if (new URL(page.url()).searchParams.get("month") !== month) await page.goto(`/student?month=${month}`);
+  await expect(page.getByText("Average attendance", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Enrolled this month" })).toContainText("Monday evening");
+  const chart = page.getByRole("region", { name: "Attendance by class type" });
+  await chart.getByRole("button", { name: /100% Waves and oscillations/ }).click();
+  const history = page.getByRole("region", { name: "Class history" });
+  await expect(history).toContainText("1 h 10 min connected");
+  await expect(history).toContainText("Joined · pending");
+  await history.getByText("3 connections", { exact: true }).click();
+  await expect(history.getByText(/25 min/).first()).toBeVisible();
+  await history.getByRole("button", { name: "Show all classes" }).click();
+  await expect(chart.getByRole("button", { name: /Waves and oscillations/ })).toHaveAttribute("aria-pressed", "false");
+  await page.goto("/staff/students/00000000-0000-4000-8000-0000000000b2/attendance");
+  await expect(page).toHaveURL(/\/student$/);
 });

@@ -18,7 +18,7 @@ export default async function StudentClassPage({ params }: { params: Promise<{ s
   const engagement = await studentApi<ClassEngagement>(`/api/v1/me/class-sessions/${sessionId}/engagement`);
   if (!engagement.ok && engagement.status === 404) notFound();
   return <Shell active="student" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
-    <p><Link className="text-link" href="/student">← My classes</Link></p>
+    <p><Link className="text-link" href="/student/classes">← My classes</Link></p>
     <h1 className="heading">Take part</h1>
     {!engagement.ok ? <p className="session-error" role="alert">We couldn’t load this class right now.</p>
       : !engagement.data.enabled ? <p className="banner">Reactions and questions are not switched on at the academy.</p>

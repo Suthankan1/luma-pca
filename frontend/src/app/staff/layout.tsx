@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { StaffTabProvider } from "@/components/StaffTabLinks";
+import { PortalRailProvider } from "@/components/PortalRail";
 import { requirePortal } from "@/lib/auth-server";
 
 /**
@@ -8,5 +9,5 @@ import { requirePortal } from "@/lib/auth-server";
  */
 export default async function StaffLayout({ children }: { children: ReactNode }) {
   await requirePortal("staff");
-  return <StaffTabProvider>{children}</StaffTabProvider>;
+  return <PortalRailProvider><StaffTabProvider>{children}</StaffTabProvider></PortalRailProvider>;
 }

@@ -82,7 +82,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const previousDay = addDays(day, -1), nextDay = addDays(day, 1);
   const recentAttendance = staffApi<CompletedClass[]>("/api/v1/attendance/recent-completed", undefined, ATTENDANCE_SUMMARY_TIMEOUT_MS);
 
-  return <StaffShell {...shell} actions={<Link className="home-button" href="/staff/dashboard">Attendance reports</Link>}>
+  return <StaffShell {...shell} actions={<Link className="home-button" href="/staff/reports">Attendance reports</Link>}>
     <div className="staff-home">
       {liveEntries.length > 0
         ? <StaffLiveStrip entries={liveEntries} initial={activeAttendance} />

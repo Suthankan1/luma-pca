@@ -165,7 +165,10 @@ function studentApi(req, send, body) {
   const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
   const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
   const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
-  if (url.pathname === "/api/v1/me/attendance-overview") return send(200, insightsOverview(INSIGHT_STUDENTS[0]));
+  if (url.pathname === "/api/v1/me/attendance-overview") {
+    const overview = insightsOverview(INSIGHT_STUDENTS[0]);
+    return send(200, studentHasEnrolments ? overview : { ...overview, enrolments: [], classes: [] });
+  }
   if (url.pathname === "/api/v1/me/student") {
     return send(200, { id: "00000000-0000-4000-8000-0000000000a1", studentNumber: "PCA001", fullName: "Amaya Perera" });
   }

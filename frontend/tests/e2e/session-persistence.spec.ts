@@ -17,7 +17,7 @@ test.describe("Staying signed in", () => {
       await context.clearCookies({ name: "luma-access" });
       await page.goto("/student/attendance");
       await expect(page).toHaveURL(/\/student\/attendance$/);
-      await expect(page.getByRole("heading", { name: "My attendance" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
       expect((await context.cookies()).some(c => c.name === "luma-access"), "renewed").toBe(true);
     }
 
@@ -38,8 +38,8 @@ test.describe("Staying signed in", () => {
 
     await context.clearCookies({ name: "luma-access" });
     await page.goto("/staff/dashboard");
-    await expect(page).toHaveURL(/\/staff\/dashboard$/);
-    await expect(page.getByRole("heading", { name: "Attendance reports" })).toBeVisible();
+    await expect(page).toHaveURL(/\/staff\/reports$/);
+    await expect(page.getByRole("heading", { name: "Reports" })).toBeVisible();
 
     await context.clearCookies({ name: "luma-access" });
     await page.goto("/sign-in");

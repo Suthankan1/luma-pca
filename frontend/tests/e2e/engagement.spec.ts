@@ -34,6 +34,7 @@ test.describe("Engagement with consent", () => {
     await expect(page.locator("#engagement-feedback")).toHaveText("Engagement is on. Students are asked for consent in their portal.");
 
     await signInStudent(page);
+    await page.getByRole("link", { name: "My classes" }).click();
     const panel = page.getByRole("region", { name: "REACTIONS AND QUESTIONS" });
     await expect(panel).toContainText("LUMA records the reactions and answers");
     await panel.getByRole("button", { name: "I agree" }).click();

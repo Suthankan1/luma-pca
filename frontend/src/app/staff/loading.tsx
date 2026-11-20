@@ -7,7 +7,6 @@ import { ClassesColumnSkeleton, StudentMonthSkeleton } from "@/components/staff/
 
 const sections: Record<string, { active: StaffSection; crumb: string; title: string }> = {
   "": { active: "overview", crumb: "Operations", title: "Staff portal" },
-  dashboard: { active: "dashboard", crumb: "Attendance", title: "Attendance reports" },
   academy: { active: "academy", crumb: "Academy database", title: "Academy classes" },
   courses: { active: "courses", crumb: "Academic setup", title: "Courses & batches" },
   batches: { active: "courses", crumb: "Academic setup", title: "Batch" },

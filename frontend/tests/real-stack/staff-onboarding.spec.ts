@@ -140,7 +140,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await student.fill("#password", passphrase);
   await student.getByRole("button", { name: "Sign in" }).click();
   await expect(student).toHaveURL(/\/student$/);
-  await expect(student.getByRole("heading", { name: "Student portal" })).toBeVisible();
+  await expect(student.getByRole("heading", { name: "Real Stack Student", exact: true })).toBeVisible();
   await studentContext.close();
 
   // 6. The administrator sees the account as active.
@@ -230,7 +230,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await portal.fill("#password", passphrase);
   await portal.getByRole("button", { name: "Sign in" }).click();
   await expect(portal).toHaveURL(/\/student$/);
-  await portal.goto("/student?from=2027-01-11");
+  await portal.goto("/student/classes?from=2027-01-11");
   await expect(portal.getByRole("region", { name: "MY CLASSES" }).getByRole("listitem", { name: "Real stack class" }))
     .toContainText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
   await expect(portal.getByRole("region", { name: "MY BATCHES" })).toContainText("from 12 Jan 2027");
@@ -423,8 +423,9 @@ test("an administrator onboards a student end to end on the real stack", async (
   await portalAgain.fill("#password", newPassphrase);
   await portalAgain.getByRole("button", { name: "Sign in" }).click();
   await expect(portalAgain).toHaveURL(/\/student$/);
-  await portalAgain.goto("/student/attendance");
-  await expect(portalAgain.getByRole("region", { name: "FINAL ATTENDANCE AND APPEALS" }).getByRole("listitem", { name: "Attendance Past real class" })
+  await portalAgain.goto("/student/attendance?month=2026-03");
+  await portalAgain.getByText("Attendance appeals", { exact: true }).click();
+  await expect(portalAgain.getByRole("listitem", { name: "Attendance Past real class" })
     .locator(".status")).toHaveText("Present");
   await finalStudent.close();
   await page.goto("/staff/activity?category=classes");
@@ -467,8 +468,9 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
 
   // UAT 11: the student appeals the corrected class; an administrator accepts it as Present.
   let student = await signInStudent(browser);
-  await student.goto("/student/attendance");
-  const record = student.getByRole("region", { name: "FINAL ATTENDANCE AND APPEALS" }).getByRole("listitem", { name: "Attendance Past real class" });
+  await student.goto("/student/attendance?month=2026-03");
+  await student.getByText("Attendance appeals", { exact: true }).click();
+  const record = student.getByRole("listitem", { name: "Attendance Past real class" });
   await record.getByText("Appeal this").click();
   await record.getByLabel("What should the academy know?").fill("I was in class for the whole session; the note was for another day.");
   await record.getByRole("button", { name: "Send appeal" }).click();
@@ -482,6 +484,7 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await appeal.getByRole("button", { name: "Accept" }).click();
   await expect(appeal).toHaveCount(0);
   await student.reload();
+  await student.getByText("Attendance appeals", { exact: true }).click();
   await expect(record.locator(".status")).toHaveText("Present");
   await expect(record).toContainText("appeal accepted");
 
@@ -497,7 +500,7 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await page.goto(`/staff/sessions/${liveClassId}`);
   const liveClass = page.url();
 
-  await student.goto("/student");
+  await student.goto("/student/classes");
   const panel = student.getByRole("region", { name: "REACTIONS AND QUESTIONS" });
   await panel.getByLabel("Staff may also see my name in engagement rankings").check();
   await panel.getByRole("button", { name: "I agree" }).click();
