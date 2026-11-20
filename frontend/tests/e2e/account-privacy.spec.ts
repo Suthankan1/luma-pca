@@ -38,7 +38,7 @@ test("An owner erases a student's personal data after typing the number again", 
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill(`${p}-1`);
   await page.locator("#student-name").fill("Leaving Student");

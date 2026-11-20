@@ -195,6 +195,10 @@ export function compactClassTitle(text: string) {
   return extra !== undefined && title && batch ? `${title} | ${batch}` : text;
 }
 
+export function classTypeKey(title: string) {
+  return compactClassTitle(title).trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 /** Group completed timetable entries by the class and batch name shown to staff. */
 export function monthlyClassTypes(sessions: readonly ClassSession[], now: number) {
   const groups = new Map<string, { title: string; sessions: ClassSession[] }>();
@@ -202,7 +206,7 @@ export function monthlyClassTypes(sessions: readonly ClassSession[], now: number
     .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
   for (const session of completed) {
     const title = compactClassTitle(session.title);
-    const key = title.trim().replace(/\s+/g, " ").toLowerCase();
+    const key = classTypeKey(session.title);
     const group = groups.get(key);
     if (group) group.sessions.push(session);
     else groups.set(key, { title, sessions: [session] });

@@ -7,7 +7,7 @@ import { validateTokens } from "@/lib/auth-parsers";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Named pages that live beside the `[id]` pages and are not IDs. */
-const NAMED = new Set(["/staff/students/import", "/staff/sessions/types"]);
+const NAMED = new Set(["/staff/students/import", "/staff/students/manage", "/staff/sessions/types"]);
 const RECORD_PAGES = /^\/(staff\/(sessions|students|team|batches)|student\/classes)\/[^/]+$/;
 
 type Renewed = { sealed: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number } | null;

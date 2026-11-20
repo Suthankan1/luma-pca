@@ -19,6 +19,7 @@ export async function createStudent(_previous: FormState, form: FormData): Promi
   const result = await staffApi<{ id: string; studentNumber: string }>("/api/v1/students", { method: "POST", body: input });
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
   revalidatePath("/staff/students");
+  revalidatePath("/staff/students/manage");
   return { ok: true, message: `Student ${result.data.studentNumber} added. Open the record to send an invitation.`,
     values: { link: `/staff/students/${result.data.id}` } };
 }
@@ -37,6 +38,7 @@ export async function updateStudent(_previous: FormState, form: FormData): Promi
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values: { fullName } };
   revalidatePath(`/staff/students/${id}`);
   revalidatePath("/staff/students");
+  revalidatePath("/staff/students/manage");
   return { ok: true, message: "Saved." };
 }
 
@@ -91,6 +93,7 @@ export async function importStudents(input: { rows: unknown; batchId: unknown; e
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
   if (result.data.imported) {
     revalidatePath("/staff/students");
+  revalidatePath("/staff/students/manage");
     if (batchId) revalidatePath(`/staff/batches/${batchId}`);
   }
   return { ok: true, ...result.data };
@@ -138,5 +141,6 @@ export async function eraseStudent(_previous: FormState, form: FormData): Promis
   }
   revalidatePath(`/staff/students/${studentId}`);
   revalidatePath("/staff/students");
+  revalidatePath("/staff/students/manage");
   return { ok: true, message: `Erased. The record is now ${result.data.placeholderNumber}.` };
 }

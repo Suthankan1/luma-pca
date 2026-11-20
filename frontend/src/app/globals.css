@@ -675,6 +675,30 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .classes-chart-value { position:absolute; inset-inline:0; top:4px; width:max-content; margin-inline:auto; padding:0 3px; border-radius:4px; background:#f7fbff; color:#17365b; font-size:10px; font-weight:700; }
 .classes-chart-label { display:block; margin-top:4px; overflow:hidden; color:#425972; font-size:10px; white-space:nowrap; text-overflow:ellipsis; }
 .class-attendance-percent { color:#116d70; font-variant-numeric:tabular-nums; }
+.student-month-tools { margin-top:0; }
+.student-month-tools label:first-child { flex-grow:2; }
+.student-month-average { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:8px 16px; margin-top:18px; }
+.student-month-average span { display:block; font-size:13px; color:var(--ink-2); }
+.student-month-average strong, .student-month-summary strong { display:block; color:#116d70; font-size:clamp(24px,4vw,36px); font-variant-numeric:tabular-nums; }
+.student-month-average p { color:var(--ink-3); font-size:12px; }
+.student-month-chart { margin-top:14px; overflow:auto; }
+.student-month-chart ul { display:flex; gap:8px; width:max-content; min-width:100%; padding:0 3px 8px; }
+.student-month-chart li { width:42px; min-width:42px; text-align:center; }
+.student-month-track { position:relative; height:138px; border-radius:6px; background:linear-gradient(to top,#edf3f8 49%,#dce5ee 49% 50%,#edf3f8 50%); }
+.student-month-reg { display:block; writing-mode:vertical-rl; margin:8px auto 0; color:var(--ink-2); font-size:11px; }
+.student-month-list { max-height:31rem; overflow:auto; scrollbar-gutter:stable; }
+.student-month-list:focus-visible, .student-month-chart:focus-visible { outline:2px solid var(--pca-blue); outline-offset:2px; }
+.student-month-row + .student-month-row, .student-month-session + .student-month-session { border-top:1px solid var(--line-soft); }
+.student-month-row a { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:10px 8px; border-radius:6px; overflow-wrap:anywhere; }
+.student-month-row a:hover { background:#edf5fc; }
+.student-month-row small { display:block; margin-top:2px; color:var(--ink-3); }
+.student-month-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); gap:14px; }
+.student-month-type > header { display:flex; justify-content:space-between; align-items:start; gap:16px; }
+.student-month-session { display:grid; grid-template-columns:minmax(110px,1fr) minmax(52px,.5fr) minmax(80px,1fr); align-items:center; gap:8px; padding:10px 4px; font-size:13px; }
+.student-month-outcome { justify-self:end; text-align:end; color:var(--ink-3); }
+.student-month-outcome[data-outcome=PRESENT], .student-month-outcome[data-outcome=LATE] { color:#116d70; }
+.student-month-outcome[data-outcome=ABSENT] { color:#9d343c; }
+@media (max-width:400px) { .student-month-session { grid-template-columns:minmax(0,1fr) auto; } .student-month-outcome { grid-column:1 / -1; justify-self:start; text-align:start; } }
 @media (prefers-reduced-motion:no-preference) { .classes-chart-fill { animation:classes-bar-rise .5s ease-out both; } }
 @keyframes classes-bar-rise { from { transform:scaleY(0); } to { transform:scaleY(1); } }
 .classes-panel-scroll { flex:1; min-height:0; overflow:auto; scrollbar-gutter:stable; padding-inline-end:4px; }

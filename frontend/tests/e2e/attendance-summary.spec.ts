@@ -30,7 +30,7 @@ test.describe("Attendance summaries", () => {
     await page.locator("#batch-starts").fill("2027-01-01");
     await page.getByRole("button", { name: "Create batch" }).click();
     for (const n of ["1", "2"]) {
-      await page.goto("/staff/students");
+      await page.goto("/staff/students/manage");
       await openSection(page, "Add a student who is not in the Academy records");
       await page.locator("#student-number").fill(`${C}-00${n}`);
       await page.locator("#student-name").fill(`Summary Student ${n}`);

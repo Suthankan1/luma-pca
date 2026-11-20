@@ -93,7 +93,7 @@ test.describe("Zoom review", () => {
     await signInAsAdmin(page);
     const P = p.toUpperCase();
     // A student whose sign-in email is the one Zoom reports for them, and one with another Zoom account.
-    await page.goto("/staff/students");
+    await page.goto("/staff/students/manage");
     for (const [number, name, email] of [[`ZM-${P}-1`, "Zoom Student", `zoom.student${n}@example.invalid`],
       [`ZM-${P}-2`, "Guest Student", `guest.student${n}@example.invalid`]]) {
       await openSection(page, "Add a student who is not in the Academy records");
@@ -166,7 +166,7 @@ test.describe("Zoom review", () => {
     await page.locator("#batch-starts").fill("2027-01-01");
     await page.getByRole("button", { name: "Create batch" }).click();
     await expect(page.locator("#batch-feedback")).toHaveText("Batch A created.");
-    await page.goto(`/staff/students?q=ZM-${P}-1`);
+    await page.goto(`/staff/students/manage?q=ZM-${P}-1`);
     await page.getByRole("link", { name: new RegExp(`ZM-${P}-1`) }).first().click();
     await page.locator("#enroll-batch").selectOption({ label: `${C} · A · Batch A` });
     await page.locator("#enroll-date").fill("2027-01-05");

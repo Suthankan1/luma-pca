@@ -24,7 +24,7 @@ async function setUp(page: Page, code: string) {
     await page.getByRole("button", { name: "Create batch" }).click();
     await expect(page.locator("#batch-feedback")).toHaveText(`Batch ${batch} created.`);
   }
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill(`${code}-001`);
   await page.locator("#student-name").fill("Class Student");

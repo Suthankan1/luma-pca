@@ -12,9 +12,9 @@ accounts to match, failed Zoom events); each line opens the page where it is han
 
 ## Setting up
 1. **Courses & batches**: create each course, then its batches (code, name, start date).
-2. **Students**: add one, or **Import** a CSV (`studentNumber,fullName,email`), optionally enrolling everyone in a batch.
+2. **Student management** (`/staff/students/manage`): add one, or **Import** a CSV (`studentNumber,fullName,email`), optionally enrolling everyone in a batch.
    Check first, then import; nothing is imported if any row has a problem.
-3. **Invitations**: from a batch or the Students page, email invitations; failed emails are listed for follow-up.
+3. **Invitations**: from a batch or Student management, email invitations and review failed emails.
 4. **Staff**: there is no staff page. Every staff member can do everything in the staff portal (one STAFF role). To add
    a colleague or block someone who left, ask the operator (`docs/delivery/runbooks/STAFF-ACCOUNTS.md`).
 
@@ -38,6 +38,9 @@ accounts to match, failed Zoom events); each line opens the page where it is han
   as "gave up"; fetch it again by hand from the occurrence.
 
 ## Attendance
+- **Students** shows the full directory, monthly registration-ID chart, and average for the current search and
+  class-type selection. Open a student to see the classes they were expected in by type, connected minutes, and
+  final outcomes. Monthly rates use completed, tracked sessions. A missing final outcome is shown as pending.
 - During and after class, the class page shows **provisional attendance**: time connected (rejoins counted once, only
   within the class time), first join and lateness. Not being seen is not proof of absence.
 - About 15 minutes after the webinar ends, LUMA fetches **Zoom's participant report** (or press "Fetch Zoom's report").

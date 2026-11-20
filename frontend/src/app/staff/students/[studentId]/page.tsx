@@ -45,7 +45,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
 
   return <StaffShell {...shellBase} title={`${s.studentNumber} ${s.fullName}`}
     subtitle={`${s.email ?? ""} · ${s.accountStatus ? accountStatusLabels[s.accountStatus] ?? s.accountStatus : ""}${s.active ? "" : " · Inactive student"}`}>
-    <p><Link className="text-link" href="/staff/students">← All students</Link></p>
+    <p><Link className="text-link" href="/staff/students/manage">← Student management</Link></p>
     <div className="staff-grid">
       <section className="panel" aria-labelledby="enrollments-title">
         <h2 id="enrollments-title" className="panel-title">ENROLMENTS</h2>

@@ -22,7 +22,7 @@ export default async function ImportStudentsPage() {
       {!courses.ok || !batches.ok
         ? <p className="session-error" role="alert">We couldn’t load batches right now. Please reload the page shortly.</p>
         : <StudentImportForm batches={batchOptions(courses.data, batches.data, batch => batch.active)} today={academyToday()} />}
-      <p><Link className="text-link" href="/staff/students">← Back to students</Link></p>
+      <p><Link className="text-link" href="/staff/students/manage">← Back to student management</Link></p>
     </section>
   </StaffShell>;
 }

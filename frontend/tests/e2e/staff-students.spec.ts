@@ -25,7 +25,7 @@ async function courseWithBatch(page: Page, course: string, batch: string) {
 }
 
 async function addStudent(page: Page, number: string, name: string, email: string) {
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill(number);
   await page.locator("#student-name").fill(name);
@@ -56,7 +56,7 @@ test.describe("Staff students and enrolments", () => {
     await addStudent(page, `pca-${p}-002`, "Nimal Silva", `kavindi.${p}@example.invalid`);
     await expect(page.locator("#student-feedback")).toHaveText("An account with this email already exists");
 
-    await page.goto("/staff/students");
+    await page.goto("/staff/students/manage");
     await page.getByRole("link", { name: new RegExp(`PCA-${p.toUpperCase()}-001 Kavindi Perera`) }).click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(`PCA-${p.toUpperCase()}-001 Kavindi Perera`);
     await expect(page.locator(".sub").first()).toContainText("Invitation pending");
@@ -97,7 +97,7 @@ test.describe("Staff students and enrolments", () => {
     await expect(studentPage).toHaveURL(/\/sign-in\?activated=1$/);
     await studentPage.close();
 
-    await page.goto("/staff/students");
+    await page.goto("/staff/students/manage");
     await expect(page.locator(".dir-course").filter({ hasText: `PCA-${p.toUpperCase()}-001` })).toContainText("Account active");
   });
 
@@ -110,7 +110,7 @@ test.describe("Staff students and enrolments", () => {
     await expect(page.locator("#details-feedback")).toHaveText("Saved.");
     await expect(page.getByText("Reactivate the student to enrol them in a batch.")).toBeVisible();
 
-    await page.goto("/staff/students");
+    await page.goto("/staff/students/manage");
     await expect(page.getByRole("region", { name: "STUDENT DIRECTORY" }).locator(".dir-list")).not.toContainText(`PCA-${p.toUpperCase()}-900`);
     await page.getByRole("link", { name: "Inactive", exact: true }).click();
     await expect(page).toHaveURL(/status=inactive/);

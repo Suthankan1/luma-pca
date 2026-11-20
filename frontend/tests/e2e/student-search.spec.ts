@@ -25,7 +25,7 @@ test.describe("Student search", () => {
     await page.getByRole("button", { name: "Import 3 students" }).click();
     await expect(page.locator("#import-feedback")).toContainText("Imported 3 students");
 
-    await page.goto("/staff/students");
+    await page.goto("/staff/students/manage");
     const search = page.getByRole("search");
     const rows = page.getByRole("region", { name: "STUDENT DIRECTORY" }).locator(".dir-list .dir-course");
     await search.getByLabel("Find a student").fill(family.toUpperCase());
@@ -49,6 +49,6 @@ test.describe("Student search", () => {
     await expect(page.getByText(`No students match “${p}-s”.`)).toBeVisible();
     await expect(search.getByLabel("Find a student")).toHaveValue(`${p}-s`);
     await search.getByRole("link", { name: "Clear" }).click();
-    await expect(page).toHaveURL(/\/staff\/students\?status=inactive$/);
+    await expect(page).toHaveURL(/\/staff\/students\/manage\?status=inactive$/);
   });
 });

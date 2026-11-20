@@ -90,10 +90,10 @@ test("the academy's today is the Colombo calendar date", () => {
 });
 
 test("student list links keep the filter and the paging cursor", () => {
-  assert.equal(studentListHref({}), "/staff/students");
-  assert.equal(studentListHref({ status: "active" }), "/staff/students");
-  assert.equal(studentListHref({ status: "all", after: "PCA-050" }), "/staff/students?status=all&after=PCA-050");
-  assert.equal(studentListHref({ status: "inactive" }), "/staff/students?status=inactive");
+  assert.equal(studentListHref({}), "/staff/students/manage");
+  assert.equal(studentListHref({ status: "active" }), "/staff/students/manage");
+  assert.equal(studentListHref({ status: "all", after: "PCA-050" }), "/staff/students/manage?status=all&after=PCA-050");
+  assert.equal(studentListHref({ status: "inactive" }), "/staff/students/manage?status=inactive");
 });
 
 test("class times convert between the academy zone and UTC", () => {

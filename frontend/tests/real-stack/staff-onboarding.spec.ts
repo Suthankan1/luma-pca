@@ -101,7 +101,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator("#batch-feedback")).toHaveText("Batch MON created.");
 
   // 4. Student, invitation and enrolment.
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill("pca-real-001");
   await page.locator("#student-name").fill("Real Stack Student");
@@ -144,7 +144,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await studentContext.close();
 
   // 6. The administrator sees the account as active.
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-001" })).toContainText("Account active");
 
   // 6b. Two more students from a CSV file, enrolled in the same batch; the real API checks then imports.
@@ -164,7 +164,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator("#import-feedback")).toHaveText("All 2 rows are ready. Nothing has been saved yet.");
   await page.getByRole("button", { name: "Import 2 students" }).click();
   await expect(page.locator("#import-feedback")).toContainText("Imported 2 students and enrolled them in REAL-PHY · MON · Monday evening.");
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-002" })).toContainText("Import, One");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-003" })).toContainText("Invitation pending");
   await page.getByRole("search").getByLabel("Find a student").fill("IMPORT,");
@@ -370,7 +370,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.locator("#batch-starts").fill("2026-01-01");
   await page.getByRole("button", { name: "Create batch" }).click();
   await expect(page.locator("#batch-feedback")).toHaveText("Batch PAST created.");
-  await page.goto("/staff/students?q=PCA-REAL-001");
+  await page.goto("/staff/students/manage?q=PCA-REAL-001");
   await page.getByRole("link", { name: /PCA-REAL-001/ }).first().click();
   await page.locator("#enroll-batch").selectOption({ label: "REAL-PHY · PAST · Past term" });
   await page.locator("#enroll-date").fill("2026-01-05");

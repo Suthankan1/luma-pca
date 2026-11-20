@@ -64,7 +64,7 @@ test.describe("Bulk invitation emails", () => {
     await expect(panel.getByRole("button", { name: "Check who will be emailed" })).toBeVisible();
 
     // The students page offers the same for every active student.
-    await page.goto("/staff/students");
+    await page.goto("/staff/students/manage");
     await expect(page.getByRole("region", { name: "INVITE BY EMAIL" })).toContainText("Emails a sign-in link to every active student");
   });
 
@@ -100,7 +100,7 @@ test.describe("Bulk invitation emails", () => {
     // Sending is in the background: the failure shows once it has been tried.
     const failed = page.getByRole("region", { name: "EMAILS THAT FAILED" });
     await expect(async () => {
-      await page.goto("/staff/students");
+      await page.goto("/staff/students/manage");
       await expect(failed).toContainText(`${P}-B1 Bounced Student`, { timeout: 1000 });
     }).toPass({ timeout: 20000 });
     await expect(failed).toContainText(`${p}.bounce@example.invalid · 5 tries`);

@@ -133,7 +133,7 @@ export function studentListHref(options: { after?: string | null; status?: strin
   if (options.status && options.status !== "active") params.set("status", options.status);
   if (options.after) params.set("after", options.after);
   const query = params.toString();
-  return `/staff/students${query ? `?${query}` : ""}`;
+  return `/staff/students/manage${query ? `?${query}` : ""}`;
 }
 
 // ---- Class sessions -------------------------------------------------------------

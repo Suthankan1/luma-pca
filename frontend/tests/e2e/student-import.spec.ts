@@ -30,7 +30,7 @@ test.describe("Student import from CSV", () => {
     await page.getByRole("button", { name: "Create batch" }).click();
     await expect(page.locator("#batch-feedback")).toHaveText(`Batch ${p.toUpperCase()}-MON created.`);
 
-    await page.goto("/staff/students");
+    await page.goto("/staff/students/manage");
     await page.getByRole("link", { name: "Import many students from a CSV file →" }).click();
     await expect(page).toHaveURL(/\/staff\/students\/import$/);
     const file = page.locator("#import-file");

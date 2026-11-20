@@ -59,7 +59,7 @@ test.describe("Attendance rule and final attendance", () => {
       [1, "Final Student", `final.student${n}@example.invalid`],
       [2, "Absent Student", `absent.student${n}@example.invalid`],
     ] as const) {
-      await page.goto("/staff/students");
+      await page.goto("/staff/students/manage");
       await openSection(page, "Add a student who is not in the Academy records");
       await page.locator("#student-number").fill(`FN-${p.toUpperCase()}-${number}`);
       await page.locator("#student-name").fill(name);
@@ -121,7 +121,7 @@ test.describe("Attendance rule and final attendance", () => {
     await expect(rows).toHaveText([/Final Student/, /Absent Student/]);
 
     await expect(final.getByText("Correct", { exact: true })).toHaveCount(0);
-    await page.goto("/staff/students?q=" + `FN-${p.toUpperCase()}-1`);
+    await page.goto("/staff/students/manage?q=" + `FN-${p.toUpperCase()}-1`);
     await page.getByRole("link", { name: new RegExp(`FN-${p.toUpperCase()}-1`) }).first().click();
     const history = page.getByRole("region", { name: "ATTENDANCE HISTORY" });
     await expect(history.getByRole("listitem", { name: `History Final class ${p}` }).locator(".status")).toHaveText("Late");
