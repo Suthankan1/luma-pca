@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
-import { StudentAttendanceProfile } from "@/components/StudentAttendanceProfile";
+import { StudentAttendanceProfile, type ProfileClass } from "@/components/StudentAttendanceProfile";
 import { requirePortal } from "@/lib/auth-server";
 import { dateOrNull, renderTime, withParams, type StudentOverview } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
@@ -29,12 +29,14 @@ export default async function StudentAttendancePage({ params, searchParams }: {
   data => data.classes.length >= 80);
   const student = await studentRequest;
   if (!student.ok && student.status === 404) notFound();
+  const scheduleRange = new URLSearchParams({ from: range.fromInstant, to: range.toInstant });
   const back = withParams("/staff/students", { month: range.month, q: typeof query.q === "string" ? query.q : null,
     type: typeof query.type === "string" ? query.type : null, sort: typeof query.sort === "string" ? query.sort : null });
   return <StaffShell active="students" crumb="Students / Attendance" title={student.ok ? student.data.fullName : "Student attendance"}
     subtitle={student.ok ? `${student.data.studentNumber} · ${monthLabel(range.month)}` : monthLabel(range.month)}
     hasStudentPortal={hasPortal(identity, "student")} actions={<Link href={back} className="text-link">← Back to Students</Link>}>
     <StudentAttendanceProfile range={range} today={today} now={now} reports={student.ok ? reports : null}
+      schedule={student.ok ? staffApi<ProfileClass[]>(`/api/v1/class-sessions?${scheduleRange}`, undefined, 25000) : null}
       href={`/staff/students/${studentId}/attendance`} staff />
   </StaffShell>;
 }

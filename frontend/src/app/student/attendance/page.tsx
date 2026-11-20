@@ -1,5 +1,5 @@
 import { Shell } from "@/components/Shell";
-import { StudentAttendanceProfile } from "@/components/StudentAttendanceProfile";
+import { StudentAttendanceProfile, type ProfileClass } from "@/components/StudentAttendanceProfile";
 import { AppealForm } from "@/components/AppealForm";
 import { requirePortal } from "@/lib/auth-server";
 import { dateOrNull, renderTime, type StudentOverview } from "@/lib/insights";
@@ -18,6 +18,8 @@ export default async function MyAttendancePage({ searchParams }: { searchParams:
   const now = renderTime();
   const today = academyToday(new Date(now));
   const range = classMonthRange(query.month, today, dateOrNull(query.from));
+  const scheduleRange = new URLSearchParams({ from: range.fromInstant, to: range.toInstant });
+  const schedule = studentApi<ProfileClass[]>(`/api/v1/me/class-sessions?${scheduleRange}`, undefined, 25000);
   const [me, reports, records] = await Promise.all([
     studentApi<{ fullName: string; studentNumber: string }>("/api/v1/me/student"),
     readAttendanceWindows(range.first, range.through ?? range.last, (from, to) => studentApi<StudentOverview>(
@@ -33,7 +35,7 @@ export default async function MyAttendancePage({ searchParams }: { searchParams:
       <h1 className="heading staff-heading">{me.ok ? me.data.fullName : "My attendance"}</h1>
       <p className="sub page-sub">{me.ok ? `${me.data.studentNumber} · ` : ""}{monthLabel(range.month)}</p>
     </div></header>
-    <StudentAttendanceProfile range={range} today={today} now={now} reports={reports} href="/student" />
+    <StudentAttendanceProfile range={range} today={today} now={now} reports={reports} schedule={schedule} href="/student" />
     {!records.ok && <p className="session-error panel-gap" role="alert">Attendance appeals couldn’t load.</p>}
     {finalRecords.length > 0 && <details className="panel panel-gap profile-appeals">
       <summary>Attendance appeals</summary>

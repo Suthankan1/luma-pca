@@ -937,7 +937,7 @@ a.class-detail-row:hover { background:#edf5fc; }
 
 .profile-overview { display: grid; gap: 16px; }
 .profile-overview .classes-month-picker { margin: 0; }
-.profile-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.profile-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
 .profile-metrics .panel { padding: 16px; }
 .profile-metrics dt { font-size: 13px; font-weight: 650; color: #3a5369; }
 .profile-metrics dd { margin: 9px 0 0; color: #122641; font-weight: 750; font-size: clamp(19px, 3vw, 29px); letter-spacing: -.035em; }
@@ -957,7 +957,7 @@ a.class-detail-row:hover { background:#edf5fc; }
 .profile-enrolments, .profile-class-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 420px; overflow: auto; }
 .profile-enrolments li { display: grid; gap: 2px; padding: 10px 0; overflow-wrap: anywhere; }
 .profile-enrolments li + li, .profile-class-list > li + li { border-top: 1px solid #e4ebf2; }
-.profile-enrolments span, .profile-enrolments small, .profile-class-row time { color: #4b6579; font-size: 12px; }
+.profile-class-row time { color: #4b6579; font-size: 12px; }
 .profile-history header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .profile-class-list > li { padding: 10px 1px; }
 .profile-class-row { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(80px,165px); align-items: center; gap: 10px; }
@@ -981,6 +981,7 @@ a.class-detail-row:hover { background:#edf5fc; }
 }
 @media (max-width: 620px) {
   .profile-metrics { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .profile-rate { grid-column: 1 / -1; }
   .profile-panels { grid-template-columns: minmax(0,1fr); }
   .profile-class-row { grid-template-columns: minmax(0,1fr) auto; }
   .profile-class-row > div { grid-column: 1 / -1; }

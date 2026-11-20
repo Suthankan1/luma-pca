@@ -3,21 +3,24 @@ import { ClassMonthPicker } from "./staff/ClassMonthPicker";
 import { PanelRetry } from "./staff/PanelRetry";
 import { StudentMonthDetails } from "./StudentMonthDetails";
 import { formatDuration, type StudentOverview, type ClassAttendance, type Enrolment } from "@/lib/insights";
-import { formatDate, instantParts, ACADEMY_TIME_ZONE } from "@/lib/staff-forms";
+import { instantParts, ACADEMY_TIME_ZONE } from "@/lib/staff-forms";
+import type { ApiResult } from "@/lib/staff-api";
 import { classTypeKey, compactClassTitle, monthLabel, type classMonthRange } from "@/lib/staff-home";
 import { attendancePercentFor, completedForStudent, participationFor, type Participation } from "@/lib/student-month";
 
 type Month = ReturnType<typeof classMonthRange>;
 
 type Reports = StudentOverview[] | null | Promise<StudentOverview[] | null>;
+export type ProfileClass = { title: string; startsAt: string; localDate: string; status: string; batches: { batchId: string }[] };
+type Schedule = Promise<ApiResult<ProfileClass[]>> | null;
 
-export function StudentAttendanceProfile({ range, today, now, reports, href, staff }: {
-  range: Month; today: string; now: number; reports: Reports; href: string; staff?: boolean;
+export function StudentAttendanceProfile({ range, today, now, reports, schedule, href, staff }: {
+  range: Month; today: string; now: number; reports: Reports; schedule: Schedule; href: string; staff?: boolean;
 }) {
   return <div className="profile-overview">
     <ClassMonthPicker href={href} month={range.month} currentMonth={today.startsWith(range.month)} label="Attendance month" />
     <Suspense key={range.month} fallback={<StudentProfileSkeleton />}>
-      <StudentProfilePanels range={range} now={now} reports={reports} staff={staff} />
+      <StudentProfilePanels range={range} now={now} reports={reports} schedule={schedule} staff={staff} />
     </Suspense>
   </div>;
 }
@@ -25,7 +28,7 @@ export function StudentAttendanceProfile({ range, today, now, reports, href, sta
 export function StudentProfileSkeleton() {
   return <div className="profile-overview" role="status" aria-label="Loading student profile attendance">
     <div className="profile-metrics" aria-hidden="true">
-      {[0, 1, 2, 3].map(index => <div key={index} className="panel">
+      {[0, 1, 2].map(index => <div key={index} className="panel">
         <div className="skeleton skeleton-line" /><div className="skeleton skeleton-title" />
       </div>)}
     </div>
@@ -36,8 +39,8 @@ export function StudentProfileSkeleton() {
   </div>;
 }
 
-async function StudentProfilePanels({ range, now, reports, staff }: {
-  range: Month; now: number; reports: Reports; staff?: boolean;
+async function StudentProfilePanels({ range, now, reports, schedule, staff }: {
+  range: Month; now: number; reports: Reports; schedule: Schedule; staff?: boolean;
 }) {
   const loaded = await reports;
   if (!loaded) return <p className="session-error" role="alert">Monthly attendance couldn’t load. <PanelRetry /></p>;
@@ -50,7 +53,9 @@ async function StudentProfilePanels({ range, now, reports, staff }: {
       if (through && day >= first && day <= through && completedForStudent(session, now)) classes.set(session.id, session);
     }
     for (const item of report.enrolments ?? []) {
-      if (item.enrolledOn <= last && (!item.withdrawnOn || item.withdrawnOn > first)) enrolments.set(item.batchId, item);
+      if (item.enrolledOn <= last && (!item.withdrawnOn || item.withdrawnOn > first)) {
+        enrolments.set(`${item.batchId}/${item.enrolledOn}`, item);
+      }
     }
   }
   const sessions = [...classes.values()].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
@@ -74,14 +79,35 @@ async function StudentProfilePanels({ range, now, reports, staff }: {
         <div className="panel profile-rate"><dt>Average attendance</dt><dd>{rate == null ? "—" : `${Math.round(rate)}%`}</dd></div>
         <div className="panel"><dt>Classes joined</dt><dd>{totals.joined}<small> / {totals.expected}</small></dd></div>
         <div className="panel"><dt>Time connected</dt><dd>{formatDuration(connected)}</dd></div>
-        <div className="panel"><dt>Enrolled batches</dt><dd>{enrolments.size}</dd></div>
       </dl>
-      <StudentMonthDetails key={month} types={[...groups.values()]} sessions={sessions} staff={staff} enrolments={<>
-        {enrolments.size ? <ul className="profile-enrolments">{[...enrolments.values()].map(item => <li key={item.batchId}>
-          <strong>{item.batchName}</strong>
-          <span>{[item.batchCode, item.courseTitle].filter(Boolean).join(" · ")}</span>
-          <small>{formatDate(item.enrolledOn)}{item.withdrawnOn ? ` – ${formatDate(item.withdrawnOn)}` : " onward"}</small>
-        </li>)}</ul> : <p className="panel-sub">No enrolments in {monthLabel(month)}.</p>}
-      </>} />
+      <StudentMonthDetails key={month} types={[...groups.values()]} sessions={sessions} staff={staff} enrolments={
+        <Suspense fallback={<p className="panel-sub" role="status">Loading class types…</p>}>
+          <EnrolledClassTypes schedule={schedule} enrolments={[...enrolments.values()]} sessions={sessions} range={range} />
+        </Suspense>
+      } />
+  </>;
+}
+
+async function EnrolledClassTypes({ schedule, enrolments, sessions, range }: {
+  schedule: Schedule; enrolments: Enrolment[]; sessions: ClassAttendance[]; range: Month;
+}) {
+  const result = await schedule;
+  const titles = new Map(sessions.map(session => [classTypeKey(session.title), compactClassTitle(session.title)]));
+  const from = Date.parse(range.fromInstant);
+  const to = Date.parse(range.toInstant);
+  for (const session of result?.ok ? result.data : []) {
+    const starts = Date.parse(session.startsAt);
+    if (session.status === "CANCELLED" || !(starts >= from && starts < to)) continue;
+    if (enrolments.some(item => item.enrolledOn <= session.localDate && (!item.withdrawnOn || item.withdrawnOn > session.localDate)
+      && session.batches.some(batch => batch.batchId === item.batchId))) {
+      titles.set(classTypeKey(session.title), compactClassTitle(session.title));
+    }
+  }
+  return <>
+    {titles.size > 0 && <ul className="profile-enrolments">
+      {[...titles].sort((a, b) => a[1].localeCompare(b[1])).map(([key, title]) => <li key={key}><strong>{title}</strong></li>)}
+    </ul>}
+    {!result?.ok ? <p className="session-error" role="alert">Scheduled class types couldn’t load. <PanelRetry /></p>
+      : titles.size === 0 && <p className="panel-sub">No enrolled class types scheduled this month.</p>}
   </>;
 }

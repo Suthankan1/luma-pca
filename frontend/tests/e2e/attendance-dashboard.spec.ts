@@ -46,7 +46,7 @@ test("the staff directory opens the selected profile while monthly attendance is
   } finally {
     await setOverview("release");
   }
-  await expect(page.getByRole("region", { name: "Enrolled this month" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Enrolled class types" })).toBeVisible();
   await page.getByRole("link", { name: "Previous month" }).click();
   await expect(page).toHaveURL(/\/attendance\?month=\d{4}-\d{2}$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Monthly Profile Student");
@@ -58,7 +58,9 @@ test("a verified student lands on their own profile and can filter the attendanc
     .format(new Date(Date.now() - 8 * 86_400_000)).slice(0, 7);
   if (new URL(page.url()).searchParams.get("month") !== month) await page.goto(`/student?month=${month}`);
   await expect(page.getByText("Average attendance", { exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Enrolled this month" })).toContainText("Monday evening");
+  const enrolled = page.getByRole("region", { name: "Enrolled class types" });
+  await expect(enrolled.getByText("Waves and oscillations", { exact: true })).toHaveCount(1);
+  await expect(enrolled).not.toContainText("Monday evening");
   const chart = page.getByRole("region", { name: "Attendance by class type" });
   await chart.getByRole("button", { name: /100% Waves and oscillations/ }).click();
   const history = page.getByRole("region", { name: "Class history" });
@@ -68,6 +70,10 @@ test("a verified student lands on their own profile and can filter the attendanc
   await expect(history.getByText(/25 min/).first()).toBeVisible();
   await history.getByRole("button", { name: "Show all classes" }).click();
   await expect(chart.getByRole("button", { name: /Waves and oscillations/ })).toHaveAttribute("aria-pressed", "false");
+  const futureMonth = new Date(Date.now() + 40 * 86_400_000).toISOString().slice(0, 7);
+  await page.goto(`/student?month=${futureMonth}`);
+  await expect(enrolled).toContainText("Far future class");
+  await expect(chart).toContainText("No completed sessions this month.");
   await page.goto("/staff/students/00000000-0000-4000-8000-0000000000b2/attendance");
   await expect(page).toHaveURL(/\/student$/);
 });

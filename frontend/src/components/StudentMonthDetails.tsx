@@ -32,7 +32,7 @@ export function StudentMonthDetails({ types, sessions, enrolments, staff }: {
         })}</ul> : <p className="panel-sub">No completed sessions this month.</p>}
       </section>
       <section className="panel" aria-labelledby="profile-enrolments-title">
-        <h2 id="profile-enrolments-title" className="panel-title">Enrolled this month</h2>
+        <h2 id="profile-enrolments-title" className="panel-title">Enrolled class types</h2>
         {enrolments}
       </section>
     </div>
