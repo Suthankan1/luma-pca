@@ -2749,3 +2749,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Reports opens on three report type cards and the month controls. The selected type loads its searchable picker without fetching unrelated options. The download route and date rules stay the same.
 - Production build, 81 frontend unit tests and desktop/mobile browser checks passed. The browser checks opened and verified each of the three generated Excel files, including a student selected by registration ID without separators. A first run exposed a shadowed variable in the mock for the new student fixture. Fixed it and passed the rerun.
 - Frontend-only. Revert this commit to restore the three eagerly loaded pickers. Original Supabase exports were not tested.
+
+## Compact Students month view (2026-11-21)
+
+- The directory makes one request for student identities and class-type totals. Full-result search, sorting and averages stay immediate in the browser, and offscreen rows and chart bars defer layout. A 404 from an older backend uses the previous read path.
+- The backend scope, no-store, unenrolled student and attendance parity tests passed. The production build and signed-in k6 run passed. With all 28 projections ready, Students page p95 was 109 ms versus 658 ms at baseline, and its compact API p95 was 65 ms. The frontend made eight compact calls and no attendance-dashboard calls during this run.
+- The monthly API uses V31 on the current backend. Revert this frontend integration to restore the prior reads. No hosted configuration or data changed.

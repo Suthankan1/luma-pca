@@ -707,11 +707,13 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .student-month-chart { margin-top:14px; overflow:auto; }
 .student-month-chart ul { display:flex; gap:8px; width:max-content; min-width:100%; padding:0 3px 8px; }
 .student-month-chart li { width:42px; min-width:42px; text-align:center; }
+.student-month-chart li { content-visibility:auto; contain-intrinsic-size:42px auto 208px; }
 .student-month-track { position:relative; height:138px; border-radius:6px; background:linear-gradient(to top,#edf3f8 49%,#dce5ee 49% 50%,#edf3f8 50%); }
 .student-month-reg { display:block; writing-mode:vertical-rl; margin:8px auto 0; color:var(--ink-2); font-size:11px; }
 .student-month-list { max-height:31rem; overflow:auto; scrollbar-gutter:stable; }
 .student-month-list:focus-visible, .student-month-chart:focus-visible { outline:2px solid var(--pca-blue); outline-offset:2px; }
 .student-month-row + .student-month-row, .student-month-session + .student-month-session { border-top:1px solid var(--line-soft); }
+.student-month-row { content-visibility:auto; contain-intrinsic-block-size:auto 58px; }
 .student-month-row a { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:10px 8px; border-radius:6px; overflow-wrap:anywhere; }
 .student-month-row a:hover { background:#edf5fc; }
 .student-month-row small { display:block; margin-top:2px; color:var(--ink-3); }
