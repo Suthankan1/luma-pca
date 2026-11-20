@@ -12,7 +12,10 @@ test("The staff portal has no Staff page or menu item", async ({ page }) => {
   await expect(page).toHaveURL(/\/staff$/);
   const menu = page.getByRole("complementary", { name: "Staff navigation" });
   await expect(menu.getByRole("link", { name: /^\W*Staff$/ })).toHaveCount(0);
-  await expect(menu.getByRole("link", { name: /Classes/ })).toBeVisible();
+  const sections = menu.getByRole("navigation", { name: "Staff sections" });
+  await expect(sections.locator('a[href^="/staff"]')).toHaveText([/Home/, /Classes/, /Students/]);
+  await sections.getByRole("link", { name: "Students", exact: true }).click();
+  await expect(sections.getByRole("link", { name: "Students", exact: true })).toHaveAttribute("aria-current", "page");
   expect((await page.goto("/staff/team"))?.status()).toBe(404);
   expect((await page.goto("/staff/team/00000000-0000-4000-8000-0000000000bb"))?.status()).toBe(404);
 });

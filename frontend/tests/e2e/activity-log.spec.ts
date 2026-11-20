@@ -28,6 +28,7 @@ test.describe("Activity log", () => {
     await page.locator("#batch-name").fill("Monday");
     await page.locator("#batch-starts").fill("2027-01-10");
     await page.getByRole("button", { name: "Create batch" }).click();
+    await expect(page.locator("#batch-feedback")).toHaveText(`Batch ${P}-MON created.`);
     const lesson = await scheduleClass(page, { title: `Logged ${p}`, date: "2027-04-05", start: "18:00", end: "20:00",
       batch: `${P}-HX · ${P}-MON · Monday` });
 
@@ -44,8 +45,6 @@ test.describe("Activity log", () => {
     await page.getByRole("link", { name: "Show everything" }).click();
     await expect(page).toHaveURL(/\/staff\/activity\?category=students$/);
     for (const summary of await rows.locator("strong").allTextContents()) expect(summary).toMatch(/^Imported \d+ students?$/);
-    await expect(page.getByRole("complementary", { name: "Staff navigation" }).getByRole("link", { name: /Activity log/ }))
-      .toHaveAttribute("aria-current", "page");
   });
 
   test("Scheduling a class appears under Classes, in the class's own time", async ({ page }) => {

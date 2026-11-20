@@ -7,34 +7,14 @@ const staffFont = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500",
 import { AcademyBrand } from "./AcademyBrand";
 import type { ReactNode } from "react";
 
-/** The staff menu, in groups people think in: what is happening, teaching, people, and setup. */
-export const staffNavGroups = [
-  { label: "Overview", items: [
-    { key: "overview", label: "Home", href: "/staff", icon: "◷" },
-  ] },
-  { label: "Teaching", items: [
-    { key: "sessions", label: "Classes", href: "/staff/sessions", icon: "▶" },
-    { key: "attendance", label: "Attendance", href: "/staff/attendance", icon: "✓" },
-  ] },
-  { label: "Academy", items: [
-    { key: "academy", label: "Academy classes", href: "/staff/academy", icon: "⇄" },
-    { key: "students", label: "Students", href: "/staff/students", icon: "☺" },
-  ] },
-  { label: "Administration", items: [
-    { key: "courses", label: "Courses & batches", href: "/staff/courses", icon: "▤" },
-    { key: "zoom", label: "Zoom review", href: "/staff/zoom", icon: "◎" },
-    { key: "activity", label: "Activity log", href: "/staff/activity", icon: "≡" },
-  ] },
+const staffNav = [
+  { key: "overview", label: "Home", href: "/staff", icon: "◷" },
+  { key: "sessions", label: "Classes", href: "/staff/sessions", icon: "▶" },
+  { key: "students", label: "Students", href: "/staff/students", icon: "☺" },
 ] as const;
 
-/** Pages reached from another section's tabs light up that section in the menu. */
-const sectionOf: Record<string, string> = { dashboard: "attendance" };
-
-type NavItem = (typeof staffNavGroups)[number]["items"][number];
-
-export const staffNav: readonly NavItem[] = staffNavGroups.flatMap(group => group.items as readonly NavItem[]);
-
-export type StaffSection = NavItem["key"] | "dashboard";
+export type StaffSection = (typeof staffNav)[number]["key"]
+  | "attendance" | "academy" | "courses" | "zoom" | "activity" | "dashboard";
 
 /** Staff layout: a navy menu that stays in view, then a compact page header and the page. */
 export function StaffShell({ active, crumb, title, fullTitle, subtitle, hasStudentPortal, actions, children }: {
@@ -51,15 +31,12 @@ export function StaffShell({ active, crumb, title, fullTitle, subtitle, hasStude
   return <div className={`shell staff-shell ${staffFont.variable}${active === "overview" ? " staff-home-shell" : ""}`}>
     <aside className="aside staff-rail" aria-label="Staff navigation">
       <AcademyBrand href="/staff" />
-      <nav className="staff-nav">
-        {staffNavGroups.map(group => <div key={group.label} className="staff-navgroup" role="group" aria-label={group.label}>
-          <span className="staff-navlabel" aria-hidden>{group.label}</span>
-          {group.items.map(item => <Link key={item.key} href={item.href}
-            className={`staff-navitem ${item.key === (sectionOf[active] ?? active) ? "active" : ""}`}
-            aria-current={item.key === (sectionOf[active] ?? active) ? "page" : undefined}>
-            <span className="staff-navicon" aria-hidden>{item.icon}</span>{item.label}<LinkPending />
-          </Link>)}
-        </div>)}
+      <nav className="staff-nav" aria-label="Staff sections">
+        {staffNav.map(item => <Link key={item.key} href={item.href}
+          className={`staff-navitem ${item.key === active ? "active" : ""}`}
+          aria-current={item.key === active ? "page" : undefined}>
+          <span className="staff-navicon" aria-hidden>{item.icon}</span>{item.label}<LinkPending />
+        </Link>)}
         {hasStudentPortal && <Link href="/student" className="staff-navitem">
           <span className="staff-navicon" aria-hidden>↗</span>Student portal
         </Link>}

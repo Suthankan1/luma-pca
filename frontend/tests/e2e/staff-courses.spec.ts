@@ -18,10 +18,9 @@ test.describe("Staff courses and batches", () => {
 
   test("An administrator creates a course and a batch, sees refusals inline, and deactivates and reactivates", async ({ page }) => {
     await signInAsAdmin(page);
-    await page.getByRole("link", { name: /Courses & batches/ }).first().click();
+    await page.goto("/staff/courses");
     await expect(page).toHaveURL(/\/staff\/courses$/);
     await expect(page.getByRole("heading", { level: 1, name: "Courses & batches" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Courses & batches/ }).first()).toHaveAttribute("aria-current", "page");
 
     const course = `phy-${suffix}`;
     await page.getByLabel("Code", { exact: true }).first().fill(course);

@@ -37,7 +37,7 @@ test.describe("Zoom review", () => {
     await page.goto("/staff/sessions");
     await scheduleClass(page, { title: `Zoom class ${p}`, date: `2027-03-0${n}`, start: "18:00", end: "20:00", batch: `${C} · A · Batch A`, webinar: `987 6543 210${n}` });
 
-    await page.getByRole("link", { name: /Zoom review$/ }).first().click();
+    await page.goto("/staff/zoom");
     await expect(page).toHaveURL(/\/staff\/zoom$/);
     const auto = page.getByRole("listitem", { name: `Webinar 987 6543 210${n} at ${n} Mar 2027 18:05` });
     const manual = page.getByRole("listitem", { name: `Webinar 555 0001 110${n} at ${n} Mar 2027 09:30` });

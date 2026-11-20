@@ -5,6 +5,8 @@ Every staff account signs in with its email and password. Choose a strong passwo
 Change your password with **Change password** at the top of every staff page; you are signed out everywhere afterwards.
 
 ## Every day
+The staff sidebar has **Home**, **Classes**, and **Students**. Use links inside those pages or an existing bookmark to reach supporting screens.
+
 The **Staff portal** home shows today's classes and what needs attention (classes to finalise, appeals, Zoom
 accounts to match, failed Zoom events); each line opens the page where it is handled.
 

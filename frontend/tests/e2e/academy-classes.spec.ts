@@ -16,7 +16,7 @@ test.describe("Academy classes", () => {
   test("A class from the Academy records is set up in one step and its students synced", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Sets up shared mock data once");
     await signInStaff(page, "admin-enrolled@example.invalid");
-    await page.getByRole("link", { name: /Academy classes/ }).first().click();
+    await page.goto("/staff/academy");
     await expect(page).toHaveURL(/\/staff\/academy$/);
     await expect(page.getByRole("heading", { name: "Academy classes", level: 1 })).toBeVisible();
 

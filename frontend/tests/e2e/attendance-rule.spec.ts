@@ -32,7 +32,7 @@ test.describe("Attendance rule and final attendance", () => {
 
     await page.context().clearCookies();
     await signIn(page, "admin-enrolled@example.invalid");
-    await page.getByRole("link", { name: /Attendance$/ }).first().click();
+    await page.goto("/staff/attendance");
     await expect(page).toHaveURL(/\/staff\/attendance$/);
     await expect(page.locator(".rule-line")).toContainText("present from 75% of the class");
     await page.getByRole("navigation", { name: "Attendance sections" }).getByRole("link", { name: "Rule & settings" }).click();

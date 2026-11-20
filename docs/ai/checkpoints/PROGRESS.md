@@ -2657,3 +2657,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Removed the average connected-time summary card and the per-student correction control. The final roster offers All statuses, Present, Late and Absent filters. The filter and right-aligned status column use a fixed compact width on desktop, with a flexible layout on mobile.
 - Passed 77 frontend unit tests, TypeScript, targeted ESLint, the structure check, and four desktop/mobile Edge checks against the mock backend. Updated the real-stack onboarding test for the new roster and final outcome display. The real-stack suite and the signed-in Supabase page were not run.
 - The frontend change needs no database migration. Revert this commit to roll back.
+
+## Simplified staff sidebar (2026-11-21)
+
+- The sidebar lists Home, Classes, and Students. Removed the Attendance, Academy classes, Courses & batches, Zoom review, and Activity log tabs and the menu group headings. Supporting screens can still be reached through their existing links and URLs.
+- Passed 77 unit tests, TypeScript, targeted ESLint, and the structure check. Desktop and mobile mock browser coverage passed 21 cases across the main run and the Activity log rerun after correcting a test fixture race. One shared Academy setup case was skipped on mobile by design. API readiness and sign-in smoke passed. Signed-in verification with original data was not run.
+- Frontend-only change. Revert this commit to roll back.
