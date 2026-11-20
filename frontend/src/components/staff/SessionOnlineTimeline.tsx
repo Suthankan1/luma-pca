@@ -24,8 +24,17 @@ export function SessionOnlineTimeline({ history, start, end, endLabel, timeZone 
   const ceiling = Math.max(2, Math.ceil(peak / 2) * 2);
   const x = (at: number) => (at - left) * 100 / span;
   const y = (online: number) => (ceiling - online) * 100 / ceiling;
-  const line = samples.map(({ at, online }, i) => i === 0 ? `M${x(at)},${y(online)}`
-    : `H${x(at)}V${y(online)}`).join(" ");
+  const line = samples.map(({ at, online }, i) => {
+    const endX = x(at);
+    const endY = y(online);
+    if (i === 0) return `M${endX},${endY}`;
+    const previous = samples[i - 1];
+    const startX = x(previous.at);
+    const startY = y(previous.online);
+    const third = (endX - startX) / 3;
+    // Horizontal tangents join smoothly without overshooting either recorded count.
+    return `C${startX + third},${startY} ${endX - third},${endY} ${endX},${endY}`;
+  }).join(" ");
   const clock = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const sampleLabel = active && `${clock.format(active.at)} · ${active.online} online`;
 
@@ -40,7 +49,7 @@ export function SessionOnlineTimeline({ history, start, end, endLabel, timeZone 
   return <figure className="panel panel-gap session-timeline" aria-labelledby={titleId}>
     <figcaption id={titleId} className="panel-title">Students online over time</figcaption>
     {last && active ? <>
-      <p className="panel-sub">{samples.length} {samples.length === 1 ? "sample" : "samples"} from Zoom join and leave data, at 30-second intervals.</p>
+      <p className="panel-sub">{samples.length} {samples.length === 1 ? "sample" : "samples"} · 30-second intervals</p>
       <div className="session-timeline-readout"><strong>{sampleLabel}</strong><span>Peak {peak}</span></div>
       <div className="session-timeline-plot">
         <div className="session-timeline-scale" aria-hidden="true"><span>{ceiling}</span><span>{ceiling / 2}</span><span>0</span></div>

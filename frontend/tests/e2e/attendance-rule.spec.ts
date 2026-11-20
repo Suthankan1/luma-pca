@@ -55,17 +55,22 @@ test.describe("Attendance rule and final attendance", () => {
     await page.getByRole("button", { name: "Create batch" }).click();
     await expect(page.locator("#batch-feedback")).toHaveText("Batch A created.");
 
-    await page.goto("/staff/students");
-    await openSection(page, "Add a student who is not in the Academy records");
-    await page.locator("#student-number").fill(`FN-${p.toUpperCase()}-1`);
-    await page.locator("#student-name").fill("Final Student");
-    await page.locator("#student-email").fill(`final.student${n}@example.invalid`);
-    await page.getByRole("button", { name: "Add student" }).click();
-    await page.getByRole("link", { name: "Open the new student’s record →" }).click();
-    await page.locator("#enroll-batch").selectOption({ label: `${C} · A · Batch A` });
-    await page.locator("#enroll-date").fill("2026-01-05");
-    await page.getByRole("button", { name: "Enrol", exact: true }).click();
-    await expect(page.locator("#enroll-feedback")).toHaveText("Enrolled.");
+    for (const [number, name, email] of [
+      [1, "Final Student", `final.student${n}@example.invalid`],
+      [2, "Absent Student", `absent.student${n}@example.invalid`],
+    ] as const) {
+      await page.goto("/staff/students");
+      await openSection(page, "Add a student who is not in the Academy records");
+      await page.locator("#student-number").fill(`FN-${p.toUpperCase()}-${number}`);
+      await page.locator("#student-name").fill(name);
+      await page.locator("#student-email").fill(email);
+      await page.getByRole("button", { name: "Add student" }).click();
+      await page.getByRole("link", { name: "Open the new student’s record →" }).click();
+      await page.locator("#enroll-batch").selectOption({ label: `${C} · A · Batch A` });
+      await page.locator("#enroll-date").fill("2026-01-05");
+      await page.getByRole("button", { name: "Enrol", exact: true }).click();
+      await expect(page.locator("#enroll-feedback")).toHaveText("Enrolled.");
+    }
 
     // A past class on the seeded webinar, 09:00–11:00 Colombo; the student joined at 09:15 and stayed.
     const day = `2026-03-0${Number(n) + 4}`;
@@ -88,13 +93,31 @@ test.describe("Attendance rule and final attendance", () => {
     const final = page.getByRole("region", { name: "FINAL ATTENDANCE" });
     await expect(final.getByRole("listitem", { name: `Attendance FN-${p.toUpperCase()}-1 Final Student` }).locator(".status")).toHaveText("Late");
     const metric = (label: string) => page.locator(".session-metrics > div").filter({ has: page.getByText(label, { exact: true }) }).locator("dd strong");
-    await expect(metric("Expected")).toHaveText("1");
+    await expect(metric("Expected")).toHaveText("2");
     await expect(metric("Students joined")).toHaveText("1");
-    await expect(metric("Expected not seen")).toHaveText("0");
+    await expect(metric("Expected not seen")).toHaveText("1");
     await expect(metric("Attendance credited")).toHaveText("1");
     await expect(metric("Average time connected")).toHaveText("105 min");
-    await expect(final).toContainText("Final since");
+    await expect(final.getByText(/Final since|Recalculate from Zoom/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Finalise attendance" })).toHaveCount(0);
+
+    const rows = final.getByRole("region", { name: "Student attendance results" }).getByRole("listitem");
+    const search = final.getByRole("searchbox", { name: "Search students" });
+    const status = final.getByRole("combobox", { name: "Attendance", exact: true });
+    await search.fill("absent student");
+    await expect(rows).toHaveText([/Absent Student/]);
+    await search.fill(`fn-${p}-1`);
+    await expect(rows).toHaveText([/Final Student/]);
+    await status.selectOption("ABSENT");
+    await expect(final.getByRole("status")).toHaveText("No students match these filters.");
+    await search.fill("");
+    await expect(rows).toHaveText([/Absent Student/]);
+    await status.selectOption("all");
+    const order = final.getByRole("combobox", { name: "Sort by" });
+    await order.selectOption("shortest");
+    await expect(rows).toHaveText([/Absent Student/, /Final Student/]);
+    await order.selectOption("longest");
+    await expect(rows).toHaveText([/Final Student/, /Absent Student/]);
 
     // A correction with a reason; the computed outcome stays visible in the student's history.
     const row = final.getByRole("listitem", { name: `Attendance FN-${p.toUpperCase()}-1 Final Student` });
@@ -104,11 +127,6 @@ test.describe("Attendance rule and final attendance", () => {
     await row.getByRole("button", { name: "Save correction" }).click();
     await expect(row.locator(".status")).toHaveText("Excused");
     await expect(metric("Attendance credited")).toHaveText("0");
-    await page.getByText("Recalculate from Zoom’s report").click();
-    await page.locator("#recalc-reason").fill("Zoom report fetched again");
-    await page.getByRole("button", { name: "Recalculate" }).click();
-    await expect(page.locator("#recalc-feedback")).toHaveText("Recalculated: 0 changed, 1 corrected kept, 0 added.");
-    await expect(row.locator(".status")).toHaveText("Excused");
     await page.goto("/staff/students?q=" + `FN-${p.toUpperCase()}-1`);
     await page.getByRole("link", { name: new RegExp(`FN-${p.toUpperCase()}-1`) }).first().click();
     const history = page.getByRole("region", { name: "ATTENDANCE HISTORY" });

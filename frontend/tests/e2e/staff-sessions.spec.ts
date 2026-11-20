@@ -63,10 +63,11 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await expect(row.getByRole("link")).toHaveAttribute("href", `/staff/sessions/${old.id}`);
     await expect(page.locator("#class-batch")).toHaveCount(0);
 
-    // Its page keeps the expected students and attendance, without any way to change the class.
+    // Its attendance roster includes expected students and the class stays read-only.
     await page.goto(`/staff/sessions/${old.id}`);
-    await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText(`cl-${p}-001`.toUpperCase());
-    await expect(page.getByRole("region", { name: "ZOOM", exact: true })).toContainText("can no longer be edited or cancelled here");
+    await expect(page.getByRole("region", { name: "Student attendance results" })).toContainText(`cl-${p}-001`.toUpperCase());
+    await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "ZOOM", exact: true })).toHaveCount(0);
     await expect(page.locator("#edit-title, #edit-date, #status-select")).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Save changes|Cancel class|Restore class/ })).toHaveCount(0);
 

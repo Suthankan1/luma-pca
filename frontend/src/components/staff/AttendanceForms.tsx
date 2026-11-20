@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { correctRecord, finaliseAllReady, finaliseAttendance, recalculateAttendance, resolveAppeal, savePolicy } from "@/app/staff/attendance/actions";
+import { correctRecord, finaliseAllReady, finaliseAttendance, resolveAppeal, savePolicy } from "@/app/staff/attendance/actions";
 import { attendanceOutcomes, outcomeLabels, type AttendanceOutcome, type AttendancePolicy, type FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, id }: { state: FormState; id: string }) {
@@ -24,7 +24,7 @@ export function PolicyForm({ policy }: { policy: AttendancePolicy | null }) {
     <input id="policy-description" name="description" maxLength={500} required autoComplete="off"
       defaultValue={values?.description ?? policy?.description ?? ""} placeholder="Approved at the staff meeting on 1 Nov 2026" />
     <label className="check"><input type="checkbox" name="autoFinalise" defaultChecked={!!policy?.autoFinalise} /> Finalise each class
-      automatically once Zoom’s report is in (in your name; staff can still correct and recalculate)</label>
+      automatically once Zoom’s report is in (in your name)</label>
     <button className="action" type="submit" disabled={pending}>{pending ? "Saving…" : "Save rule"}</button>
     <Feedback state={state} id="policy-feedback" />
   </form>;
@@ -88,18 +88,4 @@ export function AppealDecisionForm({ prefix, appealId, current }: { prefix: stri
     </div>
     <Feedback state={state} id={`${prefix}-feedback`} />
   </form>;
-}
-
-export function RecalculateForm({ sessionId }: { sessionId: string }) {
-  const [state, action, pending] = useActionState(recalculateAttendance, null);
-  const values = state && !state.ok ? state.values : undefined;
-  return <details className="decision recalculate"><summary>Recalculate from Zoom’s report</summary>
-    <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
-      <input type="hidden" name="sessionId" value={sessionId} />
-      <p className="panel-sub">Use this after Zoom’s report was fetched again or another run was linked. Corrected records keep their outcome.</p>
-      <label htmlFor="recalc-reason">Reason <span className="muted">(recorded)</span></label>
-      <input id="recalc-reason" name="reason" maxLength={300} required autoComplete="off" defaultValue={values?.reason} />
-      <button className="action secondary" type="submit" disabled={pending}>{pending ? "Recalculating…" : "Recalculate"}</button>
-      <Feedback state={state} id="recalc-feedback" />
-    </form></details>;
 }

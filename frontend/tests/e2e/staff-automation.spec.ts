@@ -93,6 +93,7 @@ test.describe("Less manual work for staff", () => {
     await expect(page.locator(".session-metrics").getByText("1 h 50 min", { exact: true })).toBeVisible();
     await expect(timeline).toContainText("221 samples");
     await expect(timeline).toContainText("End");
+    await expect(timeline.locator(".session-timeline-line")).toHaveAttribute("d", /^M[^C]+C/);
     const scrubber = timeline.getByRole("slider", { name: "Explore timeline" });
     await expect(scrubber).toHaveAttribute("aria-valuetext", /0 online$/);
     await scrubber.press("Home");

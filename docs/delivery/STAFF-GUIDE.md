@@ -43,9 +43,9 @@ accounts to match, failed Zoom events); each line opens the page where it is han
 - **Waiting to be finalised** (Attendance page): every ended class that is not final, with what it waits for (Zoom's
   report, or a Zoom run to link). **Finalise N ready classes** finalises them all at once.
 - **Automatic finalisation** (on the rule form): once Zoom's report is in, LUMA finalises each class within a few
-  minutes in the name of the staff member who switched it on; the activity log says "Automatically finalised". Corrections and recalculation still work.
-- **Recalculate** a final class (with a reason) after a late report, a new Zoom decision or a rule change. Corrected
-  outcomes are kept; students enrolled since are added.
+  minutes in the name of the staff member who switched it on; the activity log says "Automatically finalised".
+- **Final attendance** on the class page supports search by student name or registration number, outcome filters,
+  and sorting by name or time connected.
 - **Correct** a student's outcome (e.g. Excused) with a reason; the original outcome stays in the history. The student
   is emailed. Managers are emailed when a student appeals.
 - **Appeals** from students appear on the Attendance page: accept (choose the outcome) or reject, with a note they see.

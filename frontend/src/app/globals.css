@@ -717,7 +717,6 @@ a.class-detail-row:hover { background:#edf5fc; }
 .session-metrics dt { font-size:13px; font-weight:700; color:var(--ink-2); }
 .session-metrics dd { margin:6px 0 0; }
 .session-metrics strong { display:block; color:#116d70; font-size:clamp(21px,2.3vw,29px); font-variant-numeric:tabular-nums; }
-.session-metrics dd > span { display:block; margin-top:4px; font-size:12px; color:var(--ink-3); }
 .session-timeline-readout { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin:14px 0 8px; color:#116d70; font-size:13px; font-variant-numeric:tabular-nums; }
 .session-timeline-readout > span { color:var(--ink-3); }
 .session-timeline-plot { display:grid; grid-template:minmax(0,1fr) / 32px minmax(0,1fr); gap:10px; height:clamp(150px,26vw,240px); }
@@ -734,6 +733,9 @@ a.class-detail-row:hover { background:#edf5fc; }
 @media (prefers-reduced-motion:no-preference) { .session-timeline-line { animation:session-timeline-enter .4s ease-out both; } }
 @keyframes session-timeline-enter { from { opacity:0; } }
 .session-roster-head, .session-roster-row { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1.6fr) minmax(110px,.55fr); gap:8px 18px; align-items:start; padding:12px; }
+.session-roster-tools { align-items:end; }
+.session-roster-tools label:first-child { flex-grow:2; }
+.session-roster-export { display:inline-flex; align-items:center; min-height:36px; margin-inline-start:auto; font-size:13px; }
 .session-roster-head { margin-top:16px; border-radius:8px 8px 0 0; background:#edf4fa; color:var(--ink-2); font-size:12px; font-weight:700; }
 .session-roster-scroll { max-height:34rem; overflow:auto; scrollbar-gutter:stable; }
 .session-roster-row { border-bottom:1px solid var(--line-soft); font-size:14px; overflow-wrap:anywhere; }
