@@ -5,7 +5,7 @@ Every staff account signs in with its email and password. Choose a strong passwo
 Change your password with **Change password** at the top of every staff page; you are signed out everywhere afterwards.
 
 ## Every day
-The staff sidebar has **Home**, **Classes**, **Class Types**, and **Students**. Use links inside those pages or an existing bookmark to reach supporting screens.
+The staff sidebar has **Home**, **Classes**, **Class Types**, **Students**, and **Reports**. Use links inside those pages or an existing bookmark to reach supporting screens.
 
 The **Staff portal** home shows today's classes and what needs attention (classes to finalise, appeals, Zoom
 accounts to match, failed Zoom events); each line opens the page where it is handled.
@@ -38,6 +38,9 @@ accounts to match, failed Zoom events); each line opens the page where it is han
   as "gave up"; fetch it again by hand from the occurrence.
 
 ## Attendance
+- **Reports** starts in the current month. Optionally choose an end month for a range of up to 12 months, then select
+  a completed class session, class type, or student and download an Excel workbook. Reports use Sri Lanka dates and
+  include data through today. Downloads are private and recorded in the web server log.
 - **Students** shows the full directory, monthly registration-ID chart, and average for the current search and
   class-type selection. Open a student to see the classes they were expected in by type, connected minutes, and
   final outcomes. Monthly rates use completed, tracked sessions. A missing final outcome is shown as pending.

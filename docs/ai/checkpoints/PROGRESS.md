@@ -2689,3 +2689,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Search, class type, and sort controls sit above the scrolling list inside Student directory. Their selection drives the directory, bar chart, and overall average.
 - TypeScript, targeted ESLint, and the structure check passed. Desktop and mobile mock browser checks verified the controls inside the directory and their effect on attendance. Signed-in verification with original data was not run.
 - Frontend-only layout change. Revert this commit to roll back.
+
+## Excel attendance reports (2026-11-21)
+
+- Started and verified the local project against the original Supabase database before implementing Reports. The runtime uses the existing transaction-pool override and already migrated schema.
+- The staff Reports tab defaults to the current Sri Lanka month. Staff can choose up to 12 months and export one completed session, class type, or student as an Excel workbook. Each report uses the existing staff-scoped APIs, safe string and numeric cells, and private no-store responses. Successful workbook generation records the actor, academy, report kind, and period in the web server log.
+- Passed 81 unit tests, TypeScript, ESLint, the structure check, and npm audit. Four desktop/mobile mock browser checks opened all three downloaded workbooks, verified month boundaries and staff-only access. The running Supabase-backed API reported UP, sign-in returned 200, and the new routes redirected signed-out requests. Signed-in downloads against original data were not run.
+- Frontend-only rollout with the locked workbook dependency. Revert this commit to roll back. No migration is needed.

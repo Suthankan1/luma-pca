@@ -676,6 +676,14 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .classes-chart-label { display:block; margin-top:4px; overflow:hidden; color:#425972; font-size:10px; white-space:nowrap; text-overflow:ellipsis; }
 .class-attendance-percent { color:#116d70; font-variant-numeric:tabular-nums; }
 .student-month-tools label:first-child { flex-grow:2; }
+.report-period { align-items:end; margin-top:0; }
+.report-period label { max-width:240px; }
+.report-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:14px; }
+.report-options > .panel { min-width:0; }
+.report-selection { display:grid; gap:8px; margin-top:14px; }
+.report-selection label { color:var(--ink-2); font-size:13px; font-weight:600; }
+.report-selection select { width:100%; min-width:0; min-height:42px; padding:8px; border:1px solid #9fb5cb; border-radius:8px; background:#fff; }
+.report-selection button { justify-self:start; margin-top:4px; }
 .student-month-average { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:8px 16px; }
 .student-month-average span { display:block; font-size:13px; color:var(--ink-2); }
 .student-month-average strong, .student-month-summary strong { display:block; color:#116d70; font-size:clamp(24px,4vw,36px); font-variant-numeric:tabular-nums; }
