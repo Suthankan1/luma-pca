@@ -11,7 +11,7 @@ Progress is the number of verified local items divided by the ten local items be
 | 5 | Add and verify a durable, replay-safe completed attendance summary. Prove parity and rollback before enabling reads. | Verified locally. Disabled by default. |
 | 6 | Add a scoped Students monthly read with full-result filtering, ordering and aggregates. | Pending |
 | 7 | Poll live data independently of the page and preserve timeline recovery and completion. | Pending |
-| 8 | Load Reports options on demand and verify all export types. | Pending |
+| 8 | Load Reports options on demand and verify all export types. | Verified |
 | 9 | Measure auth overhead and verify any auth or cache changes against logout and account switching. | Pending |
 | 10 | Automate regression checks, repeat the baseline and document release and rollback. | Pending |
 

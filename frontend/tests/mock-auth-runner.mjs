@@ -919,7 +919,9 @@ function insightsApi(req, send) {
   }
   if (url.pathname !== "/api/v1/attendance/dashboard") {
     const student = INSIGHT_STUDENTS.find(s => url.pathname.includes(s.id));
-    return student ? send(200, insightsOverview(student)) : send(404);
+    if (student) return send(200, insightsOverview(student));
+    const id = url.pathname.split("/")[4];
+    return students.some(row => row.id === id) ? send(200, { classes: [] }) : send(404);
   }
   const from = url.searchParams.get("from"), to = url.searchParams.get("to");
   if (from && to && (Date.parse(to) - Date.parse(from)) / 86400_000 > 91) return send(400, { detail: "from must not be after to, and the range is at most 92 days" });
@@ -931,7 +933,7 @@ function insightsApi(req, send) {
       averagePercent: Math.round(cells.reduce((s, x) => s + x.percent, 0) / 3) };
   });
   const indexes = classes.map(c => INSIGHT_CLASSES.findIndex(x => x.id === c.id));
-  const students = classes.length === 0 ? [] : INSIGHT_STUDENTS.map(s => {
+  const rows = classes.length === 0 ? [] : INSIGHT_STUDENTS.map(s => {
     const cells = indexes.map(i => insightCell(s, i));
     const connected = cells.reduce((sum, x) => sum + x.connectedSeconds, 0);
     const total = classes.reduce((sum, c) => sum + c.classSeconds, 0);
@@ -940,10 +942,10 @@ function insightsApi(req, send) {
       present: cells.filter(x => x.outcome === "PRESENT").length, late: 0, absent: cells.filter(x => x.outcome === "ABSENT").length, excused: 0,
       rejoins: cells.reduce((sum, x) => sum + Math.max(0, x.visits - 1), 0), cells };
   });
-  const average = students.length ? Math.round(students.reduce((sum, x) => sum + x.percent, 0) / students.length) : 0;
+  const average = rows.length ? Math.round(rows.reduce((sum, x) => sum + x.percent, 0) / rows.length) : 0;
   return send(200, { from, to, courseId: url.searchParams.get("courseId"), batchId: url.searchParams.get("batchId"), truncated: false,
-    totals: { classes: classes.length, students: students.length, averagePercent: average, classSeconds: classes.reduce((sum, c) => sum + c.classSeconds, 0),
-      belowThreshold: students.filter(x => x.percent < 75).length, minPercent: 75, connectedNow: 0 }, classes, students });
+    totals: { classes: classes.length, students: rows.length, averagePercent: average, classSeconds: classes.reduce((sum, c) => sum + c.classSeconds, 0),
+      belowThreshold: rows.filter(x => x.percent < 75).length, minPercent: 75, connectedNow: 0 }, classes, students: rows });
 }
 
 // The Academy's own records (read-only in the real API): classes from payment rows, students by Academy ID.

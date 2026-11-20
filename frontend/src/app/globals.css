@@ -680,6 +680,9 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .report-period label { max-width:240px; }
 .report-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:14px; }
 .report-options > .panel { min-width:0; }
+.report-type-card { display:grid; gap:5px; text-decoration:none; }
+.report-type-card span { color:var(--ink-3); font-size:13px; }
+.report-type-card:hover, .report-type-card[aria-current=page] { border-color:#2499ae; background:#ebf7fa; }
 .report-selection { display:grid; gap:8px; margin-top:14px; }
 .report-selection > label { color:var(--ink-2); font-size:13px; font-weight:600; }
 .report-selection input[type="search"] { width:100%; min-width:0; min-height:42px; padding:8px 10px; border:1px solid #9fb5cb; border-radius:9px; background:#fff; color:var(--ink); }

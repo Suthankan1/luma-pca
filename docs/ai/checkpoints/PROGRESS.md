@@ -2743,3 +2743,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - V31 adds an opt-in projection of reconciled Zoom visits. It stores counts and duration per matched student, validates source and academy identity revisions, and falls back to source reads when stale. Roster membership and official attendance remain live reads. The worker uses bounded leases and compare-and-publish. Erasure removes projected student rows transactionally.
 - Added the staff-only monthly directory API with academy scope, private no-store responses, full directory coverage and compact class-type totals. Updated the OpenAPI contract, authorization matrix and architecture. The frontend integration is a separate slice.
 - Passed 19 PostgreSQL integration tests for compact directory access and participation, projection parity, concurrent claims, stale and empty results, corrections and erasure. No original Supabase benchmark or migration was performed. Apply the additive V31 in a reviewed rollout, then enable `LUMA_ATTENDANCE_PROJECTION_ENABLED` after the hosted gate. Set it to false to return to source reads and leave the schema in place on rollback.
+
+## On-demand report options (2026-11-21)
+
+- Reports opens on three report type cards and the month controls. The selected type loads its searchable picker without fetching unrelated options. The download route and date rules stay the same.
+- Production build, 81 frontend unit tests and desktop/mobile browser checks passed. The browser checks opened and verified each of the three generated Excel files, including a student selected by registration ID without separators. A first run exposed a shadowed variable in the mock for the new student fixture. Fixed it and passed the rerun.
+- Frontend-only. Revert this commit to restore the three eagerly loaded pickers. Original Supabase exports were not tested.
