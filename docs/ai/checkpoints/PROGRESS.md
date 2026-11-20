@@ -2755,3 +2755,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The directory makes one request for student identities and class-type totals. Full-result search, sorting and averages stay immediate in the browser, and offscreen rows and chart bars defer layout. A 404 from an older backend uses the previous read path.
 - The backend scope, no-store, unenrolled student and attendance parity tests passed. The production build and signed-in k6 run passed. With all 28 projections ready, Students page p95 was 109 ms versus 658 ms at baseline, and its compact API p95 was 65 ms. The frontend made eight compact calls and no attendance-dashboard calls during this run.
 - The monthly API uses V31 on the current backend. Revert this frontend integration to restore the prior reads. No hosted configuration or data changed.
+
+## Authentication round trip and debug log safety (2026-11-21)
+
+- Silent renewal leaves one current identity check in the protected render. Backend permission, role and revocation checks remain in the request path. Browser cache settings stay at their previous lifetimes.
+- The first full Maven suite detected that Spring MVC body debugging could print sensitive request or response fields when debug was enabled. Kept MVC body-processor logs at INFO. All 403 Maven tests passed on rerun with the same environment. The Next HTTP session smoke passed and asserted one identity call during renewal. Two browser projects verified private no-store behavior, logout and switching to a student account.
+- No migration or credentials change for this slice. The benchmark recorded `/auth/me` at p95 58 ms. Revert without re-enabling MVC request-body debug logging.

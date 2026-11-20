@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 let down = false;
 let identityDown = false;
 let accessRejected = false;
+let identityChecks = 0;
 let rotation = 0;
 let latestRefresh = "";
 const jwt = "fake-access-token.for-bff.integration-test";
@@ -36,6 +37,7 @@ const backend = createServer(async (req, res) => {
       if (body.refreshToken !== latestRefresh) return send(401);
       break;
     case "/api/v1/auth/me":
+      identityChecks++;
       if (identityDown) return send(503);
       if (accessRejected || req.headers.authorization !== `Bearer ${jwt}`) return send(401);
       return send(200, { accountId: "test-account", academyId: "test-academy", roles });
@@ -136,6 +138,7 @@ try {
   assert.equal(jar.get("__Host-luma-refresh"), beforeRenewal);
   assert.match(await (await call("/sign-in")).text(), /Continue session/);
   down = false;
+  const beforeIdentityCheck = identityChecks;
   const renewed = await call("/student");
   assert.equal(renewed.status, 200);
   recordCookies(renewed);
@@ -145,6 +148,7 @@ try {
   assert.match(renewedHtml, /Student portal/);
   assert.equal(renewedHtml.includes(jwt), false);
   assert.equal(renewedHtml.includes(latestRefresh), false);
+  assert.equal(identityChecks - beforeIdentityCheck, 1, "silent renewal checks identity once in the protected render");
 
   // 2b. The "Continue session" action still works when renewal could not happen on its own.
   jar.delete("__Host-luma-access");

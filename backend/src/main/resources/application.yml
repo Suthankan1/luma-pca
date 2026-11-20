@@ -1,3 +1,7 @@
+logging:
+  level:
+    # MVC's DEBUG argument/body logging can include credentials or student data.
+    org.springframework.web.servlet.mvc.method.annotation: INFO
 spring:
   threads:
     virtual:

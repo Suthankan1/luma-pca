@@ -12,7 +12,7 @@ Progress is the number of verified local items divided by the ten local items be
 | 6 | Add a scoped Students monthly read with full-result filtering, ordering and aggregates. | Verified |
 | 7 | Poll live data independently of the page and preserve timeline recovery and completion. | Pending |
 | 8 | Load Reports options on demand and verify all export types. | Verified |
-| 9 | Measure auth overhead and verify any auth or cache changes against logout and account switching. | Pending |
+| 9 | Measure auth overhead and verify any auth or cache changes against logout and account switching. | Verified |
 | 10 | Automate regression checks, repeat the baseline and document release and rollback. | Pending |
 
 ## Measurement
@@ -55,6 +55,10 @@ The same 150 students, 28 completed sessions and four concurrent staff users wer
 | Compact Students API | — | 65 ms |
 
 The final run enabled the projection in the synthetic environment. Hosted projection reads remain disabled by default. Windows Git Bash did not populate all process resource samples. The k6, API and SQL timings were collected successfully.
+
+## Auth and cache decision
+
+The final local `/auth/me` p95 was 58 ms. Silent renewal now avoids a duplicate check and still verifies the new token before rendering. Ordinary authenticated requests retain live revocation and role enforcement. Keep Cache Components and longer private browser caches out of this rollout. The browser regression checks the private response headers, back navigation after sign-out and switching to a student account.
 
 ## Hosted acceptance
 
