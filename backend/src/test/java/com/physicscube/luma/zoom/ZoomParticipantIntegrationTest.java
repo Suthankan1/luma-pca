@@ -45,7 +45,7 @@ class ZoomParticipantIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2027"), "A");
         enrolled = (String) fixtures.student("S-001", "first.student@example.test").get("id");
@@ -208,23 +208,23 @@ class ZoomParticipantIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void decisionsAreValidatedAndLimitedToManagersOfTheAcademy() {
+    void decisionsAreValidatedAndLimitedToStaffOfTheAcademy() {
         runWebinar();
         assertEquals(404, decide("nobody@example.test", null, "Never joined").statusCode(), "only emails seen in Zoom");
         assertEquals(400, decide("guest@example.test", null, "  ").statusCode());
         assertEquals(400, decide("not-an-email", null, "Reason here").statusCode());
 
         UUID other = academy("Other Academy");
-        String otherStudent = (String) new AcademyFixtures(api, tokenFor(other, Role.ACADEMY_ADMIN))
+        String otherStudent = (String) new AcademyFixtures(api, tokenFor(other, Role.STAFF))
                 .student("O-001", "other.student@example.test").get("id");
         assertEquals(404, decide("guest@example.test", otherStudent, "Wrong academy").statusCode());
 
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(403, api.get("/api/v1/zoom/participants/unmatched", instructor).statusCode());
-        assertEquals(403, api.get("/api/v1/zoom/participants?occurrence=x", instructor).statusCode());
+        String nonStaff = tokenFor(academyId, Role.STUDENT);
+        assertEquals(403, api.get("/api/v1/zoom/participants/unmatched", nonStaff).statusCode());
+        assertEquals(403, api.get("/api/v1/zoom/participants?occurrence=x", nonStaff).statusCode());
         assertEquals(404, api.get("/api/v1/zoom/participants?occurrence=unknown", admin).statusCode());
         // Another academy's admin sees none of this academy's occurrences or people.
-        String otherAdmin = tokenFor(other, Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(other, Role.STAFF);
         assertEquals(404, api.get("/api/v1/zoom/participants?occurrence=" + URLEncoder.encode(OCCURRENCE, StandardCharsets.UTF_8),
                 otherAdmin).statusCode());
         assertEquals(List.of(), HttpApi.parseList(api.get("/api/v1/zoom/participants/unmatched", otherAdmin)));

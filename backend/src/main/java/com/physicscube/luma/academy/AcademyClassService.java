@@ -122,10 +122,10 @@ public class AcademyClassService {
         return link == null ? java.util.Optional.empty() : java.util.Optional.of(link.batchId());
     }
 
-    /** Every Academy class with its distinct-student count and, when linked, its LUMA batch. Managers only. */
+    /** Every Academy class with its distinct-student count and, when linked, its LUMA batch. Staff only. */
     @Transactional(readOnly = true)
     public List<AcademyClassView> classes(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<AcademyPaymentClass> source = read(AcademyPaymentsCatalog::listClasses);
         Map<String, Link> links = links(caller.academyId());
         Map<UUID, BatchView> linkedBatches = batches.viewsInAcademy(caller.academyId(),
@@ -144,7 +144,7 @@ public class AcademyClassService {
     /** Links (or re-links) an Academy class to an active batch. A batch stands for at most one Academy class. */
     @Transactional
     public AcademyClassView link(CurrentAccount caller, String className, UUID batchId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String name = requireName(className);
         if (batchId == null) {
             throw new InvalidRequestException("batchId is required");
@@ -180,7 +180,7 @@ public class AcademyClassService {
     /** Brings the linked batch's enrolments in step with the Academy class. Safe to repeat. */
     @Transactional
     public SyncResult sync(CurrentAccount caller, String className) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String name = requireName(className);
         Link link = links(caller.academyId()).get(name);
         if (link == null) {

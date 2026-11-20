@@ -23,7 +23,7 @@ class ManualSchedulingOffIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void everySchedulingRouteIsRefusedAndHistoryStaysReadable() {
         UUID academyId = academy("Physics Cube Test");
-        String admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        String admin = tokenFor(academyId, Role.STAFF);
         String batch = new AcademyFixtures(api, admin).batch(new AcademyFixtures(api, admin).course("PHY-2027"), "MON");
         // A class from before the change (inserted directly): still readable.
         UUID old = UUID.randomUUID();
@@ -41,7 +41,7 @@ class ManualSchedulingOffIntegrationTest extends StaffApiIntegrationTest {
                 + "\"endsAt\":\"2027-01-06T14:30:00Z\",\"batchIds\":[\"" + batch + "\"],\"status\":\"CANCELLED\",\"version\":0}", admin).statusCode());
         assertEquals(409, api.post("/api/v1/zoom/webinar-imports", "{\"webinarId\":\"84400000101\",\"batchIds\":[\"" + batch + "\"]}", admin)
                 .statusCode());
-        assertEquals(403, create("INSTRUCTOR", academyId, batch), "roles are still checked first");
+        assertEquals(403, create("STUDENT", academyId, batch), "roles are still checked first");
 
         assertEquals(200, api.get("/api/v1/class-sessions/" + old, admin).statusCode(), "history stays readable");
         assertEquals("Old class", jdbc.queryForObject("SELECT title FROM class_sessions WHERE id = ?", String.class, old));

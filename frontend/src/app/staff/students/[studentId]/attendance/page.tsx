@@ -7,7 +7,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { dateOrNull, presets, withParams, type StudentOverview } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { academyToday, isAcademyManager, uuidOrNull } from "@/lib/staff-forms";
+import { academyToday, uuidOrNull } from "@/lib/staff-forms";
 
 export const metadata = { title: "Student attendance · LUMA" };
 
@@ -24,11 +24,6 @@ export default async function StudentAttendancePage({ params, searchParams }: {
   let to = dateOrNull(query.to) ?? fallback.to;
   if (from > to) [from, to] = [to, from];
   const base = { active: "students" as const, crumb: "People", hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...base} title="Student attendance" subtitle="">
-      <p className="banner">Only academy owners and administrators open a student’s attendance. Use the dashboard for your batches.</p>
-    </StaffShell>;
-  }
   const result = await staffApi<StudentOverview>(withParams(`/api/v1/students/${studentId}/attendance-overview`, { from, to }) as `/api/v1/${string}`,
     undefined, 30000);
   if (!result.ok && result.status === 404) notFound();

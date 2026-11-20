@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Shell } from "@/components/Shell";
 import { currentSession } from "@/lib/auth-server";
+import { hasPortal } from "@/lib/session-policy";
 
 export const metadata: Metadata = { title: "Change password · LUMA" };
 
@@ -21,7 +22,7 @@ export default async function ChangePassword({ searchParams }: { searchParams: P
   if (!identity) redirect("/sign-in");
   const { error } = await searchParams;
   const message = error && Object.hasOwn(messages, error) ? messages[error as keyof typeof messages] : undefined;
-  const home = identity.roles.some(r => r !== "STUDENT") ? "/staff" : "/student";
+  const home = hasPortal(identity, "staff") ? "/staff" : "/student";
   return <Shell>
     <section className="panel session-panel">
       <h1 className="heading">Change your password</h1>

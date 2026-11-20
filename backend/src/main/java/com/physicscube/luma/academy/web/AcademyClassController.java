@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The Academy's own classes (read-only source) and their LUMA batches. Owners and administrators only. */
+/** The Academy's own classes (read-only source) and their LUMA batches. Staff only. */
 @RestController
 @RequestMapping("/api/v1/academy/classes")
 class AcademyClassController {

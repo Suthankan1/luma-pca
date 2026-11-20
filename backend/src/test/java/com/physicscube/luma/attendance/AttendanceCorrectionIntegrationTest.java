@@ -55,7 +55,7 @@ class AttendanceCorrectionIntegrationTest extends StaffApiIntegrationTest {
     void finalisedClass() {
         com.physicscube.luma.identity.CapturedMail.SENT.clear();
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String course = fixtures.course("PHY-2026");
         batchA = fixtures.batch(course, "A");
@@ -86,7 +86,7 @@ class AttendanceCorrectionIntegrationTest extends StaffApiIntegrationTest {
         rule.put("lateAfterMinutes", 10);
         rule.put("description", "Approved by the academy");
         rule.put("version", null);
-        assertEquals(200, api.put("/api/v1/attendance-policy", HttpApi.json(rule), tokenFor(academyId, Role.ACADEMY_OWNER)).statusCode());
+        assertEquals(200, api.put("/api/v1/attendance-policy", HttpApi.json(rule), tokenFor(academyId, Role.STAFF)).statusCode());
         assertEquals(200, api.post("/api/v1/class-sessions/" + session + "/attendance/finalisation", "{}", admin).statusCode());
         for (Map<String, Object> s : (List<Map<String, Object>>) HttpApi.parse(api.get("/api/v1/class-sessions/" + session + "/attendance", admin))
                 .get("students")) {
@@ -142,17 +142,13 @@ class AttendanceCorrectionIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void attendanceOfficersCorrectOnlyTheirBatchesStudents() {
-        accountIdOf("officer.a@example.invalid", academyId, Role.ATTENDANCE_OFFICER);
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("email", "officer.a@example.invalid");
-        fields.put("role", "ATTENDANCE_OFFICER");
-        assertEquals(201, api.post("/api/v1/batches/" + batchA + "/assignments", HttpApi.json(fields), admin).statusCode());
-        String officer = login("officer.a@example.invalid");
-        assertEquals(200, correct(recordA, "EXCUSED", "Medical note", 0, officer).statusCode());
-        assertEquals(404, correct(recordB, "ABSENT", "Not their batch", 0, officer).statusCode());
-        assertEquals(403, correct(recordA, "PRESENT", "Instructors do not correct", 1, tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
-        assertEquals(404, correct(recordA, "PRESENT", "Other academy", 1, tokenFor(academy("Other"), Role.ACADEMY_ADMIN)).statusCode());
+    void anyStaffMemberCorrectsAnyStudentOfTheirAcademyOnly() {
+        String staff = tokenFor(academyId, Role.STAFF);
+        assertEquals(200, correct(recordA, "EXCUSED", "Medical note", 0, staff).statusCode());
+        assertEquals(200, correct(recordB, "EXCUSED", "Medical note for the other batch", 0, staff).statusCode(),
+                "every batch of the academy");
+        assertEquals(403, correct(recordA, "PRESENT", "Students do not correct", 1, tokenFor(academyId, Role.STUDENT)).statusCode());
+        assertEquals(404, correct(recordA, "PRESENT", "Other academy", 1, tokenFor(academy("Other"), Role.STAFF)).statusCode());
     }
 
     @Test

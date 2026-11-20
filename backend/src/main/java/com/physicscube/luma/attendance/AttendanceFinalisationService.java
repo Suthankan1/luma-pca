@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Turns a class's attendance facts into final records (slice 004B), only when all of this holds:
  * the academy has recorded its rule; the class is scheduled and over; and every linked Zoom
  * occurrence is counted from Zoom's participant report (RECONCILED). Live events alone never
- * finalise anything. Owners and administrators only; once per class (changes are corrections, 004C).
+ * finalise anything. Staff only; once per class (changes are corrections, 004C).
  */
 @Service
 public class AttendanceFinalisationService {
@@ -56,11 +56,11 @@ public class AttendanceFinalisationService {
      * Recalculates a finalised class from Zoom's current report (fetched again, or a run linked
      * later), with the rule each record was finalised with. Records changed by a correction keep
      * their outcome; their facts are refreshed. Students expected now but without a record get one.
-     * Owners and administrators; audited with the reason.
+     * Staff; audited with the reason.
      */
     @Transactional
     public RecalculationResult recalculate(CurrentAccount caller, UUID sessionId, String reason) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String why = reason == null ? "" : reason.strip();
         if (why.length() < 3 || why.length() > 300) {
             throw new com.physicscube.luma.shared.api.InvalidRequestException("A reason of 3 to 300 characters is required");
@@ -136,16 +136,16 @@ public class AttendanceFinalisationService {
         return finalise(caller, sessionId, false);
     }
 
-    /** As {@link #finalise}, by the automatic job in the name of the owner who switched it on; audited as automatic. */
+    /** As {@link #finalise}, by the automatic job in the name of the staff member who switched it on; audited as automatic. */
     @Transactional
     public FinalisationResult finaliseAutomatically(CurrentAccount owner, UUID sessionId) {
         return finalise(owner, sessionId, true);
     }
 
     private FinalisationResult finalise(CurrentAccount caller, UUID sessionId, boolean automatic) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         SessionView session = sessions.get(caller, sessionId);
-        // One finalisation per class, even if two administrators press at once.
+        // One finalisation per class, even if two staff members press at once.
         jdbc.queryForList("SELECT id FROM class_sessions WHERE id = ? AND academy_id = ? FOR UPDATE", sessionId, caller.academyId());
         Integer done = jdbc.queryForObject("SELECT count(*) FROM attendance_records WHERE class_session_id = ?", Integer.class, sessionId);
         if (done != null && done > 0) {

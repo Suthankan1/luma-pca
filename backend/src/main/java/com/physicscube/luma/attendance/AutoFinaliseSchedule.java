@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
-/** Looks for classes to finalise automatically every few minutes; only academies whose owner switched it on are affected. */
+/** Looks for classes to finalise automatically every few minutes; only academies where staff switched it on are affected. */
 @Configuration
 @EnableScheduling
 @ConditionalOnProperty(name = "luma.attendance.auto-finalise.enabled", havingValue = "true", matchIfMissing = true)

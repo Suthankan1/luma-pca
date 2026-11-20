@@ -46,7 +46,7 @@ const backend = createServer(async (req, res) => {
     return insightsApi(req, send);
   }
 
-  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|class-sessions|zoom|audit-events|attendance|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -59,15 +59,10 @@ const backend = createServer(async (req, res) => {
       if (body.email === "student@example.invalid" || body.email === "new-student@example.invalid") {
         roles = ["STUDENT"];
         studentHasEnrolments = body.email === "student@example.invalid";
-      } else if (body.email === "instructor@example.invalid") {
-        // As the API: every staff role gets tokens straight from email and password.
-        roles = ["INSTRUCTOR"];
-      } else if (body.email === "analyst@example.invalid") {
-        roles = ["ANALYST"];
-      } else if (body.email === "owner-enrolled@example.invalid") {
-        roles = ["ACADEMY_OWNER"];
-      } else if (body.email === "admin-enrolled@example.invalid" || body.email === "admin-unenrolled@example.invalid") {
-        roles = ["ACADEMY_ADMIN"];
+      } else if (body.email === "admin-enrolled@example.invalid" || body.email === "admin-unenrolled@example.invalid"
+          || body.email === "owner-enrolled@example.invalid") {
+        // As the API: two roles; every staff account gets STAFF and its tokens straight from email and password.
+        roles = ["STAFF"];
       } else {
         return send(401);
       }
@@ -235,23 +230,15 @@ const batches = [];
 let nextId = 1;
 const uuid = () => `00000000-0000-4000-8000-${String(nextId++).padStart(12, "0")}`;
 const SELF_ID = "00000000-0000-4000-8000-0000000000aa";
-// The signed-in administrator, an owner, an analyst, and staff added by tests.
+// Staff accounts are managed by the operator (no staff API); invitations may still target one that is pending.
 const staff = [
-  { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["ACADEMY_ADMIN"], status: "ACTIVE", version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000bb", email: "owner@example.invalid", roles: ["ACADEMY_OWNER"], status: "ACTIVE", version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000cc", email: "analyst@example.invalid", roles: ["ANALYST"], status: "ACTIVE", version: 0 },
-  // Active instructors the team spec disables and re-enables, one per browser project.
-  { id: "00000000-0000-4000-8000-0000000000d7", email: "former.d@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000d8", email: "former.m@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", version: 0 },
+  { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["STAFF"], status: "ACTIVE", version: 0 },
 ];
-const assignments = [];
-const ELEVATED = ["ACADEMY_OWNER", "ACADEMY_ADMIN"];
 const students = [];
 const enrollments = [];
 const invitationLetters = "PQRSTVWXYZ";
 let invitations = 0;
 const emailedInvitations = [];
-const staffRoles = ["INSTRUCTOR", "ATTENDANCE_OFFICER"];
 const publicStudent = student => {
   const copy = { ...student };
   delete copy.invitationToken;
@@ -777,7 +764,7 @@ function monitorView(m) {
 }
 function monitorsApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
-  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  const manager = roles.includes("STAFF");
   const runPage = req.url.match(/^\/api\/v1\/class-sessions\/([^/]+)\/zoom-run$/);
   if (runPage) {
     const run = runSessions.get(runPage[1]);
@@ -884,12 +871,10 @@ function insightsOverview(student) {
 function insightsApi(req, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const url = new URL(req.url, "http://mock");
-  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  if (!roles.includes("STAFF")) return send(403);
   const latestOnly = url.pathname === "/api/v1/attendance/latest-completed";
   const recentOnly = url.pathname === "/api/v1/attendance/recent-completed";
   if (url.pathname === "/api/v1/attendance/class-totals" || latestOnly || recentOnly) {
-    if (!manager && !roles.some(r => r === "INSTRUCTOR" || r === "ATTENDANCE_OFFICER")) return send(403);
-    if (!manager) return latestOnly ? send(204) : send(200, []); // No staff assignments in this fixture.
     const from = url.searchParams.get("from"), to = url.searchParams.get("to");
     const inRange = start => {
       const date = localDate(start, "Asia/Colombo");
@@ -914,11 +899,9 @@ function insightsApi(req, send) {
     return send(200, totals.map(({ id, expected, joined }) => ({ id, expected, joined })));
   }
   if (url.pathname !== "/api/v1/attendance/dashboard") {
-    if (!manager) return send(403);
     const student = INSIGHT_STUDENTS.find(s => url.pathname.includes(s.id));
     return student ? send(200, insightsOverview(student)) : send(404);
   }
-  if (!manager && !roles.some(r => r === "INSTRUCTOR" || r === "ATTENDANCE_OFFICER")) return send(403);
   const from = url.searchParams.get("from"), to = url.searchParams.get("to");
   if (from && to && (Date.parse(to) - Date.parse(from)) / 86400_000 > 91) return send(400, { detail: "from must not be after to, and the range is at most 92 days" });
   const empty = url.searchParams.get("batchId") === "00000000-0000-4000-8000-0000000000d2";
@@ -953,7 +936,7 @@ const academyLinks = new Map();
 
 function academyApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
-  if (!roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN")) return send(403, { detail: "Forbidden" });
+  if (!roles.includes("STAFF")) return send(403, { detail: "Forbidden" });
   if (req.url === "/api/v1/academy/classes" && req.method === "GET") {
     return send(200, Object.entries(academySource).sort(([a], [b]) => a.localeCompare(b)).map(([className, rows]) => {
       const link = academyLinks.get(className);
@@ -1003,10 +986,10 @@ function academicApi(req, body, send) {
   const [path, query = ""] = req.url.split("?");
   const [, , , collection, id, sub] = path.split("/");
   if (collection === "audit-events" && req.method === "GET") {
-    if (!roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN")) return send(403, { detail: "Forbidden" });
+    if (!roles.includes("STAFF")) return send(403, { detail: "Forbidden" });
     return auditApi(query, send);
   }
-  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  const manager = roles.includes("STAFF");
   if (collection === "attendance-appeals") {
     if (!manager) return send(403, { detail: "Forbidden" });
     if (req.method === "GET") {
@@ -1027,7 +1010,7 @@ function academicApi(req, body, send) {
     return send(200, { ...appeal, outcome: myRecord.outcome });
   }
   if (collection === "attendance-records" && sub === "corrections" && req.method === "POST") {
-    if (!manager && !roles.includes("ATTENDANCE_OFFICER")) return send(403, { detail: "Forbidden" });
+    if (!manager) return send(403, { detail: "Forbidden" });
     const record = attendanceRecords.find(r => r.id === id);
     if (!record) return send(404, { detail: "Attendance record not found" });
     if (record.version !== body.version) return send(409, { detail: "This record was changed by someone else; reload and try again" });
@@ -1041,7 +1024,7 @@ function academicApi(req, body, send) {
   if (collection === "engagement-settings") {
     if (!manager) return send(403, { detail: "Forbidden" });
     if (req.method === "GET") return engagementSettings ? send(200, engagementSettings) : send(204);
-    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner switches engagement on or off" });
+    if (!roles.includes("STAFF")) return send(403, { detail: "Staff role required" });
     if ((engagementSettings?.version ?? null) !== (body.version ?? null)) return send(409, { detail: "Changed by someone else" });
     const newWording = engagementSettings && engagementSettings.consentText !== body.consentText;
     engagementSettings = { enabled: body.enabled, consentText: body.consentText, consentVersion: (engagementSettings?.consentVersion ?? 1) + (newWording ? 1 : 0),
@@ -1051,7 +1034,7 @@ function academicApi(req, body, send) {
   }
   if (collection === "attendance-policy") {
     if (req.method === "GET") return attendancePolicy ? send(200, attendancePolicy) : send(204);
-    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner records the attendance rule" });
+    if (!roles.includes("STAFF")) return send(403, { detail: "Staff role required" });
     if ((attendancePolicy?.version ?? null) !== (body.version ?? null)) return send(409, { detail: "The attendance rule was changed by someone else" });
     attendancePolicy = { minConnectedPercent: body.minConnectedPercent, lateAfterMinutes: body.lateAfterMinutes, description: body.description,
       autoFinalise: typeof body.autoFinalise === "boolean" ? body.autoFinalise : !!attendancePolicy?.autoFinalise,
@@ -1086,7 +1069,7 @@ function academicApi(req, body, send) {
     return send(405);
   }
   if (collection === "attendance" && id === "summary" && req.method === "GET") {
-    if (!manager && !roles.includes("ANALYST")) return send(403, { detail: "Owner, administrator or analyst role required" });
+    if (!manager) return send(403, { detail: "Staff role required" });
     const params = new URLSearchParams(query);
     if (!params.get("from") || !params.get("to") || params.get("to") < params.get("from")) return send(400, { detail: "from and to are required" });
     const withClasses = batches.filter(b => classSessions.some(c => c.batchIds.includes(b.id)));
@@ -1110,9 +1093,6 @@ function academicApi(req, body, send) {
     return send(200, { from: params.get("from"), to: params.get("to"), finalClasses: rows.length ? 2 : 0, classesNotFinal: 0,
       totals: sum, students: rows, method: summaryMethod });
   }
-  // Assigned staff may list batches; the mock has no assignments, so they see none.
-  if (!manager && (collection === "batches" || collection === "class-sessions") && !id && req.method === "GET"
-      && roles.some(r => staffRoles.includes(r))) return send(200, []);
   if (!manager) return send(403, { detail: "Forbidden" });
   if (req.method === "GET" && path.endsWith("/attendance/export")) {
     // The real export has more columns and one row per student; the mock proves the download path.
@@ -1138,7 +1118,7 @@ function academicApi(req, body, send) {
   if (collection === "student-invitations") return studentInvitations(req, body, send, id);
 
   if (collection === "students" && sub === "erasure" && req.method === "POST") {
-    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner erases a student's data" });
+    if (!roles.includes("STAFF")) return send(403, { detail: "Staff role required" });
     const student = students.find(s => s.id === id);
     if (!student) return send(404, { detail: "Student not found" });
     if (String(body.confirmStudentNumber ?? "").trim().toUpperCase() !== student.studentNumber) return send(400, { detail: "Type the student's number to confirm" });
@@ -1191,56 +1171,6 @@ function academicApi(req, body, send) {
     return send(405);
   }
 
-  if (collection === "staff-accounts") {
-    const owner = roles.includes("ACADEMY_OWNER");
-    const forbidden = detail => send(403, { detail });
-    if (req.method === "GET" && !id) return send(200, staff);
-    if (req.method === "POST" && !id) {
-      const email = String(body.email).trim().toLowerCase();
-      if (body.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may grant the owner or administrator role");
-      if (staff.some(s => s.email === email) || students.some(s => s.email === email)) return send(409, { detail: "An account with this email already exists" });
-      const created = { id: uuid(), email, roles: [...body.roles].sort(), status: "PENDING_ACTIVATION", version: 0 };
-      staff.push(created);
-      audit("STAFF_ACCOUNT_CREATED", "ACCOUNT", created.id, created.email, { roles: created.roles });
-      return send(201, created);
-    }
-    const person = staff.find(s => s.id === id);
-    if (!person) return notFound();
-    if (req.method === "GET") return send(200, person);
-    if (person.id === SELF_ID) return forbidden(sub === "roles" ? "You cannot change your own roles" : "You cannot disable your own account");
-    if (person.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may manage an owner or administrator account");
-    if (req.method === "PUT" && sub === "roles") {
-      if (body.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may grant the owner or administrator role");
-      if (person.version !== body.version) return stale();
-      Object.assign(person, { roles: [...body.roles].sort(), version: person.version + 1 });
-      return send(200, person);
-    }
-    if (req.method === "POST" && sub === "disable") {
-      if (person.status !== "DISABLED") {
-        person.passwordSet = person.status === "ACTIVE" || person.passwordSet === true;
-        audit("STAFF_ACCOUNT_DISABLED", "ACCOUNT", person.id, person.email, {});
-      }
-      Object.assign(person, { status: "DISABLED" });
-      return send(200, person);
-    }
-    if (req.method === "POST" && sub === "enable") {
-      if (person.status === "DISABLED") {
-        const fresh = body?.requireNewPassword === true || !person.passwordSet;
-        Object.assign(person, { status: fresh ? "PENDING_ACTIVATION" : "ACTIVE", passwordSet: !fresh, version: person.version + 1 });
-        audit("STAFF_ACCOUNT_ENABLED", "ACCOUNT", person.id, person.email, { newPasswordRequired: String(fresh), statusNow: person.status });
-      }
-      return send(200, person);
-    }
-    return send(405);
-  }
-
-  if (collection === "assignments" && req.method === "DELETE") {
-    const index = assignments.findIndex(a => a.id === id);
-    if (index < 0) return notFound();
-    assignments.splice(index, 1);
-    return send(204);
-  }
-
   if ((collection === "batches" || collection === "courses") && sub === "engagement-ranking" && req.method === "GET" && path.endsWith("/export")) {
     const params = new URLSearchParams(query);
     audit("ENGAGEMENT_RANKING_EXPORTED", collection === "courses" ? "COURSE" : "BATCH", id, null, { from: params.get("from"), to: params.get("to") });
@@ -1255,23 +1185,6 @@ function academicApi(req, body, send) {
     return send(200, { limit: Number(params.get("limit") ?? 10), classes: classSessions.filter(c => c.batchIds.includes(id)).length,
       studentsCounted: 0, top: [], method: "(reactions per class, at most 10) + 3 × pulse answers, divided by classes expected" });
   }
-  if (collection === "batches" && sub === "assignments") {
-    const batch = batches.find(b => b.id === id);
-    if (!batch) return notFound();
-    if (req.method === "GET") return send(200, assignments.filter(a => a.batchId === id));
-    const person = staff.find(s => s.email === String(body.email).trim().toLowerCase());
-    if (!person) return send(404, { detail: "Staff account not found" });
-    if (person.status === "DISABLED") return send(409, { detail: "A disabled account cannot be assigned" });
-    if (!person.roles.includes(body.role)) return send(409, { detail: `The account does not hold the ${body.role} role` });
-    if (assignments.some(a => a.batchId === id && a.accountId === person.id && a.role === body.role)) {
-      return send(409, { detail: "The account is already assigned to this batch in this role" });
-    }
-    const created = { id: uuid(), batchId: id, courseId: batch.courseId, batchCode: batch.code, batchName: batch.name,
-      accountId: person.id, email: person.email, role: body.role, createdAt: new Date().toISOString() };
-    assignments.push(created);
-    return send(201, created);
-  }
-
   if (collection === "accounts" && sub === "invitations" && req.method === "POST") {
     const student = students.find(s => s.accountId === id) ?? staff.find(s => s.id === id);
     if (!student) return notFound();

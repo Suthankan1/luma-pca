@@ -4,7 +4,7 @@ import { ActiveToggle, BatchForm, CourseForm } from "@/components/staff/ActionFo
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { formatDate, isAcademyManager } from "@/lib/staff-forms";
+import { formatDate } from "@/lib/staff-forms";
 
 type Course = { id: string; code: string; title: string; active: boolean; version: number };
 type Batch = { id: string; courseId: string; code: string; name: string; startsOn: string; endsOn: string | null; active: boolean; version: number };
@@ -16,22 +16,6 @@ export default async function CoursesPage() {
   const shell = { active: "courses" as const, crumb: "Academic setup", title: "Courses & batches",
     subtitle: "Every batch belongs to one course. Records are deactivated, never deleted, so attendance history keeps its context.",
     hasStudentPortal: hasPortal(identity, "student") };
-
-  if (!isAcademyManager(identity.roles)) {
-    // Instructors and attendance officers: the API returns only the batches they are assigned to.
-    const mine = await staffApi<Batch[]>("/api/v1/batches");
-    return <StaffShell {...shell}>
-      <p className="banner">Only academy owners and administrators manage courses and batches. Ask an administrator if something here needs to change.</p>
-      {mine.ok && <section className="panel" aria-labelledby="mine-title">
-        <h2 id="mine-title" className="panel-title">YOUR BATCHES</h2>
-        <p className="panel-sub">{mine.data.length === 0 ? "You are not assigned to any batch yet." : "Batches you are assigned to."}</p>
-        <ul className="dir-list">{mine.data.map(batch => <li key={batch.id} className="dir-row dir-course">
-          <div><strong>{batch.code}</strong> <span>{batch.name}</span></div>
-          <Link className="text-link" href={`/staff/batches/${batch.id}`}>Roster →</Link>
-        </li>)}</ul>
-      </section>}
-    </StaffShell>;
-  }
 
   const [courses, batches] = await Promise.all([staffApi<Course[]>("/api/v1/courses"), staffApi<Batch[]>("/api/v1/batches")]);
   if (!courses.ok || !batches.ok) {

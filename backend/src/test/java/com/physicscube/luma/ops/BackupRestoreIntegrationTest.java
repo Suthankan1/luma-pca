@@ -32,12 +32,11 @@ class BackupRestoreIntegrationTest extends StaffApiIntegrationTest {
 
     private void seed() {
         UUID academyId = academy("Restore Drill Academy");
-        accountIdOf("owner@example.invalid", academyId, Role.ACADEMY_OWNER);
+        accountIdOf("owner@example.invalid", academyId, Role.STAFF);
         String owner = login("owner@example.invalid");
-        String teacher = (String) com.physicscube.luma.support.HttpApi.parse(api.post("/api/v1/staff-accounts",
-                "{\"email\":\"teacher@example.invalid\",\"roles\":[\"INSTRUCTOR\"]}", owner)).get("id");
+        String teacher = pendingStaff("teacher@example.invalid", academyId).toString();
         assertEquals(201, api.post("/api/v1/accounts/" + teacher + "/invitations", "", owner).statusCode());
-        assertEquals(200, api.post("/api/v1/staff-accounts/" + teacher + "/disable", "", owner).statusCode());
+        runOperatorSql("staff-block.sql", "teacher@example.invalid");
         AcademyFixtures fixtures = new AcademyFixtures(api, owner);
         String batch = fixtures.batch(fixtures.course("PHY-2027"), "MON");
         assertEquals(200, api.post("/api/v1/students/import", "{\"rows\":[{\"studentNumber\":\"PCA-1\",\"fullName\":\"Ann Perera\","

@@ -23,7 +23,7 @@ const colomboDate = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone:
 type CompletedClass = { id: string; title: string; endsAt: string; timeZone: string; expected: number; joined: number };
 
 test.describe("Staff home", () => {
-  test("Managers see the day's classes, move between days, the month calendar and live numbers; other roles see their own", async ({ page }) => {
+  test("Staff see the day's classes, move between days, and see the month calendar and live numbers", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     const p = test.info().project.name.toUpperCase();
     await signInStaff(page, "admin-enrolled@example.invalid");
@@ -202,15 +202,6 @@ test.describe("Staff home", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
     await page.getByRole("link", { name: "Attendance reports" }).click();
     await expect(page).toHaveURL(/\/staff\/dashboard$/);
-
-    await signInStaff(page, "instructor@example.invalid");
-    await expect(page.getByRole("region", { name: /^Classes on Today/ })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Needs attention" })).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "Attendance for the last 5 classes" })).toContainText("No completed classes yet.");
-
-    await signInStaff(page, "analyst@example.invalid");
-    await page.getByRole("region", { name: "Attendance by batch" }).getByRole("link", { name: "Open reports" }).click();
-    await expect(page.getByRole("region", { name: "ATTENDANCE BY BATCH" })).toBeVisible();
   });
 
   test("the live online chart shows recorded samples on arrival and reload, and refresh can pause", async ({ page }) => {

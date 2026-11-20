@@ -256,10 +256,10 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
         assertEquals(List.of("STUDENT"), identity.get("roles"));
 
         // Roles are read from the database, not from the token: a role added now applies to the existing session.
-        jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'ANALYST')", studentId);
+        jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'STAFF')", studentId);
         HttpResponse<String> promoted = api.get("/api/v1/auth/me", token);
         assertEquals(200, promoted.statusCode(), promoted.body());
-        assertEquals(List.of("ANALYST", "STUDENT"), HttpApi.parse(promoted).get("roles"));
+        assertEquals(List.of("STAFF", "STUDENT"), HttpApi.parse(promoted).get("roles"));
     }
 
     @Test
@@ -363,7 +363,7 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void staffAccountsSignInDirectlyWithEmailAndPassword() {
-        List<Role> staffRoles = List.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN, Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST);
+        List<Role> staffRoles = List.of(Role.STAFF);
         for (Role role : staffRoles) {
             String email = role.name().toLowerCase().replace('_', '.') + "@example.invalid";
             accounts.setPassword(accounts.register(academyId, email, Set.of(role)).id(), PASSPHRASE);

@@ -27,13 +27,13 @@ page describes what exists. [ADRs](adr/) record decisions.
 | Package | Owns |
 | --- | --- |
 | `identity` | Accounts, passwords (Argon2id), lockout, refresh sessions, JWTs, invitations, resets, email notices |
-| `courses`, `batches`, `enrollments`, `students` | Academic structure, CSV import, staff assignments to batches |
+| `courses`, `batches`, `enrollments`, `students` | Academic structure, CSV import (staff see every batch of their academy, ADR-0007) |
 | `sessions` | Classes and weekly series shared by several batches |
 | `zoom` | Webhook ingress and worker, occurrence linking, participant matching (email, registration email, staff decisions), reports, webinar lookup |
 | `attendance` | Provisional facts, the academy rule, finalisation and recalculation, corrections, appeals, histories, CSV exports |
 | `engagement` | Consent, portal reactions, pulse questions, class / batch / course rankings |
 | `audit` | Append-only activity log |
-| `operations` | First-owner bootstrap, student erasure, retention job |
+| `operations` | First-staff bootstrap, student erasure, retention job |
 | `shared` | Errors, rate limits (per visitor and per account), security configuration |
 
 ## Domain identity invariants

@@ -11,12 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Erases a student's personal data on request, in one transaction (owners only; audited without
+ * Erases a student's personal data on request, in one transaction (staff only; audited without
  * personal data). The student record stays, anonymised, so classes and attendance figures remain
  * consistent: name and number are replaced, the sign-in account is disabled with its email replaced,
  * and every Zoom name, email and registration linked to the student's known emails is removed,
@@ -39,9 +38,7 @@ public class StudentErasureService {
     /** @param confirmNumber the student's current number, typed again to confirm */
     @Transactional
     public ErasureResult erase(CurrentAccount caller, UUID studentId, String confirmNumber, String reason) {
-        if (!caller.hasRole("ACADEMY_OWNER")) {
-            throw new AccessDeniedException("Only an academy owner erases a student's data");
-        }
+        caller.requireStaff();
         String why = reason == null ? "" : reason.strip();
         if (why.length() < 3 || why.length() > 300) {
             throw new InvalidRequestException("A reason of 3 to 300 characters is required");

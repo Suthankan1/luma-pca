@@ -2509,3 +2509,86 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Passed 16 targeted backend tests in `OnlineHistoryTest`, `ProvisionalAttendanceIntegrationTest`, and `AttendanceInsightsIntegrationTest`. Coverage includes Zoom reports, rejoins and overlaps, missing joins, end-time clipping, the twelve-hour bound, and academy and batch scope. Passed 79 frontend unit tests, TypeScript, lint, the structure check, and an isolated production build. Six Staff Home Playwright cases passed on Edge desktop and Pixel 7 emulation with the mock API, including pre-existing history on first visit and hard reload, refresh animation and pause, and no-evidence behavior. OpenAPI YAML parsed.
 - Restarted the local API with the original Supabase connection. Readiness returned UP, the attendance history request returned 401 without a session, and sign-in returned 200. The signed-in Supabase dashboard and live Zoom delivery were not exercised.
 - Roll out the backend before or alongside the frontend. No migration is needed. Revert both together to roll back.
+## Two roles: STAFF and STUDENT (2026-11-20)
+
+- Branch: `feat/two-roles` (from `0674ff1`), worked in the worktree `.claude/worktrees/two-roles` because the main
+  checkout had another session's uncommitted "latest completed class" work. Plan and progress table:
+  `docs/delivery/TWO-ROLES-REFACTOR-PLAN.md`; decision: `docs/architecture/adr/ADR-0007-two-roles.md`.
+- Owner decision: only two roles. `STAFF` does every staff action in its academy; `STUDENT` is unchanged. The five staff
+  roles and batch assignments are gone. Risk accepted by the owner: every staff member can disable colleagues, erase a
+  student's data and change the attendance rule; the audit log records who did it.
+- Database: `V30__two_roles.sql` gives each account holding any former staff role one `STAFF` row (earliest grant kept),
+  deletes the old rows and narrows the CHECK to `STAFF`/`STUDENT`. An account that also held `STUDENT` keeps it.
+  `staff_assignments` is kept for history (table comment) but no longer read or written.
+- Backend: `Role { STAFF, STUDENT }`; `CurrentAccount.isStaff()/requireStaff()` replace the manager checks;
+  `SecurityConfig` has one `hasRole("STAFF")` rule for every staff route. Batch scoping, `BatchScope` and the assignment
+  entity, service, controller and routes (`/batches/{id}/assignments`, `/assignments/{id}`, `/me/assignments`) are
+  removed. Former owner-only (rule, engagement switch, erasure) and role-specific actions (corrections, pulses, academy
+  totals) are staff actions. Staff accounts: create takes only an email (any `roles` sent is ignored),
+  `PUT /staff-accounts/{id}/roles` is removed, nobody disables themselves and the academy keeps one active staff account.
+  Auto-finalisation runs as the staff member who switched it on while they are active staff. Bootstrap creates the first
+  `STAFF` account and refuses when the academy has active staff (command name and env vars unchanged).
+- Frontend: `isStaff` replaces `isAcademyManager`; the staff portal opens for `STAFF` only. Dead "only owners and
+  administrators" banners are removed from 11 pages; Home, Attendance, Classes, class page, batch roster and dashboard
+  show every section to every staff member; Team has no role pickers (email only) and the batch roster no assignments.
+  The activity log still names roles recorded before the change. Sealed session cookies are unaffected: pages read
+  roles from `/auth/me` on every request.
+- Contract and docs: OpenAPI (assignment and roles routes removed, `StaffRole` = `STAFF`, summaries say "staff"),
+  authorization matrix (current model on top, earlier notes kept as history), JWT-AUTH, README, PRD, overview, schema
+  plan, staff guide, first-staff and webhook runbooks, sign-off sheet, Zoom rules, load-test and smoke scripts. Rollback
+  aid: `docs/delivery/runbooks/TWO-ROLES-ROLLBACK.sql`.
+- Passed: backend `mvn test` with Testcontainers PostgreSQL 17, 402 tests, 0 failures (includes
+  `TwoRolesMigrationIntegrationTest`: V29 data with every former role migrated by V30, and `BatchAccessServiceIntegrationTest`);
+  frontend `npm test` (79), typecheck, ESLint, production build, `npm run test:smoke`; Playwright in installed Edge
+  (bundled Chromium missing) against the mock backend, desktop and Pixel 7: 126 passed, 2 skipped (skips unchanged);
+  `scripts/check-openapi.py` (115 endpoints match) and `scripts/verify_structure.py`.
+- Not run: `scripts/auth-stack-smoke.sh`, `scripts/staff-ui-real-stack.sh` (real stack spec updated but not executed),
+  `scripts/load-test-local.sh`, and the backend against the local Supabase database: starting it there applies V30 to
+  real accounts, which needs the owner's go-ahead.
+- Rollout: deploy backend and frontend together (the web app recognises only STAFF). Before rollout, review the staff
+  list: every former instructor, attendance officer and analyst gains full staff access. Rollback: run
+  `docs/delivery/runbooks/TWO-ROLES-ROLLBACK.sql` before starting older code, then revert these commits.
+- Merge note: the main checkout's open "latest completed class" work (`GET /api/v1/attendance/latest-completed`) touches
+  `SecurityConfig`, `ClassSessionService`, Staff Home, the contract and the authorization matrix; on merge the new route
+  joins the single STAFF rule and its batch-scope code collapses to staff-wide access.
+
+## One Classes screen; no Staff page (2026-11-20)
+
+- Branch `feat/two-roles` (worktree `.claude/worktrees/two-roles`). Plan and progress:
+  `docs/delivery/CLASSES-AND-STAFF-SIMPLIFY-PLAN.md`. Owner request: Webinars and Classes become one screen showing only
+  the classes Zoom has scheduled and the ones held, with "track a Zoom link" on the same screen; and, with one STAFF
+  role, no Staff page at all.
+- Classes (`/staff/sessions`): "Track a Zoom link" (ID or join link only) at the top, the tracked links collapsed under
+  it (refresh from Zoom, stop/track again, Academy class), then two weeks of classes grouped by day from the shared
+  `calendarEntries` helper: Zoom's scheduled dates of tracked webinars ("Expected", not links) and held classes
+  (Live/Ended, linking to attendance). The batch filter, live cards, run history and the "where classes come from"
+  panel are gone. `/staff/webinars` and `/staff/zoom/import` redirect to Classes; the Webinars and Staff menu items are
+  removed; webinar actions moved to `app/staff/sessions/webinar-actions.ts`.
+- Staff page and API removed: `/staff/team` pages and forms; `GET/POST /api/v1/staff-accounts`, `GET /{id}`, `/enable`,
+  `/disable` (now 403 by the deny-all rule); `StaffAccountService/Controller/View`, `Account.enable`,
+  `AccountRepository.activeStaffOtherThan`. `POST /api/v1/accounts/{id}/invitations` stays
+  (`AccountInvitationService`/`AccountInvitationController`) for pending accounts (students).
+- Operator path: `scripts/bootstrap-owner.sh` now adds any staff member (new pending STAFF account and invitation, or a
+  fresh invitation for a pending one) and refuses active, blocked, student or other-academy addresses. Blocking and
+  unblocking are `docs/delivery/runbooks/sql/staff-block.sql` and `staff-unblock.sql` (runbook `STAFF-ACCOUNTS.md`):
+  block ends every session, cancels unused activation links (the test caught that this was missing at first) and is
+  audited without an actor. `staff-ui-real-stack.sh` adds the colleague with the command and checks the block SQL.
+- Contract: staff-account paths and `StaffAccount`/`StaffRole` schemas removed; `check-openapi.py`: 110 endpoints match.
+  Docs: authorization matrix, ADR-0007 follow-up, README, staff guide, FIRST-OWNER runbook.
+- Passed: backend `mvn test` 393 tests, 0 failures (new `StaffAccountOperatorIntegrationTest` runs the runbook SQL files
+  as written; bootstrap tests cover adding a colleague and the refusals); frontend `npm test` (77), typecheck, ESLint,
+  production build; Playwright in installed Edge against the mock backend, desktop and Pixel 7: 118 passed, 2 skipped
+  (unchanged skips); `scripts/check-openapi.py` (110 endpoints) and `scripts/verify_structure.py`.
+- Not run: `scripts/staff-ui-real-stack.sh` (updated: the colleague comes from the operator command, the block SQL is
+  checked by a refused sign-in), and nothing against the Supabase database.
+- Rollout: as for the two-role change (backend and frontend together). Anyone who must add or block staff after this
+  needs the operator command or database access.
+
+## Integrated Claude’s Classes and staff-role changes with Staff Home (2026-11-20)
+
+- Merged the committed `feat/two-roles` work through `202af21` into `integrate/claude-staff-dashboard`. The Claude worktree and its in-progress merge were left in place. The combined app keeps the single Classes screen, operator-managed staff accounts, and the dashboard’s current-time graph, saved online history, calendar previews, and recent attendance.
+- The dashboard’s class totals, latest and recent classes, and online history require `STAFF`, with data limited to the authenticated academy. The history includes matched students who joined the class, including those outside its roster. Students retain own-record access. The OpenAPI contract and authorization matrix reflect these rules.
+- Packaged the backend and ran the combined application on loopback with a separate PostgreSQL 17 preview database. Flyway applied V30 there. Verified activation and sign-in for a fictional preview staff account, the Staff dashboard and Classes pages, the Webinars redirect, the removed Staff page and API, and the recent attendance API. Backend readiness returned UP. Runtime preview uses debug logging disabled.
+- A clean full backend run passed all 398 tests with Testcontainers and debug logging disabled. The first run failed one log-privacy assertion under an inherited debug setting. The OpenAPI checker matched all 112 routes, the structure check passed, and the frontend’s 75 unit tests, lint, production build, and session smoke passed. The focused desktop and mobile browser suite passed 13 cases with one expected skip.
+- The broad mobile run completed with 58 passes, two expected skips, and one Staff Home failure caused by a running-class fixture left by the live-refresh test. Added fixture cleanup and verified the affected sequence on desktop and mobile. The broad desktop run was partial because of browser timeouts. The affected desktop academy and bulk invitation cases passed in isolated reruns.
+- The original Supabase database was left unchanged. Applying V30 there would replace original staff role records with one academy-wide role. The branch’s rollback aid maps `STAFF` to `ACADEMY_OWNER` and cannot recover individual prior roles. Use a backup that preserves roles for faithful rollback. The combined frontend and backend need to roll out together.

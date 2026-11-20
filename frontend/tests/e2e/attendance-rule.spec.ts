@@ -19,7 +19,7 @@ test.describe("Attendance rule and final attendance", () => {
     n = p === "fm" ? "2" : "1";
   });
 
-  test("Only an owner records the academy's rule; other staff read it", async ({ page }) => {
+  test("Any staff member records the academy's rule and every colleague sees it", async ({ page }) => {
     await signIn(page, "owner-enrolled@example.invalid");
     await page.goto("/staff/attendance?section=settings");
     await page.locator("#policy-late").fill("10");
@@ -37,8 +37,8 @@ test.describe("Attendance rule and final attendance", () => {
     await expect(page.locator(".rule-line")).toContainText("present from 75% of the class");
     await page.getByRole("navigation", { name: "Attendance sections" }).getByRole("link", { name: "Rule & settings" }).click();
     await expect(page.locator(".rule-summary")).toContainText("75%");
-    await expect(page.getByText("Only an academy owner can record or change the rule.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Save rule" })).toHaveCount(0);
+    await expect(page.getByText("Only an academy owner can record or change the rule.")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Save rule" })).toBeVisible();
   });
 
   test("An administrator finalises a finished class from Zoom's report, by the academy's rule", async ({ page }) => {

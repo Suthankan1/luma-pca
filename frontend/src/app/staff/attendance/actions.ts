@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireSameOriginAction, staffApi } from "@/lib/staff-api";
 import { outcomeOrNull, parsePolicyForm, problemMessage, submittedValues, uuidOrNull, type FormState } from "@/lib/staff-forms";
 
-/** Records the academy's attendance rule. Owners only; the API re-checks and audits every change. */
+/** Records the academy's attendance rule. Staff only; the API re-checks and audits every change. */
 export async function savePolicy(_previous: FormState, form: FormData): Promise<FormState> {
   await requireSameOriginAction();
   const values = submittedValues(form, ["minConnectedPercent", "lateAfterMinutes", "description"]);
@@ -15,7 +15,7 @@ export async function savePolicy(_previous: FormState, form: FormData): Promise<
   const autoFinalise = form.get("autoFinalise") === "on";
   const result = await staffApi("/api/v1/attendance-policy", { method: "PUT", body: { ...parsed, version, autoFinalise } });
   if (!result.ok) {
-    return { ok: false, values, message: result.status === 403 ? "Only an academy owner can record the attendance rule."
+    return { ok: false, values, message: result.status === 403 ? "Only staff can record the attendance rule."
       : result.status === 409 ? "Someone else changed the rule. Reload the page and try again." : problemMessage(result.status, result.detail) };
   }
   revalidatePath("/staff/attendance");
@@ -47,7 +47,7 @@ export async function finaliseAttendance(_previous: FormState, form: FormData): 
   return { ok: true, message: `Attendance is final: ${present} present, ${late} late, ${absent} absent.` };
 }
 
-/** Corrects one final record with a reason (owners, administrators, attendance officers for their batches). */
+/** Corrects one final record with a reason (staff). */
 export async function correctRecord(_previous: FormState, form: FormData): Promise<FormState> {
   await requireSameOriginAction();
   const recordId = uuidOrNull(form.get("recordId"));

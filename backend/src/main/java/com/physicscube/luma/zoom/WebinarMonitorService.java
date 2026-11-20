@@ -119,10 +119,10 @@ public class WebinarMonitorService {
                 run.connectedNow(), run.people(), monitor.academyClassName(), monitor.classResolved()));
     }
 
-    /** Owners and administrators add a webinar by ID or join link. Adding one already monitored returns it. Audited. */
+    /** Staff add a webinar by ID or join link. Adding one already monitored returns it. Audited. */
     @Transactional
     public MonitorView add(CurrentAccount caller, String input) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String webinarId = ZoomLookupService.webinarId(input);
         ZoomApiClient.Webinar webinar = fetch(webinarId);
         Optional<UUID> existing = idOf(caller.academyId(), webinarId);
@@ -159,7 +159,7 @@ public class WebinarMonitorService {
     /** Copies Zoom's current title and schedule again (Zoom may have changed them). */
     @Transactional
     public MonitorView sync(CurrentAccount caller, UUID monitorId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String webinarId = require(caller.academyId(), monitorId);
         syncOne(monitorId, webinarId);
         return view(caller.academyId(), monitorId);
@@ -168,7 +168,7 @@ public class WebinarMonitorService {
     /** Stops or resumes collecting a webinar in LUMA; the Zoom webinar itself is untouched. Runs and attendance are kept. */
     @Transactional
     public MonitorView setActive(CurrentAccount caller, UUID monitorId, boolean active) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         require(caller.academyId(), monitorId);
         Instant now = DbTime.now();
         jdbc.update("UPDATE zoom_webinar_monitors SET active = ?, stopped_by = ?, stopped_at = ?, version = version + 1 WHERE id = ?",
@@ -183,12 +183,12 @@ public class WebinarMonitorService {
     }
 
     /**
-     * An administrator's explicit decision about which Academy class (payment class_type) the webinar teaches, or
+     * A staff member's explicit decision about which Academy class (payment class_type) the webinar teaches, or
      * {@code null} to mark it unresolved. Applies to runs that start afterwards. Audited.
      */
     @Transactional
     public MonitorView setAcademyClass(CurrentAccount caller, UUID monitorId, String className) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         require(caller.academyId(), monitorId);
         String name = className == null || className.isBlank() ? null : className.strip();
         if (name != null) {
@@ -213,10 +213,10 @@ public class WebinarMonitorService {
         return view(caller.academyId(), monitorId);
     }
 
-    /** Every monitored webinar (stopped ones too, for their history), live ones first. Owners and administrators. */
+    /** Every monitored webinar (stopped ones too, for their history), live ones first. Staff. */
     @Transactional(readOnly = true)
     public List<MonitorView> list(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<UUID> ids = jdbc.queryForList("SELECT id FROM zoom_webinar_monitors WHERE academy_id = ? ORDER BY active DESC, added_at DESC",
                 UUID.class, caller.academyId());
         List<MonitorView> views = new ArrayList<>(ids.size());
@@ -299,7 +299,7 @@ public class WebinarMonitorService {
 
     /**
      * Links the webinar to an Academy class only when its Zoom title equals exactly one Academy class name (ignoring case
-     * and spacing). An administrator's choice is never replaced; no match, several matches or no Academy connection leave
+     * and spacing). A staff member's choice is never replaced; no match, several matches or no Academy connection leave
      * the association as it is (unresolved when never set).
      */
     private void resolveClass(UUID monitorId, String topic) {

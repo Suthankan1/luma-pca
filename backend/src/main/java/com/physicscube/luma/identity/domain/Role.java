@@ -1,14 +1,11 @@
 package com.physicscube.luma.identity.domain;
 
 /**
- * Academy-level role grants. A role alone never implies access to every course or
- * batch: scoped staff assignments and record ownership are checked per operation.
+ * Academy-level role grants (owner decision 2026-11-20: two roles). STAFF may do every
+ * staff action within its own academy; STUDENT reaches only its own records. The academy
+ * always comes from the verified token, and students are checked for record ownership.
  */
 public enum Role {
-    ACADEMY_OWNER,
-    ACADEMY_ADMIN,
-    INSTRUCTOR,
-    ATTENDANCE_OFFICER,
-    ANALYST,
+    STAFF,
     STUDENT
 }

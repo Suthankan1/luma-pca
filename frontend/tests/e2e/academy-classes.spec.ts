@@ -44,15 +44,4 @@ test.describe("Academy classes", () => {
     await expect(roster).toContainText("PCA101");
     await expect(roster).toContainText("Amaya Perera");
   });
-
-  test("Staff who are not owners or administrators are pointed elsewhere", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "chromium", "Shared mock data");
-    await page.context().clearCookies();
-    await page.goto("/sign-in?portal=staff");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.goto("/staff/academy");
-    await expect(page.locator(".banner")).toContainText("Only academy owners and administrators connect Academy classes.");
-  });
 });

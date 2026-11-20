@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read-only view of the academy's audit trail for owners and administrators, newest first,
+ * Read-only view of the academy's audit trail for staff, newest first,
  * paged by (time, id). A report query: it reads account emails, batch codes and class titles
  * to label events, and changes nothing.
  */
@@ -26,7 +26,7 @@ public class AuditQueryService {
     public static final int MAX_PAGE_SIZE = 200;
     private static final Pattern CURSOR = Pattern.compile("^(\\d{1,19})_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$");
 
-    /** Areas an administrator filters by; each is a set of action-name patterns. */
+    /** Areas staff filter by; each is a set of action-name patterns. */
     public static final Map<String, List<String>> CATEGORIES = Map.of(
             "staff", List.of("STAFF\\_%", "OWNER\\_%"),
             "sign-in", List.of("INVITATION\\_%", "INVITATIONS\\_%", "PASSWORD\\_RESET\\_%"),
@@ -42,7 +42,7 @@ public class AuditQueryService {
 
     @Transactional(readOnly = true)
     public AuditEventPage list(CurrentAccount caller, String category, UUID targetId, String before, int limit) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new InvalidRequestException("limit must be between 1 and " + MAX_PAGE_SIZE);
         }

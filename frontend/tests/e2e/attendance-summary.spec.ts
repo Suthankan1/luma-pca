@@ -17,7 +17,7 @@ test.describe("Attendance summaries", () => {
     p = (testInfo.project.name === "mobile" ? "sm" : "sd") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
-  test("Staff see each student's rate in a batch; analysts see batch totals without names", async ({ page }) => {
+  test("Staff see each student's rate in a batch and the academy's batch totals without names", async ({ page }) => {
     await signInStaff(page, "admin-enrolled@example.invalid");
     const C = `SUM-${p.toUpperCase()}`;
     await page.goto("/staff/courses");
@@ -64,17 +64,12 @@ test.describe("Attendance summaries", () => {
     await expect(page.getByRole("region", { name: "ATTENDANCE BY BATCH" }).getByRole("listitem", { name: `Batch ${C} A` }))
       .toContainText("75%");
 
-    await signInStaff(page, "analyst@example.invalid");
-    await page.goto("/staff/attendance");
+    // Every staff member sees every section; the batch totals link to each batch's per-student summary.
     const report = page.getByRole("region", { name: "ATTENDANCE BY BATCH" });
     await expect(report.getByRole("listitem", { name: `Batch ${C} A` })).toContainText("2 final classes (1 not final yet)");
     await expect(report).not.toContainText(`${C}-001`);
-    await expect(report.getByRole("link")).toHaveCount(0);
-    await expect(page.getByRole("region", { name: "APPEALS" })).toHaveCount(0);
-    // Analysts read the rule under its own section; they have no to-do list or per-student reports.
+    await expect(report.getByRole("link").first()).toBeVisible();
     const sections = page.getByRole("navigation", { name: "Attendance sections" });
-    await expect(sections.getByRole("link", { name: "To do" })).toHaveCount(0);
-    await sections.getByRole("link", { name: "Rule & settings" }).click();
-    await expect(page.getByRole("region", { name: "ATTENDANCE RULE" })).toBeVisible();
+    await expect(sections.getByRole("link")).toHaveText([/^To do/, "Reports", "Batch totals", "Rule & settings"]);
   });
 });

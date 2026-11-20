@@ -96,7 +96,7 @@ class ZoomLookupIntegrationTest extends StaffApiIntegrationTest {
         resetDatabase();
         REPORT_CALLS.set(0);
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         student = (String) fixtures.student("S-001", "student1@example.test").get("id");
@@ -187,8 +187,8 @@ class ZoomLookupIntegrationTest extends StaffApiIntegrationTest {
         link.put("sessionId", UUID.randomUUID().toString());
         link.put("reason", "Too early");
         assertEquals(409, api.post("/api/v1/zoom/webinar-lookup/links", HttpApi.json(link), admin).statusCode(), "fetch the report first");
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(403, api.get("/api/v1/zoom/webinar-lookup?webinar=" + WEBINAR, instructor).statusCode());
+        String nonStaff = tokenFor(academyId, Role.STUDENT);
+        assertEquals(403, api.get("/api/v1/zoom/webinar-lookup?webinar=" + WEBINAR, nonStaff).statusCode());
         assertNull(jdbc.query("SELECT 1 FROM zoom_report_fetches LIMIT 1", rs -> rs.next() ? 1 : null));
     }
 }

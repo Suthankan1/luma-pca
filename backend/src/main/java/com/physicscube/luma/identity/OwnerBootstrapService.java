@@ -13,11 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Creates an academy's first owner, the one account no administrator can invite.
- * Reachable only from the operator command ({@link OwnerBootstrapCommand}), never over
- * HTTP. It never replaces or overrides an owner: it refuses when the academy already
- * has an active owner, and re-running it before the owner activates only issues a new
- * invitation (cancelling the old one).
+ * Adds a staff member to an academy (creating the academy the first time): a pending STAFF account and its activation
+ * invitation. With one staff role and no staff page (owner decision 2026-11-20) this operator command is how staff are
+ * added; reachable only from {@link OwnerBootstrapCommand}, never over HTTP. It never takes over an existing account:
+ * it refuses an address that is active, disabled or belongs to a student or another academy, and running it again for a
+ * pending staff member only issues a new invitation (cancelling the old one).
  */
 @Service
 public class OwnerBootstrapService {
@@ -58,7 +58,7 @@ public class OwnerBootstrapService {
         try {
             email = EmailAddress.normalize(rawOwnerEmail);
         } catch (IllegalArgumentException e) {
-            throw new RefusedException("Give the owner's email address.");
+            throw new RefusedException("Give the staff member's email address.");
         }
         // One bootstrap at a time, across every instance and operator.
         jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext('luma-owner-bootstrap'))", Object.class);
@@ -73,28 +73,29 @@ public class OwnerBootstrapService {
             jdbc.update("INSERT INTO academies (id, name) VALUES (?, ?)", academyId, name);
         }
 
-        List<Map<String, Object>> owners = jdbc.queryForList("""
-                SELECT a.id, a.email, a.status FROM accounts a JOIN account_roles r ON r.account_id = a.id
-                WHERE a.academy_id = ? AND r.role = 'ACADEMY_OWNER' AND a.status <> 'DISABLED'
-                """, academyId);
-        if (owners.stream().anyMatch(o -> "ACTIVE".equals(o.get("status")))) {
-            throw new RefusedException("This academy already has an active owner. Owners invite other owners from the Staff screen.");
-        }
+        List<Map<String, Object>> existing = jdbc.queryForList("""
+                SELECT a.id, a.academy_id, a.status,
+                       EXISTS (SELECT 1 FROM account_roles r WHERE r.account_id = a.id AND r.role = 'STAFF') AS staff
+                FROM accounts a WHERE a.email = ?
+                """, email);
         UUID ownerId;
         boolean ownerCreated;
-        if (!owners.isEmpty()) {
-            Map<String, Object> pending = owners.get(0);
-            if (owners.size() > 1 || !email.equals(pending.get("email"))) {
-                throw new RefusedException("An owner invitation is already pending for another address. Re-run with that address "
-                        + "to send a new invitation.");
-            }
-            ownerId = (UUID) pending.get("id");
-            ownerCreated = false;
-        } else {
-            if (accounts.findByEmail(email).isPresent()) {
+        if (!existing.isEmpty()) {
+            Map<String, Object> account = existing.get(0);
+            boolean ours = academyId.equals(account.get("academy_id")) && Boolean.TRUE.equals(account.get("staff"));
+            if (!ours) {
                 throw new RefusedException("That address already belongs to another LUMA account. Use a different address.");
             }
-            ownerId = accounts.register(academyId, email, Set.of(Role.ACADEMY_OWNER)).id();
+            if ("ACTIVE".equals(account.get("status"))) {
+                throw new RefusedException("This staff member is already active. They sign in with their password, or reset it by email.");
+            }
+            if (!"PENDING_ACTIVATION".equals(account.get("status"))) {
+                throw new RefusedException("This staff account is blocked. Unblock it with the SQL in docs/delivery/runbooks/STAFF-ACCOUNTS.md.");
+            }
+            ownerId = (UUID) account.get("id");
+            ownerCreated = false;
+        } else {
+            ownerId = accounts.register(academyId, email, Set.of(Role.STAFF)).id();
             ownerCreated = true;
         }
         IssuedInvitation issued = invitations.issue(ownerId, null);

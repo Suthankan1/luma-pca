@@ -59,7 +59,7 @@ test.describe("Zoom review", () => {
     await expect(manual.getByLabel(/^Reason/)).toHaveValue("no");
     await manual.getByLabel(/^Reason/).fill("Checked against the timetable");
     await manual.getByRole("button", { name: "Link to class" }).click();
-    await expect(manual.locator(".status")).toHaveText("Linked by an administrator");
+    await expect(manual.locator(".status")).toHaveText("Linked by staff");
     await expect(manual.getByRole("link", { name: new RegExp(`^Zoom class ${p}, `) })).toBeVisible();
 
     // A decision can be changed; it is never overridden automatically.
@@ -188,7 +188,7 @@ test.describe("Zoom review", () => {
     await select.selectOption({ label: `${weekday} ${n} Mar 2027 · 09:00–11:00 · Attendance class ${p}` });
     await occurrence.getByLabel(/^Reason/).fill("Checked against the timetable");
     await occurrence.getByRole("button", { name: "Link to class" }).click();
-    await expect(occurrence.locator(".status")).toHaveText("Linked by an administrator");
+    await expect(occurrence.locator(".status")).toHaveText("Linked by staff");
     await occurrence.getByRole("link", { name: new RegExp(`^Attendance class ${p}, `) }).click();
 
     const attendance = page.getByRole("region", { name: "PROVISIONAL ATTENDANCE" });
@@ -225,16 +225,5 @@ test.describe("Zoom review", () => {
     await receipt.getByRole("button", { name: "Replay" }).click();
     await expect(receipt).toHaveCount(0);
     await expect(page.getByRole("region", { name: "FAILED EVENTS" })).toContainText(/\d+ events? (is|are) waiting to be processed/);
-  });
-
-  test("Only owners and administrators review Zoom events", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/zoom");
-    await expect(page.locator(".banner")).toContainText("Only academy owners and administrators review Zoom events.");
-    await expect(page.getByRole("button", { name: "Run automatic linking" })).toHaveCount(0);
   });
 });

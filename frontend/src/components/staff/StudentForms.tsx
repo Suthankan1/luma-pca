@@ -88,7 +88,7 @@ export function EnrollmentAction({ studentId, enrollment, today }: {
   </form>;
 }
 
-/** Owners only: erase a student's personal data on request. The record stays, anonymised, for attendance figures. */
+/** Erase a student's personal data on request. The record stays, anonymised, for attendance figures. */
 export function EraseStudentForm({ studentId }: { studentId: string }) {
   const [state, action, pending] = useActionState(eraseStudent, null);
   const values = state && !state.ok ? state.values : undefined;

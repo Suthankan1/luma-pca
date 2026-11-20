@@ -29,7 +29,7 @@ class ClassSeriesHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         String physics = fixtures.course("PHY-2027");
         batchA = fixtures.batch(physics, "A");
@@ -166,9 +166,9 @@ class ClassSeriesHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(404, api.post("/api/v1/class-sessions/series/" + UUID.randomUUID() + "/cancellations",
                 "{\"fromDate\":\"2027-01-20\"}", admin).statusCode());
         UUID other = academy("Other Academy");
-        assertEquals(404, api.post(path, "{\"fromDate\":\"2027-01-01\"}", tokenFor(other, Role.ACADEMY_ADMIN)).statusCode(),
+        assertEquals(404, api.post(path, "{\"fromDate\":\"2027-01-01\"}", tokenFor(other, Role.STAFF)).statusCode(),
                 "another academy cannot touch the series");
-        assertEquals(403, api.post(path, "{\"fromDate\":\"2027-01-01\"}", tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+        assertEquals(403, api.post(path, "{\"fromDate\":\"2027-01-01\"}", tokenFor(academyId, Role.STUDENT)).statusCode());
         assertEquals(400, api.post(path, "{}", admin).statusCode());
     }
 
@@ -195,7 +195,7 @@ class ClassSeriesHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(400, post(series("firstDate", "2027-01-13", "lastDate", "2027-01-13", "weekdays", List.of("WEDNESDAY")), admin)
                 .statusCode(), "only a skipped date: no classes");
         assertEquals(400, post(series("zoomWebinarId", "abc"), admin).statusCode());
-        assertEquals(403, post(series(), tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+        assertEquals(403, post(series(), tokenFor(academyId, Role.STUDENT)).statusCode());
         assertEquals(401, post(series(), null).statusCode());
         jdbc.update("UPDATE batches SET active = false WHERE id = ?::uuid", batchB);
         assertEquals(409, post(series(), admin).statusCode(), "inactive batch");
@@ -301,8 +301,8 @@ class ClassSeriesHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(400, edit(seriesId, changes("fromDate", "2027-02-01", "title", "Late"), admin).statusCode(), "no classes from then");
         assertEquals(400, edit(seriesId, changes("title", "No date"), admin).statusCode());
         assertEquals(404, edit(UUID.randomUUID().toString(), changes("fromDate", "2027-01-18", "title", "x"), admin).statusCode());
-        assertEquals(403, edit(seriesId, changes("fromDate", "2027-01-18", "title", "x"), tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
-        assertEquals(404, edit(seriesId, changes("fromDate", "2027-01-18", "title", "x"), tokenFor(academy("Other"), Role.ACADEMY_ADMIN))
+        assertEquals(403, edit(seriesId, changes("fromDate", "2027-01-18", "title", "x"), tokenFor(academyId, Role.STUDENT)).statusCode());
+        assertEquals(404, edit(seriesId, changes("fromDate", "2027-01-18", "title", "x"), tokenFor(academy("Other"), Role.STAFF))
                 .statusCode());
     }
 }

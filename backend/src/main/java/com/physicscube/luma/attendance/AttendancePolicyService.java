@@ -13,14 +13,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The academy's attendance rule, as its owner records it (OPEN-QUESTIONS P0: the threshold and
- * exceptions are the academy's decision). Staff who see attendance may read it; only an owner
- * may set it, and every change is audited. Finalised records keep the rule they used.
+ * The academy's attendance rule, as staff record it (OPEN-QUESTIONS P0: the threshold and
+ * exceptions are the academy's decision). Staff read and set it, and every change is audited.
+ * Finalised records keep the rule they used.
  */
 @Service
 public class AttendancePolicyService {
@@ -44,9 +43,7 @@ public class AttendancePolicyService {
 
     @Transactional(readOnly = true)
     public Optional<PolicyView> get(CurrentAccount caller) {
-        if (!caller.isAcademyManager() && caller.batchScopedRoles().isEmpty() && !caller.hasRole("ANALYST")) {
-            throw new AccessDeniedException("No role that reads attendance");
-        }
+        caller.requireStaff();
         return find(caller.academyId());
     }
 
@@ -75,9 +72,7 @@ public class AttendancePolicyService {
     @Transactional
     public PolicyView set(CurrentAccount caller, int minConnectedPercent, int lateAfterMinutes, String description, Long expectedVersion,
                           Boolean autoFinalise) {
-        if (!caller.hasRole("ACADEMY_OWNER")) {
-            throw new AccessDeniedException("Only an academy owner records the attendance rule");
-        }
+        caller.requireStaff();
         try {
             new AttendanceRule(minConnectedPercent, lateAfterMinutes);
         } catch (IllegalArgumentException e) {

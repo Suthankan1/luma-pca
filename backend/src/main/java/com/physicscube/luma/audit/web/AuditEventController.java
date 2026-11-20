@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** The academy's activity log: read-only, owners and administrators. */
+/** The academy's activity log: read-only, staff. */
 @RestController
 class AuditEventController {
     private final AuditQueryService audit;

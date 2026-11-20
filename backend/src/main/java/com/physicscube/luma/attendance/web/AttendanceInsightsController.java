@@ -53,7 +53,7 @@ class AttendanceInsightsController {
         return insights.recentCompleted(CurrentAccount.from(authentication));
     }
 
-    /** Owners and administrators: one student's courses and every class, with each join and leave. */
+    /** Staff: one student's courses and every class, with each join and leave. */
     @GetMapping("/api/v1/students/{studentId}/attendance-overview")
     StudentOverview student(JwtAuthenticationToken authentication, @PathVariable UUID studentId,
                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

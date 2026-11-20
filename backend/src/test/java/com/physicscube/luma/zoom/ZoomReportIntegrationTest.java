@@ -105,7 +105,7 @@ class ZoomReportIntegrationTest extends StaffApiIntegrationTest {
         REPORT_CALLS.set(0);
         REPORT.set(new Object[] {200, report(), null});
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         for (String n : List.of("1", "2")) {
@@ -206,7 +206,7 @@ class ZoomReportIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void anAdministratorCanFetchAgainAndAFailureNeverDiscardsAnEarlierReport() {
+    void staffCanFetchAgainAndAFailureNeverDiscardsAnEarlierReport() {
         liveClass(true);
         HttpResponse<String> fetched = fetchNow();
         assertEquals(200, fetched.statusCode(), fetched.body());
@@ -242,13 +242,13 @@ class ZoomReportIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void reportsAreOnlyFetchedForEndedOccurrencesByManagers() {
+    void reportsAreOnlyFetchedForEndedOccurrencesByStaff() {
         liveClass(false);
         assertEquals(0, reports.runOnce(), "not ended: Zoom has no report yet");
         assertEquals(409, fetchNow().statusCode());
         assertEquals(404, api.post("/api/v1/zoom/reports", "{\"occurrenceUuid\":\"unknown\"}", admin).statusCode());
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(403, api.post("/api/v1/zoom/reports", "{\"occurrenceUuid\":\"" + OCCURRENCE + "\"}", instructor).statusCode());
+        String nonStaff = tokenFor(academyId, Role.STUDENT);
+        assertEquals(403, api.post("/api/v1/zoom/reports", "{\"occurrenceUuid\":\"" + OCCURRENCE + "\"}", nonStaff).statusCode());
         assertEquals(0, REPORT_CALLS.get());
     }
 

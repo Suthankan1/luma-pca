@@ -55,12 +55,13 @@ test.describe("Classes (Zoom owns schedules)", () => {
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }
     await expect(page.locator("#schedule-title, #series-title")).toHaveCount(0);
-    const where = page.getByRole("region", { name: "WHERE CLASSES COME FROM" });
-    await expect(where).toContainText("Zoom owns the schedule");
-    await expect(where.getByRole("link", { name: "Webinars →" })).toHaveAttribute("href", "/staff/webinars");
-    const row = page.getByRole("listitem").filter({ hasText: `Waves ${p}` });
-    await expect(row).toContainText("Wed 6 Jan 2027 · 18:00–20:00");
-    await expect(row.locator(".status")).toHaveText("Scheduled before");
+    // One screen: tracking a Zoom link sits above the classes, grouped by day.
+    await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" })).toBeVisible();
+    const day = page.getByRole("region", { name: "CLASSES" }).getByRole("group", { name: "Wednesday 6 January 2027" });
+    const row = day.getByRole("listitem").filter({ hasText: `Waves ${p}` });
+    await expect(row).toContainText("18:00–20:00");
+    await expect(row.getByRole("link")).toHaveAttribute("href", `/staff/sessions/${old.id}`);
+    await expect(page.locator("#class-batch")).toHaveCount(0);
 
     // Its page keeps the expected students and attendance, without any way to change the class.
     await page.goto(`/staff/sessions/${old.id}`);
@@ -69,20 +70,8 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await expect(page.locator("#edit-title, #edit-date, #status-select")).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Save changes|Cancel class|Restore class/ })).toHaveCount(0);
 
-    // The old import route now leads to monitoring.
+    // The old import route now leads to the Classes screen, where Zoom links are tracked.
     await page.goto("/staff/zoom/import");
-    await expect(page).toHaveURL(/\/staff\/webinars$/);
-  });
-
-  test("Instructors see classes for their batches only", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/sessions?from=2027-01-03");
-    await expect(page.locator(".banner")).toContainText("You see the classes of the batches you are assigned to.");
-    await expect(page.getByText("No classes in these two weeks.")).toBeVisible();
-    await expect(page.getByRole("region", { name: "WHERE CLASSES COME FROM" })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/staff\/sessions$/);
   });
 });

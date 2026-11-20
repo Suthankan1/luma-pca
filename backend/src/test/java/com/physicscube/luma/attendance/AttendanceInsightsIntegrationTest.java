@@ -53,7 +53,7 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         course = fixtures.course("PHY-2027");
         batch = fixtures.batch(course, "MON");
@@ -199,12 +199,13 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void staffSeeOnlyTheirBatchesAndOtherAcademiesNothing() {
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(0, map(ok(api.get("/api/v1/attendance/dashboard", instructor)).get("totals")).get("classes"),
-                "not assigned to any batch");
+    void everyStaffMemberSeesTheWholeAcademyAndOtherAcademiesNothing() {
+        String colleague = tokenFor(academyId, Role.STAFF);
+        assertEquals(map(ok(api.get("/api/v1/attendance/dashboard", admin)).get("totals")),
+                map(ok(api.get("/api/v1/attendance/dashboard", colleague)).get("totals")), "no batch assignments any more");
+        assertEquals(200, api.get("/api/v1/students/" + amaya + "/attendance-overview", colleague).statusCode());
         UUID other = academy("Other academy");
-        String otherAdmin = tokenFor(other, Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(other, Role.STAFF);
         assertEquals(0, map(ok(api.get("/api/v1/attendance/dashboard", otherAdmin)).get("totals")).get("classes"));
         assertEquals(404, api.get("/api/v1/students/" + amaya + "/attendance-overview", otherAdmin).statusCode());
         assertTrue(api.get("/api/v1/attendance/dashboard", null).statusCode() == 401);
@@ -226,41 +227,25 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(2, latest.get("expected"));
         assertEquals(1, latest.get("joined"));
 
-        String instructorEmail = "teacher@example.test";
-        accountIdOf(instructorEmail, academyId, Role.INSTRUCTOR);
-        String instructor = login(instructorEmail);
-        assertEquals(List.of(), classTotals(instructor), "no assigned batches");
-        assertEquals(204, api.get(LATEST_COMPLETED, instructor).statusCode());
-        assertEquals(List.of(), recentCompleted(instructor));
-        assertEquals(201, api.post("/api/v1/batches/" + otherBatch + "/assignments",
-                HttpApi.json(Map.of("email", instructorEmail, "role", "INSTRUCTOR")), admin).statusCode());
-        assertEquals(List.of(Map.of("id", classId, "expected", 1, "joined", 0)), classTotals(instructor),
-                "Amaya is outside the instructor's batch even though she joined the shared class");
-
-        assertEquals(List.of(latest), recentCompleted(admin));
+        String colleague = tokenFor(academyId, Role.STAFF);
+        assertEquals(classTotals(admin), classTotals(colleague));
+        assertEquals(List.of(latest), recentCompleted(colleague));
         List<String> newer = new ArrayList<>();
         for (int day = 1; day <= 5; day++) {
             newer.add(createClass("More recent class in MON only", start.plus(day, ChronoUnit.DAYS), batch));
         }
-        assertEquals(newer.getLast(), ok(api.get(LATEST_COMPLETED, admin)).get("id"));
-        assertEquals(newer.reversed(), recentCompleted(admin).stream().map(row -> row.get("id")).toList());
-        Map<String, Object> instructorLatest = ok(api.get(LATEST_COMPLETED, instructor));
-        assertEquals(classId, instructorLatest.get("id"));
-        assertEquals(1, instructorLatest.get("expected"));
-        assertEquals(0, instructorLatest.get("joined"));
-        assertEquals(List.of(instructorLatest), recentCompleted(instructor));
+        assertEquals(newer.getLast(), ok(api.get(LATEST_COMPLETED, colleague)).get("id"));
+        assertEquals(newer.reversed(), recentCompleted(colleague).stream().map(row -> row.get("id")).toList());
     }
 
     @Test
     void classTotalsRequireStaffAndStayInsideTheAcademy() {
         String student = tokenFor(academyId, Role.STUDENT);
-        String analyst = tokenFor(academyId, Role.ANALYST);
         for (String path : List.of(CLASS_TOTALS, LATEST_COMPLETED, RECENT_COMPLETED)) {
             assertEquals(401, api.get(path, null).statusCode());
             assertEquals(403, api.get(path, student).statusCode());
-            assertEquals(403, api.get(path, analyst).statusCode());
         }
-        String otherAdmin = tokenFor(academy("Other academy"), Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(academy("Other academy"), Role.STAFF);
         assertEquals(List.of(), classTotals(otherAdmin));
         assertEquals(204, api.get(LATEST_COMPLETED, otherAdmin).statusCode());
         assertEquals(List.of(), recentCompleted(otherAdmin));

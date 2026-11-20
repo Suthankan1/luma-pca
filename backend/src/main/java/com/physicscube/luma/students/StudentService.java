@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Student records of the caller's academy. Staff routes are limited to academy
- * owners and administrators until scoped staff assignments exist; a student may
+ * staff; a student may
  * read only their own record. A student of another academy is reported as not found.
  */
 @Service
@@ -52,7 +52,7 @@ public class StudentService {
      */
     @Transactional(readOnly = true)
     public StudentPage list(CurrentAccount caller, Boolean active, String after, int limit, String query) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new InvalidRequestException("limit must be between 1 and " + MAX_PAGE_SIZE);
         }
@@ -78,7 +78,7 @@ public class StudentService {
 
     @Transactional(readOnly = true)
     public StudentView get(CurrentAccount caller, UUID studentId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         return view(load(caller.academyId(), studentId));
     }
 
@@ -96,7 +96,7 @@ public class StudentService {
      */
     @Transactional
     public StudentView create(CurrentAccount caller, String studentNumber, String fullName, String email) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String number = Codes.normalize(studentNumber);
         if (students.existsByAcademyIdAndStudentNumber(caller.academyId(), number)) {
             throw duplicateNumber();
@@ -134,7 +134,7 @@ public class StudentService {
      */
     @Transactional
     public List<StudentView> createAll(CurrentAccount caller, List<NewStudent> rows) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<AccountSummary> created;
         try {
             created = accounts.registerAll(caller.academyId(), rows.stream().map(NewStudent::email).toList(), Set.of(Role.STUDENT));
@@ -163,7 +163,7 @@ public class StudentService {
     /** The student number is the academy's stable identifier and cannot be changed. */
     @Transactional
     public StudentView update(CurrentAccount caller, UUID studentId, String fullName, boolean active, long expectedVersion) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         Student student = load(caller.academyId(), studentId);
         if (student.getVersion() != expectedVersion) {
             throw new ConflictException("The record was changed by someone else; reload and retry");

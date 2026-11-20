@@ -117,21 +117,6 @@ test.describe("Staff students and enrolments", () => {
     await expect(page.getByRole("region", { name: "STUDENT DIRECTORY" }).locator(".dir-list")).toContainText(`PCA-${p.toUpperCase()}-900 Leaving Student`);
   });
 
-  test("Instructors see explanations, their batch list, and no student records", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/students");
-    await expect(page.locator(".banner")).toContainText("Only academy owners and administrators manage student records");
-    await expect(page.getByRole("button", { name: "Add student" })).toHaveCount(0);
-    await page.goto("/staff/courses");
-    await expect(page.getByText("You are not assigned to any batch yet.")).toBeVisible();
-    await page.goto("/staff/students/00000000-0000-4000-8000-000000000001");
-    await expect(page.locator(".banner")).toContainText("Only academy owners and administrators manage student records");
-  });
-
   test("Unknown or malformed ids show not found, and the student page fits a phone", async ({ page }, testInfo) => {
     await signInAsAdmin(page);
     for (const path of ["/staff/students/not-a-uuid", "/staff/batches/not-a-uuid"]) {

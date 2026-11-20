@@ -125,8 +125,8 @@ public class ProvisionalAttendanceService {
             rows.add(row(student.studentId(), student.studentNumber(), student.fullName(), true,
                     byStudent.getOrDefault(student.studentId(), List.of()), activity, session, now));
         }
-        // Students seen but not expected: only staff who see the whole academy are shown them.
-        if (caller.isAcademyManager()) {
+        // Students of the academy seen at this class without being expected (staff only).
+        if (caller.isStaff()) {
             Set<UUID> extra = new HashSet<>(byStudent.keySet());
             extra.removeAll(expectedIds);
             Map<UUID, StudentView> named = students.viewsInAcademy(caller.academyId(), extra);

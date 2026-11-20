@@ -69,8 +69,8 @@ class PilotSimulationIntegrationTest extends StaffApiIntegrationTest {
     @SuppressWarnings("unchecked")
     void twoWeeksOfOneBatchMatchTheTeachersRegisterExactly() {
         academyId = academy("Physics Cube Pilot");
-        owner = tokenFor(academyId, Role.ACADEMY_OWNER);
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        owner = tokenFor(academyId, Role.STAFF);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String course = fixtures.course("PHY-PILOT");
         String batchA = fixtures.batch(course, "A");

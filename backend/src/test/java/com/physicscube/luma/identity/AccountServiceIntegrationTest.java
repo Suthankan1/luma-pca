@@ -85,8 +85,8 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
     @Test
     void accountMayHoldSeveralRoles() {
         AccountSummary created = accounts.register(academyId, "staff@example.invalid",
-                Set.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER));
-        assertEquals(Set.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER),
+                Set.of(Role.STAFF, Role.STUDENT));
+        assertEquals(Set.of(Role.STAFF, Role.STUDENT),
                 accounts.findByEmail("staff@example.invalid").orElseThrow().roles());
         assertEquals(2, jdbc.queryForObject(
                 "SELECT count(*) FROM account_roles WHERE account_id = ?", Integer.class, created.id()));
@@ -109,7 +109,7 @@ class AccountServiceIntegrationTest extends PostgresIntegrationTest {
         jdbc.update("INSERT INTO academies (id, name) VALUES (?, 'Other Academy')", otherAcademy);
 
         assertThrows(DuplicateEmailException.class,
-                () -> accounts.register(academyId, "STUDENT@example.invalid", Set.of(Role.INSTRUCTOR)));
+                () -> accounts.register(academyId, "STUDENT@example.invalid", Set.of(Role.STAFF)));
         assertThrows(DuplicateEmailException.class,
                 () -> accounts.register(otherAcademy, "student@example.invalid", Set.of(Role.STUDENT)));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM accounts", Integer.class));

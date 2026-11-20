@@ -102,7 +102,7 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
     }
@@ -208,7 +208,7 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(404, importRuns("83899999999", "").statusCode(), "not in the academy's Zoom account");
         assertEquals(400, api.post("/api/v1/zoom/webinar-imports", "{\"webinarId\":\"" + WEEKLY + "\",\"batchIds\":[]}", admin).statusCode());
         assertEquals(400, importRuns("not-an-id", "").statusCode());
-        AcademyFixtures other = new AcademyFixtures(api, tokenFor(academy("Other"), Role.ACADEMY_ADMIN));
+        AcademyFixtures other = new AcademyFixtures(api, tokenFor(academy("Other"), Role.STAFF));
         String otherBatch = other.batch(other.course("OTHER-1"), "Z");
         HttpResponse<String> foreign = api.post("/api/v1/zoom/webinar-imports", "{\"webinarId\":\"" + WEEKLY + "\",\"batchIds\":[\""
                 + otherBatch + "\"]}", admin);
@@ -216,9 +216,9 @@ class ZoomImportIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM class_sessions WHERE academy_id = ?", Integer.class, academyId),
                 "nothing created by refused imports");
 
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(403, api.get("/api/v1/zoom/upcoming-webinars", instructor).statusCode());
+        String nonStaff = tokenFor(academyId, Role.STUDENT);
+        assertEquals(403, api.get("/api/v1/zoom/upcoming-webinars", nonStaff).statusCode());
         assertEquals(403, api.post("/api/v1/zoom/webinar-imports", "{\"webinarId\":\"" + WEEKLY + "\",\"batchIds\":[\"" + batch + "\"]}",
-                instructor).statusCode());
+                nonStaff).statusCode());
     }
 }

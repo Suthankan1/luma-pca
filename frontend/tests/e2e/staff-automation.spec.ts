@@ -17,68 +17,62 @@ test.describe("Less manual work for staff", () => {
     p = (testInfo.project.name === "mobile" ? "am" : "ad") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
-  test("A webinar is monitored by its ID alone; Zoom's schedule is read-only and an early start is live at once", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "chromium", "One mock Zoom account: monitored once");
+  test("Classes shows Zoom's scheduled and held classes, and a Zoom link is tracked from the same screen", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "One mock Zoom account: tracked once");
     await signInStaff(page, "admin-enrolled@example.invalid");
     await page.goto("/staff/webinars");
-    await expect(page.getByRole("heading", { name: "Webinars", level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(/\/staff\/sessions$/);
+    await expect(page.getByRole("heading", { name: "Classes", level: 1 })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Staff navigation" }).getByRole("link", { name: /Webinars/ })).toHaveCount(0);
     // Only one field: the webinar ID or link. No title, date, time or recurrence to type.
-    const add = page.getByRole("region", { name: "MONITOR A WEBINAR" });
-    await expect(add.getByRole("textbox")).toHaveCount(1);
-    await expect(add.locator("input[type=date], input[type=time], select")).toHaveCount(0);
+    const track = page.getByRole("region", { name: "TRACK A ZOOM LINK" });
+    await expect(track.getByRole("textbox")).toHaveCount(1);
+    await expect(track.locator("input[type=date], input[type=time]")).toHaveCount(0);
 
-    await add.getByLabel("Zoom webinar ID or join link").fill("https://zoom.us/webinar/register/WN_abc");
-    await add.getByRole("button", { name: "Monitor webinar" }).click();
-    await expect(add.locator(".session-error")).toContainText("ID");
-    await add.getByLabel("Zoom webinar ID or join link").fill("844 9999 9999");
-    await add.getByRole("button", { name: "Monitor webinar" }).click();
-    await expect(add.locator(".session-error")).toContainText("not in the academy’s Zoom account");
+    const link = track.getByLabel("Zoom link or webinar ID to track");
+    await link.fill("https://zoom.us/webinar/register/WN_abc");
+    await track.getByRole("button", { name: "Track", exact: true }).click();
+    await expect(track.locator(".session-error")).toContainText("ID");
+    await link.fill("844 9999 9999");
+    await track.getByRole("button", { name: "Track", exact: true }).click();
+    await expect(track.locator(".session-error")).toContainText("not in the academy’s Zoom account");
+    await link.fill("https://us02web.zoom.us/j/84400000001?pwd=x");
+    await track.getByRole("button", { name: "Track", exact: true }).click();
+    await expect(track.locator(".form-ok")).toContainText("Tracking “A/L Physics 2027”");
 
-    await add.getByLabel("Zoom webinar ID or join link").fill("https://us02web.zoom.us/j/84400000001?pwd=x");
-    await add.getByRole("button", { name: "Monitor webinar" }).click();
-    await expect(add.locator(".form-ok")).toContainText("Monitoring “A/L Physics 2027”");
-
-    // Zoom started it about two hours before its scheduled time: live now, from the actual start.
+    // Zoom started it about two hours before its scheduled time: it is a live class now, and Zoom's next dates are expected.
     await page.reload();
-    const live = page.getByRole("listitem", { name: "Live A/L Physics 2027" });
-    await expect(live).toContainText("Connected now12");
-    await expect(live).toContainText(/Running for\s*25 min/);
-    await expect(live.locator("dd").nth(1)).not.toHaveText(await live.locator("dd").nth(0).innerText());
-
-    const card = page.getByRole("listitem", { name: "Webinar 844 0000 0001" });
-    await expect(card).toContainText("A/L Physics 2027");
-    await expect(card).toContainText("(Asia/Colombo)");
-    await expect(card.locator(".occurrence-list li")).toHaveCount(3);
-    await expect(card).toContainText("Academy class: A/L Physics 2027 (matches the Zoom title)");
-    await openSection(card, "Run history");
-    await expect(card.locator(".disclosure-hint").last()).toHaveText("2");
-    await expect(card.getByRole("listitem").filter({ hasText: "Zoom report in" })).toHaveCount(1);
+    const classes = page.getByRole("region", { name: "CLASSES" });
+    const live = classes.getByRole("listitem", { name: "A/L Physics 2027, Live" });
+    await expect(live).toContainText("Live attendance →");
+    await expect(classes.getByRole("listitem", { name: "A/L Physics 2027, Expected" }).first()).toContainText("Scheduled in Zoom");
     for (const name of ["Save changes", "Schedule class", "Cancel class", "Create classes"]) {
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }
 
-    // A webinar with no fixed time in Zoom: nothing is invented.
-    await add.getByLabel("Zoom webinar ID or join link").fill("84400000002");
-    await add.getByRole("button", { name: "Monitor webinar" }).click();
-    const office = page.getByRole("listitem", { name: "Webinar 844 0000 0002" });
+    // The tracked links stay out of the way, with only what is needed per webinar.
+    await openSection(track, "Tracked Zoom links");
+    const tracked = track.getByRole("listitem", { name: "Tracked 844 0000 0001" });
+    await expect(tracked).toContainText("A/L Physics 2027");
+    await expect(tracked).toContainText("(Asia/Colombo)");
+
+    // A webinar with no fixed time in Zoom: nothing is invented, and its Academy class is chosen here.
+    await link.fill("84400000002");
+    await track.getByRole("button", { name: "Track", exact: true }).click();
+    await expect(track.locator(".add-webinar .form-ok")).toContainText("Tracking “Office hours”");
+    await openSection(track, "Tracked Zoom links");
+    const office = track.getByRole("listitem", { name: "Tracked 844 0000 0002" });
     await expect(office).toContainText("Recurring, no fixed time in Zoom");
-    await expect(office.locator(".class-note")).toContainText("Academy class unresolved");
-    await openSection(office, "Manage webinar");
+    await expect(office).toContainText("Academy class not set");
     await office.getByLabel("Academy class").selectOption("Admission");
     await office.getByRole("button", { name: "Save" }).click();
     await expect(office.locator(".form-ok")).toHaveText("Academy class set to “Admission”.");
-    await office.getByRole("button", { name: "Stop monitoring Office hours" }).click();
+    await office.getByRole("button", { name: "Stop tracking Office hours" }).click();
     await expect(office.locator(".form-ok")).toContainText("The Zoom webinar is unchanged");
-    await expect(office).toContainText("Not monitored");
+    await expect(office).toContainText("Stopped");
 
-    // The run's class is listed as live, with no invented end time.
-    await page.goto("/staff/sessions");
-    await expect(page.getByRole("listitem").filter({ hasText: "A/L Physics 2027" }).first()).toContainText("live since");
-    await page.goto("/staff/webinars");
-    await expect(page.locator(".live-refresh")).toContainText("while this page is open");
-
-    // The live run's class shows Zoom's schedule beside the actual start.
-    await live.getByRole("link", { name: "Live attendance →" }).click();
+    // The live class shows Zoom's schedule beside the actual start.
+    await live.getByRole("link").click();
     const run = page.getByRole("region", { name: "ZOOM RUN" });
     await expect(run).toContainText("Live");
     await expect(run).toContainText("Zoom’s report");

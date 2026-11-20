@@ -12,7 +12,7 @@ export function mockApiBase() {
   return `http://127.0.0.1:${Number(base.port) + 1000}`;
 }
 
-async function call(page: Page, method: "GET" | "POST", path: string, data?: unknown) {
+async function call(page: Page, method: "GET" | "POST" | "PUT", path: string, data?: unknown) {
   return page.request.fetch(mockApiBase() + path, {
     method, data, headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
   });
@@ -39,4 +39,16 @@ export async function scheduleClass(page: Page, { title, date, start, end, batch
   });
   expect(response.status(), await response.text()).toBe(201);
   return (await response.json()) as { id: string };
+}
+
+/** End a running test fixture so it does not change later tests' dashboards in the shared mock server. */
+export async function cancelFixtureClass(page: Page, id: string) {
+  const path = `/api/v1/class-sessions/${id}`;
+  const response = await call(page, "GET", path);
+  expect(response.ok(), await response.text()).toBeTruthy();
+  const session = await response.json() as { batches: { batchId: string }[] };
+  const cancelled = await call(page, "PUT", path, {
+    ...session, status: "CANCELLED", batchIds: session.batches.map(batch => batch.batchId),
+  });
+  expect(cancelled.ok(), await cancelled.text()).toBeTruthy();
 }

@@ -25,9 +25,9 @@ const backend = createServer(async (req, res) => {
       if (body.email === "student@example.invalid") {
         roles = ["STUDENT"];
       } else if (body.email === "staff@example.invalid") {
-        roles = ["INSTRUCTOR"];
+        roles = ["STAFF"];
       } else if (body.email === "admin@example.invalid") {
-        roles = ["ACADEMY_ADMIN"];
+        roles = ["STAFF"];
       } else {
         return send(401);
       }
@@ -169,7 +169,7 @@ try {
   assert.equal(jar.has("__Host-luma-access"), false);
   assert.equal(jar.has("__Host-luma-refresh"), false);
 
-  // 4. Administrators sign in with email and password alone, straight into the staff portal.
+  // 4. Staff sign in with email and password alone, straight into the dashboard.
   const wrongAdmin = await post("login", { email: "admin@example.invalid", password: "wrong-password", portal: "staff" });
   assert.match(wrongAdmin.headers.get("location"), /error=invalid/);
   assert.equal(wrongAdmin.headers.getSetCookie().length, 0);
@@ -185,7 +185,7 @@ try {
 
   const adminStaff = await call("/staff");
   assert.equal(adminStaff.status, 200);
-  assert.match(await adminStaff.text(), /Staff portal/);
+  assert.match(await adminStaff.text(), /Staff dashboard/);
 
   // Final logout
   const finalLogout = await post("logout", {});

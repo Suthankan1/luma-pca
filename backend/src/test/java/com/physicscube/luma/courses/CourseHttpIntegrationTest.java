@@ -33,7 +33,7 @@ class CourseHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
     }
 
     private static String body(String code, String title) {
@@ -97,7 +97,7 @@ class CourseHttpIntegrationTest extends StaffApiIntegrationTest {
 
     @Test
     void ownerMayManageCoursesToo() {
-        String owner = tokenFor(academyId, Role.ACADEMY_OWNER);
+        String owner = tokenFor(academyId, Role.STAFF);
         assertEquals("OWNER-1", create(owner, "owner-1", "Owner course").get("code"));
         assertEquals(200, api.get("/api/v1/courses", owner).statusCode());
     }
@@ -144,7 +144,7 @@ class CourseHttpIntegrationTest extends StaffApiIntegrationTest {
 
         assertEquals(409, duplicate.statusCode());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM courses", Integer.class));
-        String otherAdmin = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(academy("Other Academy"), Role.STAFF);
         assertEquals("PHY-2027", create(otherAdmin, "PHY-2027", "Their physics").get("code"),
                 "another academy may use the same code");
     }
@@ -202,7 +202,7 @@ class CourseHttpIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void coursesOfAnotherAcademyAreInvisibleAndUntouchable() {
         Map<String, Object> ours = create(admin, "PHY", "Physics");
-        String outsider = tokenFor(academy("Other Academy"), Role.ACADEMY_OWNER);
+        String outsider = tokenFor(academy("Other Academy"), Role.STAFF);
         String path = "/api/v1/courses/" + ours.get("id");
 
         HttpResponse<String> read = api.get(path, outsider);
@@ -236,11 +236,11 @@ class CourseHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void nonManagerRolesAreForbiddenOnEveryCourseRoute() {
+    void studentsAreForbiddenOnEveryCourseRoute() {
         Map<String, Object> course = create(admin, "PHY", "Physics");
         String path = "/api/v1/courses/" + course.get("id");
 
-        for (Role role : List.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST, Role.STUDENT)) {
+        for (Role role : List.of(Role.STUDENT)) {
             String token = tokenFor(academyId, role);
             assertEquals(403, api.get("/api/v1/courses", token).statusCode(), role.name());
             assertEquals(403, api.get(path, token).statusCode(), role.name());
@@ -254,12 +254,12 @@ class CourseHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void losingTheAdminRoleTakesEffectOnTheNextRequest() {
-        UUID accountId = accountIdOf("demoted@example.invalid", academyId, Role.ACADEMY_ADMIN, Role.INSTRUCTOR);
+    void losingTheStaffRoleTakesEffectOnTheNextRequest() {
+        UUID accountId = accountIdOf("demoted@example.invalid", academyId, Role.STAFF);
         String token = login("demoted@example.invalid");
         assertEquals(200, api.get("/api/v1/courses", token).statusCode());
 
-        jdbc.update("DELETE FROM account_roles WHERE account_id = ? AND role = 'ACADEMY_ADMIN'", accountId);
+        jdbc.update("DELETE FROM account_roles WHERE account_id = ? AND role = 'STAFF'", accountId);
 
         assertEquals(403, api.get("/api/v1/courses", token).statusCode());
         assertEquals(403, api.post("/api/v1/courses", body("NEW", "New"), token).statusCode());

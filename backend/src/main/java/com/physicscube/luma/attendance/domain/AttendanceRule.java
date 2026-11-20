@@ -3,7 +3,7 @@ package com.physicscube.luma.attendance.domain;
 import java.time.Duration;
 
 /**
- * The academy's attendance rule (it is recorded by an owner, never chosen by LUMA), applied to
+ * The academy's attendance rule (it is recorded by staff, never chosen by LUMA), applied to
  * the facts from Zoom's participant report:
  * <ul>
  *   <li>PRESENT when connected for at least {@code minConnectedPercent} of the class time;</li>

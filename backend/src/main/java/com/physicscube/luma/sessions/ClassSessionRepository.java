@@ -44,15 +44,9 @@ interface ClassSessionRepository extends JpaRepository<ClassSession, UUID> {
     @Query("""
             select s from ClassSession s
             where s.academyId = :academyId and s.endsAt <= :now and s.status <> 'CANCELLED'
-              and (:allBatches = true or exists (
-                  select 1 from ClassSession visible join visible.batches b
-                  where visible.id = s.id and b.batchId in :batchIds
-              ))
             order by s.endsAt desc, s.id desc
             """)
-    List<ClassSession> recentCompleted(@Param("academyId") UUID academyId, @Param("now") Instant now,
-                                       @Param("allBatches") boolean allBatches, @Param("batchIds") Collection<UUID> batchIds,
-                                       Limit limit);
+    List<ClassSession> recentCompleted(@Param("academyId") UUID academyId, @Param("now") Instant now, Limit limit);
 
     List<ClassSession> findByAcademyIdAndSeriesIdOrderByStartsAt(UUID academyId, UUID seriesId);
 }

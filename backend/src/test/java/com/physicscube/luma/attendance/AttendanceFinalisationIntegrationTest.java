@@ -43,8 +43,8 @@ class AttendanceFinalisationIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        owner = tokenFor(academyId, Role.ACADEMY_OWNER);
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        owner = tokenFor(academyId, Role.STAFF);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         for (String n : List.of("1", "2", "3", "4", "5")) {
@@ -99,9 +99,9 @@ class AttendanceFinalisationIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void onlyAnOwnerRecordsTheRuleAndChangesAreVersionedAndAudited() {
+    void onlyStaffRecordTheRuleAndChangesAreVersionedAndAudited() {
         assertEquals(204, api.get("/api/v1/attendance-policy", admin).statusCode(), "no rule yet");
-        assertEquals(403, setPolicy(admin, 75, 10, null).statusCode(), "administrators cannot set it");
+        assertEquals(403, setPolicy(tokenFor(academyId, Role.STUDENT), 75, 10, null).statusCode(), "students cannot set it");
         assertEquals(400, setPolicy(owner, 0, 10, null).statusCode());
         assertEquals(400, setPolicy(owner, 75, 241, null).statusCode());
         HttpResponse<String> first = setPolicy(owner, 75, 10, null);
@@ -109,7 +109,7 @@ class AttendanceFinalisationIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(0, ((Number) HttpApi.parse(first).get("version")).intValue());
         assertEquals(409, setPolicy(owner, 80, 5, null).statusCode(), "a stale first-time save does not overwrite");
         assertEquals(200, setPolicy(owner, 80, 5, 0L).statusCode());
-        Map<String, Object> current = HttpApi.parse(api.get("/api/v1/attendance-policy", tokenFor(academyId, Role.INSTRUCTOR)));
+        Map<String, Object> current = HttpApi.parse(api.get("/api/v1/attendance-policy", tokenFor(academyId, Role.STAFF)));
         assertEquals(80, current.get("minConnectedPercent"));
         assertEquals(1, ((Number) current.get("version")).intValue());
         assertEquals(List.of("none", "75% / 10 min"), jdbc.queryForList("SELECT details->>'previous' FROM audit_events WHERE academy_id = ? "
@@ -171,9 +171,8 @@ class AttendanceFinalisationIntegrationTest extends StaffApiIntegrationTest {
         report();
         assertEquals(409, finalise(session, admin).statusCode());
 
-        assertEquals(403, finalise(session, tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
         assertEquals(403, finalise(session, tokenFor(academyId, Role.STUDENT)).statusCode());
-        assertEquals(404, finalise(session, tokenFor(academy("Other"), Role.ACADEMY_ADMIN)).statusCode());
+        assertEquals(404, finalise(session, tokenFor(academy("Other"), Role.STAFF)).statusCode());
     }
 
     @Test
@@ -209,7 +208,7 @@ class AttendanceFinalisationIntegrationTest extends StaffApiIntegrationTest {
         }
         assertEquals("PRESENT", outcomes.get("S-003"));
         assertEquals("EXCUSED", outcomes.get("S-004"));
-        assertEquals(403, api.post("/api/v1/class-sessions/" + session + "/attendance/recalculation", "{\"reason\":\"Officer\"}",
-                tokenFor(academyId, Role.ATTENDANCE_OFFICER)).statusCode());
+        assertEquals(403, api.post("/api/v1/class-sessions/" + session + "/attendance/recalculation", "{\"reason\":\"Student\"}",
+                tokenFor(academyId, Role.STUDENT)).statusCode());
     }
 }

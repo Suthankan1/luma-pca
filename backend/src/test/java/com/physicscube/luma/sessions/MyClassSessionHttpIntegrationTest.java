@@ -30,7 +30,7 @@ class MyClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         String physics = fixtures.course("PHY-2027");
         batchA = fixtures.batch(physics, "A");
@@ -129,7 +129,7 @@ class MyClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(List.of(), list(api.get(WINDOW, none)));
 
         assertEquals(403, api.get(WINDOW, admin).statusCode(), "staff use /api/v1/class-sessions");
-        assertEquals(403, api.get(WINDOW, tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
+        assertEquals(403, api.get(WINDOW, tokenFor(academyId, Role.STAFF)).statusCode());
         assertEquals(401, api.get(WINDOW, null).statusCode());
         assertEquals(400, api.get("/api/v1/me/class-sessions?from=2027-01-01T00:00:00Z&to=2027-06-01T00:00:00Z", inA).statusCode(),
                 "at most 92 days");

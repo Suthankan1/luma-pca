@@ -82,7 +82,7 @@ class WebinarRunTracker {
                     VALUES (?, ?, ?, ?, ?, ?, 'LIVE', ?, ?)
                     """, academyId, occurrenceUuid, webinarId, monitor.get("id"), sessionId, Timestamp.from(eventTime),
                     Timestamp.from(now), Timestamp.from(now));
-            // The run's class is the occurrence's class; an administrator's earlier decision about it stands.
+            // The run's class is the occurrence's class; a staff member's earlier decision about it stands.
             jdbc.update("""
                     INSERT INTO zoom_occurrence_links (academy_id, occurrence_uuid, webinar_id, class_session_id, link_source, linked_at)
                     VALUES (?, ?, ?, ?, 'AUTOMATIC', ?)

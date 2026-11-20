@@ -146,7 +146,7 @@ public class AttendanceInsightsService {
         UUID academyId = caller.academyId();
         List<CompletedSession> completed = sessions.recentCompleted(caller, DbTime.now(), limit);
         List<RosterRequest> requests = completed.stream()
-                .map(session -> new RosterRequest(session.id(), session.localDate(), session.visibleBatchIds())).toList();
+                .map(session -> new RosterRequest(session.id(), session.localDate(), session.batchIds())).toList();
         Map<UUID, Set<UUID>> expectedByClass = enrollments.expectedStudentIds(academyId, requests);
 
         List<CompletableFuture<CompletedClassAttendance>> tasks = completed.stream().map(session -> Parallel.start(() -> {
@@ -157,7 +157,7 @@ public class AttendanceInsightsService {
         return tasks.stream().map(Parallel::join).toList();
     }
 
-    /** Counts for every completed class, limited to the caller's academy and visible batches. */
+    /** Counts for every completed class of the staff member's academy. */
     public List<ClassTotals> classTotals(CurrentAccount caller, Range range) {
         Instant now = DbTime.now();
         List<SessionView> completed = sessions.list(caller, range.start(), range.end(), null).stream()
@@ -179,8 +179,7 @@ public class AttendanceInsightsService {
     }
 
     /**
-     * Owners and administrators see every batch; instructors and attendance officers only their own (the class list and
-     * expected students are already limited to the caller's batches).
+     * Staff see every batch of their academy.
      */
     public Dashboard dashboard(CurrentAccount caller, Range range, UUID courseId, UUID batchId) {
         Instant now = DbTime.now();
@@ -330,9 +329,9 @@ public class AttendanceInsightsService {
                                   List<ClassAttendance> classes) {
     }
 
-    /** Owners and administrators: one student's courses, batches and every class in the range. */
+    /** Staff: one student's courses, batches and every class in the range. */
     public StudentOverview forStudent(CurrentAccount caller, UUID studentId, Range range) {
-        StudentView student = students.get(caller, studentId); // managers only; 404 outside the academy
+        StudentView student = students.get(caller, studentId); // staff only; 404 outside the academy
         var enrolled = Parallel.start(() -> enrollments.forStudent(caller, studentId));
         List<StudentClassView> classes = sessions.forStudent(caller, studentId, range.start(), range.end());
         return overview(caller.academyId(), student.id(), student.studentNumber(), student.fullName(), range,

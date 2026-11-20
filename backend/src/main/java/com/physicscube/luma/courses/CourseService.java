@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Courses of the caller's academy. Only academy owners and administrators may use
- * it until scoped staff assignments exist. A course in another academy is reported
+ * Courses of the caller's academy. Only staff may use
+ * it. A course in another academy is reported
  * exactly like one that does not exist.
  */
 @Service
@@ -31,7 +31,7 @@ public class CourseService {
     /** @param active {@code null} for all courses */
     @Transactional(readOnly = true)
     public List<CourseView> list(CurrentAccount caller, Boolean active) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         CacheKey key = new CacheKey(caller.academyId(), active);
         long now = System.currentTimeMillis();
         CacheEntry cached = courseCache.get(key);
@@ -47,13 +47,13 @@ public class CourseService {
 
     @Transactional(readOnly = true)
     public CourseView get(CurrentAccount caller, UUID courseId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         return CourseView.of(load(caller.academyId(), courseId));
     }
 
     @Transactional
     public CourseView create(CurrentAccount caller, String code, String title) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String normalized = Codes.normalize(code);
         if (courses.existsByAcademyIdAndCode(caller.academyId(), normalized)) {
             throw duplicateCode();
@@ -71,7 +71,7 @@ public class CourseService {
     @Transactional
     public CourseView update(CurrentAccount caller, UUID courseId, String code, String title, boolean active,
                              long expectedVersion) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         Course course = load(caller.academyId(), courseId);
         if (course.getVersion() != expectedVersion) {
             throw new ConflictException("The record was changed by someone else; reload and retry");

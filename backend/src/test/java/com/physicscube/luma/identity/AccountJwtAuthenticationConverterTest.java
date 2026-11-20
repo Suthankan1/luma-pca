@@ -50,31 +50,31 @@ class AccountJwtAuthenticationConverterTest {
     @Test
     @DisplayName("A valid token for an active account gets the roles stored now")
     void convertsValidToken() {
-        found(AccountStatus.ACTIVE, Set.of(Role.INSTRUCTOR));
+        found(AccountStatus.ACTIVE, Set.of(Role.STAFF));
         Authentication auth = converter.convert(jwt(authVersion, academyId));
         assertThat(auth.getName()).isEqualTo(accountId.toString());
-        assertThat(auth.getAuthorities()).extracting(Object::toString).containsExactly("ROLE_INSTRUCTOR");
+        assertThat(auth.getAuthorities()).extracting(Object::toString).containsExactly("ROLE_STAFF");
     }
 
     @Test
     @DisplayName("Disabled accounts, ended sessions, old auth versions and other academies are refused")
     void refusals() {
-        found(AccountStatus.DISABLED, Set.of(Role.INSTRUCTOR));
+        found(AccountStatus.DISABLED, Set.of(Role.STAFF));
         assertThatThrownBy(() -> converter.convert(jwt(authVersion, academyId))).isInstanceOf(InvalidBearerTokenException.class);
 
         when(refreshSessions.requestAuth(sessionId, accountId)).thenReturn(null); // revoked, expired, or account gone
         assertThatThrownBy(() -> converter.convert(jwt(authVersion, academyId))).isInstanceOf(InvalidBearerTokenException.class);
 
-        found(AccountStatus.ACTIVE, Set.of(Role.INSTRUCTOR));
+        found(AccountStatus.ACTIVE, Set.of(Role.STAFF));
         assertThatThrownBy(() -> converter.convert(jwt(authVersion + 1, academyId))).isInstanceOf(InvalidBearerTokenException.class);
         assertThatThrownBy(() -> converter.convert(jwt(authVersion, UUID.randomUUID()))).isInstanceOf(InvalidBearerTokenException.class);
     }
 
     @Test
-    @DisplayName("Owners and administrators are accepted on any live password session")
-    void elevatedNeedsOnlyALiveSession() {
-        found(AccountStatus.ACTIVE, Set.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN));
+    @DisplayName("Every role the account holds now becomes an authority on any live password session")
+    void everyStoredRoleBecomesAnAuthority() {
+        found(AccountStatus.ACTIVE, Set.of(Role.STAFF, Role.STUDENT));
         assertThat(converter.convert(jwt(authVersion, academyId)).getAuthorities()).extracting(Object::toString)
-                .containsExactlyInAnyOrder("ROLE_ACADEMY_OWNER", "ROLE_ACADEMY_ADMIN");
+                .containsExactlyInAnyOrder("ROLE_STAFF", "ROLE_STUDENT");
     }
 }

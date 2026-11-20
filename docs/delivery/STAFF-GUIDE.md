@@ -13,16 +13,15 @@ accounts to match, failed Zoom events); each line opens the page where it is han
 2. **Students**: add one, or **Import** a CSV (`studentNumber,fullName,email`), optionally enrolling everyone in a batch.
    Check first, then import; nothing is imported if any row has a problem.
 3. **Invitations**: from a batch or the Students page, email invitations; failed emails are listed for follow-up.
-4. **Staff**: add instructors and attendance officers, then assign them to batches. They see only those batches.
+4. **Staff**: there is no staff page. Every staff member can do everything in the staff portal (one STAFF role). To add
+   a colleague or block someone who left, ask the operator (`docs/delivery/runbooks/STAFF-ACCOUNTS.md`).
 
 ## Timetable and Zoom
-- **Import classes from Zoom** (Classes → "Import classes from your Zoom webinars"): LUMA lists the academy's upcoming
-  webinars from Zoom (search by topic or ID; each shows its next date and how many of its dates are already classes).
-  Open one to see every upcoming date of a recurring webinar. Tick the dates and the batches, keep or change the title, and press
-  **Create classes**: each becomes a class with its webinar ID, so attendance links and fills in by itself. Dates that are
-  already classes are shown and never created twice. Webinars with no fixed time in Zoom cannot be imported.
-- **Classes**: or schedule a class or a weekly series by hand for one or more batches, with the Zoom **webinar ID**. Each
-  student is expected once per class even if in two of its batches.
+- **Classes** is the one screen for the timetable. At the top, **Track a Zoom link**: paste the webinar's join link or
+  ID and press **Track**. Below, two weeks at a time and grouped by day, are the classes Zoom has scheduled for the
+  tracked webinars ("Expected") and the ones that ran ("Live" or "Ended", each with its attendance). Titles and times
+  come from Zoom; change them in Zoom. Under **Tracked Zoom links** you can read a webinar again from Zoom, stop or
+  resume tracking it, and choose the Academy class whose students are expected.
 - **Zoom review**: each time a webinar runs it appears here and links itself to the class when exactly one class fits.
   Decide the others. **People in this occurrence** shows who joined; **Zoom accounts to match** lists emails that match no
   student: match them by student number, or mark them "not a student". A decision applies to every future webinar; **Remove** one
@@ -39,12 +38,12 @@ accounts to match, failed Zoom events); each line opens the page where it is han
 - During and after class, the class page shows **provisional attendance**: time connected (rejoins counted once, only
   within the class time), first join and lateness. Not being seen is not proof of absence.
 - About 15 minutes after the webinar ends, LUMA fetches **Zoom's participant report** (or press "Fetch Zoom's report").
-- The owner records the academy's **attendance rule** on the Attendance page. Then press **Finalise attendance** on the
+- Staff record the academy's **attendance rule** on the Attendance page. Then press **Finalise attendance** on the
   class page: present / late / absent from Zoom's report, once per class.
 - **Waiting to be finalised** (Attendance page): every ended class that is not final, with what it waits for (Zoom's
   report, or a Zoom run to link). **Finalise N ready classes** finalises them all at once.
-- **Automatic finalisation** (owner, on the rule form): once Zoom's report is in, LUMA finalises each class within a few
-  minutes in the owner's name; the activity log says "Automatically finalised". Corrections and recalculation still work.
+- **Automatic finalisation** (on the rule form): once Zoom's report is in, LUMA finalises each class within a few
+  minutes in the name of the staff member who switched it on; the activity log says "Automatically finalised". Corrections and recalculation still work.
 - **Recalculate** a final class (with a reason) after a late report, a new Zoom decision or a rule change. Corrected
   outcomes are kept; students enrolled since are added.
 - **Correct** a student's outcome (e.g. Excused) with a reason; the original outcome stays in the history. The student
@@ -52,8 +51,7 @@ accounts to match, failed Zoom events); each line opens the page where it is han
 - **Appeals** from students appear on the Attendance page: accept (choose the outcome) or reject, with a note they see.
 - **Attendance summary** on each batch page: every student's present / late / absent / excused and attendance rate for a
   period (this month by default), lowest rate first, so students who need a follow-up stand out.
-- **Attendance by batch** on the Attendance page (owners, administrators and analysts): totals and rate per batch for a
-  period, without student names. Analysts see only this and the rule.
+- **Attendance by batch** on the Attendance page: totals and rate per batch for a period, without student names.
 - **Download CSV** on a class page, or for a batch and date range on the batch page. It is personal data: keep it private.
 
 ## Engagement (only if the academy has switched it on)
@@ -63,6 +61,6 @@ accounts to match, failed Zoom events); each line opens the page where it is han
 
 ## Oversight
 - **Activity log**: every change to staff, students, classes, Zoom decisions, attendance and engagement, with filters.
-- **Erase a student** (owners, on the student's or guardian's request): Students → the student → "Erase this student’s personal data". Type the student
+- **Erase a student** (on the student's or guardian's request): Students → the student → "Erase this student’s personal data". Type the student
   number to confirm. Their name, email and Zoom details are removed; attendance figures stay, anonymised. It cannot be undone.
 - **Retention**: emails inside Zoom event records older than the retention period are removed each night.

@@ -45,9 +45,9 @@ class AttendanceQueueIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        ownerId = accountIdOf("owner.q." + UUID.randomUUID() + "@example.invalid", academyId, Role.ACADEMY_OWNER);
+        ownerId = accountIdOf("owner.q." + UUID.randomUUID() + "@example.invalid", academyId, Role.STAFF);
         owner = login(jdbc.queryForObject("SELECT email FROM accounts WHERE id = ?", String.class, ownerId));
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         String student = (String) fixtures.student("S-001", "student1@example.test").get("id");
@@ -122,18 +122,18 @@ class AttendanceQueueIntegrationTest extends StaffApiIntegrationTest {
         assertEquals("PRESENT", jdbc.queryForObject("SELECT outcome FROM attendance_records WHERE class_session_id = ?::uuid", String.class, ready));
         assertEquals(Map.of("Waiting class", "WAITING_FOR_REPORT", "No Zoom class", "NO_ZOOM_RUN"), states(), "final classes leave the list");
 
-        assertEquals(403, api.get("/api/v1/attendance/pending", tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
-        assertEquals(403, api.post("/api/v1/attendance/finalisations", "{}", tokenFor(academyId, Role.ANALYST)).statusCode());
+        assertEquals(403, api.get("/api/v1/attendance/pending", tokenFor(academyId, Role.STUDENT)).statusCode());
+        assertEquals(403, api.post("/api/v1/attendance/finalisations", "{}", tokenFor(academyId, Role.STUDENT)).statusCode());
     }
 
     @Test
-    void automaticFinalisationRunsOnlyWhenTheOwnerSwitchedItOnAndIsStillAnActiveOwner() {
+    void automaticFinalisationRunsOnlyWhenStaffSwitchedItOnAndTheyAreStillActiveStaff() {
         rule(null, null);
         assertEquals(0, queue.autoFinaliseOnce(), "off by default");
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM attendance_records WHERE academy_id = ?", Integer.class, academyId));
 
         assertEquals(403, api.put("/api/v1/attendance-policy", "{\"minConnectedPercent\":75,\"lateAfterMinutes\":10,\"description\":\"x y z\","
-                + "\"version\":0,\"autoFinalise\":true}", admin).statusCode(), "only an owner decides");
+                + "\"version\":0,\"autoFinalise\":true}", tokenFor(academyId, Role.STUDENT)).statusCode(), "students cannot decide");
         rule(true, 0L);
         assertEquals(true, HttpApi.parse(api.get("/api/v1/attendance-policy", admin)).get("autoFinalise"));
         assertEquals(1, queue.autoFinaliseOnce());
@@ -142,11 +142,11 @@ class AttendanceQueueIntegrationTest extends StaffApiIntegrationTest {
                 + "'ATTENDANCE_FINALISED'", String.class, academyId));
         assertEquals(0, queue.autoFinaliseOnce(), "nothing else is ready; never twice");
 
-        // The report for the waiting class arrives later; it is finalised on the next run unless the owner left.
+        // The report for the waiting class arrives later; it is finalised on the next run unless that staff member left.
         jdbc.update("INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, fetched_at, join_sessions) "
                 + "VALUES (?, 'Waiting==', 'FETCHED', 1, now(), 0)", academyId);
         jdbc.update("UPDATE accounts SET status = 'DISABLED' WHERE id = ?", ownerId);
-        assertEquals(0, queue.autoFinaliseOnce(), "a disabled owner's switch does nothing");
+        assertEquals(0, queue.autoFinaliseOnce(), "a disabled staff member's switch does nothing");
         jdbc.update("UPDATE accounts SET status = 'ACTIVE' WHERE id = ?", ownerId);
         assertEquals(1, queue.autoFinaliseOnce());
         assertEquals("ABSENT", jdbc.queryForObject("SELECT outcome FROM attendance_records WHERE class_session_id = ?::uuid", String.class, waiting),

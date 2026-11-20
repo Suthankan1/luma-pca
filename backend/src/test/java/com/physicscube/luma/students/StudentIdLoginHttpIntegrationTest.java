@@ -37,7 +37,7 @@ class StudentIdLoginHttpIntegrationTest extends StaffApiIntegrationTest {
     void seed() {
         jdbc.update("DELETE FROM rate_limit_counters");
         jdbc.update("INSERT INTO academies (id, name) VALUES (?, 'Physics Cube Test')", ACADEMY);
-        admin = tokenFor(ACADEMY, Role.ACADEMY_ADMIN);
+        admin = tokenFor(ACADEMY, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2027"), "MON");
         client = "203.0.113." + CLIENT.incrementAndGet();
@@ -116,14 +116,14 @@ class StudentIdLoginHttpIntegrationTest extends StaffApiIntegrationTest {
     void anAccountWithAnyStaffRoleCanNeverSignInThisWay() {
         String student = student("PCA001");
         UUID account = jdbc.queryForObject("SELECT account_id FROM students WHERE id = ?::uuid", UUID.class, student);
-        jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'ACADEMY_ADMIN')", account);
+        jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'STAFF')", account);
         assertEquals(401, signIn("PCA001", "PCA001").statusCode());
     }
 
     @Test
     void studentsOfAnotherAcademyCannotSignIn() {
         UUID otherAcademy = academy("Other academy");
-        String otherAdmin = tokenFor(otherAcademy, Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(otherAcademy, Role.STAFF);
         new AcademyFixtures(api, otherAdmin).student("PCA500", "pca500@example.invalid");
         assertEquals(401, signIn("PCA500", "PCA500").statusCode());
     }

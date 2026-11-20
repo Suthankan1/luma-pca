@@ -95,7 +95,7 @@ export const entryStateLabels: Record<EntryState, string> = { live: "Live", now:
 const SAME_RUN_MS = 60 * 60_000;
 
 /**
- * The timetable by academy date, soonest first: scheduled classes, plus (for managers, who can read the monitored webinars)
+ * The timetable by academy date, soonest first: scheduled classes, plus
  * Zoom's own upcoming occurrences that no class covers yet. `liveIds` are classes Zoom reports live right now.
  */
 export function calendarEntries(sessions: readonly ClassSession[], monitors: readonly WebinarMonitor[] | null,
@@ -121,7 +121,7 @@ export function calendarEntries(sessions: readonly ClassSession[], monitors: rea
       const endsAt = new Date(start + minutes * 60_000).toISOString();
       add(instantParts(o.startTime, ACADEMY_TIME_ZONE).date, { key: `${m.webinarId}-${o.occurrenceId ?? o.startTime}`, sessionId: null,
         title: m.topic ?? "Zoom webinar", startsAt: o.startTime, endsAt, timeZone: m.timeZone ?? ACADEMY_TIME_ZONE, source: "zoom",
-        state: now < start ? "upcoming" : now < Date.parse(endsAt) ? "now" : "ended", href: "/staff/webinars" });
+        state: now < start ? "upcoming" : now < Date.parse(endsAt) ? "now" : "ended", href: "/staff/sessions" });
     }
   }
   for (const entries of byDay.values()) entries.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));

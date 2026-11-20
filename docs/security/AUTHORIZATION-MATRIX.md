@@ -1,19 +1,46 @@
 # Roles and scoped authorization
 
-**Enforcement:** Spring backend checks academy ownership + action-specific role + course/batch/class membership + record owner. This matrix is a starting proposal and academy owner must approve it.
+**Current model (owner decision 2026-11-20): two roles, `STAFF` and `STUDENT`.** The five staff roles (owner,
+administrator, instructor, attendance officer, analyst) and batch assignments are gone; migration V30 gave every former
+staff account the one `STAFF` role on databases migrated to V30. See `docs/delivery/TWO-ROLES-REFACTOR-PLAN.md`.
 
-| Capability | Owner/Admin | Instructor (assigned) | Attendance Officer (assigned) | Analyst (approved) | Student (self) |
-| --- | --- | --- | --- | --- | --- |
-| Academy settings / Zoom credentials | Owner/Admin | — | — | — | — |
-| Create courses/batches/enrollments | Admin | — | — | — | — |
-| View scoped batch roster | Admin | Assigned batch | Assigned batch | Aggregate only | — |
-| View class attendance | Admin | Assigned class | Assigned class | Aggregate permitted | Own only |
-| Correct attendance | Admin | No by default | Assigned class + reason | — | Request only |
-| Create pulse questions | Admin | Assigned class | — | — | — |
-| Submit portal reactions | — | — | — | — | Enrolled class only |
-| Monthly report/export | Admin | Assigned batch | Assigned batch | Approved aggregate | Own history |
-| View leaderboard | Policy-dependent | Assigned batch | Policy-dependent | Approved aggregate | Opt-in/consented |
-| Change roles | Owner/Admin with escalation | — | — | — | — |
+**Enforcement:** the Spring backend checks, on every request, the academy (always from the verified token) + the role
+(read from the database, never from the token) + record ownership for students. `SecurityConfig` sends every staff route
+through one `hasRole("STAFF")` rule; services repeat the check (`CurrentAccount.requireStaff()`) and bind every query to
+the caller's academy, so records of another academy answer 404.
+
+| Capability | Staff | Student (self) |
+| --- | --- | --- |
+| Courses, batches, students, enrollments, imports, invitations | Every record of their academy | — (403) |
+| Classes, rosters, expected students, attendance, corrections, exports, reports, batch totals | Every class and batch of their academy | Own classes and own records only |
+| Attendance rule, finalisation, recalculation, appeals | Yes | Appeal own record |
+| Zoom: webinar monitoring, occurrences, participants, receipts, reports | Yes | — |
+| Engagement switch, pulse questions, rankings | Yes | Own consent, reactions and answers (enrolled class only) |
+| Student erasure | Yes (student number typed again, reason, audited) | — |
+| Staff accounts | No API (owner decision 2026-11-20): the operator adds, blocks and unblocks staff | — |
+| Invitations for pending accounts (students) | Yes | — |
+| Activity log | Yes | — |
+
+**Guards kept:** staff accounts cannot be changed over HTTP at all (the operator command adds them; the runbook SQL in
+`docs/delivery/runbooks/sql` blocks and unblocks them, ending every session and cancelling unused activation links).
+Students are never managed through staff routes. Every change is audited (actor, or none for the operator; action,
+target id; no email or token). A former role name in any request or token grants nothing.
+
+**Accepted risk (owner):** every staff member has full staff access, including erasing a student's data and changing the
+attendance rule. The audit log records who did what. Adding or blocking staff needs someone with server or database
+access.
+
+**Negative acceptance examples:** student A cannot request student B's record by guessing an ID; a student gets 403 on
+every staff route; staff of one academy cannot read or change another academy's records (404); guest or unregistered
+Zoom users are not counted as students; a student in two batches sees only classes of their enrollments.
+
+Staff can read their academy’s dated class totals, latest completed class, and last five completed classes. Shared classes
+count each student once. `GET /api/v1/class-sessions/{sessionId}/attendance?includeOnlineHistory=true` adds timestamps and
+counts of matched students from recorded Zoom visits for the requested class, including matched students outside its roster.
+
+## History (superseded by the two-role model)
+
+The notes below describe the role model before 2026-11-20 and are kept for the record.
 
 **As built (002A):** only the first two "Admin" capabilities for courses and batches exist. Owner and Admin may list, read, create and update courses and batches of their own academy through any live session (the MFA-session requirement of 001F was removed on 2026-11-20). Instructor, Attendance Officer, Analyst and Student are refused on all of those routes until staff assignments and enrollments (002B) give them scoped access. The academy is always taken from the verified token.
 
@@ -48,11 +75,3 @@ Attendance Officer; the class list and expected students are limited to the call
 only their batches' students. `GET /api/v1/students/{id}/attendance-overview` for Owner and Admin (404 outside the
 academy). `GET /api/v1/me/attendance-overview` for Students, resolved from the token only; students get 403 on the
 staff routes.
-
-`GET /api/v1/attendance/class-totals` uses the same staff roles and academy/batch scope as the attendance dashboard.
-It returns completed class IDs and counts of expected and joined students. For a shared class, each student is counted once across the caller's visible batches.
-`GET /api/v1/attendance/latest-completed` and `GET /api/v1/attendance/recent-completed` use the same scope to select completed
-classes and count their students. The recent endpoint returns at most five classes after applying the scope.
-
-`GET /api/v1/class-sessions/{sessionId}/attendance?includeOnlineHistory=true` counts only matched students visible in
-the caller's class attendance response. Owners and administrators also see matched students who were not expected.

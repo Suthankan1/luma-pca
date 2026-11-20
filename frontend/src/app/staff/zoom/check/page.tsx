@@ -5,7 +5,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  candidateClasses, formatDuration, formatInstant, formatWebinarId, isAcademyManager, occurrenceIdOrNull, participantMatchLabel,
+  candidateClasses, formatDuration, formatInstant, formatWebinarId, occurrenceIdOrNull, participantMatchLabel,
   type ClassSession, type Occurrence, type RunAttendance, type WebinarLookup, type ZoomParticipant,
 } from "@/lib/staff-forms";
 
@@ -25,9 +25,6 @@ export default async function CheckWebinarPage({ searchParams }: { searchParams:
   const shell = { active: "zoom" as const, crumb: "Zoom", title: "Check a webinar",
     subtitle: "Paste a webinar’s join link or ID to see who attended any of its past runs, from Zoom’s own report.",
     hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}><p className="banner">Only academy owners and administrators check webinars.</p></StaffShell>;
-  }
 
   const lookup = webinar ? await staffApi<WebinarLookup>(`/api/v1/zoom/webinar-lookup?${new URLSearchParams({ webinar })}`, undefined, 15000) : null;
   const selected = lookup?.ok && run ? lookup.data.runs.find(r => r.occurrenceUuid === run) : undefined;

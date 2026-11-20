@@ -26,8 +26,10 @@ test("portal preferences cannot grant a new role or redirect outside the app", (
   const identity = roles => ({ accountId: "account", academyId: "academy", roles });
   assert.equal(hasPortal(identity(["STUDENT"]), "staff"), false);
   assert.equal(portalPath(identity(["STUDENT"]), "staff"), "/student");
-  assert.equal(portalPath(identity(["INSTRUCTOR"]), "student"), "/staff");
-  assert.equal(portalPath(identity(["INSTRUCTOR", "STUDENT"]), "student"), "/student");
+  assert.equal(portalPath(identity(["STAFF"]), "student"), "/staff");
+  assert.equal(portalPath(identity(["STAFF", "STUDENT"]), "student"), "/student");
+  assert.equal(portalPath(identity(["STAFF", "STUDENT"])), "/staff");
+  assert.equal(hasPortal(identity(["ACADEMY_OWNER"]), "staff"), false, "a former role name opens nothing");
   assert.equal(portalPath(identity(["STUDENT"]), "//example.test"), "/student");
   assert.equal(portalPath(identity(["UNRECOGNIZED"])), "/sign-in?error=access");
 });
@@ -41,7 +43,7 @@ test("access cookie encryption rejects tampering and cross-environment keys", ()
   assert.equal(openAccess(cookie, key), jwt);
   assert.deepEqual(openAccessSession(cookie, key), { token: jwt, identity: null });
 
-  const identity = { accountId: "acc-1", academyId: "acad-1", roles: ["ACADEMY_OWNER"] };
+  const identity = { accountId: "acc-1", academyId: "acad-1", roles: ["STAFF"] };
   const sessionCookieVal = sealAccess({ token: jwt, identity }, key);
   assert.equal(openAccess(sessionCookieVal, key), jwt);
   assert.deepEqual(openAccessSession(sessionCookieVal, key), { token: jwt, identity });
