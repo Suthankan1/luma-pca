@@ -2720,3 +2720,8 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Monthly and recent completed totals now read linked Zoom evidence in batches of up to 16 authorized classes. Identity lookup is shared within each batch. Host exclusion, registration matching, report precedence and expected-roster filtering remain class-specific.
 - Passed 26 PostgreSQL integration tests across attendance insights, provisional attendance, Zoom participants and Zoom reports. The new parity case combines report evidence, host and registrant roles across two sessions. The before/after k6 comparison is tracked separately.
 - No API contract or migration change. Revert this commit to restore per-class reads.
+
+## Batched Classes load comparison (2026-11-21)
+
+- Repeated the 60-request synthetic benchmark with backend `46a4a6a` and the same frontend build. There were zero failures. Classes page p95 dropped from 392 ms to 185 ms and Class Types from 412 ms to 131 ms. The report-participant SQL executed 264 times instead of 680. The staff performance checklist records the sample count and limitations.
+- Verified local behavior only. No live service or database configuration changed. This commit records evidence and has no runtime rollout step.

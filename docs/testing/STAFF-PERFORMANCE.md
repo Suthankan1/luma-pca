@@ -6,7 +6,7 @@ Progress is the number of verified local items divided by the ten local items be
 | --- | --- | --- |
 | 1 | Timing and current-route load coverage. Verify response headers and benchmark configuration. | Verified |
 | 2 | Run a reproducible signed-in synthetic baseline and record request errors and route p95. | Verified |
-| 3 | Batch Classes attendance facts. Verify expected, joined and academy scope and compare query work. | Pending |
+| 3 | Batch Classes attendance facts. Verify expected, joined and academy scope and compare query work. | Verified |
 | 4 | Stream Classes, Students and Class Types with stable fallbacks and independent failure handling. | Pending |
 | 5 | Add and verify a durable, replay-safe completed attendance summary. Prove parity and rollback before enabling reads. | Pending |
 | 6 | Add a scoped Students monthly read with full-result filtering, ordering and aggregates. | Pending |
@@ -35,6 +35,10 @@ Windows Docker Desktop, production Next.js build and backend `904e345`. Run `scr
 | Report selection | 8 | 51 ms | 78 ms | 82 ms |
 
 All 60 requests passed. The busiest SQL was the student identity lookup with 680 executions and 21.8 seconds total across requests. The short run provides a development comparison with eight samples per page. The API access-log percentile parser did not run because `python3` was unavailable, and the run did not measure browser vitals, Excel export, or original Supabase latency.
+
+## Batched Classes comparison
+
+The same fixture and frontend build with backend `46a4a6a` passed all 60 requests again. Classes p95 fell from 392 ms to 185 ms and Class Types from 412 ms to 131 ms. The report-participant SQL and the matched-student SQL each dropped from 680 to 264 executions across the run. Classes and Class Types share the affected totals endpoint, which returned at p95 139 ms over 16 requests. The run still used the existing Students dashboard read path. These short measurements are local evidence and should be repeated in the intended environment.
 
 ## Hosted acceptance
 
