@@ -2615,3 +2615,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The two-week list displays joined-of-expected percentages for completed sessions, and the monthly class-type list displays an equal-weight average of its completed session percentages. A missing count or empty expected roster has no rate. Both use the existing scoped class totals endpoint.
 - A separate animated column chart sits above each list. The charts support horizontal scrolling, descriptive labels, and reduced motion. The lists remain equal height with independent scrolling.
 - Passed 77 frontend unit tests, TypeScript, targeted lint, and the structure check. The original Supabase-backed API reported UP and sign-in returned 200. Signed-in visual verification was not run. No migration is needed. Revert the frontend commit to roll back.
+
+## Class type attendance detail (2026-11-20)
+
+- The Classes tab links each monthly class type to a staff-only detail page with distinct active enrolments across its batches, an equal-weight average of completed session percentages, and an animated month-to-date trend. Each plotted point shows the session date, time, and rate on hover or focus and links to the attendance record. Student and completed session lists scroll independently and stack on narrow screens.
+- The detail page uses the existing academy-scoped schedule, roster, and attendance APIs. Each student's rate uses sessions of that type where the student was expected. Missing rates leave gaps in the chart. The frontend proxy recognises the named route and still rejects malformed class record IDs.
+- Passed 77 frontend unit tests, TypeScript, targeted ESLint, the structure check, and two focused signed-in Playwright checks in desktop and mobile Edge with mock data. The original Supabase-backed API reported UP. Its frontend redirected an unauthenticated detail request to staff sign-in and returned 404 for a malformed class record ID. Signed-in production data rendering was not tested.
+- Frontend-only rollout. No migration is needed. Revert this commit to roll back.

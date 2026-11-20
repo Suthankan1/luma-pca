@@ -9,7 +9,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { renderTime } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { ACADEMY_TIME_ZONE, academyToday, addDays, formatDate, instantParts, sessionListHref, sessionWindow, zonedToInstant, type ClassSession } from "@/lib/staff-forms";
+import { ACADEMY_TIME_ZONE, academyToday, addDays, formatDate, sessionListHref, sessionWindow, zonedToInstant, type ClassSession } from "@/lib/staff-forms";
 import { attendancePercent, averageClassAttendance, calendarEntries, compactClassTitle, longDayLabel, monthLabel, monthlyClassTypes,
   timeRange, type ClassAttendanceTotal, type DayEntry } from "@/lib/staff-home";
 import { formatWebinarId, zoomSchedule, type WebinarMonitor } from "@/lib/webinars";
@@ -158,18 +158,13 @@ async function ClassTypes({ month, today, now }: { month: string; today: string;
       <div className="classes-panel-scroll" tabIndex={0} role="region" aria-label="Monthly class types and dates">
         {!result.ok ? <p className="session-error" role="alert">Class types couldn’t load. Please reload shortly.</p>
           : groups.length === 0 ? <p className="dir-empty muted">No completed class entries this month.</p>
-          : <div className="class-type-list">{groups.map(group => <details className="class-type" key={group.key}>
-            <summary>
+          : <ul className="class-type-list">{groups.map(group => <li className="class-type" key={group.key}>
+            <Link href={`/staff/sessions/types?${new URLSearchParams({ type: group.key })}`}>
               <span>{group.title}</span>
               <span className="class-type-count">{group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}
                 {" · "}<strong className="class-attendance-percent">{group.average == null ? "—" : `${group.average}% avg`}</strong></span>
-            </summary>
-            <ul>{group.sessions.map(session => <li key={session.id}>
-              <span>{longDayLabel(instantParts(session.startsAt, ACADEMY_TIME_ZONE).date)}</span>
-              <span className="muted">{timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })}
-                {session.origin !== "ZOOM_RUN" && " · Scheduled time"}</span>
-            </li>)}</ul>
-          </details>)}</div>}
+            </Link>
+          </li>)}</ul>}
       </div>
     </section>
   </div>;
