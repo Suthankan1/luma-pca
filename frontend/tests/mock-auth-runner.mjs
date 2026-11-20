@@ -35,6 +35,13 @@ const backend = createServer(async (req, res) => {
   if (req.method === "PUT" && mockOnline) {
     if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
     const run = runSessions.get(mockOnline[1]);
+    if (run && typeof body.ended === "boolean") {
+      const session = classSessions.find(row => row.id === run.classSessionId);
+      run.state = body.ended ? "ENDED" : "LIVE";
+      run.actualEndedAt = body.ended ? new Date().toISOString() : null;
+      session.endsAt = run.actualEndedAt ?? new Date(Date.parse(run.firstSeenAt) + 12 * 3600_000).toISOString();
+      return send(200, { ended: body.ended });
+    }
     if (!run || run.state !== "LIVE") return send(404);
     if (!Number.isInteger(body.connectedNow) || body.connectedNow < 0) return send(400);
     run.connectedNow = body.connectedNow;
@@ -1305,6 +1312,8 @@ function academicApi(req, body, send) {
     }
     if (sub === "attendance" && req.method === "GET") {
       const facts = mockAttendance(session);
+      const run = runSessions.get(session.id);
+      if (run) facts.webinarEnded = run.state === "ENDED";
       if (new URLSearchParams(query).get("includeOnlineHistory") === "true") facts.onlineHistory = onlineHistories.get(session.id) ?? [];
       return send(200, facts);
     }

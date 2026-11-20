@@ -1,24 +1,21 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { StaffShell } from "@/components/StaffShell";
-import { LiveRefresh } from "@/components/LiveRefresh";
 import { LinkPending } from "@/components/LinkPending";
-import { LiveOnlineChart } from "@/components/staff/LiveOnlineChart";
 import { OneLineTitle } from "@/components/staff/OneLineTitle";
+import { StaffLiveStrip } from "@/components/staff/StaffLiveStrip";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi, type ApiResult } from "@/lib/staff-api";
-import { ACADEMY_TIME_ZONE, academyToday, addDays, instantParts, zonedToInstant, type ClassSession,
-  type OnlineObservation, type ProvisionalAttendance } from "@/lib/staff-forms";
+import { ACADEMY_TIME_ZONE, academyToday, addDays, instantParts, zonedToInstant, type ClassSession } from "@/lib/staff-forms";
+import { MAX_LIVE_CLASSES, readLiveAttendance } from "@/lib/staff-live";
 import { renderTime } from "@/lib/insights";
 import { type WebinarMonitor } from "@/lib/webinars";
 import { attendancePercent, calendarEntries, chosenDay, chosenMonth, entryStateLabels, greeting, gridRange, homeHref, joinedLabel,
-  liveNumbers, longDayLabel, monthLabel, monthWeeks, nextEntry, relativeDayName, shiftMonth, shortDayLabel,
-  startedAgoLabel, startsInLabel, timeRange, type ClassAttendanceTotal, type DayEntry, type LiveNumbers } from "@/lib/staff-home";
+  longDayLabel, monthLabel, monthWeeks, nextEntry, relativeDayName, shiftMonth, shortDayLabel,
+  startsInLabel, timeRange, type ClassAttendanceTotal, type DayEntry } from "@/lib/staff-home";
 
 const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-/** At most this many classes running at once get their own live row (each costs one attendance request). */
-const MAX_LIVE = 3;
 const ATTENDANCE_SUMMARY_TIMEOUT_MS = 25_000;
 type CompletedClass = ClassAttendanceTotal & { title: string; endsAt: string; timeZone: string };
 type RecentAttendanceResult = Promise<ApiResult<CompletedClass[]>>;
@@ -26,7 +23,6 @@ type RecentAttendanceResult = Promise<ApiResult<CompletedClass[]>>;
 function sessionsIn(fromInstant: string, toInstant: string) {
   return staffApi<ClassSession[]>(`/api/v1/class-sessions?${new URLSearchParams({ from: fromInstant, to: toInstant })}`);
 }
-
 function classTotals(range: { from: string; to: string }, timeoutMs?: number) {
   return staffApi<ClassAttendanceTotal[]>(`/api/v1/attendance/class-totals?${new URLSearchParams(range)}`, undefined, timeoutMs);
 }
@@ -69,23 +65,18 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const chosenDays = gridCoversDay ? calendarDays : entriesFrom(chosen);
   const dayEntries = chosenDays?.get(day) ?? [];
   const running = [...(soonDays?.values() ?? [])].flat()
-    .filter(e => e.sessionId && (e.state === "live" || e.state === "now")).slice(0, MAX_LIVE);
+    .filter((e): e is DayEntry & { sessionId: string } => Boolean(e.sessionId && (e.state === "live" || e.state === "now")))
+    .slice(0, MAX_LIVE_CLASSES);
   const next = soonDays ? nextEntry(new Map([...soonDays].filter(([date]) => date >= today && date < soonAfter)), now) : null;
   const endedOnDay = day <= today && dayEntries.some(e => e.state === "ended" && e.sessionId);
 
   // Second round: live numbers for running classes, and joined/expected for the chosen day's finished classes.
   const [liveAttendance, dayTotals] = await Promise.all([
-    Promise.all(running.map(e => staffApi<ProvisionalAttendance>(
-      `/api/v1/class-sessions/${e.sessionId}/attendance?includeOnlineHistory=true`, undefined, ATTENDANCE_SUMMARY_TIMEOUT_MS))),
+    readLiveAttendance(running.map(entry => entry.sessionId)),
     endedOnDay ? classTotals({ from: day, to: day }) : null,
   ]);
-  const sampledAt = renderTime();
-  const live = running.map((entry, i) => {
-    const attendance = liveAttendance[i];
-    if (!attendance.ok) return { entry, numbers: null, history: null };
-    const history = attendance.data.onlineHistory ?? null;
-    return { entry, numbers: liveNumbers(attendance.data.students, history?.at(-1)?.online), history };
-  });
+  const liveEntries = running.filter((_, index) => !liveAttendance[index].ended);
+  const activeAttendance = liveAttendance.filter(snapshot => !snapshot.ended);
   const finished = new Map(dayTotals?.ok ? dayTotals.data.map(c => [c.id, c] as const) : []);
   const href = (options: { day?: string; month?: string }) => homeHref({ day: options.day ?? day, month: options.month ?? month }, today);
   const previousDay = addDays(day, -1), nextDay = addDays(day, 1);
@@ -93,13 +84,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
 
   return <StaffShell {...shell} actions={<Link className="home-button" href="/staff/dashboard">Attendance reports</Link>}>
     <div className="staff-home">
-      {live.length > 0
-        ? <section className="home-strip home-strip-live" aria-labelledby="live-title">
-            <h2 id="live-title" className="sr-only">Live now</h2>
-            {live.map(({ entry, numbers, history }) => <LiveRow key={entry.key} entry={entry} numbers={numbers} history={history}
-              now={now} sampledAt={sampledAt} />)}
-            <LiveRefresh until={new Date(now + 3 * 3600_000).toISOString()} seconds={30} label="while a class runs" />
-          </section>
+      {liveEntries.length > 0
+        ? <StaffLiveStrip entries={liveEntries} initial={activeAttendance} />
         : <div className="home-brief">
             <section className="home-strip home-strip-next" aria-labelledby="next-title">
               <div className="home-strip-main">
@@ -266,28 +252,4 @@ async function RecentAttendanceChart({ attendance }: { attendance: RecentAttenda
         })}
       </ul>}
   </section>;
-}
-
-function LiveRow({ entry, numbers, history, now, sampledAt }: {
-  entry: DayEntry; numbers: LiveNumbers | null; history: OnlineObservation[] | null; now: number; sampledAt: number;
-}) {
-  const showChart = entry.sessionId != null;
-  return <article className={`live-row${showChart ? " live-row-chart" : ""}`} aria-label={`${entryStateLabels[entry.state]}: ${entry.title}`}>
-    <span className={`live-badge ${entry.state === "live" ? "" : "live-badge-now"}`}>
-      <span className="live-dot" aria-hidden="true" />{entry.state === "live" ? "Live" : "In progress"}
-    </span>
-    <div className="live-row-main">
-      <h3><Link href={entry.href}><OneLineTitle text={entry.title} /></Link></h3>
-      <p>{timeRange(entry)} · {startedAgoLabel(entry.startsAt, now)}</p>
-    </div>
-    {numbers ? <dl className="live-figures">
-      <div><dt>Joined</dt><dd>{numbers.joined}<small> / {numbers.expected}</small></dd></div>
-      <div><dt>Attendance</dt><dd>{numbers.percent == null ? "—" : `${numbers.percent}%`}</dd></div>
-      <div><dt>Students online</dt><dd>{history?.length === 0 ? "—" : numbers.connectedNow}</dd></div>
-    </dl> : <p className="live-row-note">Live numbers couldn’t load.</p>}
-    {entry.sessionId && <div className="live-online-slot">
-      <LiveOnlineChart sessionId={entry.sessionId} history={history} sampledAt={sampledAt}
-        startsAt={entry.startsAt} />
-    </div>}
-  </article>;
 }

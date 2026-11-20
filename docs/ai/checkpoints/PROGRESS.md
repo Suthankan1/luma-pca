@@ -2767,3 +2767,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The pull-request load workflow runs the synthetic signed-in staff scenario with warmed projections. Frontend checks include the signed-in Lighthouse budgets. The Lighthouse harness uses loopback mock data and a temporary tool install. No student data or browser logs are uploaded by the Lighthouse harness.
 - The exact targeted k6 scenario passed all 60 checks with zero failures. The local Edge Lighthouse run passed all nine route and metric assertions using the median of three runs per route. The [performance checklist](../../testing/STAFF-PERFORMANCE.md) records numbers, budgets, the hosted verification gate and rollback.
 - GitHub workflows have yet to run remotely. No hosted metrics, database settings, or deployments were changed. Revert the workflow and harness commit to remove the new gates.
+
+## Targeted live staff polling (2026-11-21)
+
+- The staff dashboard polls only live counts and sample history while the tab is visible. Session detail polls attendance, Zoom state and enabled engagement. Both retain pause, recover history on arrival and coordinate a refresh when a class ends. The BFF endpoints authorize and scope each read and return private no-store responses.
+- Passed the production build, full ESLint, 81 frontend unit tests, the 113-endpoint contract check and six final desktop/mobile browser checks. The browser cases verify timeline recovery, pause, targeted data requests, finalisation, and removal of an ended run while another class stays active.
+- The ten local slices in the [performance checklist](../../testing/STAFF-PERFORMANCE.md) are complete. Original Supabase and hosted performance checks remain open. This slice is frontend-only and can be rolled back independently by reverting the commit.

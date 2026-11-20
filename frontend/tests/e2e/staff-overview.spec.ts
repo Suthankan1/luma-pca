@@ -205,6 +205,8 @@ test.describe("Staff home", () => {
   });
 
   test("the live online chart shows recorded samples on arrival and reload, and refresh can pause", async ({ page }) => {
+    const signedOut = await page.request.get("/staff/live?session=00000000-0000-4000-8000-0000000000c1", { maxRedirects: 0 });
+    expect(signedOut.status()).toBe(307);
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await signInStaff(page, "admin-enrolled@example.invalid");
     const course = await api(page, "POST", "/api/v1/courses", { code: "CHART-TIME", title: "Chart time window" });
@@ -217,6 +219,7 @@ test.describe("Staff home", () => {
       live: { classSessionId: string; connectedNow: number; actualStartedAt: string };
     };
     const onlinePath = `/__test__/zoom-online/${run.classSessionId}`;
+    expect((await page.request.get("/staff/live?session=invalid")).status()).toBe(400);
     await page.clock.install();
     await page.goto("/staff");
     const live = page.getByRole("region", { name: "Live now" });
@@ -264,7 +267,14 @@ test.describe("Staff home", () => {
       await expect(chart).toHaveAccessibleName(recorded);
       await resume.click();
       await expect(pause).toBeVisible();
+      const update = page.waitForResponse(response => new URL(response.url()).pathname === "/staff/live");
       await page.clock.fastForward(31_000);
+      const snapshot = await update;
+      expect(snapshot.ok()).toBe(true);
+      expect(snapshot.headers()["cache-control"]).toBe("private, no-store");
+      const liveRows = await snapshot.json();
+      expect(liveRows.find((row: { sessionId: string }) => row.sessionId === run.classSessionId)?.numbers.connectedNow).toBe(17);
+      expect(JSON.stringify(liveRows)).not.toContain("students");
       const refreshed = /4 observations · 4 online at .* · 17 online at /;
       await expect(chart).toHaveAccessibleName(refreshed);
       expect(Date.parse((await zoomBounds.last().getAttribute("datetime"))!)).toBeGreaterThan(latestObservedAt);
@@ -278,7 +288,25 @@ test.describe("Staff home", () => {
       await expect(chart).toHaveAccessibleName(refreshed);
       await expect(chart.locator("circle")).toHaveCount(4);
       await expect(newestSegment).toHaveCount(0);
+
+      await page.goto(`/staff/sessions/${run.classSessionId}`);
+      await expect(page.getByLabel("Session summary")).toBeVisible();
+      const detailUpdate = page.waitForResponse(response => new URL(response.url()).pathname === `/staff/sessions/${run.classSessionId}/live`);
+      await page.clock.fastForward(31_000);
+      const detailSample = await detailUpdate;
+      expect(detailSample.headers()["cache-control"]).toBe("private, no-store");
+      const detail = await detailSample.json();
+      expect(detail.attendance.onlineHistory).toHaveLength(4);
+      expect(detail.run.connectedNow).toBe(17);
+
+      await page.goto("/staff");
+      await expect(article).toBeVisible();
+      await api(page, "PUT", onlinePath, { ended: true });
+      await page.clock.fastForward(31_000);
+      await expect(article).toHaveCount(0);
+      await expect(scheduledChart).toBeVisible();
     } finally {
+      await api(page, "PUT", onlinePath, { ended: false });
       await api(page, "PUT", onlinePath, { connectedNow: run.connectedNow });
     }
   });

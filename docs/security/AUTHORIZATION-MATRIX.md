@@ -77,3 +77,5 @@ academy). `GET /api/v1/me/attendance-overview` for Students, resolved from the t
 staff routes.
 
 **Staff monthly directory.** `GET /api/v1/attendance/student-directory` requires `STAFF`. The backend resolves the academy from the authenticated account. The response contains directory names and registration numbers with participation counts, uses `private, no-store`, and excludes account emails and per-session identities.
+
+**Staff live reads.** The BFF checks the staff portal session for `/staff/live` and `/staff/sessions/{id}/live`. The API rechecks access to each class. The dashboard response contains totals and sample times. Session detail also includes its scoped attendance rows. Both responses are private and no-store.
