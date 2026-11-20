@@ -7,6 +7,8 @@
 Students sign in with **username = student ID** and **password = the same student ID** (for example `PCA12345` /
 `PCA12345`). No registration, invitation, password creation or second factor.
 
+With the flag enabled, the landing page’s Student sign-in link opens a form with a text username field and a password field. The shared `/sign-in` page also provides the academy account form for existing email accounts.
+
 ## Why this is not secure authentication
 
 A student ID is an identifier, not a secret: it is printed on receipts and class lists, shared on WhatsApp, and often

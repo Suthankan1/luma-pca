@@ -14,7 +14,7 @@ test("student data stays private across navigation, logout and a student sign-in
   await page.goBack({ waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page.getByRole("heading", { name: "Student directory" })).toHaveCount(0);
-  await page.goto("/sign-in?portal=student");
+  await page.goto("/sign-in");
   await page.fill("#email", "student@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();

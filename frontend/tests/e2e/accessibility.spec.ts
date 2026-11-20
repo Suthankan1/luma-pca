@@ -34,7 +34,7 @@ test("staff pages have no serious accessibility problems", async ({ page }) => {
 });
 
 test("student pages have no serious accessibility problems", async ({ page }) => {
-  await page.goto("/sign-in?portal=student");
+  await page.goto("/sign-in");
   await page.fill("#email", "student@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();

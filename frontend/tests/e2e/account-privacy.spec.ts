@@ -2,7 +2,7 @@ import { openSection } from "./support/ui";
 import { test, expect } from "@playwright/test";
 
 test("A student changes their password with the current one and is signed out", async ({ page }) => {
-  await page.goto("/sign-in?portal=student");
+  await page.goto("/sign-in");
   await page.fill("#email", "student@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();

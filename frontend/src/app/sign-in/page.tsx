@@ -26,12 +26,15 @@ export default async function SignIn({ searchParams }: {
   const message = error && Object.hasOwn(messages, error)
     ? messages[error as keyof typeof messages]
     : unavailable ? messages.unavailable : undefined;
+  const showStudentIdForm = studentIdLoginEnabled() && portal !== "staff";
+  const showEmailForm = !showStudentIdForm || portal !== "student";
+  const showBothForms = showStudentIdForm && showEmailForm;
 
   return <Shell>
-    <section className={`panel session-panel ${studentIdLoginEnabled() && portal !== "staff" && !identity && !canRefresh ? "session-panel-wide" : ""}`}>
+    <section className={`panel session-panel ${showBothForms && !identity && !canRefresh ? "session-panel-wide" : ""}`}>
       <p className="eyebrow">{portal === "staff" ? "STAFF PORTAL" : portal === "student" ? "STUDENT PORTAL" : "PHYSICS CUBE ACADEMY"}</p>
       <h1 className="heading">Sign in to LUMA</h1>
-      {portal === "student" && <p className="sub">Sign in with your academy account to view your attendance.</p>}
+      {portal === "student" && !showStudentIdForm && <p className="sub">Sign in with your academy account to view your attendance.</p>}
       {message && <p className="session-error" role="alert">{message}</p>}
       {signedOut === "1" && <p className="sub" role="status">You’re signed out.</p>}
       {activated === "1" && <p className="sub" role="status">Your account is active. Sign in with your new password.</p>}
@@ -45,22 +48,22 @@ export default async function SignIn({ searchParams }: {
         <form method="post" action="/api/session/logout" className="session-form">
           <button className="action secondary" type="submit">Sign out</button>
         </form>
-      </> : <div className={studentIdLoginEnabled() && portal !== "staff" ? "signin-cards" : undefined}>
-      {studentIdLoginEnabled() && portal !== "staff" && <form method="post" action="/api/session/student-login" className="session-form"
+      </> : <div className={showBothForms ? "signin-cards" : undefined}>
+      {showStudentIdForm && <form method="post" action="/api/session/student-login" className="session-form"
         aria-labelledby="student-sign-in">
         <h2 id="student-sign-in" className="eyebrow">Students</h2>
         <input type="hidden" name="portal" value="student" />
-        <label htmlFor="student-id">Student ID</label>
-        <input id="student-id" name="studentId" autoComplete="username" autoCapitalize="characters" spellCheck={false}
+        <label htmlFor="student-id">Username</label>
+        <input id="student-id" name="studentId" type="text" autoComplete="username" autoCapitalize="characters" spellCheck={false}
           maxLength={60} required />
         <label htmlFor="student-password">Password</label>
         <input id="student-password" name="password" type="password" autoComplete="current-password" maxLength={60} required />
-        <p className="sub">Your password is your student ID unless the Academy told you otherwise.</p>
+        <p className="sub">Enter your registration ID for both username and password.</p>
         <button className="action" type="submit">Open my student portal</button>
       </form>}
-      <form method="post" action="/api/session/login" className="session-form"
-        aria-labelledby={studentIdLoginEnabled() && portal !== "staff" ? "staff-sign-in" : undefined}>
-        {studentIdLoginEnabled() && portal !== "staff" && <h2 id="staff-sign-in" className="eyebrow">Staff</h2>}
+      {showEmailForm && <form method="post" action="/api/session/login" className="session-form"
+        aria-labelledby={showBothForms ? "account-sign-in" : undefined}>
+        {showBothForms && <h2 id="account-sign-in" className="eyebrow">Academy account</h2>}
         {(portal === "staff" || portal === "student") && <input type="hidden" name="portal" value={portal} />}
         <label htmlFor="email">Email</label>
         <input id="email" name="email" type="email" autoComplete="username" maxLength={254} required />
@@ -68,7 +71,7 @@ export default async function SignIn({ searchParams }: {
         <input id="password" name="password" type="password" autoComplete="current-password" maxLength={256} required />
         <button className="action" type="submit">Sign in</button>
         <p className="sub"><Link href="/forgot-password">Forgot your password?</Link></p>
-      </form>
+      </form>}
       </div>}
     </section>
   </Shell>;

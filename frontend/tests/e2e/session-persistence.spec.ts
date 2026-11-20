@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 test.describe("Staying signed in", () => {
   test("A student stays signed in after the short access token expires, and Sign out still works", async ({ page, context }) => {
     await context.clearCookies();
-    await page.goto("/sign-in?portal=student");
+    await page.goto("/sign-in");
     await page.fill("#email", "student@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();

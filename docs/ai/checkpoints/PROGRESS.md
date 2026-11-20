@@ -2799,3 +2799,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The shared staff and student profile replaces the batch count and list with distinct class types for the selected month. Scheduled sessions count when enrolment covers the session date and batch ID. Cancelled sessions are excluded. Upcoming types appear in the enrolment panel while the attendance chart still uses completed sessions.
 - The profile reads the existing authorized timetable routes. The class-type panel loads independently from the attendance chart and history. The production build, ESLint, 81 unit tests, structure check and 16 focused desktop and mobile browser tests passed. The browser checks verified deduplication and a scheduled class type in a future month with no completed classes.
 - Restarted the frontend. Sign-in returned 200 and the original Supabase-backed API reported UP. Signed-in verification used synthetic data. Revert the frontend commit and rebuild to roll back. No schema or API change is needed.
+
+## Username field in the Student ID sign-in preview (2026-11-21)
+
+- When the existing Student ID mode is enabled, the landing page’s student link shows just the username and password form. The username accepts registration ID text. The shared sign-in route still supports existing email accounts.
+- Production build, ESLint, 81 unit tests, session smoke, structure and 30 synthetic desktop/mobile browser checks passed. The sign-in regression starts at the landing page, verifies the absence of an email field and opens the student’s attendance profile with the test ID.
+- Restarted the isolated preview on port 3450 and confirmed its username form. The main frontend was rebuilt with its existing settings. It still requires email sign-in and the original Supabase-backed API reports UP. No database or auth configuration changed. Revert the commit and rebuild to roll back.
