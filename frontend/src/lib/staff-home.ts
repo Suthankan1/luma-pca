@@ -201,6 +201,18 @@ export function attendancePercent({ expected, joined }: Pick<ClassAttendanceTota
   return expected > 0 ? Math.round(joined * 100 / expected) : null;
 }
 
+export function averageClassAttendance(sessions: readonly Pick<ClassSession, "id">[], totals: ReadonlyMap<string, ClassAttendanceTotal>) {
+  let sum = 0;
+  let count = 0;
+  for (const session of sessions) {
+    const total = totals.get(session.id);
+    if (!total || total.expected <= 0) continue;
+    sum += total.joined * 100 / total.expected;
+    count++;
+  }
+  return count ? Math.round(sum / count) : null;
+}
+
 /** "18 of 24 joined · 75%", from the per-class attendance totals. */
 export function joinedLabel(c: Pick<ClassAttendanceTotal, "expected" | "joined">) {
   const percent = attendancePercent(c);

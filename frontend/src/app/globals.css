@@ -662,7 +662,21 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .class-day + .class-day { margin-top:14px; }
 .class-day-title { margin:12px 0 2px; color:var(--ink-2); font-size:13px; font-weight:700; }
 .classes-overview { display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:16px; }
-.classes-overview > .panel { display:flex; flex-direction:column; min-width:0; height:clamp(340px,60vh,590px); }
+.classes-column { min-width:0; display:grid; gap:16px; align-content:start; }
+.classes-column > section.panel { display:flex; flex-direction:column; min-width:0; height:clamp(340px,60vh,590px); }
+.classes-attendance-chart { box-sizing:border-box; min-width:0; height:240px; background:#fff; }
+.classes-chart-frame { display:grid; grid-template-columns:auto minmax(0,1fr); gap:8px; height:144px; margin-top:14px; }
+.classes-chart-axis { display:flex; flex-direction:column; justify-content:space-between; padding-bottom:26px; color:#536981; font-size:10px; font-variant-numeric:tabular-nums; }
+.classes-chart-bars { display:flex; gap:8px; min-width:0; overflow-x:auto; padding:2px 3px 4px; }
+.classes-chart-bars li { flex:1 0 46px; min-width:0; max-width:100px; border-radius:5px; text-align:center; }
+.classes-chart-bars li:focus-visible { outline:2px solid var(--pca-blue); }
+.classes-chart-track { position:relative; height:calc(100% - 22px); border-radius:5px; background:#edf3f8; }
+.classes-chart-fill { position:absolute; inset-inline:0; inset-block-end:0; height:var(--attendance); border-radius:5px; background:linear-gradient(0deg,#16659d,#27a8b2); transform-origin:bottom; }
+.classes-chart-value { position:absolute; inset-inline:0; top:4px; width:max-content; margin-inline:auto; padding:0 3px; border-radius:4px; background:#f7fbff; color:#17365b; font-size:10px; font-weight:700; }
+.classes-chart-label { display:block; margin-top:4px; overflow:hidden; color:#425972; font-size:10px; white-space:nowrap; text-overflow:ellipsis; }
+.class-attendance-percent { color:#116d70; font-variant-numeric:tabular-nums; }
+@media (prefers-reduced-motion:no-preference) { .classes-chart-fill { animation:classes-bar-rise .5s ease-out both; } }
+@keyframes classes-bar-rise { from { transform:scaleY(0); } to { transform:scaleY(1); } }
 .classes-panel-scroll { flex:1; min-height:0; overflow:auto; scrollbar-gutter:stable; padding-inline-end:4px; }
 .classes-panel-scroll:focus-visible { outline:2px solid var(--pca-blue); outline-offset:2px; }
 .class-type-list { display:grid; gap:8px; margin-top:14px; }

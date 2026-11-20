@@ -2609,3 +2609,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 
 - The two equal-height Classes panels sit above the Zoom tracking form. Each list scrolls independently with its heading and controls still visible. On narrow screens the panels stack.
 - TypeScript, targeted lint, and the structure check passed. Supabase-backed API readiness was UP and sign-in returned 200. A signed-in visual check was not run. Frontend-only change, reversible by reverting the commit.
+
+## Attendance charts on Classes (2026-11-20)
+
+- The two-week list displays joined-of-expected percentages for completed sessions, and the monthly class-type list displays an equal-weight average of its completed session percentages. A missing count or empty expected roster has no rate. Both use the existing scoped class totals endpoint.
+- A separate animated column chart sits above each list. The charts support horizontal scrolling, descriptive labels, and reduced motion. The lists remain equal height with independent scrolling.
+- Passed 77 frontend unit tests, TypeScript, targeted lint, and the structure check. The original Supabase-backed API reported UP and sign-in returned 200. Signed-in visual verification was not run. No migration is needed. Revert the frontend commit to roll back.

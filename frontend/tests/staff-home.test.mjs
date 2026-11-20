@@ -1,12 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calendarEntries, chosenDay, chosenMonth, gridRange, homeHref, joinedLabel, liveNumbers, longDayLabel, monthLabel,
+import { averageClassAttendance, calendarEntries, chosenDay, chosenMonth, gridRange, homeHref, joinedLabel, liveNumbers, longDayLabel, monthLabel,
   monthWeeks, monthlyClassTypes, nextEntry, relativeDayName, shiftMonth, shortDayLabel, startedAgoLabel, startsInLabel, timeRange } from "../src/lib/staff-home.ts";
 
 const session = (over) => ({ id: "s1", title: "Class", startsAt: "2026-11-20T10:30:00Z", endsAt: "2026-11-20T12:00:00Z",
   timeZone: "Asia/Colombo", localDate: "2026-11-20", status: "SCHEDULED", zoomWebinarId: null, batches: [], version: 0, origin: "LUMA", ...over });
 const row = (expected, seen, openVisits = 0) => ({ studentId: String(Math.random()), studentNumber: "P", fullName: "S", expected, seen,
   visits: seen ? 1 : 0, openVisits, connectedSeconds: 0, firstJoinAt: null, secondsAfterStart: null });
+
+test("class-type attendance weights completed meetings equally and ignores missing rosters", () => {
+  const totals = new Map([
+    ["a", { id: "a", expected: 4, joined: 1 }], ["b", { id: "b", expected: 20, joined: 18 }],
+    ["empty", { id: "empty", expected: 0, joined: 0 }],
+  ]);
+  assert.equal(averageClassAttendance(["a", "b", "empty", "missing"].map(id => ({ id })), totals), 58);
+  assert.equal(averageClassAttendance([{ id: "empty" }], totals), null);
+});
 
 test("month-to-date class types group title variants and show completed sessions newest first", () => {
   const title = "Model Paper Class | 2027 Batch";
