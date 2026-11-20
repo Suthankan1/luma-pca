@@ -99,9 +99,9 @@ const backend = createServer(async (req, res) => {
       break;
 
     case "/api/v1/auth/student-id-login": {
-      // As the API: the Academy student ID is both username and password, letter case ignored.
+      // As the API: the Academy registration ID alone, letter case ignored.
       const id = String(body.studentId ?? "").trim().toUpperCase();
-      if (id !== "PCA001" || String(body.password ?? "").trim().toUpperCase() !== id) return send(401);
+      if (id !== "PCA001") return send(401);
       roles = ["STUDENT"];
       studentHasEnrolments = true;
       break;

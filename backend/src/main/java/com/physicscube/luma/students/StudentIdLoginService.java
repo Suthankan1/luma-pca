@@ -5,18 +5,16 @@ import com.physicscube.luma.identity.InvalidCredentialsException;
 import com.physicscube.luma.identity.SessionTokens;
 import com.physicscube.luma.shared.api.Codes;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 
 /**
- * Signs a student in with the Academy student ID as username and password, as the Academy asked. This is weak by
- * design (IDs are not secret); it is limited to accounts whose only role is STUDENT, is rate-limited per client like
- * every sign-in, gives the same answer for an unknown ID, a wrong password, a deactivated student and a staff
- * account, and is off unless {@code luma.student-id-login.enabled} is set.
+ * Signs a student in with the Academy registration ID alone, as the Academy asked (owner decision 2026-11-21). This is
+ * not authentication (IDs are not secret, see docs/security/STUDENT-ID-LOGIN.md); it is limited to accounts whose only
+ * role is STUDENT, is rate-limited per client like every sign-in, gives the same answer for an unknown ID, a
+ * deactivated student and a staff account, and is off unless {@code luma.student-id-login.enabled} is set.
  */
 @Service
 @EnableConfigurationProperties(StudentIdLoginProperties.class)
@@ -37,19 +35,17 @@ public class StudentIdLoginService {
         return properties.enabled() && properties.academyId() != null;
     }
 
-    public SessionTokens login(String studentId, String password) {
+    public SessionTokens login(String studentId) {
         if (!enabled()) {
             throw new ResourceNotFoundException("Route");
         }
-        if (studentId == null || password == null || !NUMBER.matcher(studentId).matches()) {
+        if (studentId == null || !NUMBER.matcher(studentId).matches()) {
             throw new InvalidCredentialsException();
         }
-        String number = Codes.normalize(studentId);
-        boolean matches = MessageDigest.isEqual(number.getBytes(StandardCharsets.UTF_8),
-                password.strip().toUpperCase(java.util.Locale.ROOT).getBytes(StandardCharsets.UTF_8));
-        Optional<Student> student = students.findByAcademyIdAndStudentNumber(properties.academyId(), number)
-                .filter(Student::isActive);
-        if (!matches || student.isEmpty()) {
+        Optional<Student> student = students.findByAcademyIdAndStudentNumber(properties.academyId(), Codes.normalize(studentId))
+                .filter(Student::isActive)
+                .filter(found -> found.getAccountId() != null);
+        if (student.isEmpty()) {
             throw new InvalidCredentialsException();
         }
         return auth.studentIdLogin(student.get().getAccountId());

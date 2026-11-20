@@ -4,10 +4,16 @@
 
 ## What the Academy asked for
 
-Students sign in with **username = student ID** and **password = the same student ID** (for example `PCA12345` /
-`PCA12345`). No registration, invitation, password creation or second factor.
+Students type **only their registration ID** (for example `PCA12345`) and see their attendance straight away. No
+password, registration, invitation, password creation or second factor. (Owner decision 2026-11-21; the earlier
+version asked for the ID twice, as username and password, which added no security.)
 
-With the flag enabled, the landing page’s Student sign-in link opens a form with a text username field and a password field. The shared `/sign-in` page also provides the academy account form for existing email accounts.
+With the flag enabled, the landing page’s Student sign-in link opens a form with one **Registration ID** field, and a
+successful sign-in lands on the student’s attendance report (`/student`). The shared `/sign-in` page also provides the
+academy account form for staff and existing email accounts. Staff sign-in is unchanged (email and password).
+
+The student never sees it, but a normal LUMA session is still opened behind the ID: it is what keeps each student to
+their own records, keeps every staff route closed to them, and lets them sign out.
 
 ## Why this is not secure authentication
 
@@ -23,10 +29,10 @@ protect staff accounts in any way.
   answers 404 and the sign-in page shows only the email form.
 - **Students only:** the session is opened only for an account whose **sole** role is `STUDENT`. An account with any
   staff role is refused, even if it also has a student record. Staff keep email + password.
-- **Same refusal for everything:** unknown ID, wrong password, deactivated student, disabled account, staff account,
+- **Same refusal for everything:** unknown ID, deactivated student, disabled account, staff account,
   another academy's student → the same 401 and message.
 - **Rate limited:** shares the per-client sign-in allowance with email sign-in (default 60 per 5 minutes; set lower
-  with `LUMA_RATE_LIMIT_SIGN_IN_LIMIT`). Per-account lockout does not help here (the password is the ID), so the
+  with `LUMA_RATE_LIMIT_SIGN_IN_LIMIT`). Per-account lockout does not help here (there is no secret), so the
   per-client limit is the real control against enumeration.
 - **Normal session security:** short-lived RS256 access token, rotating refresh token in an HttpOnly, Secure, SameSite
   cookie set by the BFF (never localStorage), logout and "sign out everywhere", session maximum lifetime.

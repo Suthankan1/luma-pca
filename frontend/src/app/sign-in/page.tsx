@@ -6,7 +6,7 @@ import { portalPath } from "@/lib/session-policy";
 
 const messages = {
   invalid: "Check your email and password and try again.",
-  student: "Check your student ID and try again.",
+  student: "We couldn’t find that registration ID. Check it and try again.",
   expired: "Your session ended. Sign in to continue.",
   unavailable: "We couldn’t reach the sign-in service. Please try again shortly.",
   limited: "Too many sign-in attempts. Wait a moment and try again.",
@@ -53,13 +53,10 @@ export default async function SignIn({ searchParams }: {
         aria-labelledby="student-sign-in">
         <h2 id="student-sign-in" className="eyebrow">Students</h2>
         <input type="hidden" name="portal" value="student" />
-        <label htmlFor="student-id">Username</label>
+        <label htmlFor="student-id">Registration ID</label>
         <input id="student-id" name="studentId" type="text" autoComplete="username" autoCapitalize="characters" spellCheck={false}
-          maxLength={60} required />
-        <label htmlFor="student-password">Password</label>
-        <input id="student-password" name="password" type="password" autoComplete="current-password" maxLength={60} required />
-        <p className="sub">Enter your registration ID for both username and password.</p>
-        <button className="action" type="submit">Open my student portal</button>
+          inputMode="text" placeholder="PCA12345" maxLength={60} required autoFocus={portal === "student"} />
+        <button className="action" type="submit">View my attendance</button>
       </form>}
       {showEmailForm && <form method="post" action="/api/session/login" className="session-form"
         aria-labelledby={showBothForms ? "account-sign-in" : undefined}>

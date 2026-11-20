@@ -171,11 +171,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     }
     if (action === "student-login") {
       if (!studentIdLoginEnabled()) return new NextResponse(null, { status: 404, headers: noStore });
-      if (!studentId || studentId.length > 60 || !password || password.length > 60) return go(errorPath("student"));
+      if (!studentId || studentId.length > 60) return go(errorPath("student"));
     }
 
     const result = action === "student-login"
-      ? await authRequest("student-id-login", { body: { studentId: studentId!, password: password! }, client })
+      ? await authRequest("student-id-login", { body: { studentId: studentId! }, client })
       : await authRequest(
         action as "login" | "refresh",
         { body: action === "login" ? { email: email!, password: password! } : { refreshToken: refreshToken! }, client }

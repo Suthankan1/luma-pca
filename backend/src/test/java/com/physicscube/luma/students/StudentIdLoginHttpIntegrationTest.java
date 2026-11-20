@@ -17,7 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
 
-/** The Academy-requested sign-in (student ID as username and password), switched on, over real HTTP. */
+/** The Academy-requested sign-in (registration ID only), switched on, over real HTTP. */
 @TestPropertySource(properties = {
     "luma.student-id-login.enabled=true",
     "luma.student-id-login.academy-id=6f2a9d3e-0c1b-4e57-9a8d-3b2c1d0e9f71",
@@ -43,10 +43,9 @@ class StudentIdLoginHttpIntegrationTest extends StaffApiIntegrationTest {
         client = "203.0.113." + CLIENT.incrementAndGet();
     }
 
-    private HttpResponse<String> signIn(String studentId, String password) {
+    private HttpResponse<String> signIn(String studentId) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("studentId", studentId);
-        body.put("password", password);
         return api.postFrom(client, LOGIN, HttpApi.json(body));
     }
 
@@ -61,7 +60,7 @@ class StudentIdLoginHttpIntegrationTest extends StaffApiIntegrationTest {
         String own = student("PCA001");
         String other = student("PCA002");
 
-        HttpResponse<String> response = signIn(" pca001 ", "PCA001");
+        HttpResponse<String> response = signIn(" pca001 ");
         assertEquals(200, response.statusCode(), response.body());
         Map<String, Object> session = HttpApi.parse(response);
         String token = (String) session.get("accessToken");
@@ -94,13 +93,12 @@ class StudentIdLoginHttpIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void everyRefusalLooksTheSame() {
         String student = student("PCA001");
-        HttpResponse<String> wrong = signIn("PCA001", "PCA002");
-        assertEquals(401, wrong.statusCode());
-        HttpResponse<String> unknown = signIn("PCA999", "PCA999");
+        HttpResponse<String> unknown = signIn("PCA999");
         assertEquals(401, unknown.statusCode());
-        assertEquals(HttpApi.parse(unknown).get("detail"), HttpApi.parse(wrong).get("detail"));
-        assertEquals(400, signIn("", "").statusCode());
-        assertEquals(401, signIn("PCA 001", "PCA 001").statusCode(), "not a valid ID");
+        HttpResponse<String> malformed = signIn("PCA 001");
+        assertEquals(401, malformed.statusCode(), "not a valid ID");
+        assertEquals(HttpApi.parse(unknown).get("detail"), HttpApi.parse(malformed).get("detail"));
+        assertEquals(400, signIn("").statusCode());
 
         // A deactivated student cannot sign in.
         Map<String, Object> view = HttpApi.parse(api.get("/api/v1/students/" + student, admin));
@@ -109,7 +107,9 @@ class StudentIdLoginHttpIntegrationTest extends StaffApiIntegrationTest {
         update.put("active", false);
         update.put("version", view.get("version"));
         assertEquals(200, api.put("/api/v1/students/" + student, HttpApi.json(update), admin).statusCode());
-        assertEquals(401, signIn("PCA001", "PCA001").statusCode());
+        HttpResponse<String> deactivated = signIn("PCA001");
+        assertEquals(401, deactivated.statusCode());
+        assertEquals(HttpApi.parse(unknown).get("detail"), HttpApi.parse(deactivated).get("detail"));
     }
 
     @Test
@@ -117,7 +117,7 @@ class StudentIdLoginHttpIntegrationTest extends StaffApiIntegrationTest {
         String student = student("PCA001");
         UUID account = jdbc.queryForObject("SELECT account_id FROM students WHERE id = ?::uuid", UUID.class, student);
         jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'STAFF')", account);
-        assertEquals(401, signIn("PCA001", "PCA001").statusCode());
+        assertEquals(401, signIn("PCA001").statusCode());
     }
 
     @Test
@@ -125,18 +125,27 @@ class StudentIdLoginHttpIntegrationTest extends StaffApiIntegrationTest {
         UUID otherAcademy = academy("Other academy");
         String otherAdmin = tokenFor(otherAcademy, Role.STAFF);
         new AcademyFixtures(api, otherAdmin).student("PCA500", "pca500@example.invalid");
-        assertEquals(401, signIn("PCA500", "PCA500").statusCode());
+        assertEquals(401, signIn("PCA500").statusCode());
     }
 
     @Test
     void guessingIsRateLimitedPerClient() {
         student("PCA001");
         for (int i = 0; i < 6; i++) {
-            assertEquals(401, signIn("PCA00" + (i + 2), "x").statusCode());
+            assertEquals(401, signIn("PCA00" + (i + 2)).statusCode());
         }
-        HttpResponse<String> limited = signIn("PCA001", "PCA001");
+        HttpResponse<String> limited = signIn("PCA001");
         assertEquals(429, limited.statusCode());
         assertNotNull(limited.headers().firstValue("Retry-After").orElse(null));
+    }
+
+    @Test
+    void anOlderClientSendingTheIdAsAPasswordStillSignsIn() {
+        student("PCA001");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("studentId", "PCA001");
+        body.put("password", "anything");
+        assertEquals(200, api.postFrom(client, LOGIN, HttpApi.json(body)).statusCode());
     }
 
     @Test

@@ -26,7 +26,8 @@ class StudentIdLoginController {
         this.login = login;
     }
 
-    record StudentIdLoginRequest(@NotBlank @Size(max = 60) String studentId, @NotBlank @Size(max = 60) String password) {
+    /** Only the registration ID; any other field (such as the earlier repeated ID as a password) is ignored. */
+    record StudentIdLoginRequest(@NotBlank @Size(max = 60) String studentId) {
     }
 
     record TokenResponse(String accessToken, String tokenType, long expiresIn, String refreshToken, long refreshExpiresIn) {
@@ -43,7 +44,7 @@ class StudentIdLoginController {
 
     @PostMapping("/api/v1/auth/student-id-login")
     TokenResponse login(@Valid @RequestBody StudentIdLoginRequest request) {
-        SessionTokens tokens = login.login(request.studentId(), request.password());
+        SessionTokens tokens = login.login(request.studentId());
         return new TokenResponse(tokens.accessToken(), "Bearer", tokens.expiresInSeconds(),
                 tokens.refreshToken(), tokens.refreshExpiresInSeconds());
     }

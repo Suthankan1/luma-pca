@@ -13,6 +13,6 @@ class StudentIdLoginDisabledHttpIntegrationTest extends StaffApiIntegrationTest 
     void theRouteIsOffByDefault() {
         assertEquals(Map.of("enabled", false), HttpApi.parse(api.get("/api/v1/auth/student-id-login", null)));
         assertEquals(404, api.post("/api/v1/auth/student-id-login",
-                HttpApi.json(Map.of("studentId", "PCA001", "password", "PCA001"))).statusCode());
+                HttpApi.json(Map.of("studentId", "PCA001"))).statusCode());
     }
 }
