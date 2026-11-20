@@ -53,3 +53,6 @@ staff routes.
 It returns completed class IDs and counts of expected and joined students. For a shared class, each student is counted once across the caller's visible batches.
 `GET /api/v1/attendance/latest-completed` and `GET /api/v1/attendance/recent-completed` use the same scope to select completed
 classes and count their students. The recent endpoint returns at most five classes after applying the scope.
+
+`GET /api/v1/class-sessions/{sessionId}/attendance?includeOnlineHistory=true` counts only matched students visible in
+the caller's class attendance response. Owners and administrators also see matched students who were not expected.

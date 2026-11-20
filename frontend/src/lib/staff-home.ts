@@ -165,12 +165,13 @@ export type LiveNumbers = { expected: number; joined: number; connectedNow: numb
 
 /**
  * A running class in numbers: students expected (enrolled in its batches), how many of them have joined so far, how many
- * people are connected now (Zoom's count when known, else the students with an open visit), and joined as a share of expected.
+ * students are connected now (the history's newest count when available, else the students with an open visit),
+ * and joined as a share of expected.
  */
-export function liveNumbers(rows: readonly AttendanceRow[], zoomConnectedNow: number | null = null): LiveNumbers {
+export function liveNumbers(rows: readonly AttendanceRow[], observedOnline: number | null = null): LiveNumbers {
   const expected = rows.filter(r => r.expected).length;
   const joined = rows.filter(r => r.expected && r.seen).length;
-  const connectedNow = zoomConnectedNow ?? rows.filter(r => r.openVisits > 0).length;
+  const connectedNow = observedOnline ?? rows.filter(r => r.openVisits > 0).length;
   return { expected, joined, connectedNow, percent: attendancePercent({ expected, joined }) };
 }
 

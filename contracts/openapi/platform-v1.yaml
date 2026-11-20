@@ -1483,6 +1483,7 @@ paths:
       tags: [Attendance]
       parameters:
         - {in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: includeOnlineHistory, schema: {type: boolean, default: false}, description: Include sampled counts of matched students who were online and visible to the caller.}
       responses:
         '200':
           description: Provisional attendance
@@ -1501,6 +1502,16 @@ paths:
                   webinarEnded: {type: boolean, description: Every linked occurrence reported webinar.ended}
                   unmatchedPeople: {type: integer}
                   calculatedAt: {type: string, format: date-time}
+                  onlineHistory:
+                    type: array
+                    maxItems: 1441
+                    description: Present only when requested. Distinct matched student counts from recorded Zoom visits, at 30-second intervals starting with the first known joined visit in the class window, plus the last time covered. Empty when no joined visit is known. Counts based on webhooks are provisional.
+                    items:
+                      type: object
+                      required: [at, online]
+                      properties:
+                        at: {type: string, format: date-time}
+                        online: {type: integer, minimum: 0}
                   students:
                     type: array
                     items:

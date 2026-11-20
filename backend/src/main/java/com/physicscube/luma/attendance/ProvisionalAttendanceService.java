@@ -1,5 +1,6 @@
 package com.physicscube.luma.attendance;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.physicscube.luma.attendance.domain.AttendanceDurationCalculator;
 import com.physicscube.luma.attendance.domain.ConnectionInterval;
 import com.physicscube.luma.enrollments.ExpectedStudent;
@@ -74,10 +75,15 @@ public class ProvisionalAttendanceService {
      * @param reportedOccurrences linked occurrences counted from Zoom's participant report
      * @param unmatchedPeople Zoom participants not matched to any student (see Zoom review)
      * @param finalisedAt when the class was finalised against the academy's rule; {@code null} before
+     * @param onlineHistory sampled online counts for visible matched students, omitted unless requested
      */
     public record ProvisionalAttendance(UUID sessionId, String status, Instant classStartsAt, Instant classEndsAt,
                                         int linkedOccurrences, int reportedOccurrences, boolean webinarEnded, int unmatchedPeople,
-                                        Instant calculatedAt, List<StudentAttendance> students, Instant finalisedAt) {
+                                        Instant calculatedAt, List<StudentAttendance> students, Instant finalisedAt,
+                                        @JsonInclude(JsonInclude.Include.NON_NULL) List<OnlineSample> onlineHistory) {
+    }
+
+    public record OnlineSample(Instant at, int online) {
     }
 
     private record FinalRecords(Map<UUID, Object[]> records, Instant finalisedAt) {
@@ -97,6 +103,11 @@ public class ProvisionalAttendanceService {
 
     @Transactional(readOnly = true)
     public ProvisionalAttendance forClass(CurrentAccount caller, UUID sessionId) {
+        return forClass(caller, sessionId, false);
+    }
+
+    @Transactional(readOnly = true)
+    public ProvisionalAttendance forClass(CurrentAccount caller, UUID sessionId, boolean includeOnlineHistory) {
         // Zoom activity and final records are read at the same time as the class (they need only the academy and class
         // IDs); nothing they return is used unless the access check below passes.
         UUID academyId = caller.academyId();
@@ -136,9 +147,11 @@ public class ProvisionalAttendanceService {
         Instant[] finalisedAt = {finals.finalisedAt()};
         List<StudentAttendance> withRecords = rows.stream().map(r -> records.containsKey(r.studentId())
                 ? r.withRecord((UUID) records.get(r.studentId())[0], (String) records.get(r.studentId())[1], (Long) records.get(r.studentId())[2]) : r).toList();
+        List<OnlineSample> onlineHistory = includeOnlineHistory ? OnlineHistory.sample(activity,
+                rows.stream().map(StudentAttendance::studentId).collect(Collectors.toSet()), session.startsAt(), session.endsAt(), now) : null;
         return new ProvisionalAttendance(sessionId, reconciled ? "RECONCILED" : "PROVISIONAL", session.startsAt(), session.endsAt(),
                 activity.occurrences().size(), activity.reportedOccurrences().size(), ended, activity.unmatchedPeople(), now, withRecords,
-                finalisedAt[0]);
+                finalisedAt[0], onlineHistory);
     }
 
     /**

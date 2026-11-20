@@ -433,8 +433,10 @@ export function parsePolicyForm(form: FormData): { minConnectedPercent: number; 
   if (description.length < 3 || description.length > 500) return { error: "Say where the rule was approved, in 3 to 500 characters." };
   return { minConnectedPercent: percent, lateAfterMinutes: late, description };
 }
+export type OnlineObservation = { at: string; online: number };
 export type ProvisionalAttendance = { sessionId: string; status: "PROVISIONAL" | "RECONCILED"; classStartsAt: string; classEndsAt: string;
-  finalisedAt?: string | null; linkedOccurrences: number; reportedOccurrences: number; webinarEnded: boolean; unmatchedPeople: number; calculatedAt: string; students: AttendanceRow[] };
+  finalisedAt?: string | null; linkedOccurrences: number; reportedOccurrences: number; webinarEnded: boolean; unmatchedPeople: number;
+  calculatedAt: string; students: AttendanceRow[]; onlineHistory?: OnlineObservation[] };
 
 /** "1 h 05 min", "45 min", "0 min"; whole minutes, rounded down. */
 export function formatDuration(seconds: number) {

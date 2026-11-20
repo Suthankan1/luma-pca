@@ -9,7 +9,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi, type ApiResult } from "@/lib/staff-api";
 import { ACADEMY_TIME_ZONE, academyToday, addDays, instantParts, isAcademyManager, zonedToInstant, type ClassSession,
-  type ProvisionalAttendance } from "@/lib/staff-forms";
+  type OnlineObservation, type ProvisionalAttendance } from "@/lib/staff-forms";
 import { renderTime } from "@/lib/insights";
 import { type WebinarMonitor } from "@/lib/webinars";
 import { attendancePercent, calendarEntries, chosenDay, chosenMonth, entryStateLabels, greeting, gridRange, homeHref, joinedLabel,
@@ -77,8 +77,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   ]);
 
   const monitorList = monitors?.ok ? monitors.data : null;
-  const liveRuns = new Map((monitorList ?? []).flatMap(m => m.live ? [[m.live.classSessionId, m.live] as const] : []));
-  const liveIds = new Set(liveRuns.keys());
+  const liveIds = new Set((monitorList ?? []).flatMap(m => m.live ? [m.live.classSessionId] : []));
   const entriesFrom = (result: typeof calendar | null) => result?.ok ? calendarEntries(result.data, monitorList, liveIds, now) : null;
   const calendarDays = entriesFrom(calendar);
   const soonDays = gridCoversSoon ? calendarDays : entriesFrom(soon);
@@ -91,12 +90,17 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
 
   // Second round: live numbers for running classes, and joined/expected for the chosen day's finished classes.
   const [liveAttendance, dayTotals] = await Promise.all([
-    Promise.all(running.map(e => staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${e.sessionId}/attendance`))),
+    Promise.all(running.map(e => staffApi<ProvisionalAttendance>(
+      `/api/v1/class-sessions/${e.sessionId}/attendance?includeOnlineHistory=true`, undefined, ATTENDANCE_SUMMARY_TIMEOUT_MS))),
     endedOnDay ? classTotals({ from: day, to: day }) : null,
   ]);
   const sampledAt = renderTime();
-  const live = running.map((entry, i) => ({ entry, numbers: liveAttendance[i].ok
-    ? liveNumbers(liveAttendance[i].data.students, liveRuns.get(entry.sessionId!)?.connectedNow ?? null) : null }));
+  const live = running.map((entry, i) => {
+    const attendance = liveAttendance[i];
+    if (!attendance.ok) return { entry, numbers: null, history: null };
+    const history = attendance.data.onlineHistory ?? null;
+    return { entry, numbers: liveNumbers(attendance.data.students, history?.at(-1)?.online), history };
+  });
   const finished = new Map(dayTotals?.ok ? dayTotals.data.map(c => [c.id, c] as const) : []);
   const href = (options: { day?: string; month?: string }) => homeHref({ day: options.day ?? day, month: options.month ?? month }, today);
   const previousDay = addDays(day, -1), nextDay = addDays(day, 1);
@@ -107,7 +111,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
       {live.length > 0
         ? <section className="home-strip home-strip-live" aria-labelledby="live-title">
             <h2 id="live-title" className="sr-only">Live now</h2>
-            {live.map(({ entry, numbers }) => <LiveRow key={entry.key} entry={entry} numbers={numbers} now={now} sampledAt={sampledAt} />)}
+            {live.map(({ entry, numbers, history }) => <LiveRow key={entry.key} entry={entry} numbers={numbers} history={history}
+              now={now} sampledAt={sampledAt} />)}
             <LiveRefresh until={new Date(now + 3 * 3600_000).toISOString()} seconds={30} label="while a class runs" />
           </section>
         : <div className="home-brief">
@@ -278,7 +283,9 @@ async function RecentAttendanceChart({ attendance }: { attendance: RecentAttenda
   </section>;
 }
 
-function LiveRow({ entry, numbers, now, sampledAt }: { entry: DayEntry; numbers: LiveNumbers | null; now: number; sampledAt: number }) {
+function LiveRow({ entry, numbers, history, now, sampledAt }: {
+  entry: DayEntry; numbers: LiveNumbers | null; history: OnlineObservation[] | null; now: number; sampledAt: number;
+}) {
   const showChart = entry.sessionId != null;
   return <article className={`live-row${showChart ? " live-row-chart" : ""}`} aria-label={`${entryStateLabels[entry.state]}: ${entry.title}`}>
     <span className={`live-badge ${entry.state === "live" ? "" : "live-badge-now"}`}>
@@ -291,10 +298,10 @@ function LiveRow({ entry, numbers, now, sampledAt }: { entry: DayEntry; numbers:
     {numbers ? <dl className="live-figures">
       <div><dt>Joined</dt><dd>{numbers.joined}<small> / {numbers.expected}</small></dd></div>
       <div><dt>Attendance</dt><dd>{numbers.percent == null ? "—" : `${numbers.percent}%`}</dd></div>
-      <div><dt>Online</dt><dd>{numbers.connectedNow}</dd></div>
+      <div><dt>Students online</dt><dd>{history?.length === 0 ? "—" : numbers.connectedNow}</dd></div>
     </dl> : <p className="live-row-note">Live numbers couldn’t load.</p>}
     {entry.sessionId && <div className="live-online-slot">
-      <LiveOnlineChart sessionId={entry.sessionId} connectedNow={numbers?.connectedNow ?? null} sampledAt={sampledAt}
+      <LiveOnlineChart sessionId={entry.sessionId} history={history} sampledAt={sampledAt}
         startsAt={entry.startsAt} />
     </div>}
   </article>;

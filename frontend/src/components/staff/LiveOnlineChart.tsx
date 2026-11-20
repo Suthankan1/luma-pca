@@ -4,9 +4,9 @@ import { useId, useState } from "react";
 import { ACADEMY_TIME_ZONE } from "@/lib/staff-forms";
 
 type Observation = { at: number; online: number };
-type Series = { sessionId: string; observations: Observation[]; animateAt: number | null };
+type OnlineHistory = readonly { at: string; online: number }[];
+type Series = { sessionId: string; response: OnlineHistory | null; observations: Observation[]; animateAt: number | null };
 
-const MAX_OBSERVATIONS = 1441; // Twelve hours at the 30-second refresh interval, including the first count.
 const MAX_MARKERS = 24;
 const TIME = new Intl.DateTimeFormat("en-GB", {
   timeZone: ACADEMY_TIME_ZONE, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
@@ -18,35 +18,44 @@ const PLOT = { left: 29, right: 310, top: 10, bottom: 50 };
 const LINE = { fill: "none", stroke: "#116d70", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
   vectorEffect: "non-scaling-stroke" } as const;
 
-/** Chart the counts observed by this tab as the live page refreshes. */
-export function LiveOnlineChart({ sessionId, connectedNow, sampledAt, startsAt }: {
+function readObservations(history: OnlineHistory | null): Observation[] {
+  const countsByTime = new Map<number, number>();
+  for (const observation of history ?? []) {
+    const at = Date.parse(observation.at);
+    if (Number.isFinite(at) && Number.isInteger(observation.online) && observation.online >= 0) {
+      countsByTime.set(at, observation.online);
+    }
+  }
+  return [...countsByTime].sort(([a], [b]) => a - b).map(([at, online]) => ({ at, online }));
+}
+
+/** Chart the stored online history for a live class. */
+export function LiveOnlineChart({ sessionId, history, sampledAt, startsAt }: {
   sessionId: string;
-  connectedNow: number | null;
+  history: OnlineHistory | null;
   sampledAt: number;
   startsAt: string;
 }) {
   const labelId = useId();
-  const incoming = connectedNow === null ? [] : [{ at: sampledAt, online: connectedNow }];
   const [series, setSeries] = useState<Series>(() => ({
-    sessionId, observations: incoming, animateAt: null,
+    sessionId, response: history, observations: readObservations(history), animateAt: null,
   }));
   const { observations, animateAt } = series;
   const latest = observations.at(-1);
   const sameClass = series.sessionId === sessionId;
-  const hasNewCount = connectedNow !== null && (!latest || sampledAt > latest.at
-    || (sampledAt === latest.at && connectedNow !== latest.online));
 
-  if (!sameClass || hasNewCount) {
-    const previous = sameClass && latest?.at === sampledAt ? observations.slice(0, -1) : observations;
-    setSeries({ sessionId, observations: [...(sameClass ? previous : []), ...incoming].slice(-MAX_OBSERVATIONS),
-      animateAt: sameClass && (!latest || latest.at < sampledAt) ? sampledAt : null });
+  if (!sameClass || history !== series.response) {
+    const received = history === null && sameClass ? observations : readObservations(history);
+    const nextLatest = received.at(-1);
+    const animateNext = sameClass && latest && nextLatest && nextLatest.at > latest.at;
+    setSeries({ sessionId, response: history, observations: received, animateAt: animateNext ? nextLatest.at : null });
   }
 
   return <figure className="live-online-chart w-full min-w-0 max-w-[320px] text-[var(--ink-3)]" aria-labelledby={labelId}>
-    <figcaption id={labelId} className="text-xs font-semibold text-[var(--ink-2)]">Online over time</figcaption>
+    <figcaption id={labelId} className="text-xs font-semibold text-[var(--ink-2)]">Students online over time</figcaption>
     {latest ? <OnlinePlot observations={observations} animateAt={animateAt} startsAt={startsAt} sampledAt={sampledAt} />
       : <p className="text-xs">No online counts available yet.</p>}
-    {latest && connectedNow === null && <p className="mt-1 text-xs">Current count unavailable. Showing the last observations.</p>}
+    {latest && history === null && <p className="mt-1 text-xs">Online history unavailable. Showing the last observations.</p>}
   </figure>;
 }
 
@@ -61,9 +70,12 @@ function OnlinePlot({ observations, animateAt, startsAt, sampledAt }: {
   const latest = observations[observations.length - 1];
   const firstTime = TIME.format(first.at);
   const lastTime = TIME.format(latest.at);
-  const counts = observations.map(point => point.online);
-  const min = Math.min(...counts);
-  const max = Math.max(...counts);
+  let min = first.online;
+  let max = first.online;
+  for (const observation of observations) {
+    min = Math.min(min, observation.online);
+    max = Math.max(max, observation.online);
+  }
   const padding = Math.max(2, Math.ceil((max - min) * 0.12));
   const floor = Math.max(0, min - padding);
   const ceiling = Math.max(max + padding, floor + 4);

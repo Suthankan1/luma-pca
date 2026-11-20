@@ -106,8 +106,9 @@ class AttendanceController {
     }
 
     @GetMapping("/api/v1/class-sessions/{sessionId}/attendance")
-    ProvisionalAttendanceService.ProvisionalAttendance forClass(JwtAuthenticationToken authentication, @PathVariable UUID sessionId) {
-        return attendance.forClass(CurrentAccount.from(authentication), sessionId);
+    ProvisionalAttendanceService.ProvisionalAttendance forClass(JwtAuthenticationToken authentication, @PathVariable UUID sessionId,
+                                                                @RequestParam(defaultValue = "false") boolean includeOnlineHistory) {
+        return attendance.forClass(CurrentAccount.from(authentication), sessionId, includeOnlineHistory);
     }
 
     @GetMapping("/api/v1/class-sessions/{sessionId}/attendance/export")

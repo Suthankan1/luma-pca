@@ -35,6 +35,7 @@ const backend = createServer(async (req, res) => {
     if (!run || run.state !== "LIVE") return send(404);
     if (!Number.isInteger(body.connectedNow) || body.connectedNow < 0) return send(400);
     run.connectedNow = body.connectedNow;
+    onlineHistories.get(mockOnline[1]).push({ at: new Date().toISOString(), online: run.connectedNow });
     return send(200, { connectedNow: run.connectedNow });
   }
 
@@ -767,6 +768,7 @@ const zoomWebinars = {
 };
 const monitors = [];
 const runSessions = new Map(); // class id -> run
+const onlineHistories = new Map(); // class id -> observed matched student counts
 function monitorView(m) {
   const runs = [...runSessions.values()].filter(r => r.monitorId === m.id).sort((a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt))
     .map(r => { const copy = { ...r }; delete copy.monitorId; return copy; });
@@ -814,6 +816,11 @@ function monitorsApi(req, body, send) {
           runSessions.set(session.id, { monitorId: m.id, occurrenceUuid: `run-${state}-${session.id.slice(-4)}==`, classSessionId: session.id,
             state, firstSeenAt: started, actualStartedAt: started, actualEndedAt: ended, reported: state === "ENDED",
             connectedNow: state === "LIVE" ? 12 : 0, people: state === "LIVE" ? 15 : 18 });
+          if (state === "LIVE") {
+            onlineHistories.set(session.id, [[1, 4], [6, 8], [24, 12]].map(([minutes, online]) => ({
+              at: new Date(Date.parse(started) + minutes * 60_000).toISOString(), online,
+            })));
+          }
         }
       }
     } else {
@@ -1362,7 +1369,11 @@ function academicApi(req, body, send) {
       audit("PULSE_OPENED", "CLASS_SESSION", session.id, session.title, { minutes: String(body.minutes), options: String(body.options.length) });
       return send(201, question);
     }
-    if (sub === "attendance" && req.method === "GET") return send(200, mockAttendance(session));
+    if (sub === "attendance" && req.method === "GET") {
+      const facts = mockAttendance(session);
+      if (new URLSearchParams(query).get("includeOnlineHistory") === "true") facts.onlineHistory = onlineHistories.get(session.id) ?? [];
+      return send(200, facts);
+    }
     if (sub === "attendance" && req.method === "POST" && path.endsWith("/attendance/recalculation")) {
       const final = finalisedClasses.get(session.id);
       if (!final) return send(409, { detail: "This class is not final yet; finalise it instead" });

@@ -195,7 +195,7 @@ test.describe("Staff home", () => {
     const live = page.getByRole("region", { name: "Live now" });
     const card = live.getByRole("article", { name: "Live: A/L Physics 2027" });
     await expect(card).toBeVisible();
-    await expect(card.getByRole("definition").nth(2)).toHaveText("12");
+    await expect(card.getByText("Students online", { exact: true }).locator("..").getByRole("definition")).toHaveText("12");
     await expect(page.getByText("Next class", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Last completed class" })).toHaveCount(0);
     await expect(live.getByRole("button", { name: "Pause" })).toBeVisible();
@@ -213,7 +213,7 @@ test.describe("Staff home", () => {
     await expect(page.getByRole("region", { name: "ATTENDANCE BY BATCH" })).toBeVisible();
   });
 
-  test("the live online chart adds real counts on refresh and stops when paused", async ({ page }) => {
+  test("the live online chart shows recorded samples on arrival and reload, and refresh can pause", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await signInStaff(page, "admin-enrolled@example.invalid");
     const course = await api(page, "POST", "/api/v1/courses", { code: "CHART-TIME", title: "Chart time window" });
@@ -230,11 +230,12 @@ test.describe("Staff home", () => {
     await page.goto("/staff");
     const live = page.getByRole("region", { name: "Live now" });
     const article = live.getByRole("article", { name: "Live: A/L Physics 2027" });
-    const figure = article.getByRole("figure", { name: "Online over time" });
+    const figure = article.getByRole("figure", { name: "Students online over time" });
     const chart = figure.getByRole("img");
-    await expect(chart).toHaveAccessibleName(/1 observation · 12 online at /);
-    await expect(chart.locator("text")).toHaveText(["14", "10"]);
-    await expect(chart.locator("circle")).toHaveCount(1);
+    const recorded = /3 observations · 4 online at .* · 12 online at /;
+    await expect(chart).toHaveAccessibleName(recorded);
+    await expect(chart.locator("text")).toHaveText(["14", "2"]);
+    await expect(chart.locator("circle")).toHaveCount(3);
     const newestSegment = chart.locator(".live-online-segment");
     await expect(newestSegment).toHaveCount(0);
     const zoomBounds = figure.locator("time");
@@ -246,11 +247,10 @@ test.describe("Staff home", () => {
     expect(latestObservedAt).toBeGreaterThan(Date.parse(run.actualStartedAt));
     expect(latestObservedAt).toBeLessThanOrEqual(Date.now());
 
-    const scheduledBounds = live.getByRole("article", { name: "In progress: Scheduled live class" })
-      .getByRole("figure", { name: "Online over time" }).locator("time");
-    await expect(scheduledBounds.first()).toHaveAttribute("datetime", startsAt);
-    await expect(scheduledBounds.last().locator("..")).toHaveText(/^Now /);
-    await expect(scheduledBounds.last()).toHaveAttribute("datetime", sampledAt);
+    const scheduledChart = live.getByRole("article", { name: "In progress: Scheduled live class" })
+      .getByRole("figure", { name: "Students online over time" });
+    await expect(scheduledChart).toContainText("No online counts available yet.");
+    await expect(scheduledChart.getByRole("img")).toHaveCount(0);
     expect(latestObservedAt).toBeLessThan(Date.parse(endsAt));
     const articleBox = (await article.boundingBox())!;
     const innerWidth = await live.evaluate(el => {
@@ -270,18 +270,23 @@ test.describe("Staff home", () => {
       await expect(resume).toBeVisible();
       await api(page, "PUT", onlinePath, { connectedNow: 17 });
       await page.clock.fastForward(31_000);
-      await expect(chart).toHaveAccessibleName(/1 observation · 12 online at /);
+      await expect(chart).toHaveAccessibleName(recorded);
       await resume.click();
       await expect(pause).toBeVisible();
       await page.clock.fastForward(31_000);
-      await expect(chart).toHaveAccessibleName(/2 observations · 12 online at .* · 17 online at /);
+      const refreshed = /4 observations · 4 online at .* · 17 online at /;
+      await expect(chart).toHaveAccessibleName(refreshed);
       expect(Date.parse((await zoomBounds.last().getAttribute("datetime"))!)).toBeGreaterThan(latestObservedAt);
-      await expect(chart.locator("text")).toHaveText(["19", "10"]);
-      await expect(chart.locator("circle")).toHaveCount(2);
+      await expect(chart.locator("text")).toHaveText(["19", "2"]);
+      await expect(chart.locator("circle")).toHaveCount(4);
       await expect(newestSegment).toHaveAttribute("pathLength", "1");
       expect(await newestSegment.evaluate(el => getComputedStyle(el).animationName)).not.toBe("none");
       await page.emulateMedia({ reducedMotion: "reduce" });
       await expect(newestSegment).toHaveCSS("animation-name", "none");
+      await page.reload();
+      await expect(chart).toHaveAccessibleName(refreshed);
+      await expect(chart.locator("circle")).toHaveCount(4);
+      await expect(newestSegment).toHaveCount(0);
     } finally {
       await api(page, "PUT", onlinePath, { connectedNow: run.connectedNow });
     }

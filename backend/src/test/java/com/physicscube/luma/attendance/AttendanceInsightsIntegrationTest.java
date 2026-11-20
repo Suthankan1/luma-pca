@@ -154,6 +154,17 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
+    void onlineHistoryUsesRecordedReportVisitsAndDeduplicatesOverlaps() {
+        Map<String, Object> attendance = ok(api.get("/api/v1/class-sessions/" + classId
+                + "/attendance?includeOnlineHistory=true", admin));
+        assertEquals("RECONCILED", attendance.get("status"));
+        List<Object> history = list(attendance.get("onlineHistory"));
+        assertEquals(Map.of("at", start.toString(), "online", 1), map(history.getFirst()));
+        assertEquals(Map.of("at", start.plus(30, ChronoUnit.MINUTES).toString(), "online", 0), map(history.get(60)));
+        assertEquals(Map.of("at", start.plus(50, ChronoUnit.MINUTES).toString(), "online", 1), map(history.get(100)));
+    }
+
+    @Test
     void oneStudentsPageListsCoursesAndEveryJoinAndLeave() {
         Map<String, Object> overview = ok(api.get("/api/v1/students/" + amaya + "/attendance-overview", admin));
         assertEquals("PCA001", overview.get("studentNumber"));
