@@ -183,12 +183,12 @@ public class ProvisionalAttendanceService {
     }
 
     /** Count expected students with a matched visit, using the same evidence as the detailed dashboard. */
-    int countJoined(UUID academyId, UUID sessionId, Set<UUID> expected) {
-        if (expected.isEmpty()) {
-            return 0;
-        }
-        return (int) zoom.activityForClass(academyId, sessionId).visits().stream()
-                .map(StudentVisit::studentId).filter(expected::contains).distinct().count();
+    Map<UUID, Integer> countJoined(UUID academyId, Map<UUID, Set<UUID>> expectedByClass) {
+        List<UUID> withRoster = expectedByClass.entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
+                .map(Map.Entry::getKey).toList();
+        return zoom.joinedStudentsByClass(academyId, withRoster).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> (int) entry.getValue().stream()
+                        .filter(expectedByClass.get(entry.getKey())::contains).count()));
     }
 
     /**

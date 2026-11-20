@@ -148,13 +148,10 @@ public class AttendanceInsightsService {
         List<RosterRequest> requests = completed.stream()
                 .map(session -> new RosterRequest(session.id(), session.localDate(), session.batchIds())).toList();
         Map<UUID, Set<UUID>> expectedByClass = enrollments.expectedStudentIds(academyId, requests);
-
-        List<CompletableFuture<CompletedClassAttendance>> tasks = completed.stream().map(session -> Parallel.start(() -> {
-            Set<UUID> expected = expectedByClass.getOrDefault(session.id(), Set.of());
-            int joined = facts.countJoined(academyId, session.id(), expected);
-            return new CompletedClassAttendance(session.id(), session.title(), session.endsAt(), session.timeZone(), expected.size(), joined);
-        })).toList();
-        return tasks.stream().map(Parallel::join).toList();
+        Map<UUID, Integer> joinedByClass = facts.countJoined(academyId, expectedByClass);
+        return completed.stream().map(session -> new CompletedClassAttendance(session.id(), session.title(), session.endsAt(),
+                session.timeZone(), expectedByClass.getOrDefault(session.id(), Set.of()).size(),
+                joinedByClass.getOrDefault(session.id(), 0))).toList();
     }
 
     /** Counts for every completed class of the staff member's academy. */
@@ -167,12 +164,9 @@ public class AttendanceInsightsService {
                 session.batches().stream().map(SessionView.Batch::batchId).collect(Collectors.toSet()))).toList();
         Map<UUID, Set<UUID>> expectedByClass = enrollments.expectedStudentIds(caller.academyId(), requests);
 
-        Semaphore permits = new Semaphore(CONCURRENCY);
-        List<CompletableFuture<ClassTotals>> tasks = completed.stream().map(session -> Parallel.start(limited(permits, () -> {
-            Set<UUID> expected = expectedByClass.getOrDefault(session.id(), Set.of());
-            return new ClassTotals(session.id(), expected.size(), facts.countJoined(caller.academyId(), session.id(), expected));
-        }))).toList();
-        return tasks.stream().map(Parallel::join).toList();
+        Map<UUID, Integer> joinedByClass = facts.countJoined(caller.academyId(), expectedByClass);
+        return completed.stream().map(session -> new ClassTotals(session.id(),
+                expectedByClass.getOrDefault(session.id(), Set.of()).size(), joinedByClass.getOrDefault(session.id(), 0))).toList();
     }
 
     private record Selected(SessionView session, List<ExpectedStudent> expected, ClassFacts facts) {

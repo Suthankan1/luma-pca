@@ -2714,3 +2714,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Used an isolated Docker PostgreSQL and production build with 150 synthetic students, 28 completed sessions and four k6 staff users. All 60 requests passed. Page p95 was 392 ms for Classes, 412 ms for Class Types, and 658 ms for Students. See the [checklist](../../testing/STAFF-PERFORMANCE.md) for samples, other routes and limitations.
 - The harness supports an alternate jar, Windows Docker Desktop and a configurable Python command. The first run collected browser-facing HTTP and SQL data. Its API access-log parser could not start under the default Windows `python3` alias. A later comparison should set `LUMA_LOAD_PYTHON`.
 - The fixture never used the original database or Zoom credentials. No application migration or deployment was made. Revert this test-tooling commit to restore the previous fixture.
+
+## Batched attendance totals (2026-11-21)
+
+- Monthly and recent completed totals now read linked Zoom evidence in batches of up to 16 authorized classes. Identity lookup is shared within each batch. Host exclusion, registration matching, report precedence and expected-roster filtering remain class-specific.
+- Passed 26 PostgreSQL integration tests across attendance insights, provisional attendance, Zoom participants and Zoom reports. The new parity case combines report evidence, host and registrant roles across two sessions. The before/after k6 comparison is tracked separately.
+- No API contract or migration change. Revert this commit to restore per-class reads.

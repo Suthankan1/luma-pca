@@ -252,6 +252,31 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
+    void batchedTotalsKeepHostExclusionAndRegistrationMatchingInTheRightClass() {
+        Instant secondStart = start.plus(1, ChronoUnit.DAYS);
+        String second = createClass("Second class", secondStart, batch);
+        jdbc.update("""
+                INSERT INTO zoom_occurrence_links (academy_id, occurrence_uuid, webinar_id, class_session_id, link_source, linked_at)
+                VALUES (?, 'second==', ?, ?::uuid, 'AUTOMATIC', now())
+                """, academyId, WEBINAR, second);
+        jdbc.update("""
+                INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, fetched_at, join_sessions)
+                VALUES (?, 'second==', 'FETCHED', now(), 2)
+                """, academyId);
+        Timestamp joined = Timestamp.from(secondStart);
+        Timestamp left = Timestamp.from(secondStart.plus(25, ChronoUnit.MINUTES));
+        jdbc.update("""
+                INSERT INTO zoom_report_participants (id, academy_id, occurrence_uuid, email, joined_at, left_at,
+                      duration_seconds, host, registrant_email)
+                VALUES (gen_random_uuid(), ?, 'second==', 'amaya@example.test', ?, ?, 1500, true, NULL),
+                       (gen_random_uuid(), ?, 'second==', 'other-zoom@example.test', ?, ?, 1500, false, 'kavin@example.test')
+                """, academyId, joined, left, academyId, joined, left);
+
+        assertEquals(List.of(Map.of("id", classId, "expected", 2, "joined", 1),
+                Map.of("id", second, "expected", 2, "joined", 1)), classTotals(admin));
+    }
+
+    @Test
     void classTotalsOmitFutureRunningAndCancelledClassesAndKeepEmptyRosters() {
         String emptyBatch = fixtures.batch(course, "EMPTY");
         Instant now = Instant.now();
