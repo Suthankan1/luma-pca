@@ -807,6 +807,11 @@ function monitorsApi(req, body, send) {
             onlineHistories.set(session.id, [[1, 4], [6, 8], [24, 12]].map(([minutes, online]) => ({
               at: new Date(Date.parse(started) + minutes * 60_000).toISOString(), online,
             })));
+          } else {
+            onlineHistories.set(session.id, Array.from({ length: length * 2 + 1 }, (_, i) => ({
+              at: new Date(Date.parse(started) + i * 30_000).toISOString(),
+              online: i === length * 2 ? 0 : Math.min(i + 1, 18),
+            })));
           }
         }
       }

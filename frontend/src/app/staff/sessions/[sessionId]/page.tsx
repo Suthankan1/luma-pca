@@ -4,11 +4,13 @@ import { StaffShell } from "@/components/StaffShell";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { CorrectionForm, FinaliseForm, RecalculateForm } from "@/components/staff/AttendanceForms";
 import { ClosePulseButton, PulseForm } from "@/components/staff/EngagementForms";
+import { SessionOnlineTimeline } from "@/components/staff/SessionOnlineTimeline";
 import { formatElapsed, formatTime, formatWebinarId as formatZoomId, formatWhen, runStart, type ClassRun } from "@/lib/webinars";
 import { renderTime } from "@/lib/insights";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
+import { compactClassTitle } from "@/lib/staff-home";
 import {
   occurrencePeopleHref, occurrenceSource, formatClassTime, formatDate, formatDuration, formatInstant, formatWebinarId, instantParts, occurrenceState, uuidOrNull,
   outcomeLabels, reactionLabels, type ClassEngagement, type ClassSession, type Occurrence, type ProvisionalAttendance,
@@ -27,12 +29,13 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
     staffApi<ClassSession>(`/api/v1/class-sessions/${sessionId}`),
     staffApi<ExpectedStudent[]>(`/api/v1/class-sessions/${sessionId}/students`),
     staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?decided=true&sessionId=${sessionId}&limit=50`),
-    staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${sessionId}/attendance`),
+    staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${sessionId}/attendance?includeOnlineHistory=true`),
     staffApi<ClassEngagement>(`/api/v1/class-sessions/${sessionId}/engagement`),
     staffApi<ClassRun | null>(`/api/v1/class-sessions/${sessionId}/zoom-run`),
   ]);
   if (!session.ok && (session.status === 404 || session.status === 403)) notFound();
-  const shell = { active: "sessions" as const, crumb: "Timetable", hasStudentPortal: hasPortal(identity, "student") };
+  const shell = { active: "sessions" as const, crumb: "Teaching / Classes", hasStudentPortal: hasPortal(identity, "student"),
+    actions: <Link className="text-link" href="/staff/sessions">← Classes</Link> };
   if (!session.ok || !expected.ok) {
     return <StaffShell {...shell} title="Class" subtitle="">
       <p className="session-error" role="alert">We couldn’t load this class right now. Please reload the page shortly.</p>
@@ -46,13 +49,107 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   const cancelled = s.status !== "SCHEDULED";
 
   const runBegan = run ? runStart(run) : null;
+  const facts = attendance.ok ? attendance.data : null;
+  const students = facts?.students ?? [];
+  const joined = students.filter(student => student.seen);
+  const expectedJoined = joined.filter(student => student.expected).length;
+  const credited = students.filter(student => student.outcome === "PRESENT" || student.outcome === "LATE").length;
+  const running = run?.state === "LIVE";
+  const legacy = s.origin !== "ZOOM_RUN";
+  const actualEnd = run?.actualEndedAt;
+  const sessionStart = Date.parse(runBegan?.at ?? s.startsAt);
+  const sessionEnd = Date.parse(s.endsAt);
+  const clock = facts ? Date.parse(facts.calculatedAt) : now;
+  const runningWindow = !cancelled && (running || (legacy && sessionStart <= clock && clock < sessionEnd && !facts?.webinarEnded));
+  const lastSample = facts?.onlineHistory?.at(-1);
+  const showLastSample = lastSample && (facts?.webinarEnded || (!legacy && !run));
+  const chartEnd = actualEnd ? Date.parse(actualEnd) : runningWindow ? clock
+    : showLastSample ? Date.parse(lastSample.at) : sessionEnd;
+  const duration = actualEnd ? Date.parse(actualEnd) : running ? clock : legacy ? sessionEnd : null;
+  const meanConnected = joined.length ? Math.round(joined.reduce((sum, student) => sum + student.connectedSeconds, 0) / joined.length / 60) : null;
+  const metrics = [
+    { label: "Expected", value: expected.data.length, note: "Enrolled for this session" },
+    { label: "Students joined", value: facts ? joined.length : "—", note: facts ? `${expectedJoined} from the expected roster` : "Matched Zoom participants" },
+    { label: "Expected not seen", value: facts && !cancelled && clock >= sessionStart && facts.linkedOccurrences > 0
+      ? students.filter(student => student.expected && !student.seen).length : "—", note: "No recorded Zoom join" },
+    { label: "Attendance credited", value: facts?.finalisedAt ? credited : "—", note: facts?.finalisedAt ? "Present or late" : "Awaiting final attendance" },
+    { label: "Class duration", value: !cancelled && duration != null ? formatElapsed((duration - sessionStart) / 1000) : "—",
+      note: cancelled ? "Cancelled" : running ? "Elapsed so far" : legacy ? "Scheduled duration" : !actualEnd ? "End time unavailable"
+        : runBegan?.known ? "Actual Zoom duration" : "From the first Zoom event" },
+    { label: "Average time connected", value: meanConnected == null ? "—" : `${meanConnected} min`, note: "Across students who joined" },
+  ];
   const subtitle = run && runBegan
-    ? `${run.state === "LIVE" ? "Live now · " : ""}${formatWhen(runBegan.at, s.timeZone)} actual start${run.actualEndedAt ? `, ended ${formatTime(run.actualEndedAt, s.timeZone)}` : ""} (${s.timeZone})`
+    ? `${running ? "Live now · " : ""}${formatWhen(runBegan.at, s.timeZone)} ${runBegan.known ? "actual start" : "first Zoom event"}${actualEnd ? `, ended ${formatTime(actualEnd, s.timeZone)}` : ""} (${s.timeZone})`
     : `${formatClassTime(s.startsAt, s.endsAt, s.timeZone)} (${s.timeZone})${cancelled ? " · Cancelled" : ""}`;
-  return <StaffShell {...shell} title={s.title} subtitle={subtitle}>
-    <p><Link className="text-link" href="/staff/sessions">← Classes</Link></p>
+  return <StaffShell {...shell} title={compactClassTitle(s.title)} fullTitle={s.title} subtitle={subtitle}>
     {cancelled && <p className="banner">This class is cancelled. It stays on record and is not linked to Zoom events automatically.</p>}
-    <div className="staff-grid">
+    <dl className="session-metrics" aria-label="Session summary">
+      {metrics.map(metric => <div className="panel" key={metric.label}>
+        <dt>{metric.label}</dt>
+        <dd><strong>{metric.value}</strong><span>{metric.note}</span></dd>
+      </div>)}
+    </dl>
+    {facts && <SessionOnlineTimeline history={facts.onlineHistory ?? []} start={sessionStart} end={chartEnd}
+      endLabel={actualEnd ? "End" : runningWindow ? "Now" : showLastSample ? "Last sample" : "Scheduled end"} timeZone={s.timeZone} />}
+    <section className="panel panel-gap" aria-labelledby="attendance-title">
+      <h2 id="attendance-title" className="panel-title">{attendance.ok && attendance.data.finalisedAt ? "FINAL ATTENDANCE"
+        : attendance.ok && attendance.data.status === "RECONCILED" ? "ATTENDANCE FROM ZOOM’S REPORT" : "PROVISIONAL ATTENDANCE"}</h2>
+      {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load attendance right now. Please reload shortly.</p> : <>
+        <p className="panel-sub">{attendance.data.status === "RECONCILED"
+            ? "From Zoom’s participant report, fetched after the webinar ended"
+            : attendance.data.reportedOccurrences > 0 ? "Partly from Zoom’s participant report, partly from live Zoom events"
+            : "From live Zoom events"}, recalculated each time this page loads ({formatInstant(attendance.data.calculatedAt)}).
+          {" "}Time connected counts rejoins once and only within the class time.
+          {" "}{attendance.data.finalisedAt ? "Final outcomes are shown below."
+            : attendance.data.status === "RECONCILED" ? "No present or absent decision is made until attendance is finalised."
+            : "This is not a final record: live events can arrive late or not at all, and a student not seen here is not proof of absence."}
+          {" "}{attendance.data.linkedOccurrences === 0 ? "No Zoom occurrence is linked to this class yet."
+            : attendance.data.webinarEnded ? "The webinar has ended." : "The webinar has not reported an end yet."}
+          {attendance.data.unmatchedPeople > 0 && <> {attendance.data.unmatchedPeople} Zoom participant{attendance.data.unmatchedPeople === 1 ? " is" : "s are"} not
+            matched to a student; <Link className="text-link" href="/staff/zoom">match them in Zoom review</Link>.</>}</p>
+        {!attendance.data.finalisedAt && !cancelled && Date.parse(s.startsAt) - 15 * 60_000 <= Date.parse(attendance.data.calculatedAt)
+          && Date.parse(attendance.data.calculatedAt) <= Date.parse(s.endsAt) + 30 * 60_000
+          && <LiveRefresh until={new Date(Date.parse(s.endsAt) + 30 * 60_000).toISOString()} />}
+        {attendance.data.finalisedAt
+          ? <><p className="banner">Final since {formatInstant(attendance.data.finalisedAt)}, by the academy’s <Link className="text-link" href="/staff/attendance">attendance rule</Link>.
+            Change a student’s outcome with a correction.</p>
+            <RecalculateForm sessionId={s.id} /></>
+          : attendance.data.status === "RECONCILED" && !cancelled && Date.parse(s.endsAt) <= Date.parse(attendance.data.calculatedAt)
+            ? <FinaliseForm sessionId={s.id} /> : null}
+        <p className="link-row"><a className="text-link" href={`/staff/sessions/${s.id}/attendance-export`} download>Download CSV</a>
+          <span className="muted">Personal data; keep it private. Exports are recorded in the activity log.</span></p>
+        <div className="session-roster-head" aria-hidden="true"><span>Student</span><span>Time connected</span><span>Attendance</span></div>
+        <div className="session-roster-scroll" role="region" aria-label="Student attendance results" tabIndex={0}>
+          <ul className="session-roster">
+            {attendance.data.students.map(a => <li key={a.studentId} className="session-roster-row"
+              aria-label={`Attendance ${a.studentNumber} ${a.fullName}`}>
+              <div className="session-roster-person">
+                <Link href={`/staff/students/${a.studentId}`} className="text-link">{a.fullName}</Link>
+                <small>{a.studentNumber}{!a.expected && " · not expected at this class"}</small>
+              </div>
+              <div className="session-roster-time">{a.seen
+                ? <><strong>{a.connectedSeconds > 0 && a.connectedSeconds < 60 ? `${a.connectedSeconds} sec` : formatDuration(a.connectedSeconds)} connected</strong>
+                    <small>{a.firstJoinAt && <>first joined {formatInstant(a.firstJoinAt, s.timeZone)}
+                      {a.secondsAfterStart ? ` (${formatDuration(a.secondsAfterStart)} after the start)` : ""}
+                      {" · "}</>}{a.visits} visit{a.visits === 1 ? "" : "s"}{a.openVisits > 0 ? " · no leave received yet" : ""}</small></>
+                : <span className="muted">No recorded join</span>}
+              </div>
+              <div className="session-roster-status">
+                {a.outcome ? <span className={`status outcome ${a.outcome === "ABSENT" ? "off" : a.outcome === "EXCUSED" ? "" : "on"}`}>{outcomeLabels[a.outcome]}</span>
+                  : <span className="status">{a.seen ? "Seen" : "Not seen"}</span>}
+                {!a.outcome && <small>{attendance.data.finalisedAt ? "No final record" : "Outcome pending"}</small>}
+              </div>
+              {a.outcome && a.recordId && a.recordVersion != null && <details className="decision correction">
+                <summary>Correct</summary>
+                <CorrectionForm prefix={`correct-${a.studentId}`} sessionId={s.id} recordId={a.recordId} version={a.recordVersion} current={a.outcome} />
+              </details>}
+            </li>)}
+            {attendance.data.students.length === 0 && <li className="dir-empty muted">No students are expected at this class.</li>}
+          </ul>
+        </div>
+      </>}
+    </section>
+    <div className="staff-grid panel-gap">
       <section className="panel" aria-labelledby="expected-title">
         <h2 id="expected-title" className="panel-title">EXPECTED STUDENTS</h2>
         <p className="panel-sub">Enrolled in {s.batches.length === 1 ? "the batch" : "one of the batches"} on {formatDate(start.date)}; each student once.
@@ -107,54 +204,6 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
           longer be edited or cancelled here.</p>
       </section>}
     </div>
-    <section className="panel panel-gap" aria-labelledby="attendance-title">
-      <h2 id="attendance-title" className="panel-title">{attendance.ok && attendance.data.finalisedAt ? "FINAL ATTENDANCE"
-        : attendance.ok && attendance.data.status === "RECONCILED" ? "ATTENDANCE FROM ZOOM’S REPORT" : "PROVISIONAL ATTENDANCE"}</h2>
-      {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load attendance right now. Please reload shortly.</p> : <>
-        <p className="panel-sub">{attendance.data.status === "RECONCILED"
-            ? "From Zoom’s participant report, fetched after the webinar ended"
-            : attendance.data.reportedOccurrences > 0 ? "Partly from Zoom’s participant report, partly from live Zoom events"
-            : "From live Zoom events"}, recalculated each time this page loads ({formatInstant(attendance.data.calculatedAt)}).
-          {" "}Time connected counts rejoins once and only within the class time.
-          {" "}{attendance.data.status === "RECONCILED" ? "No present or absent decision is made until the academy sets its attendance rule."
-            : "This is not a final record: live events can arrive late or not at all, and a student not seen here is not proof of absence."}
-          {" "}{attendance.data.linkedOccurrences === 0 ? "No Zoom occurrence is linked to this class yet."
-            : attendance.data.webinarEnded ? "The webinar has ended." : "The webinar has not reported an end yet."}
-          {attendance.data.unmatchedPeople > 0 && <> {attendance.data.unmatchedPeople} Zoom participant{attendance.data.unmatchedPeople === 1 ? " is" : "s are"} not
-            matched to a student; <Link className="text-link" href="/staff/zoom">match them in Zoom review</Link>.</>}</p>
-        {!attendance.data.finalisedAt && !cancelled && Date.parse(s.startsAt) - 15 * 60_000 <= Date.parse(attendance.data.calculatedAt)
-          && Date.parse(attendance.data.calculatedAt) <= Date.parse(s.endsAt) + 30 * 60_000
-          && <LiveRefresh until={new Date(Date.parse(s.endsAt) + 30 * 60_000).toISOString()} />}
-        {attendance.data.finalisedAt
-          ? <><p className="banner">Final since {formatInstant(attendance.data.finalisedAt)}, by the academy’s <Link className="text-link" href="/staff/attendance">attendance rule</Link>.
-            Change a student’s outcome with a correction.</p>
-            <RecalculateForm sessionId={s.id} /></>
-          : attendance.data.status === "RECONCILED" && !cancelled && Date.parse(s.endsAt) <= Date.parse(attendance.data.calculatedAt)
-            ? <FinaliseForm sessionId={s.id} /> : null}
-        <p className="link-row"><a className="text-link" href={`/staff/sessions/${s.id}/attendance-export`} download>Download CSV</a>
-          <span className="muted">Personal data; keep it private. Exports are recorded in the activity log.</span></p>
-        <ul className="dir-list">
-          {attendance.data.students.map(a => <li key={a.studentId} className="dir-row dir-course attendance-row"
-            aria-label={`Attendance ${a.studentNumber} ${a.fullName}`}>
-            <div><strong>{a.studentNumber}</strong> <span>{a.fullName}</span>
-              {!a.expected && <span className="muted"> · not expected at this class</span>}
-              <div className="dir-dates">{a.seen
-                ? <>{formatDuration(a.connectedSeconds)} connected · first joined {formatInstant(a.firstJoinAt!, s.timeZone)}
-                    {a.secondsAfterStart ? ` (${formatDuration(a.secondsAfterStart)} after the start)` : ""}
-                    {" "}· {a.visits} visit{a.visits === 1 ? "" : "s"}{a.openVisits > 0 ? " · no leave received yet" : ""}</>
-                : <span className="muted">Not seen in Zoom yet</span>}</div>
-            </div>
-            {a.outcome ? <span className={`status outcome ${a.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[a.outcome]}</span>
-              : <span className={`status ${a.seen ? "on" : "off"}`}>{a.seen ? "Seen" : "Not seen"}</span>}
-            {a.outcome && a.recordId && a.recordVersion != null && <details className="decision correction">
-              <summary>Correct</summary>
-              <CorrectionForm prefix={`correct-${a.studentId}`} sessionId={s.id} recordId={a.recordId} version={a.recordVersion} current={a.outcome} />
-            </details>}
-          </li>)}
-          {attendance.data.students.length === 0 && <li className="dir-empty muted">No students are expected at this class.</li>}
-        </ul>
-      </>}
-    </section>
     {engagement.ok && engagement.data.enabled && <section className="panel panel-gap" aria-labelledby="engagement-title">
       <h2 id="engagement-title" className="panel-title">ENGAGEMENT</h2>
       <p className="panel-sub">From the student portal, consenting students only ({engagement.data.reactingStudents} reacted). Source: {engagement.data.source}.</p>

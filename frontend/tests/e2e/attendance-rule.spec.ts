@@ -87,6 +87,12 @@ test.describe("Attendance rule and final attendance", () => {
     await page.getByRole("button", { name: "Finalise attendance" }).click();
     const final = page.getByRole("region", { name: "FINAL ATTENDANCE" });
     await expect(final.getByRole("listitem", { name: `Attendance FN-${p.toUpperCase()}-1 Final Student` }).locator(".status")).toHaveText("Late");
+    const metric = (label: string) => page.locator(".session-metrics > div").filter({ has: page.getByText(label, { exact: true }) }).locator("dd strong");
+    await expect(metric("Expected")).toHaveText("1");
+    await expect(metric("Students joined")).toHaveText("1");
+    await expect(metric("Expected not seen")).toHaveText("0");
+    await expect(metric("Attendance credited")).toHaveText("1");
+    await expect(metric("Average time connected")).toHaveText("105 min");
     await expect(final).toContainText("Final since");
     await expect(page.getByRole("button", { name: "Finalise attendance" })).toHaveCount(0);
 
@@ -97,6 +103,7 @@ test.describe("Attendance rule and final attendance", () => {
     await row.getByLabel(/^Reason/).fill("Medical note received");
     await row.getByRole("button", { name: "Save correction" }).click();
     await expect(row.locator(".status")).toHaveText("Excused");
+    await expect(metric("Attendance credited")).toHaveText("0");
     await page.getByText("Recalculate from Zoom’s report").click();
     await page.locator("#recalc-reason").fill("Zoom report fetched again");
     await page.getByRole("button", { name: "Recalculate" }).click();

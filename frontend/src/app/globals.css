@@ -712,6 +712,44 @@ a.class-detail-row:hover { background:#edf5fc; }
 @media (prefers-reduced-motion:no-preference) { .class-trend-line { stroke-dasharray:1; animation:class-trend-draw .65s ease-out both; } }
 @keyframes class-trend-draw { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
 @media (max-width:850px) { .class-detail-lists { grid-template-columns:minmax(0,1fr); } }
+.session-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,155px),1fr)); gap:12px; }
+.session-metrics > .panel { display:flex; flex-direction:column; justify-content:space-between; min-width:0; padding:16px; border-radius:14px; }
+.session-metrics dt { font-size:13px; font-weight:700; color:var(--ink-2); }
+.session-metrics dd { margin:6px 0 0; }
+.session-metrics strong { display:block; color:#116d70; font-size:clamp(21px,2.3vw,29px); font-variant-numeric:tabular-nums; }
+.session-metrics dd > span { display:block; margin-top:4px; font-size:12px; color:var(--ink-3); }
+.session-timeline-readout { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin:14px 0 8px; color:#116d70; font-size:13px; font-variant-numeric:tabular-nums; }
+.session-timeline-readout > span { color:var(--ink-3); }
+.session-timeline-plot { display:grid; grid-template:minmax(0,1fr) / 32px minmax(0,1fr); gap:10px; height:clamp(150px,26vw,240px); }
+.session-timeline-scale { display:flex; flex-direction:column; justify-content:space-between; text-align:right; }
+.session-timeline-scale, .session-timeline-times { color:var(--ink-3); font-size:11px; font-variant-numeric:tabular-nums; }
+.session-timeline-canvas { position:relative; min-width:0; margin-block:7px; }
+.session-timeline-canvas svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; cursor:crosshair; }
+.session-timeline-line { fill:none; stroke:#147d80; stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round; }
+.session-timeline-cursor { stroke:#91aabb; stroke-dasharray:3 3; pointer-events:none; }
+.session-timeline-dot { position:absolute; width:10px; height:10px; border:2px solid white; border-radius:50%; background:#147d80; box-shadow:0 0 0 1px #147d80; transform:translate(-50%,-50%); pointer-events:none; }
+.session-timeline-times { display:flex; justify-content:space-between; gap:12px; margin:6px 0 0 42px; }
+.session-timeline-scrub { display:flex; align-items:center; gap:12px; margin-top:14px; color:var(--ink-2); font-size:12px; }
+.session-timeline-scrub input { flex:1; min-width:0; accent-color:#147d80; cursor:pointer; }
+@media (prefers-reduced-motion:no-preference) { .session-timeline-line { animation:session-timeline-enter .4s ease-out both; } }
+@keyframes session-timeline-enter { from { opacity:0; } }
+.session-roster-head, .session-roster-row { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1.6fr) minmax(110px,.55fr); gap:8px 18px; align-items:start; padding:12px; }
+.session-roster-head { margin-top:16px; border-radius:8px 8px 0 0; background:#edf4fa; color:var(--ink-2); font-size:12px; font-weight:700; }
+.session-roster-scroll { max-height:34rem; overflow:auto; scrollbar-gutter:stable; }
+.session-roster-row { border-bottom:1px solid var(--line-soft); font-size:14px; overflow-wrap:anywhere; }
+.session-roster-person > a, .session-roster-time > strong { font-weight:700; }
+.session-roster-row small { display:block; margin-top:3px; font-size:12px; color:var(--ink-3); }
+.session-roster-status .status { display:inline-block; border-radius:999px; padding:2px 8px; background:#edf1f5; color:#3f536a; font-weight:700; }
+.session-roster-status .status.on { background:#e4f3eb; color:#205f48; }
+.session-roster-status .status.off { background:#fbe9e9; color:#8b252d; }
+.session-roster-status .status::before { content:none; }
+.session-roster-row .correction { grid-column:1 / -1; margin:0; }
+@media (max-width:650px) {
+  .session-roster-head { display:none; }
+  .session-roster-row { grid-template-columns:minmax(0,1fr) auto; padding:12px 4px; }
+  .session-roster-time { grid-area:2 / 1 / 3 / -1; }
+  .session-roster-status { grid-column:2; grid-row:1; }
+}
 @media (max-width:1140px) { .classes-overview { grid-template-columns:minmax(0,1fr); } }
 .tracked-link .webinar-actions { margin-top:8px; }
 .home-entry-time { color:var(--ink-2); font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }

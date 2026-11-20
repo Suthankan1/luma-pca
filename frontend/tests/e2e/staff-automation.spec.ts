@@ -77,6 +77,28 @@ test.describe("Less manual work for staff", () => {
     await expect(run).toContainText("Live");
     await expect(run).toContainText("Zoom’s report");
     await expect(page.locator(".sub").first()).toContainText("Live now");
+    const timeline = page.getByRole("figure", { name: "Students online over time" });
+    await expect(timeline).toContainText("12 online");
+    await expect(timeline).toContainText("Now");
+    const refresh = page.locator(".live-refresh");
+    await expect(refresh).toContainText("Updating every 30 seconds");
+    await refresh.getByRole("button", { name: "Pause" }).click();
+    await expect(refresh.getByRole("button", { name: "Resume" })).toBeVisible();
+
+    const endedDay = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Colombo", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date(Date.now() - 7 * 86_400_000));
+    await page.goto(`/staff/sessions?from=${endedDay}`);
+    await classes.getByRole("listitem", { name: "A/L Physics 2027, Ended" }).getByRole("link").click();
+    await expect(page.locator(".session-metrics").getByText("1 h 50 min", { exact: true })).toBeVisible();
+    await expect(timeline).toContainText("221 samples");
+    await expect(timeline).toContainText("End");
+    const scrubber = timeline.getByRole("slider", { name: "Explore timeline" });
+    await expect(scrubber).toHaveAttribute("aria-valuetext", /0 online$/);
+    await scrubber.press("Home");
+    await expect(scrubber).toHaveAttribute("aria-valuetext", /1 online$/);
+    await scrubber.press("End");
+    await expect(scrubber).toHaveAttribute("aria-valuetext", /0 online$/);
   });
 
   test("Ended classes wait in one list and are finalised together; the owner can switch on automatic finalisation", async ({ page }) => {

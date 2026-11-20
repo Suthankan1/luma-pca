@@ -37,10 +37,11 @@ export const staffNav: readonly NavItem[] = staffNavGroups.flatMap(group => grou
 export type StaffSection = NavItem["key"] | "dashboard";
 
 /** Staff layout: a navy menu that stays in view, then a compact page header and the page. */
-export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, actions, children }: {
+export function StaffShell({ active, crumb, title, fullTitle, subtitle, hasStudentPortal, actions, children }: {
   active: StaffSection;
   crumb: string;
   title: string;
+  fullTitle?: string;
   subtitle: string;
   hasStudentPortal?: boolean;
   /** Buttons or links shown beside the title. */
@@ -75,7 +76,7 @@ export function StaffShell({ active, crumb, title, subtitle, hasStudentPortal, a
       <header className="page-head">
         <div>
           {crumb && <p className="crumbs">{crumb}</p>}
-          <h1 className="heading staff-heading">{title}</h1>
+          <h1 className="heading staff-heading" title={fullTitle}>{title}</h1>
           {subtitle && <p className="sub page-sub">{subtitle}</p>}
         </div>
         {actions && <div className="page-actions">{actions}</div>}
