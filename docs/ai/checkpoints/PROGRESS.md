@@ -2812,3 +2812,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The session behind the ID is kept: student-only accounts, own records only, staff routes 403, per-client rate limit, same refusal for unknown, deactivated, staff or other-academy IDs. Students without a linked account are refused rather than failing. Anyone who knows a registration ID can view that student's attendance; the risk is in `docs/security/STUDENT-ID-LOGIN.md`.
 - Passed 8 backend integration tests (`StudentIdLogin*`), TypeScript, targeted ESLint, 81 frontend unit tests and 6 desktop/mobile Playwright sign-in checks against the mock backend after a fresh build. `student-import.spec.ts` failed on its student-directory step on both devices in the same run; it does not touch sign-in and was not investigated. Signed-in verification against original data was not run.
 - Rollout: set `LUMA_STUDENT_ID_LOGIN_ENABLED=true` in the API and web environments (the API also needs `LUMA_STUDENT_ID_LOGIN_ACADEMY_ID`, defaulting to `LUMA_ZOOM_WEBHOOK_ACADEMY_ID`) and restart both. No migration. Rollback: set the switch to false, or revert this commit.
+
+## Main integration review (2026-11-21)
+
+- Aligned the OpenAPI request with the registration-ID-only endpoint. Updated browser tests to enter through the active student sign-in and check imported students on both the monthly directory and the management record.
+- Production frontend build, ESLint, TypeScript, 81 unit tests, session HTTP smoke, structure and the 113-endpoint contract check passed. The desktop import regression passed on synthetic data. GitHub CI covers the full integration branch against its own fixtures.
+- Opening a PR leaves `main` and the running environments alone. V30 and V31 require their documented rollout steps before merge. The registration-ID-only mode is off by default and impersonation remains possible when enabled.

@@ -68,9 +68,12 @@ test.describe("Student import from CSV", () => {
       `Imported 2 students and enrolled them in ${p.toUpperCase()}-PHY · ${p.toUpperCase()}-MON · Monday import. Their sign-ins wait for an invitation, sent from each student’s record.`);
 
     await page.getByRole("link", { name: "Go to the student directory →" }).click();
-    const row = page.locator(".dir-course").filter({ hasText: `${p.toUpperCase()}-001` });
-    await expect(row).toContainText("Perera, Nimal");
-    await row.getByRole("link").click();
+    await page.getByRole("searchbox", { name: "Search students" }).fill(`${p}-001`);
+    await page.getByRole("link", { name: /Perera, Nimal/ }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Perera, Nimal");
+
+    await page.goto(`/staff/students/manage?q=${p}-001`);
+    await page.getByRole("link", { name: `${p.toUpperCase()}-001 Perera, Nimal` }).click();
     await expect(page.locator(".dir-course").filter({ hasText: `${p.toUpperCase()}-MON` })).toContainText("13 Jan 2027");
 
     // Importing the same file again reports every row as already existing.

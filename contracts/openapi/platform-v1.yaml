@@ -1650,7 +1650,26 @@ paths:
         '503': {description: Receipt could not be stored; Zoom retries 5xx}
   /api/v1/auth/student-id-login:
     get: {summary: "Whether the Academy-requested student ID sign-in is switched on (ACAD-2)", operationId: studentIdLoginAvailability, tags: [Identity], responses: {'200': {description: "enabled"}}}
-    post: {summary: "Academy-requested student sign-in: the student ID is username and password. Weak by design; off unless LUMA_STUDENT_ID_LOGIN_ENABLED; students only (ACAD-2)", operationId: studentIdLogin, tags: [Identity], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [studentId, password], properties: {studentId: {type: string, maxLength: 60}, password: {type: string, maxLength: 60, writeOnly: true}}}}}}, responses: {'200': {description: "Tokens (as /auth/login)"}, '400': {description: Malformed request}, '401': {description: "Refused. Identical for unknown ID, wrong password, deactivated student, staff account and another academy"}, '404': {description: Switched off}, '429': {description: Too many attempts from this client}}}
+    post:
+      summary: Academy-requested registration-ID-only sign-in for students (ACAD-2)
+      description: A registration ID does not establish identity. This mode is disabled by default.
+      operationId: studentIdLogin
+      tags: [Identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId]
+              properties:
+                studentId: {type: string, minLength: 1, maxLength: 60}
+      responses:
+        '200': {description: "Tokens (as /auth/login)"}
+        '400': {description: Malformed request}
+        '401': {description: Identical refusal for unknown IDs and ineligible accounts}
+        '404': {description: Switched off}
+        '429': {description: Too many attempts from this client}
   /api/v1/academy/classes:
     get: {summary: "The Academy's classes from its own database (read-only): distinct-student counts and the linked LUMA batch (staff; ACAD-1)", operationId: listAcademyClasses, tags: [Academy], security: [{bearerAuth: []}], responses: {'200': {description: "className, studentCount, batch (null until linked)"}, '403': {description: Not staff}, '503': {description: The Academy database is not connected or unreachable}}}
   /api/v1/academy/classes/link:

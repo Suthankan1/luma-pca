@@ -3,9 +3,14 @@ import { mockApiBase } from "./support/classes";
 
 async function signIn(page: Page, portal: "staff" | "student") {
   await page.goto(`/sign-in?portal=${portal}`);
-  await page.fill("#email", portal === "staff" ? "admin-enrolled@example.invalid" : "student@example.invalid");
-  await page.fill("#password", "correct-password");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  if (portal === "student") {
+    await page.getByLabel("Registration ID").fill("PCA001");
+    await page.getByRole("button", { name: "Open my student portal" }).click();
+  } else {
+    await page.fill("#email", "admin-enrolled@example.invalid");
+    await page.fill("#password", "correct-password");
+    await page.getByRole("button", { name: "Sign in" }).click();
+  }
   await expect(page).toHaveURL(new RegExp(`/${portal}$`));
 }
 
