@@ -12,7 +12,7 @@ async function signInStaff(page: Page, email: string) {
 test.describe("Attendance dashboard", () => {
   test("Staff see every student's time and attendance, filter, sort, and switch views", async ({ page }) => {
     await signInStaff(page, "admin-enrolled@example.invalid");
-    await page.getByRole("link", { name: "Attendance reports →" }).click();
+    await page.getByRole("link", { name: "Attendance reports" }).click();
     await expect(page).toHaveURL(/\/staff\/dashboard$/);
     const totals = page.getByRole("list", { name: "Totals" });
     await expect(totals.getByRole("listitem", { name: "Classes held: 2" })).toBeVisible();
