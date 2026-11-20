@@ -73,16 +73,4 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await page.goto("/staff/zoom/import");
     await expect(page).toHaveURL(/\/staff\/webinars$/);
   });
-
-  test("Instructors see classes for their batches only", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/sessions?from=2027-01-03");
-    await expect(page.locator(".banner")).toContainText("You see the classes of the batches you are assigned to.");
-    await expect(page.getByText("No classes in these two weeks.")).toBeVisible();
-    await expect(page.getByRole("region", { name: "WHERE CLASSES COME FROM" })).toHaveCount(0);
-  });
 });

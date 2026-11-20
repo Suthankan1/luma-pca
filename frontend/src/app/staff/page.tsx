@@ -6,7 +6,7 @@ import { OneLineTitle } from "@/components/staff/OneLineTitle";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { ACADEMY_TIME_ZONE, academyToday, addDays, isAcademyManager, zonedToInstant, type ClassSession,
+import { ACADEMY_TIME_ZONE, academyToday, addDays, zonedToInstant, type ClassSession,
   type ProvisionalAttendance } from "@/lib/staff-forms";
 import { renderTime } from "@/lib/insights";
 import { type WebinarMonitor } from "@/lib/webinars";
@@ -36,9 +36,6 @@ function dayOf(entry: DayEntry) {
 export default async function StaffPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const identity = await requirePortal("staff");
   const params = await searchParams;
-  const manager = isAcademyManager(identity.roles);
-  const analystOnly = !manager && identity.roles.includes("ANALYST")
-    && !identity.roles.some(role => role === "INSTRUCTOR" || role === "ATTENDANCE_OFFICER");
   const now = renderTime();
   const today = academyToday(new Date(now));
   const day = chosenDay(params.day, today);
@@ -46,18 +43,6 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const grid = gridRange(month);
   const shell = { active: "overview" as const, crumb: "", title: "Staff portal", subtitle: `${greeting(now)} · ${longDayLabel(today)}`,
     hasStudentPortal: hasPortal(identity, "student") };
-
-  if (analystOnly) {
-    return <StaffShell {...shell}>
-      <section className="home-strip" aria-labelledby="home-brief-title">
-        <div className="home-strip-main">
-          <p className="home-strip-label">Your reports</p>
-          <h2 id="home-brief-title" className="home-strip-title">Attendance by batch</h2>
-        </div>
-        <Link className="home-button" href="/staff/attendance?section=totals">Open reports</Link>
-      </section>
-    </StaffShell>;
-  }
 
   // Today and the next week feed the live row and "next class"; skipped when the calendar's grid already covers them.
   const soonAfter = addDays(today, 8);
@@ -68,10 +53,10 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
     sessionsIn(grid.fromInstant, grid.toInstant),
     gridCoversSoon ? null : sessionsIn(zonedToInstant(today, "00:00", ACADEMY_TIME_ZONE), zonedToInstant(soonAfter, "00:00", ACADEMY_TIME_ZONE)),
     gridCoversDay ? null : sessionsIn(dayGrid.fromInstant, dayGrid.toInstant),
-    manager ? staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors") : null,
+    staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors"),
   ]);
 
-  const monitorList = monitors?.ok ? monitors.data : null;
+  const monitorList = monitors.ok ? monitors.data : null;
   const liveRuns = new Map((monitorList ?? []).flatMap(m => m.live ? [[m.live.classSessionId, m.live] as const] : []));
   const liveIds = new Set(liveRuns.keys());
   const entriesFrom = (result: typeof calendar | null) => result?.ok ? calendarEntries(result.data, monitorList, liveIds, now) : null;

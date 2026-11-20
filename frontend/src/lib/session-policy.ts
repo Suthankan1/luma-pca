@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-export const staffRoles = ["ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST"];
+/** LUMA has two roles (owner decision 2026-11-20): STAFF opens the staff portal, STUDENT the student portal. */
+export const staffRoles = ["STAFF"];
 export type Portal = "staff" | "student";
 export type Identity = { accountId: string; academyId: string; roles: string[] };
 

@@ -95,7 +95,7 @@ export const entryStateLabels: Record<EntryState, string> = { live: "Live", now:
 const SAME_RUN_MS = 60 * 60_000;
 
 /**
- * The timetable by academy date, soonest first: scheduled classes, plus (for managers, who can read the monitored webinars)
+ * The timetable by academy date, soonest first: scheduled classes, plus
  * Zoom's own upcoming occurrences that no class covers yet. `liveIds` are classes Zoom reports live right now.
  */
 export function calendarEntries(sessions: readonly ClassSession[], monitors: readonly WebinarMonitor[] | null,

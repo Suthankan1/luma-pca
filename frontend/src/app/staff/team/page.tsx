@@ -4,7 +4,7 @@ import { AddStaffForm } from "@/components/staff/TeamForms";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { accountStatusLabels, grantableRoles, isAcademyManager, roleList } from "@/lib/staff-forms";
+import { accountStatusLabels } from "@/lib/staff-forms";
 
 type StaffAccount = { id: string; email: string; roles: string[]; status: string };
 
@@ -13,11 +13,8 @@ export const metadata = { title: "Staff · LUMA" };
 export default async function TeamPage() {
   const identity = await requirePortal("staff");
   const shell = { active: "team" as const, crumb: "Staff", title: "Staff",
-    subtitle: "Who can sign in to the staff portal, and with which roles. Every change here is recorded in the audit trail.",
+    subtitle: "Who can sign in to the staff portal. Every staff member can do everything here; every change is recorded in the audit trail.",
     hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}><p className="banner">Only academy owners and administrators manage staff accounts.</p></StaffShell>;
-  }
   const staff = await staffApi<StaffAccount[]>("/api/v1/staff-accounts");
   return <StaffShell {...shell}>
     <div className="staff-grid">
@@ -28,8 +25,7 @@ export default async function TeamPage() {
           <ul className="dir-list">
             {staff.data.map(person => <li key={person.id} className="dir-row dir-course">
               <div><Link className="text-link" href={`/staff/team/${person.id}`}><strong>{person.email}</strong></Link>
-                {person.id === identity.accountId && <span className="muted"> (you)</span>}
-                <span className="muted dir-dates"> · {roleList(person.roles)}</span></div>
+                {person.id === identity.accountId && <span className="muted"> (you)</span>}</div>
               <div className="dir-meta">
                 <span className={`status ${person.status === "ACTIVE" ? "on" : "off"}`}>{accountStatusLabels[person.status] ?? person.status}</span>
               </div>
@@ -39,9 +35,8 @@ export default async function TeamPage() {
       </section>
       <section className="panel" aria-labelledby="add-staff-title">
         <h2 id="add-staff-title" className="panel-title">ADD</h2>
-        <p className="panel-sub">{identity.roles.includes("ACADEMY_OWNER") ? "New staff sign in with their email and password."
-          : "Only an owner can add owners or administrators."}</p>
-        <AddStaffForm grantable={grantableRoles(identity.roles)} />
+        <p className="panel-sub">New staff get full staff access and sign in with their email and password.</p>
+        <AddStaffForm />
       </section>
     </div>
   </StaffShell>;

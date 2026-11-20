@@ -87,14 +87,6 @@ test.describe("Staff home", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
     await page.getByRole("link", { name: "Attendance reports" }).click();
     await expect(page).toHaveURL(/\/staff\/dashboard$/);
-
-    await signInStaff(page, "instructor@example.invalid");
-    await expect(page.getByRole("region", { name: /^Classes on Today/ })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Needs attention" })).toHaveCount(0);
-
-    await signInStaff(page, "analyst@example.invalid");
-    await page.getByRole("region", { name: "Attendance by batch" }).getByRole("link", { name: "Open reports" }).click();
-    await expect(page.getByRole("region", { name: "ATTENDANCE BY BATCH" })).toBeVisible();
   });
 
   test("shows one average attendance bar for the selected month", async ({ page }) => {

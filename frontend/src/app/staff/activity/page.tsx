@@ -4,7 +4,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { ACTIVITY_CATEGORIES, activityHref, actorName, describeActivity, type ActivityEvent } from "@/lib/activity";
-import { formatInstant, isAcademyManager, uuidOrNull } from "@/lib/staff-forms";
+import { formatInstant, uuidOrNull } from "@/lib/staff-forms";
 
 type Page = { items: ActivityEvent[]; nextBefore: string | null };
 
@@ -19,9 +19,6 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const shell = { active: "activity" as const, crumb: "Oversight", title: "Activity log",
     subtitle: "Who changed what, newest first. The log cannot be edited or deleted, and never holds passwords or links.",
     hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}><p className="banner">The activity log is for academy owners and administrators.</p></StaffShell>;
-  }
   const query = new URLSearchParams({ limit: "50" });
   if (category) query.set("category", category);
   if (target) query.set("targetId", target);

@@ -1,9 +1,10 @@
 /** Pure helpers for staff screens: shared by server actions, components and unit tests. */
 
-export const managerRoles = ["ACADEMY_OWNER", "ACADEMY_ADMIN"];
+/** LUMA has two roles (owner decision 2026-11-20): STAFF does every staff action, STUDENT only their own records. */
+export const STAFF_ROLE = "STAFF";
 
-export function isAcademyManager(roles: readonly string[]) {
-  return roles.some(role => managerRoles.includes(role));
+export function isStaff(roles: readonly string[]) {
+  return roles.includes(STAFF_ROLE);
 }
 
 /**
@@ -68,7 +69,7 @@ export function parseBatchForm(form: FormData): BatchInput | { error: string } {
  * details for callers, so a specific detail is shown as is; generic ones are replaced.
  */
 export function problemMessage(status: number, detail: string | undefined) {
-  if (status === 403) return "Only academy owners and administrators can make this change.";
+  if (status === 403) return "Only academy staff can make this change.";
   if (status === 404) return "That record no longer exists. Reload the page.";
   if (status === 409 && detail?.includes("changed by someone else")) {
     return "Someone else changed this record. Reload the page and try again.";
@@ -135,52 +136,15 @@ export function studentListHref(options: { after?: string | null; status?: strin
   return `/staff/students${query ? `?${query}` : ""}`;
 }
 
-export const staffRoleLabels: Record<string, string> = {
-  ACADEMY_OWNER: "Owner",
-  ACADEMY_ADMIN: "Administrator",
-  INSTRUCTOR: "Instructor",
-  ATTENDANCE_OFFICER: "Attendance officer",
-  ANALYST: "Analyst",
-};
-const elevatedRoles = ["ACADEMY_OWNER", "ACADEMY_ADMIN"];
-
-/** Roles in a fixed, senior-first order (the API returns them alphabetically). */
-export function roleList(roles: readonly string[]) {
-  const order = Object.keys(staffRoleLabels);
-  return [...roles].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(role => staffRoleLabels[role] ?? role).join(", ");
+/** Any staff member manages any other staff account except their own (nobody disables themselves). */
+export function canManageStaff(caller: { accountId: string; roles: readonly string[] }, target: { id: string }) {
+  return caller.accountId !== target.id && isStaff(caller.roles);
 }
 
-/** Roles the caller may grant: only owners grant owner or administrator. The API enforces the same rule. */
-export function grantableRoles(callerRoles: readonly string[]) {
-  return Object.keys(staffRoleLabels).filter(role => !elevatedRoles.includes(role) || callerRoles.includes("ACADEMY_OWNER"));
-}
-
-/** Whether the caller may change this staff member at all: themselves never, an owner or administrator only as an owner. */
-export function canManageStaff(caller: { accountId: string; roles: readonly string[] }, target: { id: string; roles: readonly string[] }) {
-  if (caller.accountId === target.id || !isAcademyManager(caller.roles)) return false;
-  return !target.roles.some(role => elevatedRoles.includes(role)) || caller.roles.includes("ACADEMY_OWNER");
-}
-
-export function parseRoles(form: FormData): string[] | { error: string } {
-  const roles = form.getAll("roles").filter((role): role is string => typeof role === "string");
-  if (roles.length === 0) return { error: "Choose at least one role." };
-  if (roles.some(role => !(role in staffRoleLabels)) || new Set(roles).size !== roles.length) return { error: "Choose roles from the list." };
-  return roles;
-}
-
-export function parseStaffForm(form: FormData): { email: string; roles: string[] } | { error: string } {
+export function parseStaffForm(form: FormData): { email: string } | { error: string } {
   const email = text(form, "email");
   if (email.length > 254 || !emailShape.test(email)) return { error: "Enter a valid email address." };
-  const roles = parseRoles(form);
-  return "error" in roles ? roles : { email, roles };
-}
-
-export function parseAssignForm(form: FormData): { email: string; role: string } | { error: string } {
-  const email = text(form, "email");
-  const role = text(form, "role");
-  if (email.length > 254 || !emailShape.test(email)) return { error: "Enter the staff member’s email address." };
-  if (role !== "INSTRUCTOR" && role !== "ATTENDANCE_OFFICER") return { error: "Choose instructor or attendance officer." };
-  return { email, role };
+  return { email };
 }
 
 // ---- Class sessions -------------------------------------------------------------
@@ -483,7 +447,7 @@ export function occurrenceSource(o: Occurrence) {
 export function occurrenceState(occurrence: Occurrence) {
   if (!occurrence.linkSource) return "Needs review";
   if (!occurrence.classSessionId) return "Marked not a class";
-  return occurrence.linkSource === "AUTOMATIC" ? "Linked automatically" : "Linked by an administrator";
+  return occurrence.linkSource === "AUTOMATIC" ? "Linked automatically" : "Linked by staff";
 }
 
 const DAY_MS = 86_400_000;

@@ -25,9 +25,9 @@ const backend = createServer(async (req, res) => {
       if (body.email === "student@example.invalid") {
         roles = ["STUDENT"];
       } else if (body.email === "staff@example.invalid") {
-        roles = ["INSTRUCTOR"];
+        roles = ["STAFF"];
       } else if (body.email === "admin@example.invalid") {
-        roles = ["ACADEMY_ADMIN"];
+        roles = ["STAFF"];
       } else {
         return send(401);
       }

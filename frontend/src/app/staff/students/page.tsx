@@ -6,7 +6,7 @@ import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { requirePortal, studentIdLoginEnabled } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { accountStatusLabels, formatInstant, isAcademyManager, studentListHref } from "@/lib/staff-forms";
+import { accountStatusLabels, formatInstant, studentListHref } from "@/lib/staff-forms";
 
 type Student = { id: string; studentNumber: string; fullName: string; accountStatus: string | null; active: boolean };
 type Page = { items: Student[]; nextAfter: string | null };
@@ -29,12 +29,6 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
   const shell = { active: "students" as const, crumb: "Students", title: "Students",
     subtitle: "Each student has one academy record and one sign-in, whatever batches they join.",
     hasStudentPortal: hasPortal(identity, "student") };
-
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}>
-      <p className="banner">Only academy owners and administrators manage student records. Assigned instructors and attendance officers can see their batches’ rosters from Courses &amp; batches.</p>
-    </StaffShell>;
-  }
 
   const [failures, result] = await Promise.all([
     staffApi<FailedInvitation[]>("/api/v1/student-invitations/failures"),

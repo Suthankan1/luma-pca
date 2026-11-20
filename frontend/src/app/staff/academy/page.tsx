@@ -6,7 +6,6 @@ import { requirePortal } from "@/lib/auth-server";
 import { formatSyncedAt, type AcademyClass } from "@/lib/academy";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { isAcademyManager } from "@/lib/staff-forms";
 
 type Course = { id: string; code: string };
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -18,12 +17,6 @@ export default async function AcademyClassesPage() {
   const shell = { active: "academy" as const, crumb: "Academy database", title: "Academy classes",
     subtitle: "Classes and students come from the Academy’s own records (read-only). Set each class up once; sync whenever students join.",
     hasStudentPortal: hasPortal(identity, "student") };
-
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}>
-      <p className="banner">Only academy owners and administrators connect Academy classes. Your batches are under Courses & batches.</p>
-    </StaffShell>;
-  }
 
   const [classes, courses, batches] = await Promise.all([staffApi<AcademyClass[]>("/api/v1/academy/classes", undefined, 25000),
     staffApi<Course[]>("/api/v1/courses"), staffApi<Batch[]>("/api/v1/batches")]);

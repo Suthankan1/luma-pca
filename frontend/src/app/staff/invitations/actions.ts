@@ -7,7 +7,7 @@ import { problemMessage, uuidOrNull, type FormState } from "@/lib/staff-forms";
 /**
  * Issues an activation invitation for a pending staff or student account. With delivery
  * EMAIL the API emails the link to the account's address and never returns it; otherwise
- * the link is returned once, to the administrator only. The web app stores neither;
+ * the link is returned once, to the staff member only. The web app stores neither;
  * issuing again cancels the previous link. The API decides who may invite whom.
  */
 export async function issueInvitation(_previous: FormState, form: FormData): Promise<FormState> {

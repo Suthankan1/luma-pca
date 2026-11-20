@@ -16,12 +16,11 @@ test.describe("Activity log", () => {
     p = (testInfo.project.name === "mobile" ? "am" : "ad") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
-  test("An administrator reads one staff member's history, newest first, and filters by area", async ({ page }) => {
+  test("A staff member reads a colleague's history, newest first, and filters by area", async ({ page }) => {
     await signInAsAdmin(page);
     const email = `logged.${p}@example.invalid`;
     await page.goto("/staff/team");
     await page.locator("#staff-email").fill(email);
-    await page.locator(".role-choices").getByLabel("Instructor", { exact: true }).check();
     await page.getByRole("button", { name: "Add staff member" }).click();
     await page.getByRole("link", { name: "Open their record →" }).click();
     await page.getByLabel("Sign this person out everywhere and block sign-in").check();
@@ -38,7 +37,7 @@ test.describe("Activity log", () => {
     await expect(rows.locator("strong")).toHaveText([`Re-enabled ${email}`, `Disabled ${email}`, `Added staff member ${email}`]);
     await expect(rows.first()).toContainText("by admin-enrolled@example.invalid");
     await expect(rows.first()).toContainText("A new password is required");
-    await expect(rows.last()).toContainText("Instructor");
+    await expect(rows.last()).toContainText("Staff");
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 
     // Areas narrow the same record's history; "Show everything" drops the record filter.
@@ -71,15 +70,5 @@ test.describe("Activity log", () => {
     const entry = page.locator(".activity-list > li").filter({ hasText: `Scheduled “Audited ${p}”` });
     await expect(entry).toContainText("Sat 3 Apr 2027 · 09:00–11:00");
     await expect(entry).toContainText("by admin-enrolled@example.invalid");
-  });
-
-  test("Instructors are told the log is for owners and administrators", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/activity");
-    await expect(page.locator(".banner")).toHaveText("The activity log is for academy owners and administrators.");
   });
 });

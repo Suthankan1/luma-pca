@@ -6,7 +6,7 @@ import { EnrollForm, EnrollmentAction, EraseStudentForm, StudentDetailsForm } fr
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { academyToday, accountStatusLabels, formatClassTime, formatDate, formatDuration, isAcademyManager, outcomeLabels, uuidOrNull, type AttendanceRecordView } from "@/lib/staff-forms";
+import { academyToday, accountStatusLabels, formatClassTime, formatDate, formatDuration, outcomeLabels, uuidOrNull, type AttendanceRecordView } from "@/lib/staff-forms";
 
 type Student = { id: string; studentNumber: string; fullName: string; email: string | null; accountId: string;
   accountStatus: string | null; active: boolean; version: number };
@@ -22,11 +22,6 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
   const studentId = uuidOrNull((await params).studentId);
   if (!studentId) notFound();
   const shellBase = { active: "students" as const, crumb: "Students", hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shellBase} title="Student" subtitle="">
-      <p className="banner">Only academy owners and administrators manage student records.</p>
-    </StaffShell>;
-  }
 
   const [student, enrollments, batches, courses, attendance] = await Promise.all([
     staffApi<Student>(`/api/v1/students/${studentId}`),
@@ -74,7 +69,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
           ? <InviteForm accountId={s.accountId} who="student" email={s.email ?? "the student’s address"} />
           : <p className="panel-sub">{s.accountStatus === "ACTIVE" ? "The student has activated their sign-in." : "The student’s sign-in is disabled."}</p>}
         <StudentDetailsForm id={s.id} version={s.version} fullName={s.fullName} active={s.active} />
-        {identity.roles.includes("ACADEMY_OWNER") && !s.studentNumber.startsWith("ERASED-") && <EraseStudentForm studentId={s.id} />}
+        {!s.studentNumber.startsWith("ERASED-") && <EraseStudentForm studentId={s.id} />}
       </section>
     </div>
     <section className="panel panel-gap" aria-labelledby="history-title">

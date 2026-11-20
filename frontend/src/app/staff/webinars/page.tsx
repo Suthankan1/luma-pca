@@ -7,7 +7,6 @@ import { requirePortal } from "@/lib/auth-server";
 import { renderTime } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { isAcademyManager } from "@/lib/staff-forms";
 import {
   formatElapsed, formatTime, formatWebinarId, formatWhen, runStart, syncNote, upcomingOccurrences, zoomSchedule,
   type WebinarMonitor, type WebinarRun,
@@ -78,12 +77,6 @@ export default async function WebinarsPage() {
   const shell = { active: "webinars" as const, crumb: "Teaching", title: "Webinars",
     subtitle: "Zoom owns the schedule. Add a webinar by its ID or link; every time Zoom actually starts it, LUMA records attendance from that moment.",
     hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}>
-      <p className="banner">Only academy owners and administrators choose which webinars LUMA monitors. Your classes and their attendance are under
-        {" "}<Link className="text-link" href="/staff/sessions">Classes</Link>.</p>
-    </StaffShell>;
-  }
   const [monitors, academy] = await Promise.all([
     staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors"),
     staffApi<{ className: string }[]>("/api/v1/academy/classes", undefined, 20000),

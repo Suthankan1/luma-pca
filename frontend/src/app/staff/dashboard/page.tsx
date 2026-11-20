@@ -10,7 +10,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { dateOrNull, formatDuration, level, presets, withParams, withoutCells, type Dashboard } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { academyToday, isAcademyManager, uuidOrNull } from "@/lib/staff-forms";
+import { academyToday, uuidOrNull } from "@/lib/staff-forms";
 
 type Course = { id: string; code: string; title: string; active: boolean };
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -23,7 +23,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const identity = await requirePortal("staff");
   const params = await searchParams;
   const one = (key: string) => typeof params[key] === "string" ? params[key] as string : null;
-  const manager = isAcademyManager(identity.roles);
   const today = academyToday();
   const fallback = presets(today)[1];
   let from = dateOrNull(one("from")) ?? fallback.from;
@@ -39,32 +38,32 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const query = withParams("/api/v1/attendance/dashboard", { from, to, courseId, batchId }) as `/api/v1/${string}`;
   const [dashboard, courses, batches] = await Promise.all([
     staffApi<Dashboard>(query, undefined, 30000),
-    manager ? staffApi<Course[]>("/api/v1/courses") : Promise.resolve(null),
+    staffApi<Course[]>("/api/v1/courses"),
     staffApi<Batch[]>("/api/v1/batches"),
   ]);
 
-  const courseList = courses?.ok ? courses.data : [];
+  const courseList = courses.ok ? courses.data : [];
   const batchList = batches.ok ? batches.data : [];
   const courseCode = new Map(courseList.map(c => [c.id, c.code]));
   const keep = { course: courseId, batch: batchId, view: view === "students" ? null : view };
-  const tabs = <AttendanceTabs active="reports" manager={manager} analyst={false} />;
+  const tabs = <AttendanceTabs active="reports" />;
   const filters = <section className="panel filters-panel" aria-labelledby="filters-title">
     <h2 id="filters-title" className="sr-only">Filters</h2>
     <form method="get" action="/staff/dashboard" className="filters" role="search" aria-label="Filter attendance">
       <input type="hidden" name="from" value={from} />
       <input type="hidden" name="to" value={to} />
       {view !== "students" && <input type="hidden" name="view" value={view} />}
-      {manager && <div className="field">
+      <div className="field">
         <label htmlFor="filter-course">Course</label>
         <select id="filter-course" name="course" defaultValue={courseId ?? ""}>
           <option value="">All courses</option>
           {courseList.map(c => <option key={c.id} value={c.id}>{c.code} · {c.title}{c.active ? "" : " (inactive)"}</option>)}
         </select>
-      </div>}
+      </div>
       <div className="field">
         <label htmlFor="filter-batch">Batch</label>
         <select id="filter-batch" name="batch" defaultValue={batchId ?? ""}>
-          <option value="">{manager ? "All batches" : "All my batches"}</option>
+          <option value="">All batches</option>
           {batchList.filter(b => !courseId || b.courseId === courseId).map(b =>
             <option key={b.id} value={b.id}>{courseCode.get(b.courseId) ? `${courseCode.get(b.courseId)} · ` : ""}{b.code} · {b.name}</option>)}
         </select>
@@ -83,8 +82,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   }
   const d = dashboard.data;
   const t = d.totals;
-  const studentHref = manager ? Object.fromEntries(d.students.map(s =>
-    [s.studentId, withParams(`/staff/students/${s.studentId}/attendance`, { from, to })])) : null;
+  const studentHref = Object.fromEntries(d.students.map(s =>
+    [s.studentId, withParams(`/staff/students/${s.studentId}/attendance`, { from, to })]));
   const rows = d.students.map(withoutCells);
 
   return <StaffShell {...shell}>

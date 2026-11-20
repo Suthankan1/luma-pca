@@ -63,17 +63,6 @@ test.describe("Staff courses and batches", () => {
     await expect(courseRow.locator(".dir-row").first()).toContainText("Active");
   });
 
-  test("Instructors see an explanation instead of the forms", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/courses");
-    await expect(page.locator(".banner")).toContainText("Only academy owners and administrators manage courses and batches");
-    await expect(page.getByRole("button", { name: "Create course" })).toHaveCount(0);
-  });
-
   test("Signed-out visitors are sent to sign-in and the layout fits a phone", async ({ page }, testInfo) => {
     await page.goto("/staff/courses");
     await expect(page).toHaveURL(/\/sign-in/);

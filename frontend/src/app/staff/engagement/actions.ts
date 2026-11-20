@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireSameOriginAction, staffApi } from "@/lib/staff-api";
 import { parsePulseForm, problemMessage, submittedValues, uuidOrNull, type FormState } from "@/lib/staff-forms";
 
-/** Switches engagement on or off with the consent wording. Owners only; audited. */
+/** Switches engagement on or off with the consent wording. Staff only; audited. */
 export async function saveEngagementSettings(_previous: FormState, form: FormData): Promise<FormState> {
   await requireSameOriginAction();
   const values = submittedValues(form, ["consentText"]);
@@ -15,7 +15,7 @@ export async function saveEngagementSettings(_previous: FormState, form: FormDat
   if (consentText.length < 20 || consentText.length > 2000) return { ok: false, message: "Write the consent wording in 20 to 2000 characters.", values };
   const result = await staffApi("/api/v1/engagement-settings", { method: "PUT", body: { enabled, consentText, version } });
   if (!result.ok) {
-    return { ok: false, values, message: result.status === 403 ? "Only an academy owner can switch engagement on or off."
+    return { ok: false, values, message: result.status === 403 ? "Only staff can switch engagement on or off."
       : result.status === 409 ? "Someone else changed these settings. Reload the page and try again." : problemMessage(result.status, result.detail) };
   }
   revalidatePath("/staff/attendance");

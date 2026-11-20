@@ -10,7 +10,7 @@ type SortKey = "studentNumber" | "fullName" | "percent" | "connectedSeconds" | "
 
 /**
  * Every student of the selection: search by ID or name, show only those below the rule or never seen, sort by any
- * column. A row opens the student's own page (owners and administrators).
+ * column. A row opens the student's own page (staff).
  */
 export function StudentTable({ rows, minPercent, studentHref }: {
   rows: Row[]; minPercent: number | null; studentHref: Record<string, string> | null;
