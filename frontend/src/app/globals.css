@@ -692,10 +692,13 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .class-detail-lists li + li { border-top:1px solid #eaf0f5; }
 .class-detail-row small { display:block; margin-top:2px; color:#52677d; font-size:12px; }
 a.class-detail-row:hover { background:#edf5fc; }
-.class-trend-frame { display:grid; grid-template-columns:auto minmax(0,1fr); gap:10px; height:190px; margin:20px 12px 0 0; }
+.class-student-tools { display:flex; flex-wrap:wrap; gap:8px 12px; margin:12px 0 6px; }
+.class-student-tools label { display:grid; flex:1 1 145px; min-width:0; gap:4px; color:var(--ink-2); font-size:12px; font-weight:600; }
+.class-student-tools :is(input,select) { width:100%; min-width:0; min-height:36px; padding:6px 9px; border:1px solid #9fb5cb; border-radius:8px; background:#fff; color:var(--ink); font:inherit; font-size:13px; }
+.class-trend-frame { display:grid; grid-template: minmax(0,1fr) / auto minmax(0,1fr); gap:10px; height:190px; margin:20px 12px 0 0; }
 .class-trend-axis { display:flex; flex-direction:column; justify-content:space-between; color:#52677d; font-size:11px; }
 .class-trend-plot { position:relative; min-width:0; margin-block:7px; }
-.class-trend-plot svg { display:block; width:100%; height:100%; overflow:visible; }
+.class-trend-plot svg { position:absolute; inset:0; display:block; width:100%; height:100%; overflow:visible; }
 .class-trend-grid { stroke:#dce5ee; }
 .class-trend-line { fill:none; stroke:#147d80; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
 .class-trend-point { position:absolute; inset-inline-start:var(--x); top:var(--y); display:grid; place-items:center; width:20px; height:20px; transform:translate(-50%,-50%); border-radius:50%; }
@@ -705,6 +708,7 @@ a.class-detail-row:hover { background:#edf5fc; }
 .class-trend-point:is(:hover,:focus-visible) { z-index:1; outline:2px solid var(--pca-blue); }
 .class-trend-point:is(:hover,:focus) span { display:block; }
 .class-trend-dates { display:flex; justify-content:space-between; margin:6px 12px 0 38px; color:#52677d; font-size:11px; }
+.class-trend-dates[data-single] { justify-content:center; }
 @media (prefers-reduced-motion:no-preference) { .class-trend-line { stroke-dasharray:1; animation:class-trend-draw .65s ease-out both; } }
 @keyframes class-trend-draw { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
 @media (max-width:850px) { .class-detail-lists { grid-template-columns:minmax(0,1fr); } }

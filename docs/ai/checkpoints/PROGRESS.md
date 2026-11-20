@@ -2622,3 +2622,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The detail page uses the existing academy-scoped schedule, roster, and attendance APIs. Each student's rate uses sessions of that type where the student was expected. Missing rates leave gaps in the chart. The frontend proxy recognises the named route and still rejects malformed class record IDs.
 - Passed 77 frontend unit tests, TypeScript, targeted ESLint, the structure check, and two focused signed-in Playwright checks in desktop and mobile Edge with mock data. The original Supabase-backed API reported UP. Its frontend redirected an unauthenticated detail request to staff sign-in and returned 404 for a malformed class record ID. Signed-in production data rendering was not tested.
 - Frontend-only rollout. No migration is needed. Revert this commit to roll back.
+
+## Class type roster controls and chart alignment (2026-11-20)
+
+- The class-type detail excludes sessions with zero recorded joins from the completed list, trend, class average, and each student's expected-session denominator. Unavailable attendance still displays as unavailable. Sessions with actual joins and a rate that rounds to zero display as less than 1%.
+- Added live name and registration-number search and name or attendance sorting above the roster. Unknown rates sort after known rates. The line and interactive points now share the same fixed plot bounds at desktop and mobile widths.
+- Passed 77 frontend unit tests, TypeScript, targeted ESLint, and the structure check. Desktop and mobile Edge mock checks verified search, sorting, zero-join exclusion and averages, point focus, and line-to-point alignment within one pixel. The Supabase-backed API reported UP and sign-in returned 200. Signed-in verification with original data was not run.
+- Frontend-only rollout. No migration is needed. Revert this commit to roll back.
