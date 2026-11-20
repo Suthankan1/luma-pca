@@ -4,12 +4,13 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/refresh/logout/logout-all/activate/me, JWKS, courses, batches, students, enrollments, class sessions, staff administration, invitations, own-record routes, the Zoom webhook ingress, receipt operations and occurrence linking. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me, JWKS, courses, batches, students, enrollments, class sessions, invitations, own-record routes, the Zoom webhook ingress, receipt operations and occurrence linking. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
 
     Roles (owner decision 2026-11-20): STAFF and STUDENT only. Every staff route needs STAFF and is limited to the
     caller's academy (another academy's records answer 404); students get 403 on staff routes and reach only their own
-    records through /api/v1/me/... routes.
+    records through /api/v1/me/... routes. There is no staff-account API: the operator adds and blocks staff
+    (docs/delivery/runbooks/STAFF-ACCOUNTS.md).
 servers:
   - url: http://localhost:8080
 paths:
@@ -511,99 +512,6 @@ paths:
         '400': {description: withdrawnOn before enrolledOn}
         '404': {description: Not found, or belongs to another academy}
         '409': {description: Stale version}
-  /api/v1/staff-accounts:
-    get:
-      summary: Staff accounts of the caller's academy, by email; students are never listed (implemented; staff)
-      operationId: listStaffAccounts
-      tags: [Identity]
-      security: [{bearerAuth: []}]
-      responses:
-        '200':
-          description: Staff accounts
-          content:
-            application/json:
-              schema: {type: array, items: {$ref: '#/components/schemas/StaffAccount'}}
-        '403': {description: Not staff}
-    post:
-      summary: Create a staff account pending activation; it gets the STAFF role (implemented; staff)
-      operationId: createStaffAccount
-      tags: [Identity]
-      security: [{bearerAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email]
-              properties:
-                email: {type: string, maxLength: 254}
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/StaffAccount'}
-        '400': {description: Invalid email}
-        '403': {description: Not staff}
-        '409': {description: Email already used}
-  /api/v1/staff-accounts/{accountId}:
-    get:
-      summary: Read a staff account (implemented; staff)
-      operationId: getStaffAccount
-      tags: [Identity]
-      security: [{bearerAuth: []}]
-      parameters:
-        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
-      responses:
-        '200':
-          description: Staff account
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/StaffAccount'}
-        '404': {description: Not a staff account of this academy}
-  /api/v1/staff-accounts/{accountId}/enable:
-    post:
-      summary: Re-enable a disabled staff account (implemented; staff)
-      description: >-
-        The account becomes ACTIVE with its existing password, or PENDING_ACTIVATION when requireNewPassword is true or it never had a
-        password; then the old password is removed and any open invitation revoked, so an
-        invitation is needed. Sessions and tokens ended by the disable stay invalid; lockout is
-        cleared. Enabling an account that is not disabled changes nothing. Audited.
-      operationId: enableStaffAccount
-      tags: [Staff]
-      security: [{bearerAuth: []}]
-      parameters:
-        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                requireNewPassword: {type: boolean, default: false}
-      responses:
-        '200': {description: The account as it is now}
-        '403': {description: Caller may not manage this account}
-        '404': {description: No such staff account in the caller's academy (students are not staff accounts)}
-  /api/v1/staff-accounts/{accountId}/disable:
-    post:
-      summary: Disable a staff account and end all its sessions; repeating is harmless (implemented; staff)
-      operationId: disableStaffAccount
-      tags: [Identity]
-      security: [{bearerAuth: []}]
-      parameters:
-        - {in: path, name: accountId, required: true, schema: {type: string, format: uuid}}
-      responses:
-        '200':
-          description: Disabled
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/StaffAccount'}
-        '403': {description: Own account}
-        '404': {description: Not a staff account of this academy}
-        '409': {description: It would leave no active staff account}
   /api/v1/accounts/{accountId}/invitations:
     post:
       summary: Issue an activation invitation for a pending staff or student account (implemented; staff)
@@ -1939,19 +1847,6 @@ components:
         version: {type: integer}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
-    StaffRole:
-      type: string
-      enum: [STAFF]
-    StaffAccount:
-      type: object
-      required: [id, email, roles, status, version, createdAt]
-      properties:
-        id: {type: string, format: uuid}
-        email: {type: string}
-        roles: {type: array, items: {$ref: '#/components/schemas/StaffRole'}}
-        status: {type: string, enum: [PENDING_ACTIVATION, ACTIVE, DISABLED]}
-        version: {type: integer}
-        createdAt: {type: string, format: date-time}
     ZoomOccurrence:
       type: object
       required: [occurrenceUuid, webinarId, firstEventAt, lastEventAt, eventCount]

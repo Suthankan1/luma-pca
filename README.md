@@ -12,7 +12,8 @@ A course- and batch-aware Zoom Webinar attendance and engagement platform for Ph
   their own data, checked on every route.
 - **Academic data:** courses, batches, students (CSV import, or synced read-only from the Academy's own database by class),
   enrolments, bulk invitation emails, an append-only activity log.
-- **Zoom owns schedules (Academy decision 2026-11-18):** staff add a webinar by its ID or join link only; LUMA reads its
+- **Zoom owns schedules (Academy decision 2026-11-18):** on the one Classes screen staff track a webinar by its ID or
+  join link only and see the classes Zoom has scheduled and those already held; LUMA reads its
   title, schedule and occurrences from Zoom (read-only) and has no scheduling, editing or import controls. Every run Zoom
   actually starts (early, late or unscheduled) becomes its own attendance class, keyed by the occurrence UUID, from the
   actual start to the actual end; a missed end is closed from Zoom's report. See `docs/integration/ZOOM-RULES.md`.
@@ -93,7 +94,7 @@ npm --prefix frontend run build
 python3 scripts/verify_structure.py
 scripts/auth-stack-smoke.sh            # real backend + database + Next.js sign-in flow
 scripts/staff-ui-real-stack.sh         # real stack + Playwright, end to end (also the "Real-stack browser test" CI workflow)
-scripts/bootstrap-owner.sh "Academy" owner@example.com   # create an academy's first staff account (operator command)
+scripts/bootstrap-owner.sh "Academy" person@example.com  # add a staff member (operator; there is no staff page)
 STUDENTS=150 scripts/load-test-local.sh   # k6 load scenarios on this machine (baseline only; see docs/testing/LOAD-TEST-PLAN.md)
 ```
 

@@ -17,16 +17,18 @@ the caller's academy, so records of another academy answer 404.
 | Zoom: webinar monitoring, occurrences, participants, receipts, reports | Yes | — |
 | Engagement switch, pulse questions, rankings | Yes | Own consent, reactions and answers (enrolled class only) |
 | Student erasure | Yes (student number typed again, reason, audited) | — |
-| Staff accounts: list, add (email only), invite, disable, re-enable | Yes, except disabling themselves | — |
+| Staff accounts | No API (owner decision 2026-11-20): the operator adds, blocks and unblocks staff | — |
+| Invitations for pending accounts (students) | Yes | — |
 | Activity log | Yes | — |
 
-**Guards kept:** nobody disables their own account; the academy always keeps at least one active staff account (staff
-administration locks the academy row and re-reads the caller, so two staff disabling each other at once leave one).
-Students are never managed through staff routes; staff routes return 404 for a student account. Every change is
-audited (actor, action, target id; no email or token). A former role name in any request or token grants nothing.
+**Guards kept:** staff accounts cannot be changed over HTTP at all (the operator command adds them; the runbook SQL in
+`docs/delivery/runbooks/sql` blocks and unblocks them, ending every session and cancelling unused activation links).
+Students are never managed through staff routes. Every change is audited (actor, or none for the operator; action,
+target id; no email or token). A former role name in any request or token grants nothing.
 
-**Accepted risk (owner):** every staff member has full staff access, including disabling colleagues, erasing a student's
-data and changing the attendance rule. The audit log records who did what.
+**Accepted risk (owner):** every staff member has full staff access, including erasing a student's data and changing the
+attendance rule. The audit log records who did what. Adding or blocking staff needs someone with server or database
+access.
 
 **Negative acceptance examples:** student A cannot request student B's record by guessing an ID; a student gets 403 on
 every staff route; staff of one academy cannot read or change another academy's records (404); guest or unregistered

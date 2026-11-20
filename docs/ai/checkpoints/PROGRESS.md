@@ -2484,3 +2484,35 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Merge note: the main checkout's open "latest completed class" work (`GET /api/v1/attendance/latest-completed`) touches
   `SecurityConfig`, `ClassSessionService`, Staff Home, the contract and the authorization matrix; on merge the new route
   joins the single STAFF rule and its batch-scope code collapses to staff-wide access.
+
+## One Classes screen; no Staff page (2026-11-20)
+
+- Branch `feat/two-roles` (worktree `.claude/worktrees/two-roles`). Plan and progress:
+  `docs/delivery/CLASSES-AND-STAFF-SIMPLIFY-PLAN.md`. Owner request: Webinars and Classes become one screen showing only
+  the classes Zoom has scheduled and the ones held, with "track a Zoom link" on the same screen; and, with one STAFF
+  role, no Staff page at all.
+- Classes (`/staff/sessions`): "Track a Zoom link" (ID or join link only) at the top, the tracked links collapsed under
+  it (refresh from Zoom, stop/track again, Academy class), then two weeks of classes grouped by day from the shared
+  `calendarEntries` helper: Zoom's scheduled dates of tracked webinars ("Expected", not links) and held classes
+  (Live/Ended, linking to attendance). The batch filter, live cards, run history and the "where classes come from"
+  panel are gone. `/staff/webinars` and `/staff/zoom/import` redirect to Classes; the Webinars and Staff menu items are
+  removed; webinar actions moved to `app/staff/sessions/webinar-actions.ts`.
+- Staff page and API removed: `/staff/team` pages and forms; `GET/POST /api/v1/staff-accounts`, `GET /{id}`, `/enable`,
+  `/disable` (now 403 by the deny-all rule); `StaffAccountService/Controller/View`, `Account.enable`,
+  `AccountRepository.activeStaffOtherThan`. `POST /api/v1/accounts/{id}/invitations` stays
+  (`AccountInvitationService`/`AccountInvitationController`) for pending accounts (students).
+- Operator path: `scripts/bootstrap-owner.sh` now adds any staff member (new pending STAFF account and invitation, or a
+  fresh invitation for a pending one) and refuses active, blocked, student or other-academy addresses. Blocking and
+  unblocking are `docs/delivery/runbooks/sql/staff-block.sql` and `staff-unblock.sql` (runbook `STAFF-ACCOUNTS.md`):
+  block ends every session, cancels unused activation links (the test caught that this was missing at first) and is
+  audited without an actor. `staff-ui-real-stack.sh` adds the colleague with the command and checks the block SQL.
+- Contract: staff-account paths and `StaffAccount`/`StaffRole` schemas removed; `check-openapi.py`: 110 endpoints match.
+  Docs: authorization matrix, ADR-0007 follow-up, README, staff guide, FIRST-OWNER runbook.
+- Passed: backend `mvn test` 393 tests, 0 failures (new `StaffAccountOperatorIntegrationTest` runs the runbook SQL files
+  as written; bootstrap tests cover adding a colleague and the refusals); frontend `npm test` (77), typecheck, ESLint,
+  production build; Playwright in installed Edge against the mock backend, desktop and Pixel 7: 118 passed, 2 skipped
+  (unchanged skips); `scripts/check-openapi.py` (110 endpoints) and `scripts/verify_structure.py`.
+- Not run: `scripts/staff-ui-real-stack.sh` (updated: the colleague comes from the operator command, the block SQL is
+  checked by a refused sign-in), and nothing against the Supabase database.
+- Rollout: as for the two-role change (backend and frontend together). Anyone who must add or block staff after this
+  needs the operator command or database access.

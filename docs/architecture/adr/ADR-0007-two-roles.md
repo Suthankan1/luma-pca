@@ -12,9 +12,12 @@ all courses and batches. `STUDENT` reaches only its own records. Migration V30 m
 `staff_assignments` is kept for history but no longer read. Roles are still read from the database on every request.
 
 **Guards kept:** academy isolation from the verified token (another academy's records answer 404); students get 403 on
-every staff route; nobody disables their own account; an academy keeps at least one active staff account; every change
-is audited.
+every staff route; every change is audited.
 
-**Consequences:** every staff member can disable colleagues, erase a student's data, change the attendance rule and see
-every student of the academy. The owner accepted this risk; the audit log is the control. Rolling back needs a reverse
+**Follow-up (same day, owner):** with nothing per person to administer, the staff page and the staff-account API were
+removed. The operator adds staff with `scripts/bootstrap-owner.sh` and blocks or unblocks them with the runbook SQL
+(`docs/delivery/runbooks/STAFF-ACCOUNTS.md`).
+
+**Consequences:** every staff member can erase a student's data, change the attendance rule and see every student of
+the academy. The owner accepted this risk; the audit log is the control. Rolling back needs a reverse
 data script (map `STAFF` to `ACADEMY_OWNER`) before deploying older code, because older code cannot read `STAFF`.

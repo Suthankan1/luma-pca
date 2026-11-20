@@ -13,17 +13,15 @@ accounts to match, failed Zoom events); each line opens the page where it is han
 2. **Students**: add one, or **Import** a CSV (`studentNumber,fullName,email`), optionally enrolling everyone in a batch.
    Check first, then import; nothing is imported if any row has a problem.
 3. **Invitations**: from a batch or the Students page, email invitations; failed emails are listed for follow-up.
-4. **Staff**: add colleagues by email and send each an invitation. Every staff member can do everything in the staff
-   portal (one STAFF role); nobody can disable their own account.
+4. **Staff**: there is no staff page. Every staff member can do everything in the staff portal (one STAFF role). To add
+   a colleague or block someone who left, ask the operator (`docs/delivery/runbooks/STAFF-ACCOUNTS.md`).
 
 ## Timetable and Zoom
-- **Import classes from Zoom** (Classes → "Import classes from your Zoom webinars"): LUMA lists the academy's upcoming
-  webinars from Zoom (search by topic or ID; each shows its next date and how many of its dates are already classes).
-  Open one to see every upcoming date of a recurring webinar. Tick the dates and the batches, keep or change the title, and press
-  **Create classes**: each becomes a class with its webinar ID, so attendance links and fills in by itself. Dates that are
-  already classes are shown and never created twice. Webinars with no fixed time in Zoom cannot be imported.
-- **Classes**: or schedule a class or a weekly series by hand for one or more batches, with the Zoom **webinar ID**. Each
-  student is expected once per class even if in two of its batches.
+- **Classes** is the one screen for the timetable. At the top, **Track a Zoom link**: paste the webinar's join link or
+  ID and press **Track**. Below, two weeks at a time and grouped by day, are the classes Zoom has scheduled for the
+  tracked webinars ("Expected") and the ones that ran ("Live" or "Ended", each with its attendance). Titles and times
+  come from Zoom; change them in Zoom. Under **Tracked Zoom links** you can read a webinar again from Zoom, stop or
+  resume tracking it, and choose the Academy class whose students are expected.
 - **Zoom review**: each time a webinar runs it appears here and links itself to the class when exactly one class fits.
   Decide the others. **People in this occurrence** shows who joined; **Zoom accounts to match** lists emails that match no
   student: match them by student number, or mark them "not a student". A decision applies to every future webinar; **Remove** one
