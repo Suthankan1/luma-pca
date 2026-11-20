@@ -12,6 +12,9 @@ let roles = [];
 let studentHasEnrolments = true;
 const activatedTokens = new Set();
 const usedResetTokens = new Set();
+let blockedMonitors;
+let releaseMonitors;
+let monitorsUnavailable = false;
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -39,6 +42,17 @@ const backend = createServer(async (req, res) => {
     return send(200, { connectedNow: run.connectedNow });
   }
 
+  if (req.method === "PUT" && req.url === "/__test__/zoom-monitor-response") {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    releaseMonitors?.();
+    blockedMonitors = body.mode === "hold" ? new Promise(resolve => { releaseMonitors = resolve; }) : undefined;
+    monitorsUnavailable = body.mode === "fail";
+    return send(204);
+  }
+  if (req.method === "GET" && req.url === "/api/v1/zoom/monitors") {
+    await blockedMonitors;
+    if (monitorsUnavailable) return send(503);
+  }
   if (req.url.startsWith("/api/v1/zoom/monitors") || /^\/api\/v1\/class-sessions\/[^/]+\/zoom-run$/.test(req.url)) {
     return monitorsApi(req, body, send);
   }

@@ -2731,3 +2731,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The attendance dashboard and student detail now batch named rosters, Zoom evidence and final records over authorized classes. Students enrolled in overlapping batches still count once per session, and the existing batch codes and filtering remain intact. The existing range and export contracts still apply.
 - Passed 27 PostgreSQL integration tests across insights, provisional attendance, Zoom reports and participants, and enrollment authorization. A separate repeat benchmark will measure the Students improvement on the same fixture.
 - No migration. Revert this commit to restore the per-class detail reads.
+
+## Streamed staff attendance pages (2026-11-21)
+
+- Classes, Class Types and Students stream the month controls and page layout before their heavier reads. On Classes the tracked Zoom links and class types have independent loading boundaries. Both columns share the same monthly requests. Errors show a Retry action inline and retry the current route without a browser reload.
+- The production Next build, ESLint and TypeScript passed. All 14 desktop and mobile Chromium checks passed, including a held Zoom response and the failure and retry flow. A first browser run could not start because the Playwright Chromium revision was missing. Installed that revision for the successful rerun.
+- Frontend-only slice. No hosted timing or visual check on original data was run. Revert this commit to restore the earlier rendering strategy.

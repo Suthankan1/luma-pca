@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
+import { StudentMonthSkeleton } from "@/components/staff/AttendanceSkeleton";
+import { PanelRetry } from "@/components/staff/PanelRetry";
 import { ClassMonthPicker } from "@/components/staff/ClassMonthPicker";
 import { requirePortal } from "@/lib/auth-server";
 import { renderTime, type Dashboard } from "@/lib/insights";
@@ -25,20 +28,30 @@ export default async function StudentsPage({ searchParams }: {
   const now = renderTime();
   const today = academyToday(new Date(now));
   const { first, through, month } = classMonthRange(requestedMonth, today);
-  const [directory, dashboards] = await Promise.all([
-    readStudentDirectory(),
-    through ? readAttendanceWindows(first, through, (from, to) => staffApi<Dashboard>(
-      `/api/v1/attendance/dashboard?${new URLSearchParams({ from, to })}`, undefined, 30000), data => data.truncated) : [],
-  ]);
-  const data = directory ? compileStudentMonth(directory, dashboards ?? [], now) : null;
+  const directoryRequest = readStudentDirectory();
+  const dashboardRequest = through ? readAttendanceWindows(first, through, (from, to) => staffApi<Dashboard>(
+    `/api/v1/attendance/dashboard?${new URLSearchParams({ from, to })}`, undefined, 30000), data => data.truncated) : null;
 
   return <StaffShell active="students" crumb="People" title="Students" subtitle={monthLabel(month)}
     hasStudentPortal={hasPortal(identity, "student")}>
     <ClassMonthPicker href="/staff/students" month={month} currentMonth={today.startsWith(month)} label="Attendance month" />
-    {data ? <MonthlyStudentDirectory key={JSON.stringify([month, q, type, sort])} {...data} month={month} attendanceFailed={!dashboards}
+    <Suspense key={month} fallback={<StudentMonthSkeleton />}>
+      <StudentMonthPanel month={month} now={now} q={q} type={type} sort={sort}
+        directoryRequest={directoryRequest} dashboardRequest={dashboardRequest} />
+    </Suspense>
+  </StaffShell>;
+}
+
+async function StudentMonthPanel({ month, now, q, type, sort, directoryRequest, dashboardRequest }: {
+  month: string; now: number; q?: string | string[]; type?: string | string[]; sort?: string | string[];
+  directoryRequest: ReturnType<typeof readStudentDirectory>;
+  dashboardRequest: Promise<Dashboard[] | null> | null;
+}) {
+  const [directory, dashboards] = await Promise.all([directoryRequest, dashboardRequest ?? []]);
+  const data = directory ? compileStudentMonth(directory, dashboards ?? [], now) : null;
+  return data ? <MonthlyStudentDirectory key={JSON.stringify([month, q, type, sort])} {...data} month={month} attendanceFailed={!dashboards}
       initialQuery={typeof q === "string" ? q.slice(0, 100) : ""}
       initialType={data.classTypes.find(option => option.key === type)?.key ?? ""}
       initialSort={sort === "low" || sort === "high" ? sort : "name"} />
-      : <p className="session-error" role="alert">The student directory couldn’t load. Please reload the page.</p>}
-  </StaffShell>;
+    : <p className="session-error" role="alert">The student directory couldn’t load. <PanelRetry /></p>;
 }

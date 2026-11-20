@@ -2,14 +2,16 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { StaffShell } from "@/components/StaffShell";
 import { Disclosure } from "@/components/Disclosure";
+import { ClassesColumnSkeleton } from "@/components/staff/AttendanceSkeleton";
 import { OneLineTitle } from "@/components/staff/OneLineTitle";
 import { ClassMonthPicker } from "@/components/staff/ClassMonthPicker";
 import { AttendanceChart } from "@/components/staff/ClassesAttendanceChart";
-import { ClassTypesOverview } from "@/components/staff/ClassTypesOverview";
+import { ClassTypesPanel } from "@/components/staff/ClassTypesOverview";
 import { ClassScheduleScroll } from "@/components/staff/ClassScheduleScroll";
+import { PanelRetry } from "@/components/staff/PanelRetry";
 import { AddWebinarForm, WebinarActions } from "@/components/staff/WebinarForms";
 import { requirePortal } from "@/lib/auth-server";
-import { loadClassMonth } from "@/lib/class-month-api";
+import { startClassMonth } from "@/lib/class-month-api";
 import { renderTime } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
@@ -39,16 +41,41 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   const now = renderTime();
   const today = academyToday(new Date(now));
   const range = classMonthRange(params.month, today, params.from);
-  const { month, first, last, through } = range;
+  const { month, through } = range;
   const currentMonth = today.startsWith(month);
   const shell = { active: "sessions" as const, crumb: "Teaching", title: "Classes",
     subtitle: "Classes Zoom has scheduled for the webinars you track, and the ones already held. Times come from Zoom.",
     hasStudentPortal: hasPortal(identity, "student") };
 
-  const [{ sessions, totals }, monitors] = await Promise.all([
-    loadClassMonth(range),
-    staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors"),
-  ]);
+  const requests = startClassMonth(range);
+  const monitors = staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors");
+  return <StaffShell {...shell}>
+    <ClassMonthPicker href="/staff/sessions" month={month} currentMonth={currentMonth} />
+    <div className="classes-overview">
+      <Suspense key={`schedule-${month}`} fallback={<ClassesColumnSkeleton />}>
+        <ScheduleColumn range={range} now={now} today={today} requests={requests} monitorsRequest={monitors} />
+      </Suspense>
+      <Suspense key={`types-${month}`} fallback={<ClassesColumnSkeleton />}>
+        <ClassTypesPanel month={month} through={through} now={now} requests={requests} />
+      </Suspense>
+    </div>
+    <section className="panel panel-gap" aria-labelledby="track-title">
+      <h2 id="track-title" className="panel-title">TRACK A ZOOM LINK</h2>
+      <AddWebinarForm />
+      <Suspense fallback={<p className="panel-sub" role="status">Loading tracked links…</p>}>
+        <TrackedMonitors monitorsRequest={monitors} />
+      </Suspense>
+    </section>
+  </StaffShell>;
+}
+
+async function ScheduleColumn({ range, requests, monitorsRequest, now, today }: {
+  range: ReturnType<typeof classMonthRange>; requests: ReturnType<typeof startClassMonth>;
+  monitorsRequest: ReturnType<typeof staffApi<WebinarMonitor[]>>; now: number; today: string;
+}) {
+  const { first, last, month } = range;
+  const currentMonth = today.startsWith(month);
+  const [sessions, totals, monitors] = await Promise.all([requests.sessions, requests.totals, monitorsRequest]);
   const monitorList = monitors.ok ? monitors.data : [];
   const liveIds = new Set(monitorList.flatMap(m => m.live ? [m.live.classSessionId] : []));
   const monthSessions = sessions.ok ? sessions.data.map(session => ({
@@ -66,16 +93,13 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
       percent: total ? attendancePercent(total) : null }];
   }));
 
-  return <StaffShell {...shell}>
-    <ClassMonthPicker href="/staff/sessions" month={month} currentMonth={currentMonth} />
-    <div className="classes-overview">
-      <div className="classes-column">
+  return <div className="classes-column">
         <AttendanceChart title="ATTENDANCE BY CLASS" bars={bars} failed={!sessions.ok || totals?.ok === false} />
         <section className="panel" aria-labelledby="classes-title">
           <h2 id="classes-title" className="panel-title">CLASSES</h2>
           <p className="panel-sub"><strong>{monthLabel(month)}</strong> · {formatDate(first)} – {formatDate(last)} · Sri Lanka time · {count} class{count === 1 ? "" : "es"}</p>
           <ClassScheduleScroll key={month} anchorDay={currentMonth ? today : first}>
-            {!sessions.ok && <p className="session-error" role="alert">We couldn’t load classes right now. Please reload the page shortly.</p>}
+            {!sessions.ok && <p className="session-error" role="alert">Classes couldn’t load. <PanelRetry /></p>}
             {sessions.ok && days.length === 0 && <p className="dir-empty muted">No classes scheduled or held this month.
               {monitorList.length === 0 ? " Track a Zoom link below to see its classes here." : ""}</p>}
             {scheduleDays.map(day => <div key={day} data-schedule-day={day} className="class-day" role="group" aria-label={longDayLabel(day)}>
@@ -101,19 +125,13 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
           </div>)}
           </ClassScheduleScroll>
         </section>
-      </div>
-      <ClassTypesOverview month={month} through={through} now={now} sessions={monthSessions} totals={byId}
-        sessionsFailed={!sessions.ok} totalsFailed={totals?.ok === false} />
-    </div>
-    <section className="panel panel-gap" aria-labelledby="track-title">
-      <h2 id="track-title" className="panel-title">TRACK A ZOOM LINK</h2>
-      <AddWebinarForm />
-      {monitors.ok && monitorList.length > 0 && <Suspense fallback={<p className="panel-sub">Loading tracked links…</p>}>
-        <TrackedLinks monitors={monitorList} />
-      </Suspense>}
-      {!monitors.ok && <p className="session-error" role="alert">Tracked Zoom links couldn’t load. Please reload to see Zoom’s scheduled classes.</p>}
-    </section>
-  </StaffShell>;
+  </div>;
+}
+
+async function TrackedMonitors({ monitorsRequest }: { monitorsRequest: ReturnType<typeof staffApi<WebinarMonitor[]>> }) {
+  const monitors = await monitorsRequest;
+  if (!monitors.ok) return <p className="session-error" role="alert">Tracked Zoom links couldn’t load. <PanelRetry /></p>;
+  return monitors.data.length ? <TrackedLinks monitors={monitors.data} /> : null;
 }
 
 /** The tracked webinars, collapsed: refresh from Zoom, stop or resume tracking, and the Academy class whose students are expected. */

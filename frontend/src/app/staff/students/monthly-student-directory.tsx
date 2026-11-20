@@ -1,5 +1,7 @@
 "use client";
 
+import { PanelRetry } from "@/components/staff/PanelRetry";
+
 import Link from "next/link";
 import { useState, type CSSProperties } from "react";
 import { withParams } from "@/lib/insights";
@@ -40,7 +42,7 @@ export function MonthlyStudentDirectory({ students, classTypes, month, attendanc
         <p>{rows.length} {rows.length === 1 ? "student" : "students"} · {scored.length} with attendance data</p>
       </div>
       <p className="panel-sub">Attendance measures the share of completed, tracked sessions a student was expected in and joined.</p>
-      {attendanceFailed && <p className="session-error" role="alert">Monthly attendance couldn’t load. The directory is available below.</p>}
+      {attendanceFailed && <p className="session-error" role="alert">Monthly attendance couldn’t load. <PanelRetry /></p>}
     </section>
     <figure className="panel panel-gap">
       <figcaption className="panel-title">Attendance by student</figcaption>

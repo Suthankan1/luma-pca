@@ -1,6 +1,6 @@
 import { openSection } from "./support/ui";
 import { test, expect, type Page } from "@playwright/test";
-import { scheduleClass } from "./support/classes";
+import { mockApiBase, scheduleClass } from "./support/classes";
 
 async function signInAsAdmin(page: Page) {
   await page.goto("/sign-in");
@@ -41,6 +41,27 @@ test.describe("Classes (Zoom owns schedules)", () => {
   let p = "d";
   test.beforeEach(({}, testInfo) => {
     p = (testInfo.project.name === "mobile" ? "m" : "d") + (testInfo.retry ? String(testInfo.retry) : "");
+  });
+
+  test("Classes streams the month control and class types while Zoom is still loading", async ({ page }) => {
+    await signInAsAdmin(page);
+    const setMonitors = (mode: string) => page.request.put(`${mockApiBase()}/__test__/zoom-monitor-response`, {
+      data: { mode }, headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" },
+    });
+    expect((await setMonitors("hold")).status()).toBe(204);
+    try {
+      await page.goto("/staff/sessions", { waitUntil: "commit" });
+      await expect(page.getByLabel("Class month", { exact: true })).toBeVisible();
+      await expect(page.getByRole("region", { name: "CLASS TYPES", exact: true })).toBeVisible();
+      await expect(page.getByText("Loading tracked links…")).toBeVisible();
+      expect((await setMonitors("fail")).status()).toBe(204);
+      await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" }).getByRole("alert")).toContainText("couldn’t load");
+      expect((await setMonitors("normal")).status()).toBe(204);
+      await page.getByRole("region", { name: "TRACK A ZOOM LINK" }).getByRole("button", { name: "Retry" }).click();
+      await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" }).getByRole("alert")).toHaveCount(0);
+    } finally {
+      await setMonitors("normal");
+    }
   });
 
   test("Classes are read-only: no scheduling, editing, moving or cancelling controls remain", async ({ page }) => {
