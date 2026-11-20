@@ -28,6 +28,16 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
+  const mockOnline = req.url.match(/^\/__test__\/zoom-online\/([^/]+)$/);
+  if (req.method === "PUT" && mockOnline) {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    const run = runSessions.get(mockOnline[1]);
+    if (!run || run.state !== "LIVE") return send(404);
+    if (!Number.isInteger(body.connectedNow) || body.connectedNow < 0) return send(400);
+    run.connectedNow = body.connectedNow;
+    return send(200, { connectedNow: run.connectedNow });
+  }
+
   if (req.url.startsWith("/api/v1/zoom/monitors") || /^\/api\/v1\/class-sessions\/[^/]+\/zoom-run$/.test(req.url)) {
     return monitorsApi(req, body, send);
   }

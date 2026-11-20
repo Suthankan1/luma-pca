@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { StaffShell } from "@/components/StaffShell";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { LinkPending } from "@/components/LinkPending";
+import { LiveOnlineChart } from "@/components/staff/LiveOnlineChart";
 import { OneLineTitle } from "@/components/staff/OneLineTitle";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
@@ -93,6 +94,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
     Promise.all(running.map(e => staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${e.sessionId}/attendance`))),
     endedOnDay ? classTotals({ from: day, to: day }) : null,
   ]);
+  const sampledAt = renderTime();
   const live = running.map((entry, i) => ({ entry, numbers: liveAttendance[i].ok
     ? liveNumbers(liveAttendance[i].data.students, liveRuns.get(entry.sessionId!)?.connectedNow ?? null) : null }));
   const finished = new Map(dayTotals?.ok ? dayTotals.data.map(c => [c.id, c] as const) : []);
@@ -105,7 +107,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
       {live.length > 0
         ? <section className="home-strip home-strip-live" aria-labelledby="live-title">
             <h2 id="live-title" className="sr-only">Live now</h2>
-            {live.map(({ entry, numbers }) => <LiveRow key={entry.key} entry={entry} numbers={numbers} now={now} />)}
+            {live.map(({ entry, numbers }) => <LiveRow key={entry.key} entry={entry} numbers={numbers} now={now} sampledAt={sampledAt} />)}
             <LiveRefresh until={new Date(now + 3 * 3600_000).toISOString()} seconds={30} label="while a class runs" />
           </section>
         : <div className="home-brief">
@@ -129,50 +131,52 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
           </div>}
 
       <div className="home-grid">
-        <section id="day-schedule" className="home-card home-day" aria-labelledby="day-title">
-          <div className="home-stepper">
-            <Link scroll={false} className="home-step" href={href({ day: previousDay, month: previousDay.slice(0, 7) })}
-              aria-label={`Previous day, ${shortDayLabel(previousDay)}`}>
-              <span aria-hidden="true">‹</span><span className="home-step-text">{shortDayLabel(previousDay)}</span><LinkPending />
-            </Link>
-            <div className="home-stepper-now">
-              <h2 id="day-title"><span className="sr-only">Classes on </span>{relativeDayName(day, today)}</h2>
-              <p>{day === today ? shortDayLabel(day) : <>
-                {shortDayLabel(day)} · <Link scroll={false} href={href({ day: today, month: today.slice(0, 7) })}>Back to today</Link>
-              </>}</p>
+        <div className="home-grid-main">
+          <section id="day-schedule" className="home-card home-day" aria-labelledby="day-title">
+            <div className="home-stepper">
+              <Link scroll={false} className="home-step" href={href({ day: previousDay, month: previousDay.slice(0, 7) })}
+                aria-label={`Previous day, ${shortDayLabel(previousDay)}`}>
+                <span aria-hidden="true">‹</span><span className="home-step-text">{shortDayLabel(previousDay)}</span><LinkPending />
+              </Link>
+              <div className="home-stepper-now">
+                <h2 id="day-title"><span className="sr-only">Classes on </span>{relativeDayName(day, today)}</h2>
+                <p>{day === today ? shortDayLabel(day) : <>
+                  {shortDayLabel(day)} · <Link scroll={false} href={href({ day: today, month: today.slice(0, 7) })}>Back to today</Link>
+                </>}</p>
+              </div>
+              <Link scroll={false} className="home-step home-step-next" href={href({ day: nextDay, month: nextDay.slice(0, 7) })}
+                aria-label={`Next day, ${shortDayLabel(nextDay)}`}>
+                <span className="home-step-text">{shortDayLabel(nextDay)}</span><span aria-hidden="true">›</span><LinkPending />
+              </Link>
             </div>
-            <Link scroll={false} className="home-step home-step-next" href={href({ day: nextDay, month: nextDay.slice(0, 7) })}
-              aria-label={`Next day, ${shortDayLabel(nextDay)}`}>
-              <span className="home-step-text">{shortDayLabel(nextDay)}</span><span aria-hidden="true">›</span><LinkPending />
-            </Link>
-          </div>
-          {chosenDays && dayEntries.length > 0 && <ul className="home-day-list" key={day}>
-            {dayEntries.map(entry => {
-              const done = entry.sessionId ? finished.get(entry.sessionId) : undefined;
-              const detail = entry.source === "zoom" ? "Zoom schedule"
-                : entry.state === "ended" && done ? joinedLabel(done) : null;
-              return <li key={entry.key} className={`home-entry home-entry-${entry.state}`}>
-                <Link href={entry.href}>
-                  <span className="home-entry-time">{timeRange(entry)}</span>
-                  <span className="home-entry-copy">
-                    <OneLineTitle text={entry.title} />
-                    {detail && <span className="home-entry-meta">{detail}</span>}
-                  </span>
-                  <span className={`home-state home-state-${entry.state}`}>{entryStateLabels[entry.state]}</span>
-                </Link>
-              </li>;
-            })}
-          </ul>}
-          {chosenDays && dayEntries.length === 0 && <p className="home-empty">No classes on this day.</p>}
-          {!chosenDays && <p className="home-empty">{calendar.status === 403 ? "Your role has no classes." : "Classes couldn’t load. Please reload shortly."}</p>}
-          {monitors && !monitors.ok && <p className="home-empty">Zoom’s live status couldn’t load.</p>}
-        </section>
+            {chosenDays && dayEntries.length > 0 && <ul className="home-day-list" key={day}>
+              {dayEntries.map(entry => {
+                const done = entry.sessionId ? finished.get(entry.sessionId) : undefined;
+                const detail = entry.source === "zoom" ? "Zoom schedule"
+                  : entry.state === "ended" && done ? joinedLabel(done) : null;
+                return <li key={entry.key} className={`home-entry home-entry-${entry.state}`}>
+                  <Link href={entry.href}>
+                    <span className="home-entry-time">{timeRange(entry)}</span>
+                    <span className="home-entry-copy">
+                      <OneLineTitle text={entry.title} />
+                      {detail && <span className="home-entry-meta">{detail}</span>}
+                    </span>
+                    <span className={`home-state home-state-${entry.state}`}>{entryStateLabels[entry.state]}</span>
+                  </Link>
+                </li>;
+              })}
+            </ul>}
+            {chosenDays && dayEntries.length === 0 && <p className="home-empty">No classes on this day.</p>}
+            {!chosenDays && <p className="home-empty">{calendar.status === 403 ? "Your role has no classes." : "Classes couldn’t load. Please reload shortly."}</p>}
+            {monitors && !monitors.ok && <p className="home-empty">Zoom’s live status couldn’t load.</p>}
+          </section>
 
-        <Suspense fallback={<section className="home-card home-chart" aria-label="Attendance for the last 5 classes">
-          <p className="home-empty">Loading recent attendance…</p>
-        </section>}>
-          <RecentAttendanceChart attendance={recentAttendance} />
-        </Suspense>
+          <Suspense fallback={<section className="home-card home-chart" aria-label="Attendance for the last 5 classes">
+            <p className="home-empty">Loading recent attendance…</p>
+          </section>}>
+            <RecentAttendanceChart attendance={recentAttendance} />
+          </Suspense>
+        </div>
         <section className="home-card home-calendar" aria-labelledby="calendar-title">
           <div className="home-stepper">
             <Link scroll={false} className="home-step" href={href({ month: shiftMonth(month, -1) })}
@@ -267,8 +271,9 @@ async function RecentAttendanceChart({ attendance }: { attendance: RecentAttenda
   </section>;
 }
 
-function LiveRow({ entry, numbers, now }: { entry: DayEntry; numbers: LiveNumbers | null; now: number }) {
-  return <article className="live-row" aria-label={`${entryStateLabels[entry.state]}: ${entry.title}`}>
+function LiveRow({ entry, numbers, now, sampledAt }: { entry: DayEntry; numbers: LiveNumbers | null; now: number; sampledAt: number }) {
+  const showChart = entry.sessionId != null;
+  return <article className={`live-row${showChart ? " live-row-chart" : ""}`} aria-label={`${entryStateLabels[entry.state]}: ${entry.title}`}>
     <span className={`live-badge ${entry.state === "live" ? "" : "live-badge-now"}`}>
       <span className="live-dot" aria-hidden="true" />{entry.state === "live" ? "Live" : "In progress"}
     </span>
@@ -281,5 +286,8 @@ function LiveRow({ entry, numbers, now }: { entry: DayEntry; numbers: LiveNumber
       <div><dt>Attendance</dt><dd>{numbers.percent == null ? "—" : `${numbers.percent}%`}</dd></div>
       <div><dt>Online</dt><dd>{numbers.connectedNow}</dd></div>
     </dl> : <p className="live-row-note">Live numbers couldn’t load.</p>}
+    {entry.sessionId && <div className="live-online-slot">
+      <LiveOnlineChart sessionId={entry.sessionId} connectedNow={numbers?.connectedNow ?? null} sampledAt={sampledAt} />
+    </div>}
   </article>;
 }

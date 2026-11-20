@@ -81,6 +81,23 @@ test.describe("Staff home", () => {
         expect(metricBox.x + metricBox.width).toBeLessThanOrEqual(lastBox.x + lastBox.width);
         expect(metricBox.y + metricBox.height).toBeLessThanOrEqual(lastBox.y + lastBox.height);
       }
+      const daySchedule = page.getByRole("region", { name: /^Classes on Today/ });
+      const attendance = page.getByRole("region", { name: "Attendance for the last 5 classes" });
+      const monthCalendar = page.getByRole("region", { name: /^[A-Z][a-z]+ \d{4}$/ });
+      await expect(attendance.getByRole("listitem").first()).toBeVisible();
+      const [dayPanel, attendancePanel, calendarPanel] = (await Promise.all([
+        daySchedule.boundingBox(), attendance.boundingBox(), monthCalendar.boundingBox(),
+      ])).map(rect => rect!);
+      expect(Math.abs(dayPanel.x - attendancePanel.x)).toBeLessThanOrEqual(1);
+      expect(dayPanel.y + dayPanel.height).toBeLessThan(attendancePanel.y);
+      if (test.info().project.name === "mobile") {
+        expect(Math.abs(dayPanel.x - calendarPanel.x)).toBeLessThanOrEqual(1);
+        expect(attendancePanel.y + attendancePanel.height).toBeLessThan(calendarPanel.y);
+      } else {
+        expect(dayPanel.x + dayPanel.width).toBeLessThan(calendarPanel.x);
+        expect(Math.abs(dayPanel.y - calendarPanel.y)).toBeLessThanOrEqual(1);
+        expect(Math.abs(attendancePanel.y + attendancePanel.height - (calendarPanel.y + calendarPanel.height))).toBeLessThanOrEqual(1);
+      }
       if (test.info().project.name === "chromium") {
         const tooltip = nextCard.locator(".one-line-full");
         expect(await nextLink.locator(".one-line-text").evaluate(el => el.scrollWidth)).toBeLessThanOrEqual(
@@ -176,6 +193,50 @@ test.describe("Staff home", () => {
     await signInStaff(page, "analyst@example.invalid");
     await page.getByRole("region", { name: "Attendance by batch" }).getByRole("link", { name: "Open reports" }).click();
     await expect(page.getByRole("region", { name: "ATTENDANCE BY BATCH" })).toBeVisible();
+  });
+
+  test("the live online chart adds real counts on refresh and stops when paused", async ({ page }) => {
+    await signInStaff(page, "admin-enrolled@example.invalid");
+    const { live: run } = await api(page, "POST", "/api/v1/zoom/monitors", { webinar: "84400000001" }) as {
+      live: { classSessionId: string; connectedNow: number };
+    };
+    const onlinePath = `/__test__/zoom-online/${run.classSessionId}`;
+    await page.clock.install();
+    await page.goto("/staff");
+    const live = page.getByRole("region", { name: "Live now" });
+    const chart = live.getByRole("figure", { name: "Online over time" }).getByRole("img");
+    await expect(chart).toHaveAccessibleName(/1 observation · 12 online at /);
+    await expect(chart.locator("circle")).toHaveCount(1);
+    await expect(chart.locator("polyline")).toHaveCount(0);
+    const article = live.getByRole("article", { name: "Live: A/L Physics 2027" });
+    const articleBox = (await article.boundingBox())!;
+    const innerWidth = await live.evaluate(el => {
+      const style = getComputedStyle(el);
+      return el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+    expect(Math.abs(articleBox.width - innerWidth)).toBeLessThanOrEqual(1);
+    if (test.info().project.name === "chromium") {
+      const chartBox = (await chart.boundingBox())!;
+      expect(Math.abs(chartBox.x + chartBox.width - (articleBox.x + articleBox.width))).toBeLessThanOrEqual(1);
+    }
+
+    try {
+      const pause = live.getByRole("button", { name: "Pause" });
+      const resume = live.getByRole("button", { name: "Resume" });
+      await pause.click();
+      await expect(resume).toBeVisible();
+      await api(page, "PUT", onlinePath, { connectedNow: 17 });
+      await page.clock.fastForward(31_000);
+      await expect(chart).toHaveAccessibleName(/1 observation · 12 online at /);
+      await resume.click();
+      await expect(pause).toBeVisible();
+      await page.clock.fastForward(31_000);
+      await expect(chart).toHaveAccessibleName(/2 observations · 12 online at .* · 17 online at /);
+      await expect(chart.locator("polyline")).toHaveCount(1);
+      await expect(chart.locator("circle")).toHaveCount(2);
+    } finally {
+      await api(page, "PUT", onlinePath, { connectedNow: run.connectedNow });
+    }
   });
 
   test("shows the five most recently completed classes independently of the calendar month", async ({ page }) => {
