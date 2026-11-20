@@ -50,7 +50,7 @@ interface ClassSessionRepository extends JpaRepository<ClassSession, UUID> {
               ))
             order by s.endsAt desc, s.id desc
             """)
-    List<ClassSession> latestCompleted(@Param("academyId") UUID academyId, @Param("now") Instant now,
+    List<ClassSession> recentCompleted(@Param("academyId") UUID academyId, @Param("now") Instant now,
                                        @Param("allBatches") boolean allBatches, @Param("batchIds") Collection<UUID> batchIds,
                                        Limit limit);
 

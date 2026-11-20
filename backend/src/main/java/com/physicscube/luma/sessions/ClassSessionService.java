@@ -19,7 +19,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -97,18 +96,18 @@ public class ClassSessionService {
                                    Set<UUID> visibleBatchIds) {
     }
 
-    /** The caller's last completed class with only its readable batches. */
+    /** The caller's most recently completed classes with only their readable batches. */
     @Transactional(readOnly = true)
-    public Optional<CompletedSession> latestCompleted(CurrentAccount caller, Instant now) {
+    public List<CompletedSession> recentCompleted(CurrentAccount caller, Instant now, int limit) {
         BatchScope scope = batches.scope(caller);
         if (!scope.all() && scope.batchIds().isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
-        return sessions.latestCompleted(caller.academyId(), now, scope.all(), scope.batchIds(), Limit.of(1)).stream()
-                .findFirst()
+        return sessions.recentCompleted(caller.academyId(), now, scope.all(), scope.batchIds(), Limit.of(limit)).stream()
                 .map(session -> new CompletedSession(session.getId(), session.getTitle(), session.getEndsAt(),
                         session.getTimeZone(), session.localDate(), session.batchIds().stream()
-                                .filter(scope::includes).collect(Collectors.toUnmodifiableSet())));
+                                .filter(scope::includes).collect(Collectors.toUnmodifiableSet())))
+                .toList();
     }
 
     /**

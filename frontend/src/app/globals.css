@@ -594,7 +594,6 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .home-card-head h2 { color:var(--ink); font-size:16px; font-weight:700; }
 .home-card-head p { color:var(--ink-3); font-size:13px; margin-top:2px; }
 .home-empty { padding:14px 2px 2px; color:var(--ink-3); font-size:14px; }
-.home-note { margin-top:10px; color:var(--ink-3); font-size:12px; }
 
 /* Class summaries at the top of Staff Home */
 .home-brief { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
@@ -658,14 +657,17 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .home-state-upcoming { color:var(--pca-blue); }
 .home-state-upcoming::before { background:var(--pca-blue); }
 
-/* Monthly attendance average */
-.month-attendance { margin-top:16px; }
-.month-attendance-summary { display:flex; align-items:baseline; gap:12px; margin-bottom:8px; color:var(--ink-3); font-size:13px; }
-.month-attendance-summary strong { color:var(--ink); font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; }
-.month-attendance-bar { appearance:none; display:block; width:100%; height:14px; overflow:hidden; border:0; border-radius:999px; background:#e6ebf1; }
-.month-attendance-bar::-webkit-meter-bar { height:100%; background:#e6ebf1; border:0; border-radius:999px; }
-.month-attendance-bar::-webkit-meter-optimum-value { background:var(--pca-blue); border-radius:999px; }
-.month-attendance-bar::-moz-meter-bar { background:var(--pca-blue); border-radius:999px; }
+/* Recent class attendance */
+.recent-attendance { display:grid; gap:14px; margin-top:14px; }
+.recent-attendance-title { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:baseline; gap:12px; color:var(--ink); font-size:14px; }
+.recent-attendance-title a { display:block; min-width:0; font-weight:600; }
+.recent-attendance-title a:hover { color:var(--pca-blue); }
+.recent-attendance-title strong { font-variant-numeric:tabular-nums; }
+.recent-attendance-meta { margin:2px 0 6px; color:var(--ink-3); font-size:12px; }
+.recent-attendance-bar { appearance:none; display:block; width:100%; height:8px; overflow:hidden; border:0; border-radius:999px; background:#e6ebf1; }
+.recent-attendance-bar::-webkit-meter-bar { height:100%; background:#e6ebf1; border:0; border-radius:999px; }
+.recent-attendance-bar::-webkit-meter-optimum-value { background:var(--pca-blue); border-radius:999px; }
+.recent-attendance-bar::-moz-meter-bar { background:var(--pca-blue); border-radius:999px; }
 
 /* Titles kept to one line; the full title shows in a small card on hover or keyboard focus when it is cut off */
 .one-line { display:block; min-width:0; }

@@ -1867,17 +1867,26 @@ paths:
           description: The latest completed class and its counts
           content:
             application/json:
-              schema:
-                type: object
-                required: [id, title, endsAt, timeZone, expected, joined]
-                properties:
-                  id: {type: string, format: uuid}
-                  title: {type: string}
-                  endsAt: {type: string, format: date-time}
-                  timeZone: {type: string}
-                  expected: {type: integer, minimum: 0}
-                  joined: {type: integer, minimum: 0}
+              schema: {$ref: '#/components/schemas/CompletedClassAttendance'}
         '204': {description: No completed class visible to the caller}
+        '401': {description: Sign-in required}
+        '403': {description: Staff role with class access required}
+  /api/v1/attendance/recent-completed:
+    get:
+      summary: Up to five recent completed classes visible to staff with joined and expected counts
+      description: Non-cancelled classes ordered by end time from newest to oldest. For a shared class, only students in batches visible to the caller are counted. Joined counts expected students with matched Zoom visits, counting rejoins once.
+      operationId: recentCompletedAttendanceClasses
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: The visible completed classes and their counts, or an empty array
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 5
+                items: {$ref: '#/components/schemas/CompletedClassAttendance'}
         '401': {description: Sign-in required}
         '403': {description: Staff role with class access required}
   /api/v1/students/{studentId}/attendance-overview:
@@ -1899,6 +1908,16 @@ paths:
     get: {summary: "The Zoom run behind a class: Zoom's schedule (display only) beside the actual start and end, live counts and report status (staff who may open the class)", operationId: classZoomRun, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: "webinarId, topic, occurrenceUuid, state, firstSeenAt, actualStartedAt, actualEndedAt, scheduledStartAt, reported, connectedNow, people, academyClassName, classResolved"}, '204': {description: Not created by a Zoom run}, '404': {description: No such class or not visible}}}
 components:
   schemas:
+    CompletedClassAttendance:
+      type: object
+      required: [id, title, endsAt, timeZone, expected, joined]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string}
+        endsAt: {type: string, format: date-time}
+        timeZone: {type: string}
+        expected: {type: integer, minimum: 0}
+        joined: {type: integer, minimum: 0}
     AttendancePolicy:
       type: object
       required: [minConnectedPercent, lateAfterMinutes, description, version, updatedAt]

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calendarEntries, chosenDay, chosenMonth, gridRange, heldRange, homeHref, joinedLabel, liveNumbers, longDayLabel, monthLabel,
-  monthWeeks, monthlyAttendance, nextEntry, relativeDayName, shiftMonth, shortDayLabel, startedAgoLabel, startsInLabel, timeRange } from "../src/lib/staff-home.ts";
+import { calendarEntries, chosenDay, chosenMonth, gridRange, homeHref, joinedLabel, liveNumbers, longDayLabel, monthLabel,
+  monthWeeks, nextEntry, relativeDayName, shiftMonth, shortDayLabel, startedAgoLabel, startsInLabel, timeRange } from "../src/lib/staff-home.ts";
 
 const session = (over) => ({ id: "s1", title: "Class", startsAt: "2026-11-20T10:30:00Z", endsAt: "2026-11-20T12:00:00Z",
   timeZone: "Asia/Colombo", localDate: "2026-11-20", status: "SCHEDULED", zoomWebinarId: null, batches: [], version: 0, origin: "LUMA", ...over });
@@ -18,6 +18,7 @@ test("the chosen day and month fall back to today and the day's month", () => {
   assert.equal(shiftMonth("2026-01", -1), "2025-12");
   assert.equal(monthLabel("2026-11"), "November 2026");
   assert.equal(longDayLabel("2026-11-20"), "Friday 20 November 2026");
+  assert.equal(shortDayLabel("2026-11-20"), "Fri 20 Nov");
 });
 
 test("the calendar is whole Monday-to-Sunday weeks, and one request covers its grid in academy time", () => {
@@ -87,22 +88,4 @@ test("home links leave out what would only repeat today", () => {
   assert.equal(homeHref({ day: "2026-11-20", month: "2026-11" }, "2026-11-20"), "/staff");
   assert.equal(homeHref({ day: "2026-11-21", month: "2026-11" }, "2026-11-20"), "/staff?day=2026-11-21");
   assert.equal(homeHref({ day: "2026-11-20", month: "2026-12" }, "2026-11-20"), "/staff?month=2026-12");
-});
-
-test("the month attendance range stops today and skips future months", () => {
-  assert.deepEqual(heldRange("2026-11", "2026-11-20"), { from: "2026-11-01", to: "2026-11-20" });
-  assert.deepEqual(heldRange("2026-10", "2026-11-20"), { from: "2026-10-01", to: "2026-10-31" });
-  assert.equal(heldRange("2026-12", "2026-11-20"), null);
-  assert.equal(shortDayLabel("2026-11-20"), "Fri 20 Nov");
-});
-
-test("monthly attendance gives each class equal weight and rounds once", () => {
-  assert.deepEqual(monthlyAttendance([
-    { expected: 6, joined: 1 },
-    { expected: 25, joined: 1 },
-    { expected: 0, joined: 0 },
-  ]), { average: 10, classes: 2, withoutStudents: 1 });
-  assert.deepEqual(monthlyAttendance([{ expected: 8, joined: 0 }]), { average: 0, classes: 1, withoutStudents: 0 });
-  assert.deepEqual(monthlyAttendance([{ expected: 0, joined: 0 }]), { average: null, classes: 0, withoutStudents: 1 });
-  assert.deepEqual(monthlyAttendance([]), { average: null, classes: 0, withoutStudents: 0 });
 });

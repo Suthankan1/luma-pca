@@ -2,8 +2,8 @@ package com.physicscube.luma.attendance.web;
 
 import com.physicscube.luma.attendance.AttendanceInsightsService;
 import com.physicscube.luma.attendance.AttendanceInsightsService.ClassTotals;
+import com.physicscube.luma.attendance.AttendanceInsightsService.CompletedClassAttendance;
 import com.physicscube.luma.attendance.AttendanceInsightsService.Dashboard;
-import com.physicscube.luma.attendance.AttendanceInsightsService.LatestCompletedClass;
 import com.physicscube.luma.attendance.AttendanceInsightsService.StudentOverview;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import java.time.LocalDate;
@@ -43,9 +43,14 @@ class AttendanceInsightsController {
     }
 
     @GetMapping("/api/v1/attendance/latest-completed")
-    ResponseEntity<LatestCompletedClass> latestCompleted(JwtAuthenticationToken authentication) {
+    ResponseEntity<CompletedClassAttendance> latestCompleted(JwtAuthenticationToken authentication) {
         return insights.latestCompleted(CurrentAccount.from(authentication)).map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/api/v1/attendance/recent-completed")
+    List<CompletedClassAttendance> recentCompleted(JwtAuthenticationToken authentication) {
+        return insights.recentCompleted(CurrentAccount.from(authentication));
     }
 
     /** Owners and administrators: one student's courses and every class, with each join and leave. */

@@ -31,7 +31,7 @@ const backend = createServer(async (req, res) => {
   if (req.url.startsWith("/api/v1/zoom/monitors") || /^\/api\/v1\/class-sessions\/[^/]+\/zoom-run$/.test(req.url)) {
     return monitorsApi(req, body, send);
   }
-  if (/^\/api\/v1\/attendance\/(dashboard|class-totals|latest-completed)(\?|$)/.test(req.url) || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
+  if (/^\/api\/v1\/attendance\/(dashboard|class-totals|latest-completed|recent-completed)(\?|$)/.test(req.url) || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
     return insightsApi(req, send);
   }
 
@@ -868,14 +868,15 @@ function insightsApi(req, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const url = new URL(req.url, "http://mock");
   const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
-  if (url.pathname === "/api/v1/attendance/class-totals" || url.pathname === "/api/v1/attendance/latest-completed") {
+  const latestOnly = url.pathname === "/api/v1/attendance/latest-completed";
+  const recentOnly = url.pathname === "/api/v1/attendance/recent-completed";
+  if (url.pathname === "/api/v1/attendance/class-totals" || latestOnly || recentOnly) {
     if (!manager && !roles.some(r => r === "INSTRUCTOR" || r === "ATTENDANCE_OFFICER")) return send(403);
-    const latestOnly = url.pathname === "/api/v1/attendance/latest-completed";
     if (!manager) return latestOnly ? send(204) : send(200, []); // No staff assignments in this fixture.
     const from = url.searchParams.get("from"), to = url.searchParams.get("to");
     const inRange = start => {
       const date = localDate(start, "Asia/Colombo");
-      return latestOnly || (from <= date && date <= to);
+      return latestOnly || recentOnly || (from <= date && date <= to);
     };
     const fixtures = INSIGHT_CLASSES.flatMap((c, i) => inRange(c.start) ? [{
       id: c.id, title: c.title, endsAt: iso(c.start, c.minutes), timeZone: "Asia/Colombo",
@@ -888,9 +889,10 @@ function insightsApi(req, send) {
       return { id: s.id, title: s.title, endsAt: s.endsAt, timeZone: s.timeZone, expected: expected.length,
         joined: expected.filter(row => row.visits > 0).length };
     })];
-    if (latestOnly) {
-      const latest = totals.sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt))[0];
-      return latest ? send(200, latest) : send(204);
+    if (latestOnly || recentOnly) {
+      totals.sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt) || b.id.localeCompare(a.id));
+      if (recentOnly) return send(200, totals.slice(0, 5));
+      return totals.length ? send(200, totals[0]) : send(204);
     }
     return send(200, totals.map(({ id, expected, joined }) => ({ id, expected, joined })));
   }

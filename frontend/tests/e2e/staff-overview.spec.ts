@@ -20,6 +20,7 @@ async function api(page: Page, method: "GET" | "POST" | "PUT", path: string, dat
 }
 
 const colomboDate = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo" }).format(new Date(ms));
+type CompletedClass = { id: string; title: string; endsAt: string; timeZone: string; expected: number; joined: number };
 
 test.describe("Staff home", () => {
   test("Managers see the day's classes, move between days, the month calendar and live numbers; other roles see their own", async ({ page }) => {
@@ -48,9 +49,7 @@ test.describe("Staff home", () => {
     });
     try {
       await page.reload();
-      const latest = await api(page, "GET", "/api/v1/attendance/latest-completed") as {
-        id: string; title: string; expected: number; joined: number;
-      };
+      const [latest] = await api(page, "GET", "/api/v1/attendance/recent-completed") as CompletedClass[];
       const recents = page.getByRole("region", { name: "Last completed class" });
       await expect(page.getByRole("region", { name: "Live now" })).toHaveCount(0);
       await expect(recents.getByRole("link", { name: latest.title, exact: true })).toHaveAttribute("href", `/staff/sessions/${latest.id}`);
@@ -136,24 +135,52 @@ test.describe("Staff home", () => {
     await signInStaff(page, "instructor@example.invalid");
     await expect(page.getByRole("region", { name: /^Classes on Today/ })).toBeVisible();
     await expect(page.getByRole("region", { name: "Needs attention" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Attendance for the last 5 classes" })).toContainText("No completed classes yet.");
 
     await signInStaff(page, "analyst@example.invalid");
     await page.getByRole("region", { name: "Attendance by batch" }).getByRole("link", { name: "Open reports" }).click();
     await expect(page.getByRole("region", { name: "ATTENDANCE BY BATCH" })).toBeVisible();
   });
 
-  test("shows one average attendance bar for the selected month", async ({ page }) => {
+  test("shows the five most recently completed classes independently of the calendar month", async ({ page }) => {
     await signInStaff(page, "admin-enrolled@example.invalid");
-    // The mock has a completed class three days ago with two of three expected students joining.
-    const latest = new Date(Date.now() - 3 * 86400_000);
-    latest.setUTCHours(3, 30, 0, 0);
-    const month = colomboDate(latest.getTime()).slice(0, 7);
-    await page.goto(`/staff?month=${month}`);
-    const chart = page.getByRole("region", { name: /^Attendance in / });
-    await expect(chart.getByRole("meter", { name: "Average attendance" })).toHaveCount(1);
-    await expect(chart.getByRole("meter")).toHaveAttribute("value", "67");
-    await expect(chart.getByText("67%", { exact: true })).toBeVisible();
-    await expect(chart.getByText(/\d+ class(?:es)? counted/)).toBeVisible();
-    await expect(chart.getByText("Attendance couldn’t load.", { exact: false })).toHaveCount(0);
+    const project = test.info().project.name.toUpperCase();
+    const course = await api(page, "POST", "/api/v1/courses", { code: `RECENT-${project}`, title: "Recent classes course" });
+    const batch = await api(page, "POST", "/api/v1/batches", { courseId: course.id, code: "RECENT", name: "Recent classes", startsOn: "2026-01-01" });
+    const day = 24 * 3600_000;
+    const endedNow = Date.now() - 60_000;
+    const monthStart = Date.parse(`${colomboDate(endedNow).slice(0, 7)}-01T00:00:00+05:30`);
+    const current = `Latest class ${project} – Model Papers for Physics | 2027 Batch & Repeaters | Full class name stays readable`;
+    const dates = [endedNow, ...[10, 11, 12, 13].map(offset => monthStart - offset * day)];
+    for (const [index, end] of dates.entries()) {
+      await api(page, "POST", "/api/v1/class-sessions", { title: index === 0 ? current : `Past class ${project} ${index}`,
+        startsAt: new Date(end - 3600_000).toISOString(), endsAt: new Date(end).toISOString(),
+        timeZone: "Asia/Colombo", batchIds: [batch.id], zoomWebinarId: null });
+    }
+    const completed = await api(page, "GET", "/api/v1/attendance/recent-completed") as CompletedClass[];
+    expect(completed).toHaveLength(5);
+    expect(completed[0].title).toBe(current);
+
+    // Open a calendar month that cannot contain these completed classes.
+    const futureMonth = colomboDate(monthStart + 45 * day).slice(0, 7);
+    await page.goto(`/staff?month=${futureMonth}`);
+    const chart = page.getByRole("region", { name: "Attendance for the last 5 classes" });
+    const rows = chart.getByRole("listitem");
+    await expect(rows).toHaveCount(5);
+    for (const [index, item] of completed.entries()) {
+      const row = rows.nth(index);
+      await expect(row.getByRole("link", { name: item.title, exact: true })).toHaveAttribute("href", `/staff/sessions/${item.id}`);
+      const date = new Intl.DateTimeFormat("en-GB", { timeZone: item.timeZone, weekday: "short", day: "numeric", month: "short" })
+        .format(new Date(item.endsAt)).replace(",", "").replace(/Sept\b/, "Sep");
+      await expect(row).toContainText(date);
+    }
+    await expect(rows.first()).toContainText("No students expected");
+    await expect(rows.first().getByText("—", { exact: true })).toBeVisible();
+    await expect(rows.first().getByRole("meter")).toHaveCount(0);
+    const electricFields = rows.filter({ has: page.getByRole("link", { name: "Electric fields", exact: true }) });
+    await expect(electricFields.getByText("67%", { exact: true })).toBeVisible();
+    await expect(electricFields).toContainText("2 of 3 joined");
+    await expect(electricFields.getByRole("meter", { name: "Electric fields attendance" })).toHaveAttribute("value", "67");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
   });
 });

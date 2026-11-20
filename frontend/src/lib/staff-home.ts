@@ -171,13 +171,20 @@ export function liveNumbers(rows: readonly AttendanceRow[], zoomConnectedNow: nu
   const expected = rows.filter(r => r.expected).length;
   const joined = rows.filter(r => r.expected && r.seen).length;
   const connectedNow = zoomConnectedNow ?? rows.filter(r => r.openVisits > 0).length;
-  return { expected, joined, connectedNow, percent: expected ? Math.round((joined * 100) / expected) : null };
+  return { expected, joined, connectedNow, percent: attendancePercent({ expected, joined }) };
+}
+
+export type ClassAttendanceTotal = { id: string; expected: number; joined: number };
+
+export function attendancePercent({ expected, joined }: Pick<ClassAttendanceTotal, "expected" | "joined">) {
+  return expected > 0 ? Math.round(joined * 100 / expected) : null;
 }
 
 /** "18 of 24 joined · 75%", from the per-class attendance totals. */
-export function joinedLabel(c: { expected: number; joined: number }) {
-  if (!c.expected) return c.joined ? `${c.joined} joined` : "No students expected";
-  return `${c.joined} of ${c.expected} joined · ${Math.round((c.joined * 100) / c.expected)}%`;
+export function joinedLabel(c: Pick<ClassAttendanceTotal, "expected" | "joined">) {
+  const percent = attendancePercent(c);
+  if (percent == null) return c.joined ? `${c.joined} joined` : "No students expected";
+  return `${c.joined} of ${c.expected} joined · ${percent}%`;
 }
 
 /** "Good morning" before noon, "Good afternoon" until five, then "Good evening", at the academy. */
@@ -193,27 +200,6 @@ export function homeHref(options: { day?: string | null; month?: string | null }
   if (options.month && options.month !== (options.day ?? today).slice(0, 7)) params.set("month", options.month);
   const query = params.toString();
   return `/staff${query ? `?${query}` : ""}`;
-}
-
-/** The days of a month that have already started at the academy, or null for a future month. */
-export function heldRange(month: string, today: string) {
-  const first = `${month}-01`;
-  if (first > today) return null;
-  const last = addDays(`${shiftMonth(month, 1)}-01`, -1);
-  return { from: first, to: last < today ? last : today };
-}
-
-export type ClassAttendanceTotal = { id: string; expected: number; joined: number };
-
-/**
- * Average the unrounded share of expected students who joined, giving each class equal weight.
- * Classes without expected students have no rate.
- */
-export function monthlyAttendance(totals: readonly Pick<ClassAttendanceTotal, "expected" | "joined">[]) {
-  const counted = totals.filter(c => c.expected > 0);
-  const sum = counted.reduce((total, c) => total + (Math.min(c.joined, c.expected) * 100) / c.expected, 0);
-  const average = counted.length ? Math.round(sum / counted.length) : null;
-  return { average, classes: counted.length, withoutStudents: totals.length - counted.length };
 }
 
 /** "Fri 20 Nov". */

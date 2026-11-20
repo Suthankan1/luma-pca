@@ -9,6 +9,7 @@ import com.physicscube.luma.enrollments.EnrollmentService.RosterRequest;
 import com.physicscube.luma.enrollments.EnrollmentView;
 import com.physicscube.luma.enrollments.ExpectedStudent;
 import com.physicscube.luma.sessions.ClassSessionService;
+import com.physicscube.luma.sessions.ClassSessionService.CompletedSession;
 import com.physicscube.luma.sessions.SessionView;
 import com.physicscube.luma.sessions.StudentClassView;
 import com.physicscube.luma.shared.api.InvalidRequestException;
@@ -52,6 +53,7 @@ public class AttendanceInsightsService {
     static final int MAX_CLASSES = 80;
     /** Classes computed at the same time: each takes database connections. */
     private static final int CONCURRENCY = 6;
+    private static final int RECENT_COMPLETED_CLASSES = 5;
 
     private final ClassSessionService sessions;
     private final ProvisionalAttendanceService facts;
@@ -129,17 +131,30 @@ public class AttendanceInsightsService {
     public record ClassTotals(UUID id, int expected, int joined) {
     }
 
-    public record LatestCompletedClass(UUID id, String title, Instant endsAt, String timeZone, int expected, int joined) {
+    public record CompletedClassAttendance(UUID id, String title, Instant endsAt, String timeZone, int expected, int joined) {
     }
 
-    public Optional<LatestCompletedClass> latestCompleted(CurrentAccount caller) {
-        return sessions.latestCompleted(caller, DbTime.now()).map(session -> {
-            RosterRequest request = new RosterRequest(session.id(), session.localDate(), session.visibleBatchIds());
-            Set<UUID> expected = enrollments.expectedStudentIds(caller.academyId(), List.of(request))
-                    .getOrDefault(session.id(), Set.of());
-            int joined = facts.countJoined(caller.academyId(), session.id(), expected);
-            return new LatestCompletedClass(session.id(), session.title(), session.endsAt(), session.timeZone(), expected.size(), joined);
-        });
+    public Optional<CompletedClassAttendance> latestCompleted(CurrentAccount caller) {
+        return recentCompleted(caller, 1).stream().findFirst();
+    }
+
+    public List<CompletedClassAttendance> recentCompleted(CurrentAccount caller) {
+        return recentCompleted(caller, RECENT_COMPLETED_CLASSES);
+    }
+
+    private List<CompletedClassAttendance> recentCompleted(CurrentAccount caller, int limit) {
+        UUID academyId = caller.academyId();
+        List<CompletedSession> completed = sessions.recentCompleted(caller, DbTime.now(), limit);
+        List<RosterRequest> requests = completed.stream()
+                .map(session -> new RosterRequest(session.id(), session.localDate(), session.visibleBatchIds())).toList();
+        Map<UUID, Set<UUID>> expectedByClass = enrollments.expectedStudentIds(academyId, requests);
+
+        List<CompletableFuture<CompletedClassAttendance>> tasks = completed.stream().map(session -> Parallel.start(() -> {
+            Set<UUID> expected = expectedByClass.getOrDefault(session.id(), Set.of());
+            int joined = facts.countJoined(academyId, session.id(), expected);
+            return new CompletedClassAttendance(session.id(), session.title(), session.endsAt(), session.timeZone(), expected.size(), joined);
+        })).toList();
+        return tasks.stream().map(Parallel::join).toList();
     }
 
     /** Counts for every completed class, limited to the caller's academy and visible batches. */

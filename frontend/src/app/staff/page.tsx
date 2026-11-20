@@ -5,13 +5,13 @@ import { LiveRefresh } from "@/components/LiveRefresh";
 import { OneLineTitle } from "@/components/staff/OneLineTitle";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
-import { staffApi } from "@/lib/staff-api";
+import { staffApi, type ApiResult } from "@/lib/staff-api";
 import { ACADEMY_TIME_ZONE, academyToday, addDays, instantParts, isAcademyManager, zonedToInstant, type ClassSession,
   type ProvisionalAttendance } from "@/lib/staff-forms";
 import { renderTime } from "@/lib/insights";
 import { type WebinarMonitor } from "@/lib/webinars";
-import { calendarEntries, chosenDay, chosenMonth, entryStateLabels, greeting, gridRange, heldRange, homeHref, joinedLabel,
-  liveNumbers, longDayLabel, monthLabel, monthWeeks, monthlyAttendance, nextEntry, relativeDayName, shiftMonth, shortDayLabel,
+import { attendancePercent, calendarEntries, chosenDay, chosenMonth, entryStateLabels, greeting, gridRange, homeHref, joinedLabel,
+  liveNumbers, longDayLabel, monthLabel, monthWeeks, nextEntry, relativeDayName, shiftMonth, shortDayLabel,
   startedAgoLabel, startsInLabel, timeRange, type ClassAttendanceTotal, type DayEntry, type LiveNumbers } from "@/lib/staff-home";
 
 const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -19,6 +19,7 @@ const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_LIVE = 3;
 const ATTENDANCE_SUMMARY_TIMEOUT_MS = 25_000;
 type CompletedClass = ClassAttendanceTotal & { title: string; endsAt: string; timeZone: string };
+type RecentAttendanceResult = Promise<ApiResult<CompletedClass[]>>;
 
 function sessionsIn(fromInstant: string, toInstant: string) {
   return staffApi<ClassSession[]>(`/api/v1/class-sessions?${new URLSearchParams({ from: fromInstant, to: toInstant })}`);
@@ -96,6 +97,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const finished = new Map(dayTotals?.ok ? dayTotals.data.map(c => [c.id, c] as const) : []);
   const href = (options: { day?: string; month?: string }) => homeHref({ day: options.day ?? day, month: options.month ?? month }, today);
   const previousDay = addDays(day, -1), nextDay = addDays(day, 1);
+  const recentAttendance = staffApi<CompletedClass[]>("/api/v1/attendance/recent-completed", undefined, ATTENDANCE_SUMMARY_TIMEOUT_MS);
 
   return <StaffShell {...shell} actions={<Link className="home-button home-button-quiet" href="/staff/dashboard">Attendance reports</Link>}>
     <div className="staff-home">
@@ -121,7 +123,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
             <Suspense fallback={<section className="home-strip home-strip-completed" aria-label="Last completed class">
               <p className="home-strip-label">Loading last completed class…</p>
             </section>}>
-              <LastCompletedClass />
+              <LastCompletedClass attendance={recentAttendance} />
             </Suspense>
           </div>}
 
@@ -164,10 +166,10 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
           {monitors && !monitors.ok && <p className="home-empty">Zoom’s live status couldn’t load.</p>}
         </section>
 
-        <Suspense fallback={<section className="home-card home-chart" aria-label="Attendance this month">
-          <p className="home-empty">Adding up this month’s attendance…</p>
+        <Suspense fallback={<section className="home-card home-chart" aria-label="Attendance for the last 5 classes">
+          <p className="home-empty">Loading recent attendance…</p>
         </section>}>
-          <MonthAttendance month={month} today={today} />
+          <RecentAttendanceChart attendance={recentAttendance} />
         </Suspense>
       </div>
 
@@ -216,10 +218,11 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   </StaffShell>;
 }
 
-async function LastCompletedClass() {
-  const result = await staffApi<CompletedClass | null>("/api/v1/attendance/latest-completed", undefined, ATTENDANCE_SUMMARY_TIMEOUT_MS);
-  const last = result.ok ? result.data : null;
+async function LastCompletedClass({ attendance }: { attendance: RecentAttendanceResult }) {
+  const result = await attendance;
+  const last = result.ok ? result.data[0] : null;
   const ended = last ? instantParts(last.endsAt, last.timeZone) : null;
+  const percent = last ? attendancePercent(last) : null;
   return <section className="home-strip home-strip-completed" aria-labelledby="last-class-title">
     <div className="home-strip-main">
       <h2 id="last-class-title" className="home-strip-label">Last completed class</h2>
@@ -231,33 +234,35 @@ async function LastCompletedClass() {
     {last && <dl className="home-completed-figures">
       <div><dt>Expected</dt><dd>{last.expected}</dd></div>
       <div><dt>Joined</dt><dd>{last.joined}</dd></div>
-      <div><dt>Attendance</dt><dd>{last.expected > 0 ? `${Math.round(last.joined * 100 / last.expected)}%` : "—"}</dd></div>
+      <div><dt>Attendance</dt><dd>{percent == null ? "—" : `${percent}%`}</dd></div>
     </dl>}
   </section>;
 }
 
-async function MonthAttendance({ month, today }: { month: string; today: string }) {
-  const range = heldRange(month, today);
-  const result = range ? await classTotals(range, ATTENDANCE_SUMMARY_TIMEOUT_MS) : null;
-  const totals = result?.ok ? monthlyAttendance(result.data) : null;
+async function RecentAttendanceChart({ attendance }: { attendance: RecentAttendanceResult }) {
+  const result = await attendance;
   return <section className="home-card home-chart" aria-labelledby="chart-title">
     <div className="home-card-head">
-      <h2 id="chart-title">Attendance in {monthLabel(month)}</h2>
-      <p>Average share of expected students who joined each completed class</p>
+      <h2 id="chart-title">Attendance for the last 5 classes</h2>
     </div>
-    {result && !result.ok && <p className="home-empty">{result.status === 403 ? "Your role has no attendance figures." : "Attendance couldn’t load. Please reload shortly."}</p>}
-    {(!range || (result?.ok && result.data.length === 0)) && <p className="home-empty">No completed classes this month.</p>}
-    {totals && totals.average == null && totals.withoutStudents > 0 && <p className="home-empty">No completed classes with expected students this month.</p>}
-    {totals && totals.average != null && <div className="month-attendance">
-      <p className="month-attendance-summary">
-        <strong>{totals.average}%</strong>
-        <span>{totals.classes} {totals.classes === 1 ? "class" : "classes"} counted</span>
-      </p>
-      <meter className="month-attendance-bar" min={0} max={100} value={totals.average} aria-label="Average attendance" />
-      {totals.withoutStudents > 0 && <p className="home-note">
-        {totals.withoutStudents} {totals.withoutStudents === 1 ? "class had" : "classes had"} no expected students.
-      </p>}
-    </div>}
+    {!result.ok ? <p className="home-empty">{result.status === 403 ? "Your role has no attendance figures." : "Attendance couldn’t load. Please reload shortly."}</p>
+      : result.data.length === 0 ? <p className="home-empty">No completed classes yet.</p>
+      : <ul className="recent-attendance">
+        {result.data.map(item => {
+          const percent = attendancePercent(item);
+          const { date } = instantParts(item.endsAt, item.timeZone);
+          return <li key={item.id}>
+            <div className="recent-attendance-title">
+              <Link href={`/staff/sessions/${item.id}`}><OneLineTitle text={item.title} /></Link>
+              <strong>{percent == null ? "—" : `${percent}%`}</strong>
+            </div>
+            <p className="recent-attendance-meta">{shortDayLabel(date)} · {item.expected > 0
+              ? `${item.joined} of ${item.expected} joined` : "No students expected"}</p>
+            {percent == null ? <span className="recent-attendance-bar" aria-hidden="true" />
+              : <meter className="recent-attendance-bar" min={0} max={100} value={percent} aria-label={`${item.title} attendance`} />}
+          </li>;
+        })}
+      </ul>}
   </section>;
 }
 
