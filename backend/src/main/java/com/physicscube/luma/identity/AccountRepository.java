@@ -29,13 +29,6 @@ interface AccountRepository extends JpaRepository<Account, UUID> {
     java.util.List<Account> withAnyRole(@Param("academyId") UUID academyId,
                                         @Param("roles") java.util.Collection<com.physicscube.luma.identity.domain.Role> roles);
 
-    @Query("""
-            select count(distinct a) from Account a join a.roles r
-            where a.academyId = :academyId and r = com.physicscube.luma.identity.domain.Role.STAFF
-              and a.status = com.physicscube.luma.identity.domain.AccountStatus.ACTIVE and a.id <> :excluded
-            """)
-    long activeStaffOtherThan(@Param("academyId") UUID academyId, @Param("excluded") UUID excluded);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Account> findWithLockById(UUID id);
 

@@ -40,9 +40,7 @@ class InvitationEmailHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     private UUID pendingTeacher(String email) {
-        HttpResponse<String> created = api.post("/api/v1/staff-accounts", "{\"email\":\"" + email + "\",\"roles\":[\"INSTRUCTOR\"]}", admin);
-        assertEquals(201, created.statusCode(), created.body());
-        return UUID.fromString((String) HttpApi.parse(created).get("id"));
+        return pendingStaff(email, academyId);
     }
 
     private HttpResponse<String> invite(String token, UUID accountId, String body) {

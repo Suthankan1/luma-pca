@@ -40,7 +40,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/courses", "/api/v1/courses/**", "/api/v1/batches", "/api/v1/batches/**",
                             "/api/v1/students", "/api/v1/students/**", "/api/v1/enrollments/**",
                             "/api/v1/class-sessions", "/api/v1/class-sessions/**",
-                            "/api/v1/staff-accounts", "/api/v1/staff-accounts/**", "/api/v1/accounts/*/invitations",
+                            "/api/v1/accounts/*/invitations",
                             "/api/v1/student-invitations", "/api/v1/student-invitations/progress", "/api/v1/student-invitations/failures", "/api/v1/audit-events",
                             "/api/v1/zoom/receipts", "/api/v1/zoom/receipts/**",
                             "/api/v1/zoom/occurrences", "/api/v1/zoom/occurrences/**", "/api/v1/zoom/occurrence-links",

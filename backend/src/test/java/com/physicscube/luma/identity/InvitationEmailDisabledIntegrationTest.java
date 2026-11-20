@@ -15,8 +15,7 @@ class InvitationEmailDisabledIntegrationTest extends StaffApiIntegrationTest {
     void emailDeliveryIsRefusedBeforeAnythingChangesAndLinksStillWork() {
         UUID academyId = academy("No Mail Academy");
         String admin = tokenFor(academyId, Role.STAFF);
-        HttpResponse<String> created = api.post("/api/v1/staff-accounts", "{\"email\":\"teacher@example.invalid\",\"roles\":[\"INSTRUCTOR\"]}", admin);
-        String id = (String) HttpApi.parse(created).get("id");
+        String id = pendingStaff("teacher@example.invalid", academyId).toString();
 
         HttpResponse<String> emailed = api.post("/api/v1/accounts/" + id + "/invitations", "{\"delivery\":\"EMAIL\"}", admin);
         assertEquals(503, emailed.statusCode());

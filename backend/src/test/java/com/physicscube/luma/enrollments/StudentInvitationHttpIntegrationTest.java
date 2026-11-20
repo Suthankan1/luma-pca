@@ -140,8 +140,7 @@ class StudentInvitationHttpIntegrationTest extends StaffApiIntegrationTest {
     void theWholeAcademySkipsThoseAlreadyInvitedUnlessResendingAndNeverStaff() {
         String linked = student("PCA-LINK", null);
         student("PCA-NEW", batch);
-        assertEquals(201, api.post("/api/v1/staff-accounts", "{\"email\":\"teacher@example.invalid\",\"roles\":[\"INSTRUCTOR\"]}", admin)
-                .statusCode());
+        pendingStaff("teacher@example.invalid", academyId);
         assertEquals(201, api.post("/api/v1/accounts/" + linked + "/invitations", "", admin).statusCode(), "a copied link, still usable");
 
         assertEquals(counts(2, 1, 0, 1), invite("{}"));

@@ -54,6 +54,26 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
         return id;
     }
 
+    /** A staff account pending activation, as the operator command creates it (there is no staff-account API). */
+    protected UUID pendingStaff(String email, UUID academyId) {
+        return accounts.register(academyId, email, Set.of(Role.STAFF)).id();
+    }
+
+    /**
+     * Runs one of the operator's runbook SQL files (docs/delivery/runbooks/sql) for an address, exactly as written
+     * there apart from the address and the psql transaction lines (the statement is atomic on its own).
+     */
+    protected void runOperatorSql(String file, String email) {
+        try {
+            String sql = java.nio.file.Files.readString(java.nio.file.Path.of("..", "docs", "delivery", "runbooks", "sql", file));
+            String statement = sql.lines().filter(line -> !line.startsWith("--") && !line.equals("BEGIN;") && !line.equals("COMMIT;"))
+                    .collect(java.util.stream.Collectors.joining("\n")).replace("person@example.com", email).strip();
+            jdbc.execute(statement.endsWith(";") ? statement.substring(0, statement.length() - 1) : statement);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
     /** Redeems an invitation over HTTP with the test passphrase; returns the HTTP status. */
     protected int activateWithInvitation(String token) {
         Map<String, String> body = new LinkedHashMap<>();
