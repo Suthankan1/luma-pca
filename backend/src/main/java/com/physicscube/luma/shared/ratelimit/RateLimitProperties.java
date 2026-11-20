@@ -7,15 +7,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /**
  * Per-client limits on the public auth routes. Defaults are generous on purpose: many
  * students share one public address behind mobile carrier NAT. Accounts have their own
- * lockout (sign-in, MFA) and hourly reset limit on top of these.
+ * sign-in lockout and hourly reset limit on top of these.
  */
 @ConfigurationProperties("luma.rate-limit")
 public record RateLimitProperties(
         @DefaultValue("true") boolean enabled,
         /** POST /auth/login. */
         @DefaultValue({"60", "PT5M"}) Rule signIn,
-        /** POST /auth/mfa/enroll and /auth/mfa/verify. */
-        @DefaultValue({"60", "PT5M"}) Rule mfa,
         /** POST /auth/activate and /auth/password-reset/confirm (redeeming a 256-bit link). */
         @DefaultValue({"30", "PT10M"}) Rule linkRedemption,
         /** POST /auth/password-reset/request: limits email sent to many addresses from one place. */

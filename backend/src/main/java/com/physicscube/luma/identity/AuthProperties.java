@@ -13,8 +13,6 @@ public record AuthProperties(
         String signingKeyPem,
         @DefaultValue List<String> verificationKeysPem,
         @DefaultValue("false") boolean ephemeralSigningKey,
-        /** Base64 of 32 random bytes; encrypts authenticator secrets at rest. */
-        String mfaEncryptionKey,
         @DefaultValue("5") int maxFailedLogins,
         @DefaultValue("PT15M") Duration lockDuration,
         /** How long an unused refresh token stays valid (idle limit). */

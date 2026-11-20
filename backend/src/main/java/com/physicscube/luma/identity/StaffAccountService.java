@@ -43,7 +43,6 @@ public class StaffAccountService {
     private final AccountRepository accounts;
     private final AccountService accountService;
     private final InvitationService invitations;
-    private final MfaService mfa;
     private final RefreshSessions sessions;
     private final AuditLog audit;
     private final JdbcTemplate jdbc;
@@ -52,12 +51,11 @@ public class StaffAccountService {
     private final MailDelivery delivery;
 
     StaffAccountService(AccountRepository accounts, AccountService accountService, InvitationService invitations,
-                        MfaService mfa, RefreshSessions sessions, AuditLog audit, JdbcTemplate jdbc,
+                        RefreshSessions sessions, AuditLog audit, JdbcTemplate jdbc,
                         MailProperties mail, AccountMailer mailer, MailDelivery delivery) {
         this.accounts = accounts;
         this.accountService = accountService;
         this.invitations = invitations;
-        this.mfa = mfa;
         this.sessions = sessions;
         this.audit = audit;
         this.jdbc = jdbc;
@@ -282,6 +280,6 @@ public class StaffAccountService {
 
     private StaffAccountView view(Account account) {
         return new StaffAccountView(account.getId(), account.getEmail(), names(account.getRoles()), account.getStatus().name(),
-                mfa.isEnrolled(account.getId()), account.getVersion(), account.getCreatedAt(), account.getPasswordHash() != null);
+                account.getVersion(), account.getCreatedAt(), account.getPasswordHash() != null);
     }
 }

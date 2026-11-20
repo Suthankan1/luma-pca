@@ -39,13 +39,13 @@ class RefreshSessions {
     }
 
     @Transactional
-    Issued start(UUID accountId, int authVersion, boolean mfaVerified) {
+    Issued start(UUID accountId, int authVersion) {
         Instant now = Instant.now();
         UUID sessionId = UUID.randomUUID();
         Instant sessionExpiry = now.plus(properties.sessionMaxLifetime());
-        jdbc.update("INSERT INTO refresh_sessions (id, account_id, auth_version, created_at, expires_at, mfa_verified) "
-                        + "VALUES (?, ?, ?, ?, ?, ?)",
-                sessionId, accountId, authVersion, Timestamp.from(now), Timestamp.from(sessionExpiry), mfaVerified);
+        jdbc.update("INSERT INTO refresh_sessions (id, account_id, auth_version, created_at, expires_at) "
+                        + "VALUES (?, ?, ?, ?, ?)",
+                sessionId, accountId, authVersion, Timestamp.from(now), Timestamp.from(sessionExpiry));
         return issue(sessionId, accountId, now, sessionExpiry);
     }
 
@@ -57,7 +57,7 @@ class RefreshSessions {
         }
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT t.id AS token_id, t.expires_at AS token_expires_at, s.id AS session_id, s.account_id,
-                       s.auth_version, s.expires_at AS session_expires_at, s.revoked_at, s.mfa_verified
+                       s.auth_version, s.expires_at AS session_expires_at, s.revoked_at
                 FROM refresh_tokens t JOIN refresh_sessions s ON s.id = t.session_id
                 WHERE t.token_hash = ? FOR UPDATE OF s
                 """, OpaqueToken.digest(presentedToken));
@@ -87,15 +87,9 @@ class RefreshSessions {
                 return null;
             }
         }
-        // Like bearer authentication, refreshing cannot continue a password-only
-        // session once its account has been promoted to an elevated role.
-        Integer currentVersion = jdbc.query("""
-                SELECT auth_version FROM accounts
-                WHERE id = ? AND status = 'ACTIVE' AND (? OR NOT EXISTS (
-                    SELECT 1 FROM account_roles WHERE account_id = accounts.id
-                      AND role IN ('ACADEMY_OWNER', 'ACADEMY_ADMIN')
-                ))
-                """, results -> results.next() ? results.getInt(1) : null, accountId, row.get("mfa_verified"));
+        // Like bearer authentication, refreshing ends with the account's status or a credential change.
+        Integer currentVersion = jdbc.query("SELECT auth_version FROM accounts WHERE id = ? AND status = 'ACTIVE'",
+                results -> results.next() ? results.getInt(1) : null, accountId);
         if (currentVersion == null || currentVersion != ((Number) row.get("auth_version")).intValue()) {
             revoke(sessionId, "ACCOUNT_CHANGED", now);
             return null;
@@ -129,20 +123,19 @@ class RefreshSessions {
         return updated;
     }
 
-    /** @return whether the current account's live session passed MFA, or {@code null} when the session is invalid */
-    @Transactional(readOnly = true)
     /** What every API request needs to know about its token's account and session, read in one database round trip. */
     record RequestAuth(UUID academyId, com.physicscube.luma.identity.domain.AccountStatus status, int authVersion,
-                       java.util.Set<com.physicscube.luma.identity.domain.Role> roles, boolean mfaVerified) {
+                       java.util.Set<com.physicscube.luma.identity.domain.Role> roles) {
     }
 
     /**
      * The account and its session together, or {@code null} when the account is gone or the session is revoked, expired or
-     * from an older auth version. Same rules as {@link AccountService#findById} plus {@link #mfaStateIfActive}, in one query.
+     * from an older auth version. Same rules as {@link AccountService#findById} plus a live-session check, in one query.
      */
+    @Transactional(readOnly = true)
     RequestAuth requestAuth(UUID sessionId, UUID accountId) {
         return jdbc.query("""
-                SELECT a.academy_id, a.status, a.auth_version, s.mfa_verified,
+                SELECT a.academy_id, a.status, a.auth_version,
                        ARRAY(SELECT r.role FROM account_roles r WHERE r.account_id = a.id) AS roles
                 FROM accounts a
                 JOIN refresh_sessions s ON s.account_id = a.id AND s.id = ? AND s.auth_version = a.auth_version
@@ -158,15 +151,8 @@ class RefreshSessions {
             }
             return new RequestAuth((UUID) results.getObject("academy_id"),
                     com.physicscube.luma.identity.domain.AccountStatus.valueOf(results.getString("status")),
-                    results.getInt("auth_version"), roles, results.getBoolean("mfa_verified"));
+                    results.getInt("auth_version"), roles);
         }, sessionId, Timestamp.from(Instant.now()), accountId);
-    }
-
-    Boolean mfaStateIfActive(UUID sessionId, UUID accountId, int authVersion) {
-        return jdbc.query("SELECT mfa_verified FROM refresh_sessions "
-                        + "WHERE id = ? AND account_id = ? AND auth_version = ? AND revoked_at IS NULL AND expires_at > ?",
-                results -> results.next() ? results.getBoolean(1) : null,
-                sessionId, accountId, authVersion, Timestamp.from(Instant.now()));
     }
 
     private void revoke(UUID sessionId, String reason, Instant now) {

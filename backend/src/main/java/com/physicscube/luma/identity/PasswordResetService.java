@@ -21,8 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Self-service password reset. A request never reveals whether the address belongs to
  * an account: the caller always gets the same answer, and the email is sent after the
  * request has finished. Only active accounts can be reset; a pending account uses its
- * invitation. Completing a reset revokes every session and clears a lockout, but not
- * MFA: owners and administrators still need their authenticator.
+ * invitation. Completing a reset revokes every session and clears a lockout.
  */
 @Service
 public class PasswordResetService {

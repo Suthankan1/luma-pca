@@ -15,8 +15,7 @@ import org.springframework.stereotype.Component;
  * A valid signature is not enough: on every request the account must still be
  * active, the token must carry its current auth version and its sign-in session must
  * not be revoked. So logout, disabling an account or changing its password all
- * reject tokens issued earlier. Owner and administrator accounts are additionally
- * accepted only on sessions that passed MFA. Authorities come from the
+ * reject tokens issued earlier. Authorities come from the
  * roles stored now, never from the token.
  */
 @Component
@@ -55,9 +54,7 @@ public class AccountJwtAuthenticationConverter implements Converter<Jwt, Abstrac
         if (auth == null || auth.status() != AccountStatus.ACTIVE
                 || !(jwt.getClaim(AccessTokenIssuer.AUTH_VERSION_CLAIM) instanceof Number version)
                 || version.longValue() != auth.authVersion()
-                || !auth.academyId().toString().equals(jwt.getClaimAsString(AccessTokenIssuer.ACADEMY_CLAIM))
-                // An account promoted to owner/admin after signing in without MFA must sign in again.
-                || (AuthService.isElevated(auth.roles()) && !auth.mfaVerified())) {
+                || !auth.academyId().toString().equals(jwt.getClaimAsString(AccessTokenIssuer.ACADEMY_CLAIM))) {
             throw new InvalidBearerTokenException("Token is no longer valid");
         }
         List<SimpleGrantedAuthority> authorities = auth.roles().stream()

@@ -100,7 +100,6 @@ class StaffAccountHttpIntegrationTest extends StaffApiIntegrationTest {
             Map<String, Object> staff = created(admin, " " + email(role.toLowerCase()).toUpperCase() + " ", role);
             assertEquals(List.of(role), staff.get("roles"));
             assertEquals("PENDING_ACTIVATION", staff.get("status"));
-            assertEquals(false, staff.get("mfaEnrolled"));
         }
         assertEquals(403, createStaff(admin, email("x"), "ACADEMY_ADMIN").statusCode());
         assertEquals(403, createStaff(admin, email("x"), "INSTRUCTOR", "ACADEMY_OWNER").statusCode());
@@ -135,8 +134,7 @@ class StaffAccountHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(3, listed.size(), "owner, admin and instructor of this academy only");
         assertTrue(listed.stream().anyMatch(a -> a.get("id").equals(instructor)));
         assertTrue(listed.stream().noneMatch(a -> a.get("id").equals(studentId)));
-        assertEquals(true, listed.stream().filter(a -> a.get("id").equals(adminId.toString())).findFirst().orElseThrow()
-                .get("mfaEnrolled"), "administrators signed in with MFA");
+        assertTrue(listed.stream().noneMatch(a -> a.containsKey("mfaEnrolled")), "there is no second factor to report");
         assertEquals(404, api.get("/api/v1/staff-accounts/" + studentId, admin).statusCode());
         assertEquals(404, setRoles(admin, studentId, 0, "INSTRUCTOR").statusCode(), "a student cannot be turned into staff");
     }

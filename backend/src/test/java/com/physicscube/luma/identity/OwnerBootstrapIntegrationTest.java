@@ -2,6 +2,7 @@ package com.physicscube.luma.identity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,7 +67,7 @@ class OwnerBootstrapIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(204, activateWithInvitation(result.token()));
         HttpResponse<String> login = passwordLogin(OWNER);
         assertEquals(200, login.statusCode(), login.body());
-        assertEquals(true, HttpApi.parse(login).get("mfaRequired"), "owners must set up two-step sign-in");
+        assertNotNull(HttpApi.parse(login).get("accessToken"), "owners sign in with their password alone");
     }
 
     @Test

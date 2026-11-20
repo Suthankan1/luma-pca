@@ -42,15 +42,15 @@ class AccountJwtAuthenticationConverterTest {
                 AccessTokenIssuer.ACADEMY_CLAIM, academy.toString()));
     }
 
-    private void found(AccountStatus status, Set<Role> roles, boolean mfa) {
+    private void found(AccountStatus status, Set<Role> roles) {
         when(refreshSessions.requestAuth(sessionId, accountId))
-                .thenReturn(new RefreshSessions.RequestAuth(academyId, status, (int) authVersion, roles, mfa));
+                .thenReturn(new RefreshSessions.RequestAuth(academyId, status, (int) authVersion, roles));
     }
 
     @Test
     @DisplayName("A valid token for an active account gets the roles stored now")
     void convertsValidToken() {
-        found(AccountStatus.ACTIVE, Set.of(Role.INSTRUCTOR), true);
+        found(AccountStatus.ACTIVE, Set.of(Role.INSTRUCTOR));
         Authentication auth = converter.convert(jwt(authVersion, academyId));
         assertThat(auth.getName()).isEqualTo(accountId.toString());
         assertThat(auth.getAuthorities()).extracting(Object::toString).containsExactly("ROLE_INSTRUCTOR");
@@ -59,23 +59,22 @@ class AccountJwtAuthenticationConverterTest {
     @Test
     @DisplayName("Disabled accounts, ended sessions, old auth versions and other academies are refused")
     void refusals() {
-        found(AccountStatus.DISABLED, Set.of(Role.INSTRUCTOR), true);
+        found(AccountStatus.DISABLED, Set.of(Role.INSTRUCTOR));
         assertThatThrownBy(() -> converter.convert(jwt(authVersion, academyId))).isInstanceOf(InvalidBearerTokenException.class);
 
         when(refreshSessions.requestAuth(sessionId, accountId)).thenReturn(null); // revoked, expired, or account gone
         assertThatThrownBy(() -> converter.convert(jwt(authVersion, academyId))).isInstanceOf(InvalidBearerTokenException.class);
 
-        found(AccountStatus.ACTIVE, Set.of(Role.INSTRUCTOR), true);
+        found(AccountStatus.ACTIVE, Set.of(Role.INSTRUCTOR));
         assertThatThrownBy(() -> converter.convert(jwt(authVersion + 1, academyId))).isInstanceOf(InvalidBearerTokenException.class);
         assertThatThrownBy(() -> converter.convert(jwt(authVersion, UUID.randomUUID()))).isInstanceOf(InvalidBearerTokenException.class);
     }
 
     @Test
-    @DisplayName("Owners and administrators need a session that passed MFA")
-    void elevatedNeedsMfa() {
-        found(AccountStatus.ACTIVE, Set.of(Role.ACADEMY_ADMIN), false);
-        assertThatThrownBy(() -> converter.convert(jwt(authVersion, academyId))).isInstanceOf(InvalidBearerTokenException.class);
-        found(AccountStatus.ACTIVE, Set.of(Role.ACADEMY_ADMIN), true);
-        assertThat(converter.convert(jwt(authVersion, academyId)).getAuthorities()).hasSize(1);
+    @DisplayName("Owners and administrators are accepted on any live password session")
+    void elevatedNeedsOnlyALiveSession() {
+        found(AccountStatus.ACTIVE, Set.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN));
+        assertThat(converter.convert(jwt(authVersion, academyId)).getAuthorities()).extracting(Object::toString)
+                .containsExactlyInAnyOrder("ROLE_ACADEMY_OWNER", "ROLE_ACADEMY_ADMIN");
     }
 }

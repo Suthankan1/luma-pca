@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
 
 /** Heavier signed-in actions are limited per account (429 with Retry-After); other accounts are unaffected. */
-@TestPropertySource(properties = {"luma.rate-limit.enabled=true", "luma.rate-limit.sign-in.limit=1000", "luma.rate-limit.mfa.limit=1000",
+@TestPropertySource(properties = {"luma.rate-limit.enabled=true", "luma.rate-limit.sign-in.limit=1000",
         "luma.rate-limit.heavy-staff.limit=2"})
 class AccountRateLimitIntegrationTest extends StaffApiIntegrationTest {
     @Test

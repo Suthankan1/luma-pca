@@ -1,8 +1,8 @@
 package com.physicscube.luma.students;
 
 import com.physicscube.luma.identity.AuthService;
-import com.physicscube.luma.identity.AuthService.LoginOutcome;
 import com.physicscube.luma.identity.InvalidCredentialsException;
+import com.physicscube.luma.identity.SessionTokens;
 import com.physicscube.luma.shared.api.Codes;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
 import java.nio.charset.StandardCharsets;
@@ -37,7 +37,7 @@ public class StudentIdLoginService {
         return properties.enabled() && properties.academyId() != null;
     }
 
-    public LoginOutcome login(String studentId, String password) {
+    public SessionTokens login(String studentId, String password) {
         if (!enabled()) {
             throw new ResourceNotFoundException("Route");
         }

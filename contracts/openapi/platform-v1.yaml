@@ -4,7 +4,7 @@ info:
   version: 0.1.0-bootstrap
   description: |
     Endpoints without x-implementation-status are implemented and tested: system status,
-    auth login/refresh/logout/logout-all/activate/me and MFA enroll/verify/reset, JWKS, courses, batches, students, enrollments, staff assignments, class sessions, staff administration, invitations, own-record routes, the Zoom webhook ingress, receipt operations and occurrence linking. Endpoints marked "planned" are proposal inventory,
+    auth login/refresh/logout/logout-all/activate/me, JWKS, courses, batches, students, enrollments, staff assignments, class sessions, staff administration, invitations, own-record routes, the Zoom webhook ingress, receipt operations and occurrence linking. Endpoints marked "planned" are proposal inventory,
     not production guarantees.
 servers:
   - url: http://localhost:8080
@@ -23,7 +23,7 @@ paths:
                 $ref: '#/components/schemas/SystemStatus'
   /api/v1/auth/login:
     post:
-      summary: Password sign-in for a session or MFA challenge (implemented)
+      summary: Email and password sign-in for a session, every role (implemented)
       operationId: login
       tags: [Identity]
       requestBody:
@@ -38,13 +38,11 @@ paths:
                 password: {type: string, maxLength: 256, writeOnly: true}
       responses:
         '200':
-          description: Tokens, or an MFA challenge for accounts that need a second factor
+          description: Session tokens
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/AccessTokenResponse'
-                  - $ref: '#/components/schemas/MfaRequiredResponse'
+                $ref: '#/components/schemas/AccessTokenResponse'
         '400': {description: Malformed request}
         '401': {description: Invalid credentials. Identical for unknown email, wrong password, inactive and locked accounts}
         '429': {description: Too many attempts from this client (per-visitor limit); see the Retry-After header}
@@ -94,7 +92,7 @@ paths:
   /api/v1/auth/password-reset/confirm:
     post:
       summary: Set a new password with an emailed reset token (implemented)
-      description: Ends every session of the account and clears a lockout. MFA is unchanged.
+      description: Ends every session of the account and clears a lockout.
       operationId: confirmPasswordReset
       tags: [Identity]
       requestBody:
@@ -133,90 +131,12 @@ paths:
       tags: [Identity]
       responses:
         '200': {description: JWK Set containing public RSA keys only}
-  /api/v1/auth/mfa/enroll:
-    post:
-      summary: Start authenticator enrolment for an account that needs MFA (implemented)
-      operationId: enrollMfa
-      tags: [Identity]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [mfaToken]
-              properties:
-                mfaToken: {type: string, maxLength: 128, writeOnly: true}
-      responses:
-        '200':
-          description: Secret to load into an authenticator app; replaces any unconfirmed secret
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [secret, otpauthUri]
-                properties:
-                  secret: {type: string, description: Base32}
-                  otpauthUri: {type: string}
-        '400': {description: Malformed request}
-        '401': {description: 'Challenge unusable, or the account already has a confirmed authenticator'}
-        '429': {description: Too many attempts from this client (per-visitor limit); see the Retry-After header}
-  /api/v1/auth/mfa/verify:
-    post:
-      summary: Complete sign-in with an authenticator or recovery code (implemented)
-      operationId: verifyMfa
-      tags: [Identity]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [mfaToken, code]
-              properties:
-                mfaToken: {type: string, maxLength: 128, writeOnly: true}
-                code: {type: string, maxLength: 32, description: 6-digit code or a recovery code}
-      responses:
-        '200':
-          description: Tokens; recoveryCodes is set only when this call completed enrolment
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AccessTokenResponse'
-                  - type: object
-                    properties:
-                      recoveryCodes: {type: [array, 'null'], items: {type: string}}
-        '400': {description: Malformed request}
-        '401': {description: Unusable challenge or rejected code (indistinguishable)}
-        '429': {description: Too many attempts from this client (per-visitor limit); see the Retry-After header}
-  /api/v1/auth/mfa/reset:
-    post:
-      summary: Remove the caller's authenticator and end all their sessions (implemented)
-      description: An enrolled account must use a live MFA-verified session.
-      operationId: resetMfa
-      tags: [Identity]
-      security: [{bearerAuth: []}]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [password]
-              properties:
-                password: {type: string, maxLength: 256, writeOnly: true}
-      responses:
-        '204': {description: Authenticator removed; next sign-in enrols again}
-        '400': {description: Malformed request}
-        '401': {description: Invalid session or failed password recheck}
   /api/v1/auth/refresh:
     post:
       summary: Exchange a refresh token for a new token pair (implemented)
       description: >-
         Refresh tokens are single-use. Presenting an exchanged token revokes
-        the session. An account promoted to owner or administrator must
-        complete MFA before it can refresh a session.
+        the session. Disabling the account or changing its password ends it.
       operationId: refreshSession
       tags: [Identity]
       requestBody:
@@ -733,8 +653,7 @@ paths:
     post:
       summary: Re-enable a disabled staff account (implemented; owner/admin, only an owner for owner or administrator accounts)
       description: >-
-        The account becomes ACTIVE with its existing password (and two-step sign-in, if
-        enrolled), or PENDING_ACTIVATION when requireNewPassword is true or it never had a
+        The account becomes ACTIVE with its existing password, or PENDING_ACTIVATION when requireNewPassword is true or it never had a
         password; then the old password is removed and any open invitation revoked, so an
         invitation is needed. Sessions and tokens ended by the disable stay invalid; lockout is
         cleared. Enabling an account that is not disabled changes nothing. Audited.
@@ -1900,7 +1819,7 @@ paths:
         '503': {description: Receipt could not be stored; Zoom retries 5xx}
   /api/v1/auth/student-id-login:
     get: {summary: "Whether the Academy-requested student ID sign-in is switched on (ACAD-2)", operationId: studentIdLoginAvailability, tags: [Identity], responses: {'200': {description: "enabled"}}}
-    post: {summary: "Academy-requested student sign-in: the student ID is username and password. Weak by design; off unless LUMA_STUDENT_ID_LOGIN_ENABLED; students only (ACAD-2)", operationId: studentIdLogin, tags: [Identity], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [studentId, password], properties: {studentId: {type: string, maxLength: 60}, password: {type: string, maxLength: 60, writeOnly: true}}}}}}, responses: {'200': {description: "Tokens (as /auth/login), or an MFA challenge when the student added an authenticator"}, '400': {description: Malformed request}, '401': {description: "Refused. Identical for unknown ID, wrong password, deactivated student, staff account and another academy"}, '404': {description: Switched off}, '429': {description: Too many attempts from this client}}}
+    post: {summary: "Academy-requested student sign-in: the student ID is username and password. Weak by design; off unless LUMA_STUDENT_ID_LOGIN_ENABLED; students only (ACAD-2)", operationId: studentIdLogin, tags: [Identity], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [studentId, password], properties: {studentId: {type: string, maxLength: 60}, password: {type: string, maxLength: 60, writeOnly: true}}}}}}, responses: {'200': {description: "Tokens (as /auth/login)"}, '400': {description: Malformed request}, '401': {description: "Refused. Identical for unknown ID, wrong password, deactivated student, staff account and another academy"}, '404': {description: Switched off}, '429': {description: Too many attempts from this client}}}
   /api/v1/academy/classes:
     get: {summary: "The Academy's classes from its own database (read-only): distinct-student counts and the linked LUMA batch (managers; ACAD-1)", operationId: listAcademyClasses, tags: [Academy], security: [{bearerAuth: []}], responses: {'200': {description: "className, studentCount, batch (null until linked)"}, '403': {description: Not an owner or administrator}, '503': {description: The Academy database is not connected or unreachable}}}
   /api/v1/academy/classes/link:
@@ -1965,14 +1884,6 @@ components:
         refreshToken: {type: string, description: Opaque single-use token}
         refreshExpiresIn: {type: integer, description: Seconds, example: 604800}
       required: [accessToken, tokenType, expiresIn, refreshToken, refreshExpiresIn]
-    MfaRequiredResponse:
-      type: object
-      required: [mfaRequired, mfaToken, mfaExpiresIn, mfaEnrolled]
-      properties:
-        mfaRequired: {type: boolean, const: true}
-        mfaToken: {type: string, description: Short-lived challenge consumed on successful verification}
-        mfaExpiresIn: {type: integer, description: Seconds, example: 300}
-        mfaEnrolled: {type: boolean, description: False means the client must call mfa/enroll first}
     RefreshTokenRequest:
       type: object
       required: [refreshToken]
@@ -2107,13 +2018,12 @@ components:
       enum: [ACADEMY_OWNER, ACADEMY_ADMIN, INSTRUCTOR, ATTENDANCE_OFFICER, ANALYST]
     StaffAccount:
       type: object
-      required: [id, email, roles, status, mfaEnrolled, version, createdAt]
+      required: [id, email, roles, status, version, createdAt]
       properties:
         id: {type: string, format: uuid}
         email: {type: string}
         roles: {type: array, items: {$ref: '#/components/schemas/StaffRole'}}
         status: {type: string, enum: [PENDING_ACTIVATION, ACTIVE, DISABLED]}
-        mfaEnrolled: {type: boolean}
         version: {type: integer}
         createdAt: {type: string, format: date-time}
     ZoomOccurrence:
