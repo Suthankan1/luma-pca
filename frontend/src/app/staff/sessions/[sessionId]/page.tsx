@@ -18,6 +18,7 @@ import {
 } from "@/lib/staff-forms";
 
 export const metadata = { title: "Class · LUMA" };
+const attendanceTimeoutMs = 25_000;
 
 /** One class for staff: its students, Zoom run, attendance (with corrections) and engagement questions. */
 export default async function SessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
@@ -27,7 +28,7 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   const [session, zoom, attendance, engagement, zoomRun] = await Promise.all([
     staffApi<ClassSession>(`/api/v1/class-sessions/${sessionId}`),
     staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?decided=true&sessionId=${sessionId}&limit=50`),
-    staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${sessionId}/attendance?includeOnlineHistory=true`),
+    staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${sessionId}/attendance?includeOnlineHistory=true`, undefined, attendanceTimeoutMs),
     staffApi<ClassEngagement>(`/api/v1/class-sessions/${sessionId}/engagement`),
     staffApi<ClassRun | null>(`/api/v1/class-sessions/${sessionId}/zoom-run`),
   ]);
@@ -87,8 +88,8 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
     {facts && <SessionOnlineTimeline history={facts.onlineHistory ?? []} start={sessionStart} end={chartEnd}
       endLabel={actualEnd ? "End" : runningWindow ? "Now" : showLastSample ? "Last sample" : "Scheduled end"} timeZone={s.timeZone} />}
     <section className="panel panel-gap" aria-labelledby="attendance-title">
-      <h2 id="attendance-title" className="panel-title">{attendance.ok && attendance.data.finalisedAt ? "FINAL ATTENDANCE"
-        : attendance.ok && attendance.data.status === "RECONCILED" ? "ATTENDANCE FROM ZOOM’S REPORT" : "PROVISIONAL ATTENDANCE"}</h2>
+      <h2 id="attendance-title" className="panel-title">{!attendance.ok ? "ATTENDANCE" : finalised ? "FINAL ATTENDANCE"
+        : attendance.data.status === "RECONCILED" ? "ATTENDANCE FROM ZOOM’S REPORT" : "PROVISIONAL ATTENDANCE"}</h2>
       {!attendance.ok ? <p className="session-error" role="alert">We couldn’t load attendance right now. Please reload shortly.</p> : <>
         {!finalised && <p className="panel-sub">{attendance.data.status === "RECONCILED"
           ? "From Zoom’s participant report, fetched after the webinar ended. No present or absent decision is made until finalisation."
