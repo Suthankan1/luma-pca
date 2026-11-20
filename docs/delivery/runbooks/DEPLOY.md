@@ -21,7 +21,8 @@ terraform apply plan.bin
 
 ## After the first apply (secrets are never in Terraform or Git)
 Put values into the secret containers Terraform created (`luma-staging/...`):
-- `auth-signing-key` (PEM, ES256 private key), `auth-mfa-encryption-key`, `session-key` (32 random bytes, base64url);
+- `auth-signing-key` (PEM, ES256 private key), `session-key` (32 random bytes, base64url); `auth-mfa-encryption-key` is no
+  longer read by the API (MFA removed 2026-11-20) and can stay empty;
 - `zoom-api` (JSON `account_id`, `client_id`, `client_secret`), `zoom-webhook` (the Zoom app's secret token);
 - `mail` (JSON `username`, `password`).
 Then `aws ecs update-service --force-new-deployment` for `api` and `web`, wait for both to be healthy, and:

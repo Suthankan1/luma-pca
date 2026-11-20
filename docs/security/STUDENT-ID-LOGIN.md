@@ -20,7 +20,7 @@ protect staff accounts in any way.
   `LUMA_STUDENT_ID_LOGIN_ACADEMY_ID`, defaulting to the Zoom webhook academy) and in the web app. While off, the API
   answers 404 and the sign-in page shows only the email form.
 - **Students only:** the session is opened only for an account whose **sole** role is `STUDENT`. An account with any
-  staff role is refused, even if it also has a student record. Staff keep email + password + MFA.
+  staff role is refused, even if it also has a student record. Staff keep email + password.
 - **Same refusal for everything:** unknown ID, wrong password, deactivated student, disabled account, staff account,
   another academy's student → the same 401 and message.
 - **Rate limited:** shares the per-client sign-in allowance with email sign-in (default 60 per 5 minutes; set lower
@@ -31,7 +31,6 @@ protect staff accounts in any way.
 - **Own data only:** a student session can only read the caller's own record, classes and attendance; every staff
   route answers 403 (tested: `StudentIdLoginHttpIntegrationTest`).
 - **Email sign-in stays closed:** an account activated this way gets a random password nobody knows.
-- **A student's own authenticator is honoured:** if a student added one, they are still asked for it.
 
 ## Before switching it on in production
 

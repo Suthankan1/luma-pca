@@ -6,8 +6,8 @@ it deliberately does not do: [docs/delivery/KNOWN-LIMITS.md](docs/delivery/KNOWN
 
 A course- and batch-aware Zoom Webinar attendance and engagement platform for Physics Cube Academy. What it does:
 
-- **Accounts and access:** staff and student sign-in (RS256 JWTs, rotating refresh sessions in HttpOnly cookies, TOTP MFA
-  with recovery codes for every staff role), invitations, password reset and password change, per-visitor and per-account
+- **Accounts and access:** staff and student sign-in with email and password, no second factor (RS256 JWTs, rotating
+  refresh sessions in HttpOnly cookies), invitations, password reset and password change, per-visitor and per-account
   rate limits, account lockout; roles scoped to the academy, assigned batches, or the student's own data on every route.
 - **Academic data:** courses, batches, students (CSV import, or synced read-only from the Academy's own database by class),
   enrolments, staff assignments, bulk invitation emails, an append-only activity log.
@@ -47,7 +47,7 @@ Do not onboard real students until the academy's P0 decisions are signed off (`d
 | --- | --- |
 | Frontend | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4 (responsive staff/student web) |
 | API/backend | Java 21, Spring Boot 4.1.2, modular monolith; later Spring Modulith tests |
-| Authentication | **Implemented:** first-party RS256 JWTs, account lockout, rotating refresh sessions, Next.js HttpOnly session cookies, TOTP MFA with recovery codes for all staff, password change and reset, invitations by email, per-visitor rate limits, role/academy/batch/ownership checks on every route |
+| Authentication | **Implemented:** first-party RS256 JWTs, account lockout, rotating refresh sessions, Next.js HttpOnly session cookies, email and password sign-in for every role (no MFA), password change and reset, invitations by email, per-visitor rate limits, role/academy/batch/ownership checks on every route |
 | Database | PostgreSQL 17, Flyway; schema evolves through reviewed migrations |
 | Zoom | **Implemented:** signed webhooks into an idempotent inbox with a retrying worker, S2S OAuth read-only client, post-webinar participant reports |
 | Async | **Implemented:** database inbox with SKIP LOCKED workers (Zoom receipts, invitation emails, reports, retention); dead letters with audited replay |
@@ -80,7 +80,7 @@ npm ci
 npm run dev                            # http://localhost:3000
 ```
 
-The backend exposes `POST /api/v1/auth/login`, `refresh`, `logout`, `logout-all` and `activate`, `GET /api/v1/auth/me` and `GET /.well-known/jwks.json`. The Next.js sign-in, session continuation, sign-out and browser MFA step work against it (`scripts/auth-stack-smoke.sh`). Every staff member completes MFA through the Next.js sign-in flow or directly through the API using `POST /api/v1/auth/mfa/enroll` and `POST /api/v1/auth/mfa/verify`. They can reset their own authenticator with `POST /api/v1/auth/mfa/reset`. Create the first academy owner with `scripts/bootstrap-owner.sh "Academy name" owner@example.com` (after `mvn -f backend/pom.xml package`, with the same database settings as the backend); it prints an activation link. Everyone else is invited from the staff screens. The Spring security filter denies other API routes by default until authorized feature slices are built.
+The backend exposes `POST /api/v1/auth/login`, `refresh`, `logout`, `logout-all` and `activate`, `GET /api/v1/auth/me` and `GET /.well-known/jwks.json`. The Next.js sign-in, session continuation and sign-out work against it (`scripts/auth-stack-smoke.sh`). Staff and students sign in with email and password only; there is no second factor. Create the first academy owner with `scripts/bootstrap-owner.sh "Academy name" owner@example.com` (after `mvn -f backend/pom.xml package`, with the same database settings as the backend); it prints an activation link. Everyone else is invited from the staff screens. The Spring security filter denies other API routes by default until authorized feature slices are built.
 
 ## Commands
 

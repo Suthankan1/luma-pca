@@ -26,7 +26,7 @@ page describes what exists. [ADRs](adr/) record decisions.
 
 | Package | Owns |
 | --- | --- |
-| `identity` | Accounts, passwords (Argon2id), lockout, TOTP MFA for all staff, refresh sessions, JWTs, invitations, resets, email notices |
+| `identity` | Accounts, passwords (Argon2id), lockout, refresh sessions, JWTs, invitations, resets, email notices |
 | `courses`, `batches`, `enrollments`, `students` | Academic structure, CSV import, staff assignments to batches |
 | `sessions` | Classes and weekly series shared by several batches |
 | `zoom` | Webhook ingress and worker, occurrence linking, participant matching (email, registration email, staff decisions), reports, webinar lookup |
@@ -46,7 +46,7 @@ student record, never by a Zoom display name.
 ## Security design
 
 Short-lived RS256 access tokens bound to a rotating refresh session (reuse detection revokes the session). Every staff
-role signs in with TOTP MFA. Roles are scoped to the academy, assigned batches or the student's own records, and checked on
+role signs in with email and password (no MFA). Roles are scoped to the academy, assigned batches or the student's own records, and checked on
 every route with object-level checks. Zoom credentials are separate secrets. See [JWT auth](../security/JWT-AUTH.md),
 [permissions](../security/AUTHORIZATION-MATRIX.md) and [threat model](../security/THREAT-MODEL.md).
 

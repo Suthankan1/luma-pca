@@ -2,7 +2,6 @@
 # Generates production-grade persistent cryptographic keys for LUMA:
 #   1. RS256 signing private key (PKCS#8 RSA 2048-bit) for access tokens
 #   2. Public key in X.509 format (for JWKS verification / rotation)
-#   3. AES-256 32-byte Base64 key for TOTP MFA secret encryption at rest
 #
 # Usage:
 #   scripts/generate-auth-keys.sh [--write-env] [--dir <directory>]
@@ -46,7 +45,6 @@ chmod 700 "$SECRETS_DIR"
 
 PRIVATE_KEY_FILE="$SECRETS_DIR/auth-signing-key-pkcs8.pem"
 PUBLIC_KEY_FILE="$SECRETS_DIR/auth-verification-key.pem"
-MFA_KEY_FILE="$SECRETS_DIR/auth-mfa-encryption.key"
 
 echo "==> Generating RSA 2048-bit PKCS#8 private key for token signing..."
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$PRIVATE_KEY_FILE"
@@ -56,18 +54,12 @@ echo "==> Extracting public verification key..."
 openssl rsa -pubout -in "$PRIVATE_KEY_FILE" -out "$PUBLIC_KEY_FILE"
 chmod 644 "$PUBLIC_KEY_FILE"
 
-echo "==> Generating 32-byte AES-256 Base64 key for MFA encryption..."
-openssl rand -base64 32 > "$MFA_KEY_FILE"
-chmod 600 "$MFA_KEY_FILE"
-
-MFA_KEY="$(tr -d '\r\n' < "$MFA_KEY_FILE")"
 # Format private key into a single line with escaped \n for environment variable storage
 SIGNING_KEY_ESCAPED="$(awk '{printf "%s\\n", $0}' "$PRIVATE_KEY_FILE" | sed 's/\\n$//')"
 
 echo "Keys generated successfully in $SECRETS_DIR:"
 echo "  - $PRIVATE_KEY_FILE (mode 600)"
 echo "  - $PUBLIC_KEY_FILE (mode 644)"
-echo "  - $MFA_KEY_FILE (mode 600)"
 
 if [ "$WRITE_ENV" = true ]; then
   ENV_FILE="$ROOT/.env"
@@ -83,7 +75,6 @@ if [ "$WRITE_ENV" = true ]; then
   {
     cat "$ENV_FILE.tmp"
     echo "LUMA_AUTH_EPHEMERAL_SIGNING_KEY=false"
-    echo "LUMA_AUTH_MFA_ENCRYPTION_KEY=$MFA_KEY"
     echo "LUMA_AUTH_SIGNING_KEY_PEM=\"$SIGNING_KEY_ESCAPED\""
   } > "$ENV_FILE"
   rm -f "$ENV_FILE.tmp"

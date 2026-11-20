@@ -1,6 +1,6 @@
 // L3: instructors assigned to every batch keep reading the heavy staff pages during class:
 // their batch list, a 500-student roster, the class page with every expected student, and
-// the class list. Instructors sign in without MFA (owners and administrators need it).
+// the class list. Staff sign in with email and password.
 //
 // Env: BASE_URL, WEB_ORIGIN (if different), STAFF (20), DURATION_S (300), PASSWORD, BATCH_IDS (comma list), SESSION_ID.
 import http from "k6/http";

@@ -15,7 +15,7 @@
 | View leaderboard | Policy-dependent | Assigned batch | Policy-dependent | Approved aggregate | Opt-in/consented |
 | Change roles | Owner/Admin with escalation | — | — | — | — |
 
-**As built (002A):** only the first two "Admin" capabilities for courses and batches exist. Owner and Admin may list, read, create and update courses and batches of their own academy through sessions that completed MFA (001F). Instructor, Attendance Officer, Analyst and Student are refused on all of those routes until staff assignments and enrollments (002B) give them scoped access. The academy is always taken from the verified token.
+**As built (002A):** only the first two "Admin" capabilities for courses and batches exist. Owner and Admin may list, read, create and update courses and batches of their own academy through any live session (the MFA-session requirement of 001F was removed on 2026-11-20). Instructor, Attendance Officer, Analyst and Student are refused on all of those routes until staff assignments and enrollments (002B) give them scoped access. The academy is always taken from the verified token.
 
 **As built (002B part 1):** Owner and Admin manage students and enrollments of their own academy. A Student reads only `GET /api/v1/me/student` and `GET /api/v1/me/enrollments`, which resolve "own" from the token; students get 403 on every staff route, including for their own record, and never see rosters or classmates. Other staff roles still get 403 until staff assignments exist.
 

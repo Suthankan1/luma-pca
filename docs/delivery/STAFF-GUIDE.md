@@ -1,7 +1,8 @@
 # LUMA staff guide
 
-Every staff account signs in with a password and an authenticator app code (set up at first sign-in; keep the recovery
-codes). Change your password with **Change password** at the top of every staff page; you are signed out everywhere afterwards.
+Every staff account signs in with its email and password. Choose a strong password you use nowhere else.
+
+Change your password with **Change password** at the top of every staff page; you are signed out everywhere afterwards.
 
 ## Every day
 The **Staff portal** home shows today's classes and what needs attention (classes to finalise, appeals, Zoom

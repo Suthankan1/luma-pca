@@ -4,7 +4,7 @@
 #   scripts/bootstrap-owner.sh "Physics Cube Academy" owner@academy.example [PRINT|EMAIL]
 #
 # Run it once per new academy, with the same environment as the API (DB_URL, DB_USERNAME,
-# DB_PASSWORD, the signing and MFA keys, and for EMAIL the LUMA_MAIL_* and SPRING_MAIL_*
+# DB_PASSWORD, the signing key, and for EMAIL the LUMA_MAIL_* and SPRING_MAIL_*
 # settings). It starts the backend jar without a web server, prints the outcome and exits:
 # 0 done, 1 refused (for example the academy already has an active owner), 2 bad arguments,
 # 3 saved but the email failed. Running it again before the owner activates sends a new
