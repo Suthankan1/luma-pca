@@ -2663,3 +2663,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The sidebar lists Home, Classes, and Students. Removed the Attendance, Academy classes, Courses & batches, Zoom review, and Activity log tabs and the menu group headings. Supporting screens can still be reached through their existing links and URLs.
 - Passed 77 unit tests, TypeScript, targeted ESLint, and the structure check. Desktop and mobile mock browser coverage passed 21 cases across the main run and the Activity log rerun after correcting a test fixture race. One shared Academy setup case was skipped on mobile by design. API readiness and sign-in smoke passed. Signed-in verification with original data was not run.
 - Frontend-only change. Revert this commit to roll back.
+
+## Shared monthly Classes schedule (2026-11-21)
+
+- The month picker controls the schedule, class-type list, and charts together. Sri Lanka midnight bounds each calendar month. The current month's independently scrollable schedule opens at today's group, and older class-type pages keep their selected month on the detail page and back link.
+- The class chart includes every ended class record from the selected month through today. Classes without a rate show a dash. Upcoming schedule entries do not appear in the attendance chart. Both panels share one schedule and one attendance totals request. Legacy date links still select the corresponding month.
+- Passed 78 frontend unit tests, TypeScript, targeted ESLint, the structure check, and desktop/mobile mock browser checks for the legacy schedule and the new month picker, scroll position, leap-month boundaries, chart coverage, and detail links. API readiness and sign-in smoke passed. Signed-in verification with original data was not run.
+- Frontend-only change with existing APIs. Revert this commit to roll back. No migration is needed.

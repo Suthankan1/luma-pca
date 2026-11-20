@@ -656,6 +656,11 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .home-entry-static { display:grid; grid-template-columns:92px minmax(0,1fr) auto; align-items:center; gap:12px; padding:11px 6px; color:var(--ink); }
 .class-day + .class-day { margin-top:14px; }
 .class-day-title { margin:12px 0 2px; color:var(--ink-2); font-size:13px; font-weight:700; }
+.class-day-today { display:inline-block; margin-inline-start:8px; padding:2px 7px; border-radius:8px; background:#e0edf8; color:#134a75; font-size:11px; }
+.classes-month-picker, .classes-month-picker form { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.classes-month-picker { margin-bottom:16px; }
+.classes-month-picker input { min-height:38px; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); font:inherit; font-size:13px; }
+.classes-month-picker .text-link { margin-inline-start:4px; }
 .classes-overview { display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:16px; }
 .classes-column { min-width:0; display:grid; gap:16px; align-content:start; }
 .classes-column > section.panel { display:flex; flex-direction:column; min-width:0; height:clamp(340px,60vh,590px); }

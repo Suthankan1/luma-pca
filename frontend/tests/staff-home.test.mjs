@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { averageClassAttendance, calendarEntries, chosenDay, chosenMonth, gridRange, homeHref, joinedLabel, liveNumbers, longDayLabel, monthLabel,
+import { averageClassAttendance, calendarEntries, chosenDay, chosenMonth, classMonthRange, gridRange, homeHref, joinedLabel, liveNumbers, longDayLabel, monthLabel,
   monthWeeks, monthlyClassTypes, nextEntry, relativeDayName, shiftMonth, shortDayLabel, startedAgoLabel, startsInLabel, timeRange } from "../src/lib/staff-home.ts";
 
 const session = (over) => ({ id: "s1", title: "Class", startsAt: "2026-11-20T10:30:00Z", endsAt: "2026-11-20T12:00:00Z",
@@ -41,6 +41,19 @@ test("the chosen day and month fall back to today and the day's month", () => {
   assert.equal(monthLabel("2026-11"), "November 2026");
   assert.equal(longDayLabel("2026-11-20"), "Friday 20 November 2026");
   assert.equal(shortDayLabel("2026-11-20"), "Fri 20 Nov");
+});
+
+test("Classes share a calendar month bounded by Colombo midnight and cap attendance at today", () => {
+  const today = "2026-11-21";
+  assert.deepEqual(classMonthRange(undefined, today), {
+    month: "2026-11", first: "2026-11-01", after: "2026-12-01", last: "2026-11-30", through: today,
+    fromInstant: "2026-10-31T18:30:00.000Z", toInstant: "2026-11-30T18:30:00.000Z",
+  });
+  assert.equal(classMonthRange("2024-02", today).through, "2024-02-29");
+  assert.equal(classMonthRange("2026-12", today).through, null);
+  assert.equal(classMonthRange(undefined, today, "2027-01-17").month, "2027-01");
+  assert.equal(classMonthRange("2026-10", today, "2027-01-17").month, "2026-10");
+  assert.equal(classMonthRange("9999-12", today).month, "2026-11");
 });
 
 test("the calendar is whole Monday-to-Sunday weeks, and one request covers its grid in academy time", () => {

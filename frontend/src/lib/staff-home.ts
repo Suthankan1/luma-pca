@@ -27,6 +27,19 @@ export function shiftMonth(month: string, by: number) {
   return date.toISOString().slice(0, 7);
 }
 
+/** One calendar month for the Classes list and its attendance reports, using academy midnight. */
+export function classMonthRange(param: unknown, today: string, legacyFrom?: unknown) {
+  const fallback = isRealDate(legacyFrom) ? legacyFrom : today;
+  const requested = chosenMonth(param, fallback);
+  const month = isRealDate(`${requested}-01`) && isRealDate(`${shiftMonth(requested, 1)}-01`) ? requested : today.slice(0, 7);
+  const first = `${month}-01`;
+  const after = `${shiftMonth(month, 1)}-01`;
+  const last = addDays(after, -1);
+  return { month, first, after, last, through: first > today ? null : last < today ? last : today,
+    fromInstant: zonedToInstant(first, "00:00", ACADEMY_TIME_ZONE),
+    toInstant: zonedToInstant(after, "00:00", ACADEMY_TIME_ZONE) };
+}
+
 /** "November 2026". */
 export function monthLabel(month: string) {
   const [y, m] = month.split("-").map(Number);

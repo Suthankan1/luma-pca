@@ -75,4 +75,53 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await page.goto("/staff/zoom/import");
     await expect(page).toHaveURL(/\/staff\/sessions$/);
   });
+
+  test("the schedule and class types share a month, with completed classes charted and today in view", async ({ page }) => {
+    await signInAsAdmin(page);
+    const code = `month-${p}`;
+    await setUp(page, code);
+    const batch = `${code.toUpperCase()} · A · Batch A`;
+    const year = p.startsWith("m") ? "2020" : "2024";
+    for (const [date, title] of [["02-01", "February opening"], ["02-29", "February review"], ["03-01", "March opening"]]) {
+      await scheduleClass(page, { title, date: `${year}-${date}`, start: "18:00", end: "19:00", batch });
+    }
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo", year: "numeric", month: "2-digit", day: "2-digit" })
+      .format(new Date());
+    await scheduleClass(page, { title: "Today's fixture", date: today, start: "20:00", end: "21:00", batch });
+    if (!today.endsWith("-01")) {
+      for (let i = 0; i < 10; i++) {
+        await scheduleClass(page, { title: `Earlier fixture ${i}`, date: `${today.slice(0, 7)}-01`,
+          start: `${String(8 + i).padStart(2, "0")}:00`, end: `${String(9 + i).padStart(2, "0")}:00`, batch });
+      }
+    }
+
+    await page.goto("/staff/sessions");
+    const schedule = page.getByRole("region", { name: "Monthly schedule" });
+    const todayGroup = schedule.locator(`[data-schedule-day="${today}"]`);
+    await expect(todayGroup.getByText("Today", { exact: true })).toBeVisible();
+    await expect.poll(() => todayGroup.locator("h3").evaluate(heading => {
+      const panel = heading.closest(".classes-panel-scroll")!.getBoundingClientRect();
+      const bounds = heading.getBoundingClientRect();
+      return bounds.top >= panel.top && bounds.bottom <= panel.bottom;
+    })).toBe(true);
+    if (!today.endsWith("-01")) {
+      await expect.poll(() => schedule.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+    }
+
+    await page.getByLabel("Class month", { exact: true }).fill(`${year}-02`);
+    await page.getByRole("button", { name: "View", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`month=${year}-02$`));
+    const classes = page.getByRole("region", { name: "CLASSES", exact: true });
+    const types = page.getByRole("region", { name: "CLASS TYPES", exact: true });
+    await expect(classes).toContainText(`February ${year}`);
+    await expect(types).toContainText(`February ${year}`);
+    await expect(schedule.getByRole("listitem", { name: /February/ })).toHaveCount(2);
+    await expect(schedule.getByRole("listitem", { name: /March opening/ })).toHaveCount(0);
+    const chart = page.getByRole("list", { name: "ATTENDANCE BY CLASS", exact: true });
+    await expect(chart.getByRole("listitem")).toHaveCount(2);
+    await expect(chart.getByRole("listitem", { name: new RegExp(`February review.*29 Feb ${year}`) })).toBeVisible();
+    await types.getByRole("link", { name: /February review/ }).click();
+    await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Back to Classes/ })).toHaveAttribute("href", `/staff/sessions?month=${year}-02`);
+  });
 });

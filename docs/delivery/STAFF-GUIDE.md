@@ -19,11 +19,10 @@ accounts to match, failed Zoom events); each line opens the page where it is han
    a colleague or block someone who left, ask the operator (`docs/delivery/runbooks/STAFF-ACCOUNTS.md`).
 
 ## Timetable and Zoom
-- **Classes** is the one screen for the timetable. At the top, **Track a Zoom link**: paste the webinar's join link or
-  ID and press **Track**. Below, two weeks at a time and grouped by day, are the classes Zoom has scheduled for the
-  tracked webinars ("Expected") and the ones that ran ("Live" or "Ended", each with its attendance). Titles and times
-  come from Zoom; change them in Zoom. Under **Tracked Zoom links** you can read a webinar again from Zoom, stop or
-  resume tracking it, and choose the Academy class whose students are expected.
+- **Classes** shows a calendar month in Sri Lanka time and opens the current schedule at today. Change the month to
+  update the schedule, attendance charts, and class types together. The attendance chart shows each completed class
+  in that month through today. **Track a Zoom link** sits below the panels. Paste a join link or webinar ID and press
+  **Track**. Under **Tracked Zoom links** you can refresh a webinar, stop or resume tracking, and choose its Academy class.
 - **Zoom review**: each time a webinar runs it appears here and links itself to the class when exactly one class fits.
   Decide the others. **People in this occurrence** shows who joined; **Zoom accounts to match** lists emails that match no
   student: match them by student number, or mark them "not a student". A decision applies to every future webinar; **Remove** one

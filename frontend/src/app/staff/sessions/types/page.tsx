@@ -6,8 +6,8 @@ import { requirePortal } from "@/lib/auth-server";
 import { formatDay, formatShortDay, renderTime, type Dashboard } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { ACADEMY_TIME_ZONE, academyToday, addDays, zonedToInstant, type ClassSession, type ProvisionalAttendance } from "@/lib/staff-forms";
-import { attendancePercent, averageClassAttendance, monthLabel, monthlyClassTypes, timeRange, type ClassAttendanceTotal } from "@/lib/staff-home";
+import { ACADEMY_TIME_ZONE, academyToday, formatDate, type ClassSession, type ProvisionalAttendance } from "@/lib/staff-forms";
+import { attendancePercent, averageClassAttendance, classMonthRange, monthLabel, monthlyClassTypes, timeRange, type ClassAttendanceTotal } from "@/lib/staff-home";
 import { StudentAttendanceList } from "./student-attendance-list";
 
 export const metadata = { title: "Class type attendance · LUMA" };
@@ -16,19 +16,18 @@ type Enrolment = { studentId: string; studentName: string; studentNumber: string
 type SessionRate = { session: ClassSession; percent: number | null };
 const timeout = 25000;
 
-export default async function ClassTypePage({ searchParams }: { searchParams: Promise<{ type?: string | string[] }> }) {
+export default async function ClassTypePage({ searchParams }: { searchParams: Promise<{ type?: string | string[]; month?: string | string[] }> }) {
   const identity = await requirePortal("staff");
-  const { type } = await searchParams;
+  const { type, month: requestedMonth } = await searchParams;
   if (typeof type !== "string" || !type) notFound();
   const now = renderTime();
   const today = academyToday(new Date(now));
-  const month = today.slice(0, 7);
-  const first = `${month}-01`;
-  const range = new URLSearchParams({ from: zonedToInstant(first, "00:00", ACADEMY_TIME_ZONE),
-    to: zonedToInstant(addDays(today, 1), "00:00", ACADEMY_TIME_ZONE) });
+  const { month, first, through, fromInstant, toInstant } = classMonthRange(requestedMonth, today);
+  if (!through) notFound();
+  const range = new URLSearchParams({ from: fromInstant, to: toInstant });
   const sessions = await staffApi<ClassSession[]>(`/api/v1/class-sessions?${range}`, undefined, timeout);
   const shell = { active: "sessions" as const, crumb: "Teaching / Classes", hasStudentPortal: hasPortal(identity, "student"),
-    actions: <Link href="/staff/sessions" className="text-link">← Back to Classes</Link> };
+    actions: <Link href={`/staff/sessions?month=${month}`} className="text-link">← Back to Classes</Link> };
   if (!sessions.ok) return <StaffShell {...shell} title="Class type attendance" subtitle={monthLabel(month)}>
     <p className="session-error">Class history couldn’t load. Please reload.</p>
   </StaffShell>;
@@ -36,7 +35,7 @@ export default async function ClassTypePage({ searchParams }: { searchParams: Pr
   if (!group) notFound();
 
   const batchIds = [...new Set(group.sessions.flatMap(session => session.batches.map(batch => batch.batchId)))];
-  const attendanceRange = new URLSearchParams({ from: first, to: today });
+  const attendanceRange = new URLSearchParams({ from: first, to: through });
   if (batchIds.length === 1) attendanceRange.set("batchId", batchIds[0]);
   const [dashboard, rosters] = await Promise.all([
     staffApi<Dashboard>(`/api/v1/attendance/dashboard?${attendanceRange}`, undefined, timeout),
@@ -44,7 +43,7 @@ export default async function ClassTypePage({ searchParams }: { searchParams: Pr
   ]);
   const rosterComplete = rosters.every(result => result.ok);
   const enrolled = new Map(rosters.flatMap(result => result.ok ? result.data : [])
-    .filter(item => item.enrolledOn <= today && (!item.withdrawnOn || item.withdrawnOn > today))
+    .filter(item => item.enrolledOn <= through && (!item.withdrawnOn || item.withdrawnOn > through))
     .map(item => [item.studentId, item]));
   const ids = new Set(group.sessions.map(session => session.id));
   const totals = new Map<string, ClassAttendanceTotal>();
@@ -100,7 +99,7 @@ export default async function ClassTypePage({ searchParams }: { searchParams: Pr
     return { studentId, studentName, studentNumber, percent: complete && counts ? attendancePercent(counts) : null };
   });
 
-  return <StaffShell {...shell} title={group.title} subtitle={`${monthLabel(month)} · through today · Sri Lanka time`}>
+  return <StaffShell {...shell} title={group.title} subtitle={`${monthLabel(month)} · through ${formatDate(through)} · Sri Lanka time`}>
     <div className="class-detail-metrics">
       <section className="panel"><h2 className="panel-title">Enrolled students</h2><strong>{rosterComplete ? enrolled.size : "—"}</strong></section>
       <section className="panel"><h2 className="panel-title">Average attendance</h2><strong>{average === 0 ? "<1%" : showPercent(average)}</strong></section>
