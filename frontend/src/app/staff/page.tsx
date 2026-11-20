@@ -295,7 +295,8 @@ function LiveRow({ entry, numbers, now, sampledAt }: { entry: DayEntry; numbers:
       <div><dt>Online</dt><dd>{numbers.connectedNow}</dd></div>
     </dl> : <p className="live-row-note">Live numbers couldn’t load.</p>}
     {entry.sessionId && <div className="live-online-slot">
-      <LiveOnlineChart sessionId={entry.sessionId} connectedNow={numbers?.connectedNow ?? null} sampledAt={sampledAt} />
+      <LiveOnlineChart sessionId={entry.sessionId} connectedNow={numbers?.connectedNow ?? null} sampledAt={sampledAt}
+        startsAt={entry.startsAt} endsAt={entry.endsAt} />
     </div>}
   </article>;
 }

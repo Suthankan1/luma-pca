@@ -208,19 +208,39 @@ test.describe("Staff home", () => {
   });
 
   test("the live online chart adds real counts on refresh and stops when paused", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     await signInStaff(page, "admin-enrolled@example.invalid");
+    const course = await api(page, "POST", "/api/v1/courses", { code: "CHART-TIME", title: "Chart time window" });
+    const batch = await api(page, "POST", "/api/v1/batches", { courseId: course.id, code: "CHART", name: "Chart time batch", startsOn: "2026-01-01" });
+    const now = Date.now();
+    const startsAt = new Date(now - 10 * 60_000).toISOString();
+    const endsAt = new Date(now + 50 * 60_000).toISOString();
+    await api(page, "POST", "/api/v1/class-sessions", { title: "Scheduled live class", startsAt, endsAt, timeZone: "Asia/Colombo", batchIds: [batch.id] });
     const { live: run } = await api(page, "POST", "/api/v1/zoom/monitors", { webinar: "84400000001" }) as {
-      live: { classSessionId: string; connectedNow: number };
+      live: { classSessionId: string; connectedNow: number; actualStartedAt: string };
     };
     const onlinePath = `/__test__/zoom-online/${run.classSessionId}`;
     await page.clock.install();
     await page.goto("/staff");
     const live = page.getByRole("region", { name: "Live now" });
-    const chart = live.getByRole("figure", { name: "Online over time" }).getByRole("img");
-    await expect(chart).toHaveAccessibleName(/1 observation · 12 online at /);
-    await expect(chart.locator("circle")).toHaveCount(1);
-    await expect(chart.locator("polyline")).toHaveCount(0);
     const article = live.getByRole("article", { name: "Live: A/L Physics 2027" });
+    const figure = article.getByRole("figure", { name: "Online over time" });
+    const chart = figure.getByRole("img");
+    await expect(chart).toHaveAccessibleName(/1 observation · 12 online at /);
+    await expect(chart.locator("text")).toHaveText(["14", "10"]);
+    await expect(chart.locator("circle")).toHaveCount(1);
+    const newestSegment = chart.locator(".live-online-segment");
+    await expect(newestSegment).toHaveCount(0);
+    const zoomBounds = figure.locator("time");
+    await expect(zoomBounds.first()).toHaveAttribute("datetime", run.actualStartedAt);
+    const latestObservedAt = Date.parse((await zoomBounds.last().getAttribute("datetime"))!);
+    expect(latestObservedAt).toBeGreaterThan(Date.parse(run.actualStartedAt));
+    expect(latestObservedAt).toBeLessThanOrEqual(Date.now());
+
+    const scheduledBounds = live.getByRole("article", { name: "In progress: Scheduled live class" })
+      .getByRole("figure", { name: "Online over time" }).locator("time");
+    await expect(scheduledBounds.first()).toHaveAttribute("datetime", startsAt);
+    await expect(scheduledBounds.last()).toHaveAttribute("datetime", endsAt);
     const articleBox = (await article.boundingBox())!;
     const innerWidth = await live.evaluate(el => {
       const style = getComputedStyle(el);
@@ -244,8 +264,12 @@ test.describe("Staff home", () => {
       await expect(pause).toBeVisible();
       await page.clock.fastForward(31_000);
       await expect(chart).toHaveAccessibleName(/2 observations · 12 online at .* · 17 online at /);
-      await expect(chart.locator("polyline")).toHaveCount(1);
+      await expect(chart.locator("text")).toHaveText(["19", "10"]);
       await expect(chart.locator("circle")).toHaveCount(2);
+      await expect(newestSegment).toHaveAttribute("pathLength", "1");
+      expect(await newestSegment.evaluate(el => getComputedStyle(el).animationName)).not.toBe("none");
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await expect(newestSegment).toHaveCSS("animation-name", "none");
     } finally {
       await api(page, "PUT", onlinePath, { connectedNow: run.connectedNow });
     }

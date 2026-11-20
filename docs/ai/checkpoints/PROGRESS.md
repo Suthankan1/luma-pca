@@ -2486,3 +2486,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Date links show a hover preview with each scheduled class title and time range. Medium-width calendar cells show the first two class start times and an overflow count. Narrow cells keep the number of classes, and wide cells keep their class links. Selecting the date still opens that day’s schedule.
 - TypeScript, targeted lint, the structure check, and two targeted Staff Home Playwright cases passed with the mock API on desktop Edge and Pixel 7 emulation. The local API reported UP. The signed-in Supabase calendar was not verified.
 - Frontend-only change. Revert the commit to roll back. No migration or schedule data changes.
+
+## Staff Home live chart scale and motion (2026-11-20)
+
+- The online chart scales to the observed count range with padding, including zero when it was recorded. Each 30-second refresh draws the newest segment and fades in the new point. Reduced-motion preferences disable the animation.
+- The timeline starts at class start and shows the scheduled end when known. For an open-ended class it extends to the latest observation, labeled to the second. The chart retains observations from the current page for the run, bounded to 1,441 points. Time before the first observation stays empty.
+- Passed 79 frontend unit tests, TypeScript, targeted lint, the structure check, an isolated production build, and the live chart Playwright case in desktop Edge and Pixel 7 emulation with the mock API. A focused check verified the actual axis boundary for a run that started only seconds earlier. The local API reported UP and sign-in returned 200. A signed-in Supabase webinar was not tested.
+- Frontend-only change. Revert the commit to roll back. No database migration is needed.
