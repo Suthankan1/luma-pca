@@ -64,7 +64,6 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
   const chartEnd = actualEnd ? Date.parse(actualEnd) : runningWindow ? clock
     : showLastSample ? Date.parse(lastSample.at) : sessionEnd;
   const duration = actualEnd ? Date.parse(actualEnd) : running ? clock : legacy ? sessionEnd : null;
-  const meanConnected = joined.length ? Math.round(joined.reduce((sum, student) => sum + student.connectedSeconds, 0) / joined.length / 60) : null;
   const metrics = [
     { label: "Expected", value: facts ? expected.length : "—" },
     { label: "Students joined", value: facts ? joined.length : "—" },
@@ -73,7 +72,6 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
     { label: "Attendance credited", value: finalised ? credited : "—" },
     { label: legacy ? "Scheduled duration" : "Class duration",
       value: !cancelled && duration != null ? formatElapsed((duration - sessionStart) / 1000) : "—" },
-    { label: "Average time connected", value: meanConnected == null ? "—" : `${meanConnected} min` },
   ];
   const subtitle = run && runBegan
     ? `${running ? "Live now · " : ""}${formatWhen(runBegan.at, s.timeZone)} ${runBegan.known ? "actual start" : "first Zoom event"}${actualEnd ? `, ended ${formatTime(actualEnd, s.timeZone)}` : ""} (${s.timeZone})`

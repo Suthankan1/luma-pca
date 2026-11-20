@@ -2651,3 +2651,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Restarted the existing loopback API against the same Supabase database using a process-only JDBC override for the transaction pooler on port 6543 with `prepareThreshold=0` and `DB_POOL_MAX=8`. Used the already migrated schema with Flyway and the existing background workers disabled for this run. The original configuration files were preserved.
 - Eight concurrent readiness checks passed before the switch and again on port 8080 after the switch. Frontend sign-in returned 200, an unauthenticated attendance request returned 401, and the replacement API log showed no pool errors during verification. Passed 77 frontend unit tests, TypeScript, targeted ESLint, the structure check, and two desktop and mobile timeline checks with mock data. Signed-in verification on the original session was not run.
 - To retain the runtime fix on another restart, reapply the transaction-pooler JDBC override to the app process. Keep Flyway on a direct or session-pool connection for future migrations. Rollback uses the previous session-pool runtime connection and may restore the connection-limit failure. No database migration was made.
+
+## Compact session attendance controls (2026-11-21)
+
+- Removed the average connected-time summary card and the per-student correction control. The final roster offers All statuses, Present, Late and Absent filters. The filter and right-aligned status column use a fixed compact width on desktop, with a flexible layout on mobile.
+- Passed 77 frontend unit tests, TypeScript, targeted ESLint, the structure check, and four desktop/mobile Edge checks against the mock backend. Updated the real-stack onboarding test for the new roster and final outcome display. The real-stack suite and the signed-in Supabase page were not run.
+- The frontend change needs no database migration. Revert this commit to roll back.

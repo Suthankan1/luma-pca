@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { attendanceOutcomes, formatDuration, formatInstant, outcomeLabels, type AttendanceRow } from "@/lib/staff-forms";
-import { CorrectionForm } from "./AttendanceForms";
+
+const finalFilters = attendanceOutcomes.filter(outcome => outcome !== "EXCUSED");
 
 export function SessionAttendanceRoster({ students, sessionId, timeZone, finalised }: {
   students: AttendanceRow[];
@@ -17,7 +18,7 @@ export function SessionAttendanceRoster({ students, sessionId, timeZone, finalis
   const query = search.trim().toLowerCase();
   const activeStatus = finalised && (status === "seen" || status === "unseen") ? "all" : status;
   const rows = students.filter(student => {
-    const value = student.outcome ?? (finalised ? "unrecorded" : student.seen ? "seen" : "unseen");
+    const value = student.outcome ?? (finalised ? null : student.seen ? "seen" : "unseen");
     return (activeStatus === "all" || value === activeStatus)
       && (student.fullName.toLowerCase().includes(query) || student.studentNumber.toLowerCase().includes(query));
   });
@@ -33,24 +34,22 @@ export function SessionAttendanceRoster({ students, sessionId, timeZone, finalis
       <label>Search students
         <input type="search" placeholder="Name or reg. no." value={search} onChange={event => setSearch(event.target.value)} />
       </label>
-      <label>Attendance
-        <select value={activeStatus} onChange={event => setStatus(event.target.value)}>
-          <option value="all">All statuses</option>
-          {finalised ? <>
-            {attendanceOutcomes.map(value => <option key={value} value={value}>{outcomeLabels[value]}</option>)}
-            <option value="unrecorded">No final record</option>
-          </> : <>
-            <option value="seen">Seen</option>
-            <option value="unseen">Not seen</option>
-          </>}
-        </select>
-      </label>
       <label>Sort by
         <select value={order} onChange={event => setOrder(event.target.value)}>
           <option value="roster">Roster order</option>
           <option value="name">Name A–Z</option>
           <option value="longest">Longest connected</option>
           <option value="shortest">Shortest connected</option>
+        </select>
+      </label>
+      <label className="session-roster-filter">Attendance
+        <select value={activeStatus} onChange={event => setStatus(event.target.value)}>
+          <option value="all">All statuses</option>
+          {finalised ? finalFilters.map(value => <option key={value} value={value}>{outcomeLabels[value]}</option>)
+            : <>
+              <option value="seen">Seen</option>
+              <option value="unseen">Not seen</option>
+            </>}
         </select>
       </label>
       <a className="text-link session-roster-export" href={`/staff/sessions/${sessionId}/attendance-export`} download>Download CSV</a>
@@ -76,10 +75,6 @@ export function SessionAttendanceRoster({ students, sessionId, timeZone, finalis
             {a.outcome ? <span className={`status outcome ${a.outcome === "ABSENT" ? "off" : a.outcome === "EXCUSED" ? "" : "on"}`}>{outcomeLabels[a.outcome]}</span>
               : <span className="status">{finalised ? "No final record" : a.seen ? "Seen" : "Not seen"}</span>}
           </div>
-          {a.outcome && a.recordId && a.recordVersion != null && <details className="decision correction">
-            <summary>Correct</summary>
-            <CorrectionForm prefix={`correct-${a.studentId}`} sessionId={sessionId} recordId={a.recordId} version={a.recordVersion} current={a.outcome} />
-          </details>}
         </li>)}
       </ul>}
     </div>

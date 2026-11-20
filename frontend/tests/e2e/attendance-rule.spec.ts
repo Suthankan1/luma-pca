@@ -97,13 +97,14 @@ test.describe("Attendance rule and final attendance", () => {
     await expect(metric("Students joined")).toHaveText("1");
     await expect(metric("Expected not seen")).toHaveText("1");
     await expect(metric("Attendance credited")).toHaveText("1");
-    await expect(metric("Average time connected")).toHaveText("105 min");
+    await expect(page.locator(".session-metrics").getByText("Average time connected")).toHaveCount(0);
     await expect(final.getByText(/Final since|Recalculate from Zoom/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Finalise attendance" })).toHaveCount(0);
 
     const rows = final.getByRole("region", { name: "Student attendance results" }).getByRole("listitem");
     const search = final.getByRole("searchbox", { name: "Search students" });
     const status = final.getByRole("combobox", { name: "Attendance", exact: true });
+    await expect(status.locator("option")).toHaveText(["All statuses", "Present", "Late", "Absent"]);
     await search.fill("absent student");
     await expect(rows).toHaveText([/Absent Student/]);
     await search.fill(`fn-${p}-1`);
@@ -119,18 +120,10 @@ test.describe("Attendance rule and final attendance", () => {
     await order.selectOption("longest");
     await expect(rows).toHaveText([/Final Student/, /Absent Student/]);
 
-    // A correction with a reason; the computed outcome stays visible in the student's history.
-    const row = final.getByRole("listitem", { name: `Attendance FN-${p.toUpperCase()}-1 Final Student` });
-    await row.getByText("Correct", { exact: true }).click();
-    await row.getByLabel("Corrected outcome").selectOption({ label: "Excused" });
-    await row.getByLabel(/^Reason/).fill("Medical note received");
-    await row.getByRole("button", { name: "Save correction" }).click();
-    await expect(row.locator(".status")).toHaveText("Excused");
-    await expect(metric("Attendance credited")).toHaveText("0");
+    await expect(final.getByText("Correct", { exact: true })).toHaveCount(0);
     await page.goto("/staff/students?q=" + `FN-${p.toUpperCase()}-1`);
     await page.getByRole("link", { name: new RegExp(`FN-${p.toUpperCase()}-1`) }).first().click();
     const history = page.getByRole("region", { name: "ATTENDANCE HISTORY" });
-    await expect(history.getByRole("listitem", { name: `History Final class ${p}` })).toContainText("corrected from late");
-    await expect(history.getByRole("listitem", { name: `History Final class ${p}` }).locator(".status")).toHaveText("Excused");
+    await expect(history.getByRole("listitem", { name: `History Final class ${p}` }).locator(".status")).toHaveText("Late");
   });
 });

@@ -46,8 +46,7 @@ accounts to match, failed Zoom events); each line opens the page where it is han
   minutes in the name of the staff member who switched it on; the activity log says "Automatically finalised".
 - **Final attendance** on the class page supports search by student name or registration number, outcome filters,
   and sorting by name or time connected.
-- **Correct** a student's outcome (e.g. Excused) with a reason; the original outcome stays in the history. The student
-  is emailed. Managers are emailed when a student appeals.
+- Managers are emailed when a student appeals.
 - **Appeals** from students appear on the Attendance page: accept (choose the outcome) or reject, with a note they see.
 - **Attendance summary** on each batch page: every student's present / late / absent / excused and attendance rate for a
   period (this month by default), lowest rate first, so students who need a follow-up stand out.

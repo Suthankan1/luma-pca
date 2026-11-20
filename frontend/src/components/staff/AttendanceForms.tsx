@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { correctRecord, finaliseAllReady, finaliseAttendance, resolveAppeal, savePolicy } from "@/app/staff/attendance/actions";
+import { finaliseAllReady, finaliseAttendance, resolveAppeal, savePolicy } from "@/app/staff/attendance/actions";
 import { attendanceOutcomes, outcomeLabels, type AttendanceOutcome, type AttendancePolicy, type FormState } from "@/lib/staff-forms";
 
 function Feedback({ state, id }: { state: FormState; id: string }) {
@@ -45,28 +45,6 @@ export function FinaliseForm({ sessionId }: { sessionId: string }) {
     <input type="hidden" name="sessionId" value={sessionId} />
     <button className="action" type="submit" disabled={pending}>{pending ? "Finalising…" : "Finalise attendance"}</button>
     <Feedback state={state} id="finalise-feedback" />
-  </form>;
-}
-
-export function CorrectionForm({ prefix, sessionId, recordId, version, current }: {
-  prefix: string; sessionId: string; recordId: string; version: number; current: AttendanceOutcome;
-}) {
-  const [state, action, pending] = useActionState(correctRecord, null);
-  const values = state && !state.ok ? state.values : undefined;
-  const choices = attendanceOutcomes.filter(o => o !== current);
-  return <form key={JSON.stringify(state)} action={action} className="session-form decision-form">
-    <input type="hidden" name="recordId" value={recordId} />
-    <input type="hidden" name="sessionId" value={sessionId} />
-    <input type="hidden" name="version" value={version} />
-    <label htmlFor={`${prefix}-outcome`}>Corrected outcome</label>
-    <select id={`${prefix}-outcome`} name="outcome" defaultValue={values?.outcome ?? choices[0]}>
-      {choices.map(o => <option key={o} value={o}>{outcomeLabels[o]}</option>)}
-    </select>
-    <label htmlFor={`${prefix}-reason`}>Reason <span className="muted">(recorded)</span></label>
-    <input id={`${prefix}-reason`} name="reason" maxLength={500} required autoComplete="off" defaultValue={values?.reason}
-      placeholder="Medical note received" />
-    <button className="action secondary" type="submit" disabled={pending}>{pending ? "Saving…" : "Save correction"}</button>
-    <Feedback state={state} id={`${prefix}-feedback`} />
   </form>;
 }
 

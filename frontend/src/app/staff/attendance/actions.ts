@@ -47,24 +47,6 @@ export async function finaliseAttendance(_previous: FormState, form: FormData): 
   return { ok: true, message: `Attendance is final: ${present} present, ${late} late, ${absent} absent.` };
 }
 
-/** Corrects one final record with a reason (staff). */
-export async function correctRecord(_previous: FormState, form: FormData): Promise<FormState> {
-  await requireSameOriginAction();
-  const recordId = uuidOrNull(form.get("recordId"));
-  const sessionId = uuidOrNull(form.get("sessionId"));
-  const version = Number(form.get("version"));
-  const outcome = outcomeOrNull(form.get("outcome"));
-  const reason = String(form.get("reason") ?? "").trim();
-  const values = submittedValues(form, ["reason", "outcome"]);
-  if (!recordId || !sessionId || !Number.isInteger(version)) return { ok: false, message: "That request was not valid. Reload the page." };
-  if (!outcome) return { ok: false, message: "Choose the corrected outcome.", values };
-  if (reason.length < 3 || reason.length > 500) return { ok: false, message: "Give a reason of 3 to 500 characters.", values };
-  const result = await staffApi(`/api/v1/attendance-records/${recordId}/corrections`, { method: "POST", body: { outcome, reason, version } });
-  if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
-  revalidatePath(`/staff/sessions/${sessionId}`);
-  return { ok: true, message: "Corrected." };
-}
-
 /** Accepts (correcting the record) or rejects a student's appeal, with a note the student sees. */
 export async function resolveAppeal(_previous: FormState, form: FormData): Promise<FormState> {
   await requireSameOriginAction();

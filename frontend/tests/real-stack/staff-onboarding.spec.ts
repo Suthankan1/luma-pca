@@ -405,22 +405,16 @@ test("an administrator onboards a student end to end on the real stack", async (
   const pastRow = finalAttendance.getByRole("listitem", { name: /Attendance PCA-REAL-001/ });
   await expect(pastRow.locator(".status")).toHaveText("Present");
 
-  // A correction reaches the student by real SMTP; the CSV and the student's portal agree.
-  await pastRow.getByText("Correct", { exact: true }).click();
-  await pastRow.getByLabel("Corrected outcome").selectOption({ label: "Excused" });
-  await pastRow.getByLabel(/^Reason/).fill("Medical note received");
-  await pastRow.getByRole("button", { name: "Save correction" }).click();
-  await expect(pastRow.locator(".status")).toHaveText("Excused");
-  const notice = await newestEmailTo("real.student@example.invalid");
-  expect(notice.subject).toBe("Your attendance was updated");
-  expect(notice.text).toContain("Past real class on 9 Mar 2026 is now Excused (it was Present)");
+  await expect(pastRow.getByText("Correct", { exact: true })).toHaveCount(0);
+
+  // CSV, staff history, and the student portal show the same final outcome.
   const csvDownload = page.waitForEvent("download");
   await finalAttendance.getByRole("link", { name: "Download CSV" }).click();
   const csvText = readFileSync(await (await csvDownload).path(), "utf8");
   expect(csvText).toContain(",PCA-REAL-001,");
-  expect(csvText.trim().split("\r\n").find((l: string) => l.includes(",PCA-REAL-001,"))).toMatch(/,EXCUSED$/);
+  expect(csvText.trim().split("\r\n").find((l: string) => l.includes(",PCA-REAL-001,"))).toMatch(/,PRESENT$/);
   await page.goto(studentRecord);
-  await expect(page.getByRole("region", { name: "ATTENDANCE HISTORY" })).toContainText("corrected from present");
+  await expect(page.getByRole("region", { name: "ATTENDANCE HISTORY" }).getByRole("listitem", { name: "History Past real class" }).locator(".status")).toHaveText("Present");
 
   const finalStudent = await browser.newContext();
   const portalAgain = await finalStudent.newPage();
@@ -431,7 +425,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(portalAgain).toHaveURL(/\/student$/);
   await portalAgain.goto("/student/attendance");
   await expect(portalAgain.getByRole("region", { name: "FINAL ATTENDANCE AND APPEALS" }).getByRole("listitem", { name: "Attendance Past real class" })
-    .locator(".status")).toHaveText("Excused");
+    .locator(".status")).toHaveText("Present");
   await finalStudent.close();
   await page.goto("/staff/activity?category=classes");
   await expect(page.getByText("Finalised attendance of “Past real class”").first()).toBeVisible();
