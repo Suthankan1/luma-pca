@@ -12,6 +12,7 @@ import { readStudentDirectory } from "@/lib/student-month-api";
 import { ReportSelection } from "./report-selection";
 
 export const metadata = { title: "Reports · LUMA" };
+export const unstable_dynamicStaleTime = 90;
 
 const reportChoices = [
   { kind: "session", title: "Class session report", label: "One completed class" },

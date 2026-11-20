@@ -13,6 +13,7 @@ import { readMonthlyStudentDirectory } from "@/lib/student-month-api";
 import { MonthlyStudentDirectory } from "./monthly-student-directory";
 
 export const metadata = { title: "Students · LUMA" };
+export const unstable_dynamicStaleTime = 90;
 
 export default async function StudentsPage({ searchParams }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

@@ -58,7 +58,7 @@ The final run enabled the projection in the synthetic environment. Hosted projec
 
 ## Auth and cache decision
 
-The final local `/auth/me` p95 was 58 ms. Silent renewal now avoids a duplicate check and still verifies the new token before rendering. Ordinary authenticated requests retain live revocation and role enforcement. Keep Cache Components and longer private browser caches out of this rollout. The browser regression checks the private response headers, back navigation after sign-out and switching to a student account.
+The final local `/auth/me` p95 was 58 ms. Silent renewal now avoids a duplicate check and still verifies the new token before rendering. Ordinary authenticated requests retain live revocation and role enforcement. The benchmark used the original router lifetimes. Classes, Class Types, Students and Reports now use a 90-second router lifetime for recent pages. Subsequent browser checks verify fast return and expiry on Students, plus private response headers, back navigation after sign-out and switching to a student account.
 
 ## Hosted acceptance
 

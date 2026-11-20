@@ -21,6 +21,7 @@ import { attendancePercent, calendarEntries, classMonthRange, compactClassTitle,
 import { formatWebinarId, zoomSchedule, type WebinarMonitor } from "@/lib/webinars";
 
 export const metadata = { title: "Classes · LUMA" };
+export const unstable_dynamicStaleTime = 90;
 
 const stateLabels: Record<DayEntry["state"], string> = { live: "Live", now: "In progress", upcoming: "Expected", ended: "Ended" };
 

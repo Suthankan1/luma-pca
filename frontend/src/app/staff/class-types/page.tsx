@@ -11,6 +11,7 @@ import { academyToday } from "@/lib/staff-forms";
 import { classMonthRange } from "@/lib/staff-home";
 
 export const metadata = { title: "Class Types · LUMA" };
+export const unstable_dynamicStaleTime = 90;
 
 export default async function ClassTypesPage({ searchParams }: { searchParams: Promise<{ month?: string | string[] }> }) {
   const identity = await requirePortal("staff");
