@@ -4,12 +4,14 @@ import com.physicscube.luma.attendance.AttendanceInsightsService;
 import com.physicscube.luma.attendance.AttendanceInsightsService.ClassTotals;
 import com.physicscube.luma.attendance.AttendanceInsightsService.CompletedClassAttendance;
 import com.physicscube.luma.attendance.AttendanceInsightsService.Dashboard;
+import com.physicscube.luma.attendance.AttendanceInsightsService.MonthlyDirectory;
 import com.physicscube.luma.attendance.AttendanceInsightsService.StudentOverview;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,6 +42,14 @@ class AttendanceInsightsController {
                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return insights.classTotals(CurrentAccount.from(authentication), AttendanceInsightsService.range(from, to));
+    }
+
+    @GetMapping("/api/v1/attendance/student-directory")
+    ResponseEntity<MonthlyDirectory> monthlyDirectory(JwtAuthenticationToken authentication,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(
+                insights.monthlyDirectory(CurrentAccount.from(authentication), AttendanceInsightsService.range(from, to)));
     }
 
     @GetMapping("/api/v1/attendance/latest-completed")

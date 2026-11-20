@@ -75,3 +75,5 @@ Attendance Officer; the class list and expected students are limited to the call
 only their batches' students. `GET /api/v1/students/{id}/attendance-overview` for Owner and Admin (404 outside the
 academy). `GET /api/v1/me/attendance-overview` for Students, resolved from the token only; students get 403 on the
 staff routes.
+
+**Staff monthly directory.** `GET /api/v1/attendance/student-directory` requires `STAFF`. The backend resolves the academy from the authenticated account. The response contains directory names and registration numbers with participation counts, uses `private, no-store`, and excludes account emails and per-session identities.

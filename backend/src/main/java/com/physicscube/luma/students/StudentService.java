@@ -82,6 +82,18 @@ public class StudentService {
         return view(load(caller.academyId(), studentId));
     }
 
+    public record DirectoryStudent(UUID id, String studentNumber, String fullName) {
+    }
+
+    /** Minimal identities for the staff attendance directory, including students without an enrolment. */
+    @Transactional(readOnly = true)
+    public List<DirectoryStudent> attendanceDirectory(CurrentAccount caller) {
+        caller.requireStaff();
+        return jdbc.query("SELECT id, student_number, full_name FROM students WHERE academy_id = ? ORDER BY student_number",
+                (row, index) -> new DirectoryStudent(row.getObject(1, UUID.class), row.getString(2), row.getString(3)),
+                caller.academyId());
+    }
+
     /** The calling student's own record. */
     @Transactional(readOnly = true)
     public StudentView mine(CurrentAccount caller) {

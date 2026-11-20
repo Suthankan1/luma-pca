@@ -1,6 +1,7 @@
 package com.physicscube.luma.attendance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,15 +20,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * The Academy's example: a two-hour webinar, a student connected 25 + 25 + 20 minutes with two rejoins (and one
  * overlapping duplicate connection) is in the class for 70 minutes, once, on every dashboard.
  */
+@TestPropertySource(properties = "luma.attendance.projection.enabled=true")
 class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     private static final String WEBINAR = "81234500077";
     private static final String CLASS_TOTALS = "/api/v1/attendance/class-totals";
@@ -38,6 +44,12 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     ZoomReceiptProcessor processor;
     @Autowired
     ApplicationContext context;
+
+    @Autowired
+    AttendanceProjectionStore projections;
+
+    @Autowired
+    ProvisionalAttendanceService attendance;
 
     UUID academyId;
     String admin;
@@ -249,6 +261,76 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(List.of(), classTotals(otherAdmin));
         assertEquals(204, api.get(LATEST_COMPLETED, otherAdmin).statusCode());
         assertEquals(List.of(), recentCompleted(otherAdmin));
+    }
+
+    @Test
+    void compactStudentDirectoryIncludesUnenrolledStudentsAndPreservesMonthlyAttendance() {
+        String unenrolled = (String) fixtures.student("PCA003", "unassigned@example.test").get("id");
+        String path = "/api/v1/attendance/student-directory?from=" + start.minus(1, ChronoUnit.DAYS).toString().substring(0, 10)
+                + "&to=" + start.plus(1, ChronoUnit.DAYS).toString().substring(0, 10);
+        assertEquals(401, api.get(path, null).statusCode());
+        assertEquals(403, api.get(path, tokenFor(academyId, Role.STUDENT)).statusCode());
+        assertEquals(List.of(), list(ok(api.get(path, tokenFor(academy("Other directory academy"), Role.STAFF))).get("students")));
+        var response = api.get(path, admin);
+        assertTrue(response.headers().firstValue("Cache-Control").orElseThrow().contains("no-store"));
+        assertFalse(response.body().contains("example.test"));
+        var directory = ok(response);
+        assertEquals(List.of(Map.of("key", "type:waves", "label", "Waves")), directory.get("classTypes"));
+        List<Map<String, Object>> rows = list(directory.get("students")).stream().map(AttendanceInsightsIntegrationTest::map).toList();
+        assertEquals(List.of(amaya, kavin, unenrolled), rows.stream().map(row -> row.get("id")).toList());
+        assertEquals(Map.of("type:waves", Map.of("expected", 1, "joined", 1)), rows.get(0).get("types"));
+        assertEquals(Map.of("type:waves", Map.of("expected", 1, "joined", 0)), rows.get(1).get("types"));
+        assertEquals(Map.of(), rows.get(2).get("types"));
+    }
+
+    @Test
+    void completedProjectionMatchesSourceAndRejectsStalePublication() {
+        UUID session = UUID.fromString(classId);
+        String dashboard = "/api/v1/attendance/dashboard";
+        Map<String, Object> before = ok(api.get(dashboard, admin));
+        List<Object> totalsBefore = classTotals(admin);
+        var first = projections.claim(1).getFirst();
+        var visits = attendance.projectableVisits(academyId, first.window());
+        assertEquals(Map.of(UUID.fromString(amaya), new AttendanceProjectionStore.ProjectedVisit(4, 4200)), visits);
+        assertTrue(projections.publish(first, visits));
+        assertEquals(visits, projections.ready(academyId, java.util.Set.of(session)).get(session));
+        assertEquals(before, ok(api.get(dashboard, admin)));
+        assertEquals(totalsBefore, classTotals(admin));
+        assertEquals(Map.of(), projections.ready(academy("Other projection academy"), java.util.Set.of(session)));
+
+        jdbc.update("DELETE FROM zoom_report_participants WHERE academy_id = ? AND occurrence_uuid = 'Waves=='", academyId);
+        assertEquals(Map.of(), projections.ready(academyId, java.util.Set.of(session)));
+        assertEquals(List.of(Map.of("id", classId, "expected", 2, "joined", 0)), classTotals(admin));
+        var next = projections.claim(1).getFirst();
+        assertFalse(projections.publish(first, visits));
+        assertTrue(projections.publish(next, attendance.projectableVisits(academyId, next.window())));
+        assertEquals(Map.of(session, Map.of()), projections.ready(academyId, java.util.Set.of(session)));
+
+        jdbc.update("UPDATE accounts SET email = 'changed@example.test' WHERE id = ?", amayaAccount);
+        assertEquals(Map.of(), projections.ready(academyId, java.util.Set.of(session)));
+        assertFalse(projections.publish(next, Map.of()));
+    }
+
+    @Test
+    void concurrentWorkersClaimOnlyOneLeaseAndErasureRemovesPublishedVisits() throws Exception {
+        var startTogether = new CyclicBarrier(2);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<List<AttendanceProjectionStore.Job>> claim = () -> {
+                startTogether.await(10, TimeUnit.SECONDS);
+                return projections.claim(1);
+            };
+            var one = executor.submit(claim);
+            var two = executor.submit(claim);
+            var results = new ArrayList<>(one.get(10, TimeUnit.SECONDS));
+            results.addAll(two.get(10, TimeUnit.SECONDS));
+            assertEquals(1, results.size());
+            var job = results.getFirst();
+            assertTrue(projections.publish(job, attendance.projectableVisits(academyId, job.window())));
+        }
+        assertEquals(200, api.post("/api/v1/students/" + amaya + "/erasure",
+                "{\"confirmStudentNumber\":\"PCA001\",\"reason\":\"Requested by student\"}", admin).statusCode());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM attendance_projected_visits WHERE academy_id = ?", Integer.class, academyId));
+        assertEquals(Map.of(), projections.ready(academyId, java.util.Set.of(UUID.fromString(classId))));
     }
 
     @Test

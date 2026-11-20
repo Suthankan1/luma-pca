@@ -1,6 +1,7 @@
 package com.physicscube.luma.operations;
 
 import com.physicscube.luma.audit.AuditLog;
+import com.physicscube.luma.attendance.AttendanceProjectionStore;
 import com.physicscube.luma.shared.api.InvalidRequestException;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
 import com.physicscube.luma.shared.security.CurrentAccount;
@@ -26,10 +27,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudentErasureService {
     private final JdbcTemplate jdbc;
     private final AuditLog audit;
+    private final AttendanceProjectionStore projections;
 
-    StudentErasureService(JdbcTemplate jdbc, AuditLog audit) {
+    StudentErasureService(JdbcTemplate jdbc, AuditLog audit, AttendanceProjectionStore projections) {
         this.jdbc = jdbc;
         this.audit = audit;
+        this.projections = projections;
     }
 
     public record ErasureResult(UUID studentId, String placeholderNumber, int zoomRowsCleared) {
@@ -84,6 +87,7 @@ public class StudentErasureService {
                 + "WHERE academy_id = ? AND (email = ANY (?) OR registrant_email = ANY (?))", caller.academyId(), known, known);
         cleared += jdbc.update("DELETE FROM zoom_registrants WHERE academy_id = ? AND email = ANY (?)", caller.academyId(), known);
         jdbc.update("DELETE FROM zoom_identity_links WHERE academy_id = ? AND (student_id = ? OR email = ANY (?))", caller.academyId(), studentId, known);
+        projections.eraseProjectedVisits(caller.academyId(), studentId);
         jdbc.update("DELETE FROM portal_reactions WHERE academy_id = ? AND student_id = ?", caller.academyId(), studentId);
         jdbc.update("DELETE FROM pulse_answers WHERE academy_id = ? AND student_id = ?", caller.academyId(), studentId);
         jdbc.update("DELETE FROM engagement_consents WHERE academy_id = ? AND student_id = ?", caller.academyId(), studentId);

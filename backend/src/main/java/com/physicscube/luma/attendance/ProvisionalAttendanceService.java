@@ -1,6 +1,7 @@
 package com.physicscube.luma.attendance;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.physicscube.luma.attendance.AttendanceProjectionStore.ProjectedVisit;
 import com.physicscube.luma.attendance.domain.AttendanceDurationCalculator;
 import com.physicscube.luma.attendance.domain.ConnectionInterval;
 import com.physicscube.luma.enrollments.ExpectedStudent;
@@ -41,13 +42,15 @@ public class ProvisionalAttendanceService {
     private final ZoomParticipantService zoom;
     private final StudentService students;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final AttendanceProjectionStore projection;
 
     ProvisionalAttendanceService(ClassSessionService sessions, ZoomParticipantService zoom, StudentService students,
-                                 org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                                 org.springframework.jdbc.core.JdbcTemplate jdbc, AttendanceProjectionStore projection) {
         this.sessions = sessions;
         this.zoom = zoom;
         this.students = students;
         this.jdbc = jdbc;
+        this.projection = projection;
     }
 
     /**
@@ -188,17 +191,20 @@ public class ProvisionalAttendanceService {
 
     /** Count expected students with a matched visit, using the same evidence as the detailed dashboard. */
     Map<UUID, Integer> countJoined(UUID academyId, Map<UUID, Set<UUID>> expectedByClass) {
-        List<UUID> withRoster = expectedByClass.entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
-                .map(Map.Entry::getKey).toList();
-        return zoom.joinedStudentsByClass(academyId, withRoster).entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> (int) entry.getValue().stream()
-                        .filter(expectedByClass.get(entry.getKey())::contains).count()));
+        Set<UUID> withRoster = expectedByClass.entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
+                .map(Map.Entry::getKey).collect(Collectors.toSet());
+        Map<UUID, Set<UUID>> matched = new HashMap<>();
+        projection.ready(academyId, withRoster).forEach((id, visits) -> matched.put(id, visits.keySet()));
+        withRoster.removeAll(matched.keySet());
+        matched.putAll(zoom.joinedStudentsByClass(academyId, withRoster));
+        return matched.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> (int) entry.getValue().stream()
+                .filter(expectedByClass.get(entry.getKey())::contains).count()));
     }
 
     /**
      * Attendance facts for authorized classes. The caller filters the students it may show.
      */
-    Map<UUID, ClassFacts> factsForClasses(UUID academyId, List<FactWindow> windows) {
+    Map<UUID, ClassFacts> factsForClasses(UUID academyId, List<FactWindow> windows, boolean dashboardSummary) {
         if (windows.isEmpty()) return Map.of();
         Map<UUID, FactWindow> byId = windows.stream().collect(Collectors.toMap(FactWindow::sessionId, window -> window));
         Map<UUID, Map<UUID, FinalOutcome>> finals = new HashMap<>();
@@ -212,9 +218,29 @@ public class ProvisionalAttendanceService {
         }, academyId, byId.keySet().toArray(UUID[]::new));
         Instant now = DbTime.now();
         Map<UUID, ClassFacts> result = new HashMap<>();
-        zoom.forEachClassActivity(academyId, byId.keySet(), (id, activity) -> result.put(id,
+        if (dashboardSummary) {
+            projection.ready(academyId, byId.keySet()).forEach((id, visits) -> {
+                Map<UUID, StudentFacts> projected = new HashMap<>();
+                visits.forEach((student, visit) -> projected.put(student,
+                        new StudentFacts(true, visit.visits(), 0, visit.connectedSeconds(), null, null, List.of())));
+                Map<UUID, FinalOutcome> records = finals.getOrDefault(id, Map.of());
+                result.put(id, new ClassFacts(records.isEmpty() ? "REPORT" : "FINAL", projected, records));
+            });
+        }
+        Set<UUID> missing = new HashSet<>(byId.keySet());
+        missing.removeAll(result.keySet());
+        zoom.forEachClassActivity(academyId, missing, (id, activity) -> result.put(id,
                 classFacts(activity, byId.get(id), finals.getOrDefault(id, Map.of()), now)));
         return result;
+    }
+
+    /** Build a projection only when every linked occurrence has its complete Zoom report. */
+    Map<UUID, ProjectedVisit> projectableVisits(UUID academyId, FactWindow window) {
+        ClassActivity activity = zoom.activityForClass(academyId, window.sessionId());
+        if (activity.occurrences().isEmpty() || !activity.reportedOccurrences().containsAll(activity.occurrences())) return null;
+        var data = classFacts(activity, window, Map.of(), DbTime.now());
+        return data.students().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                entry -> new ProjectedVisit(entry.getValue().visits(), entry.getValue().connectedSeconds())));
     }
 
     private static ClassFacts classFacts(ClassActivity activity, FactWindow window, Map<UUID, FinalOutcome> finals, Instant now) {

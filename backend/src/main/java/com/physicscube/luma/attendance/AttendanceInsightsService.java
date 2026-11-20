@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -168,6 +169,65 @@ public class AttendanceInsightsService {
     private record Selected(SessionView session, List<ExpectedStudent> expected, ClassFacts facts) {
     }
 
+    public record DirectoryParticipation(int expected, int joined) {
+        private DirectoryParticipation plus(DirectoryParticipation other) {
+            return new DirectoryParticipation(expected + other.expected, joined + other.joined);
+        }
+    }
+
+    public record DirectoryRow(UUID id, String studentNumber, String fullName, Map<String, DirectoryParticipation> types) {
+    }
+
+    public record DirectoryClassType(String key, String label) {
+    }
+
+    public record MonthlyDirectory(List<DirectoryRow> students, List<DirectoryClassType> classTypes) {
+    }
+
+    /** Compact monthly participation totals for the entire authorized directory, without per-session cells. */
+    public MonthlyDirectory monthlyDirectory(CurrentAccount caller, Range range) {
+        caller.requireStaff();
+        UUID academyId = caller.academyId();
+        Instant now = DbTime.now();
+        var directory = Parallel.start(() -> students.attendanceDirectory(caller));
+        List<SessionView> completed = sessions.list(caller, range.start(), range.end(), null).stream()
+                .filter(session -> !"CANCELLED".equals(session.status()) && !session.endsAt().isAfter(now))
+                .sorted(Comparator.comparing(SessionView::startsAt)).toList();
+        List<RosterRequest> requests = completed.stream().map(session -> new RosterRequest(session.id(), session.localDate(),
+                session.batches().stream().map(SessionView.Batch::batchId).collect(Collectors.toSet()))).toList();
+        var rosters = Parallel.start(() -> enrollments.expectedStudentIds(academyId, requests));
+        Map<UUID, ClassFacts> byClass = facts.factsForClasses(academyId, completed.stream()
+                .map(session -> new FactWindow(session.id(), session.startsAt(), session.endsAt())).toList(), true);
+        Map<UUID, Set<UUID>> expected = Parallel.join(rosters);
+        Map<String, String> labels = new LinkedHashMap<>();
+        Map<UUID, Map<String, DirectoryParticipation>> byStudent = new HashMap<>();
+        for (SessionView session : completed) {
+            ClassFacts data = byClass.get(session.id());
+            if ("LIVE".equals(data.state())) continue;
+            String label = compactClassTitle(session.title());
+            String type = "type:" + label.strip().replaceAll("(?U)\\s+", " ").toLowerCase(Locale.ROOT);
+            labels.put(type, label);
+            long classSeconds = heldSeconds(session.startsAt(), session.endsAt(), now);
+            for (UUID studentId : expected.getOrDefault(session.id(), Set.of())) {
+                Cell cell = cell(data, studentId, classSeconds);
+                boolean joined = cell.visits() > 0 || cell.connectedSeconds() > 0;
+                boolean tracked = !"NO_WEBINAR".equals(data.state()) || joined || cell.outcome() != null;
+                byStudent.computeIfAbsent(studentId, id -> new HashMap<>()).merge(type,
+                        new DirectoryParticipation(tracked ? 1 : 0, joined ? 1 : 0), DirectoryParticipation::plus);
+            }
+        }
+        return new MonthlyDirectory(Parallel.join(directory).stream().map(student -> new DirectoryRow(student.id(),
+                student.studentNumber(), student.fullName(), byStudent.getOrDefault(student.id(), Map.of()))).toList(),
+                labels.entrySet().stream().map(entry -> new DirectoryClassType(entry.getKey(), entry.getValue()))
+                        .sorted(Comparator.comparing(DirectoryClassType::label, String.CASE_INSENSITIVE_ORDER)).toList());
+    }
+
+    private static String compactClassTitle(String title) {
+        String[] segments = title.split("\\|", 3);
+        return segments.length == 3 && !segments[0].isBlank() && !segments[1].isBlank()
+                ? segments[0].strip() + " | " + segments[1].strip() : title;
+    }
+
     /**
      * Staff see every batch of their academy.
      */
@@ -192,7 +252,7 @@ public class AttendanceInsightsService {
                 s.batches().stream().map(SessionView.Batch::batchId).collect(Collectors.toSet()))).toList();
         var rosters = Parallel.start(() -> enrollments.expectedStudentsBySession(caller.academyId(), requests));
         Map<UUID, ClassFacts> factsByClass = facts.factsForClasses(caller.academyId(), chosen.stream()
-                .map(s -> new FactWindow(s.id(), s.startsAt(), s.endsAt())).toList());
+                .map(s -> new FactWindow(s.id(), s.startsAt(), s.endsAt())).toList(), true);
         Map<UUID, List<ExpectedStudent>> expectedByClass = Parallel.join(rosters);
         List<Selected> selected = chosen.stream().map(s -> {
             Set<UUID> inSelection = selectedBatches.get(s.id());
@@ -356,7 +416,7 @@ public class AttendanceInsightsService {
         }
         var courseInfo = Parallel.start(() -> courses(academyId, enrolled.stream().map(EnrollmentView::courseId).collect(Collectors.toSet())));
         Map<UUID, ClassFacts> factsByClass = facts.factsForClasses(academyId, classes.stream()
-                .map(c -> new FactWindow(c.id(), c.startsAt(), c.endsAt())).toList());
+                .map(c -> new FactWindow(c.id(), c.startsAt(), c.endsAt())).toList(), false);
 
         List<ClassAttendance> rows = new ArrayList<>();
         Map<UUID, BatchAcc> perBatch = new LinkedHashMap<>();

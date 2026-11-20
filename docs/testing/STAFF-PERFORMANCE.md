@@ -8,7 +8,7 @@ Progress is the number of verified local items divided by the ten local items be
 | 2 | Run a reproducible signed-in synthetic baseline and record request errors and route p95. | Verified |
 | 3 | Batch Classes attendance facts. Verify expected, joined and academy scope and compare query work. | Verified |
 | 4 | Stream Classes, Students and Class Types with stable fallbacks and independent failure handling. | Verified |
-| 5 | Add and verify a durable, replay-safe completed attendance summary. Prove parity and rollback before enabling reads. | Pending |
+| 5 | Add and verify a durable, replay-safe completed attendance summary. Prove parity and rollback before enabling reads. | Verified locally. Disabled by default. |
 | 6 | Add a scoped Students monthly read with full-result filtering, ordering and aggregates. | Pending |
 | 7 | Poll live data independently of the page and preserve timeline recovery and completion. | Pending |
 | 8 | Load Reports options on demand and verify all export types. | Pending |

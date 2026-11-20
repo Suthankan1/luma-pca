@@ -19,6 +19,7 @@ page describes what exists. [ADRs](adr/) record decisions.
 - **Async:** a database queue (`FOR UPDATE SKIP LOCKED`) with retries, backoff, dead letters and an audited replay. There is
   no message broker; at one academy's volume none is needed.
 - **Live updates:** the staff and student class pages refresh themselves while a class runs; there is no server push (SSE).
+- **Completed attendance:** the optional PostgreSQL projection summarizes matched visits for fully reconciled classes. Official records and enrolments stay authoritative. Live and unreconciled data use source evidence. See [ADR 0008](adr/ADR-0008-completed-attendance-projection.md).
 - **Infrastructure as code, not applied:** AWS ECS Fargate, RDS, S3, WAF, CloudWatch alarms, AWS Backup (Terraform,
   validated in CI). Applying it needs the academy's AWS account and budget.
 

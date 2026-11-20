@@ -1659,6 +1659,52 @@ paths:
     post: {summary: "Bring the linked batch's enrolments in step with the Academy class: create missing students, enrol; never withdraws (staff; audited with counts only)", operationId: syncAcademyClass, tags: [Academy], security: [{bearerAuth: []}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [className], properties: {className: {type: string, maxLength: 200}}}}}}, responses: {'200': {description: "academyStudents, created, enrolled, alreadyEnrolled, withoutName, withoutEmail, withdrawnInLuma, inactiveInLuma, invalidIds, notInAcademyClass"}, '404': {description: Not linked}, '503': {description: The Academy database is not connected or unreachable}}}
   /api/v1/attendance/dashboard:
     get: {summary: "Attendance dashboard for staff in their academy: time in class (rejoins merged), share of class time, outcomes and per-class cells for the selected course or batch", operationId: attendanceDashboard, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: query, name: from, schema: {type: string, format: date}}, {in: query, name: to, schema: {type: string, format: date}}, {in: query, name: courseId, schema: {type: string, format: uuid}}, {in: query, name: batchId, schema: {type: string, format: uuid}}], responses: {'200': {description: "from, to, truncated, totals, classes[], students[] with cells[] in class order"}, '400': {description: Range over 92 days or reversed}}}
+  /api/v1/attendance/student-directory:
+    get:
+      summary: Compact monthly participation for staff in their academy
+      operationId: attendanceStudentDirectory
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: from, required: true, schema: {type: string, format: date}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: Directory and completed class types in the inclusive Asia/Colombo date range
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [students, classTypes]
+                properties:
+                  students:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, studentNumber, fullName, types]
+                      properties:
+                        id: {type: string, format: uuid}
+                        studentNumber: {type: string}
+                        fullName: {type: string}
+                        types:
+                          type: object
+                          additionalProperties:
+                            type: object
+                            required: [expected, joined]
+                            properties:
+                              expected: {type: integer, minimum: 0}
+                              joined: {type: integer, minimum: 0}
+                  classTypes:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, label]
+                      properties:
+                        key: {type: string}
+                        label: {type: string}
+        '400': {description: Invalid or unsupported date range}
+        '401': {description: Missing or invalid sign-in}
+        '403': {description: Staff access required}
   /api/v1/attendance/class-totals:
     get:
       summary: Joined and expected student counts per completed class visible to staff
