@@ -6,7 +6,7 @@ import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { accountStatusLabels, grantableRoles, isAcademyManager, roleList } from "@/lib/staff-forms";
 
-type StaffAccount = { id: string; email: string; roles: string[]; status: string; mfaEnrolled: boolean };
+type StaffAccount = { id: string; email: string; roles: string[]; status: string };
 
 export const metadata = { title: "Staff · LUMA" };
 
@@ -32,7 +32,6 @@ export default async function TeamPage() {
                 <span className="muted dir-dates"> · {roleList(person.roles)}</span></div>
               <div className="dir-meta">
                 <span className={`status ${person.status === "ACTIVE" ? "on" : "off"}`}>{accountStatusLabels[person.status] ?? person.status}</span>
-                {person.status === "ACTIVE" && <span className="status">{person.mfaEnrolled ? "2-step on" : "2-step off"}</span>}
               </div>
             </li>)}
           </ul>
@@ -40,7 +39,7 @@ export default async function TeamPage() {
       </section>
       <section className="panel" aria-labelledby="add-staff-title">
         <h2 id="add-staff-title" className="panel-title">ADD</h2>
-        <p className="panel-sub">{identity.roles.includes("ACADEMY_OWNER") ? "Owners and administrators must use two-step sign-in."
+        <p className="panel-sub">{identity.roles.includes("ACADEMY_OWNER") ? "New staff sign in with their email and password."
           : "Only an owner can add owners or administrators."}</p>
         <AddStaffForm grantable={grantableRoles(identity.roles)} />
       </section>

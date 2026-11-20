@@ -49,26 +49,14 @@ const backend = createServer(async (req, res) => {
         roles = ["STUDENT"];
         studentHasEnrolments = body.email === "student@example.invalid";
       } else if (body.email === "instructor@example.invalid") {
-        // Every staff role signs in with a second factor, as the API requires.
-        return send(200, { mfaRequired: true, mfaToken: "challenge-token-instructor", mfaExpiresIn: 300, mfaEnrolled: true });
+        // As the API: every staff role gets tokens straight from email and password.
+        roles = ["INSTRUCTOR"];
       } else if (body.email === "analyst@example.invalid") {
-        return send(200, { mfaRequired: true, mfaToken: "challenge-token-analyst", mfaExpiresIn: 300, mfaEnrolled: true });
-      } else if (body.email === "admin-unenrolled@example.invalid") {
-        return send(200, {
-          mfaRequired: true,
-          mfaToken: "challenge-token-unenrolled",
-          mfaExpiresIn: 300,
-          mfaEnrolled: false,
-        });
+        roles = ["ANALYST"];
       } else if (body.email === "owner-enrolled@example.invalid") {
-        return send(200, { mfaRequired: true, mfaToken: "challenge-token-owner", mfaExpiresIn: 300, mfaEnrolled: true });
-      } else if (body.email === "admin-enrolled@example.invalid") {
-        return send(200, {
-          mfaRequired: true,
-          mfaToken: "challenge-token-enrolled",
-          mfaExpiresIn: 300,
-          mfaEnrolled: true,
-        });
+        roles = ["ACADEMY_OWNER"];
+      } else if (body.email === "admin-enrolled@example.invalid" || body.email === "admin-unenrolled@example.invalid") {
+        roles = ["ACADEMY_ADMIN"];
       } else {
         return send(401);
       }
@@ -89,62 +77,6 @@ const backend = createServer(async (req, res) => {
       if (body.currentPassword !== "correct-password") return send(400, { detail: "The current password is not correct" });
       if ([...String(body.newPassword ?? "")].length < 12) return send(422, { detail: "Password too short" });
       return send(204);
-
-    case "/api/v1/auth/mfa/enroll":
-      if (body.mfaToken === "challenge-token-unenrolled") {
-        return send(200, {
-          secret: "JBSWY3DPEHPK3PXP",
-          otpauthUri: "otpauth://totp/Physics%20Cube%20Academy:admin@example.invalid?secret=JBSWY3DPEHPK3PXP&issuer=Physics%20Cube%20Academy",
-        });
-      }
-      return send(401);
-
-    case "/api/v1/auth/mfa/verify":
-      if (body.mfaToken === "challenge-token-unenrolled") {
-        if (body.code !== "123456") return send(401);
-        roles = ["ACADEMY_ADMIN"];
-        latestRefresh = issueRefresh();
-        return send(200, {
-          accessToken: jwt,
-          tokenType: "Bearer",
-          expiresIn: 300,
-          refreshToken: latestRefresh,
-          refreshExpiresIn: 600,
-          recoveryCodes: ["rec-1111", "rec-2222", "rec-3333", "rec-4444"],
-        });
-      }
-      if (body.mfaToken === "challenge-token-analyst") {
-        if (body.code !== "rec-recovery") return send(401);
-        roles = ["ANALYST"];
-        latestRefresh = issueRefresh();
-        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
-      }
-      if (body.mfaToken === "challenge-token-instructor") {
-        if (body.code !== "rec-recovery") return send(401);
-        roles = ["INSTRUCTOR"];
-        latestRefresh = issueRefresh();
-        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
-      }
-      if (body.mfaToken === "challenge-token-owner") {
-        if (body.code !== "rec-recovery") return send(401);
-        roles = ["ACADEMY_OWNER"];
-        latestRefresh = issueRefresh();
-        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
-      }
-      if (body.mfaToken === "challenge-token-enrolled") {
-        if (body.code !== "654321" && body.code !== "rec-recovery") return send(401);
-        roles = ["ACADEMY_ADMIN"];
-        latestRefresh = issueRefresh();
-        return send(200, {
-          accessToken: jwt,
-          tokenType: "Bearer",
-          expiresIn: 300,
-          refreshToken: latestRefresh,
-          refreshExpiresIn: 600,
-          recoveryCodes: null,
-        });
-      }
-      return send(401);
 
     // Activation codes: one letter repeated 43 times activates once ("U" is always used up),
     // so each browser project can use its own code. Anything else is unknown.
@@ -294,12 +226,12 @@ const uuid = () => `00000000-0000-4000-8000-${String(nextId++).padStart(12, "0")
 const SELF_ID = "00000000-0000-4000-8000-0000000000aa";
 // The signed-in administrator, an owner, an analyst, and staff added by tests.
 const staff = [
-  { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["ACADEMY_ADMIN"], status: "ACTIVE", mfaEnrolled: true, version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000bb", email: "owner@example.invalid", roles: ["ACADEMY_OWNER"], status: "ACTIVE", mfaEnrolled: true, version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000cc", email: "analyst@example.invalid", roles: ["ANALYST"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
+  { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["ACADEMY_ADMIN"], status: "ACTIVE", version: 0 },
+  { id: "00000000-0000-4000-8000-0000000000bb", email: "owner@example.invalid", roles: ["ACADEMY_OWNER"], status: "ACTIVE", version: 0 },
+  { id: "00000000-0000-4000-8000-0000000000cc", email: "analyst@example.invalid", roles: ["ANALYST"], status: "ACTIVE", version: 0 },
   // Active instructors the team spec disables and re-enables, one per browser project.
-  { id: "00000000-0000-4000-8000-0000000000d7", email: "former.d@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000d8", email: "former.m@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
+  { id: "00000000-0000-4000-8000-0000000000d7", email: "former.d@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", version: 0 },
+  { id: "00000000-0000-4000-8000-0000000000d8", email: "former.m@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", version: 0 },
 ];
 const assignments = [];
 const ELEVATED = ["ACADEMY_OWNER", "ACADEMY_ADMIN"];
@@ -1222,7 +1154,7 @@ function academicApi(req, body, send) {
       const email = String(body.email).trim().toLowerCase();
       if (body.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may grant the owner or administrator role");
       if (staff.some(s => s.email === email) || students.some(s => s.email === email)) return send(409, { detail: "An account with this email already exists" });
-      const created = { id: uuid(), email, roles: [...body.roles].sort(), status: "PENDING_ACTIVATION", mfaEnrolled: false, version: 0 };
+      const created = { id: uuid(), email, roles: [...body.roles].sort(), status: "PENDING_ACTIVATION", version: 0 };
       staff.push(created);
       audit("STAFF_ACCOUNT_CREATED", "ACCOUNT", created.id, created.email, { roles: created.roles });
       return send(201, created);

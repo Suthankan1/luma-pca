@@ -12,8 +12,6 @@ test("A running class's page updates itself, and staff can pause it", async ({ p
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 
   const C = `LIV-${p.toUpperCase()}`;

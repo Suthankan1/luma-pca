@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Shell } from "@/components/Shell";
-import { currentMfaChallenge, currentSession, studentIdLoginEnabled } from "@/lib/auth-server";
+import { currentSession, studentIdLoginEnabled } from "@/lib/auth-server";
 import { portalPath } from "@/lib/session-policy";
 
 const messages = {
@@ -23,7 +23,6 @@ export default async function SignIn({ searchParams }: {
   if (destination && error !== "sign-out" && (destination === "/staff" || destination === "/student")) {
     redirect(destination);
   }
-  const mfa = !identity && !canRefresh ? await currentMfaChallenge() : null;
   const message = error && Object.hasOwn(messages, error)
     ? messages[error as keyof typeof messages]
     : unavailable ? messages.unavailable : undefined;
@@ -46,14 +45,6 @@ export default async function SignIn({ searchParams }: {
         <form method="post" action="/api/session/logout" className="session-form">
           <button className="action secondary" type="submit">Sign out</button>
         </form>
-      </> : mfa ? <>
-        <p className="sub">Two-factor authentication is required to complete sign-in.</p>
-        <div className="nav-links">
-          <Link href="/sign-in/mfa" className="action">Continue verification</Link>
-          <form method="post" action="/api/session/mfa-cancel">
-            <button className="action secondary" type="submit">Cancel and restart</button>
-          </form>
-        </div>
       </> : <div className={studentIdLoginEnabled() && portal !== "staff" ? "signin-cards" : undefined}>
       {studentIdLoginEnabled() && portal !== "staff" && <form method="post" action="/api/session/student-login" className="session-form"
         aria-labelledby="student-sign-in">

@@ -1,11 +1,10 @@
-import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test, expect, devices, type Browser, type Page } from "@playwright/test";
 import { openSection } from "../e2e/support/ui";
 
 /**
- * Real stack, real browser: an administrator activates their invitation, enrols an
- * authenticator, sets up a course, batch and student, invites and enrols the student,
+ * Real stack, real browser: an administrator activates their invitation, signs in with
+ * email and password, sets up a course, batch and student, invites and enrols the student,
  * the student activates and signs in, and an instructor is invited, assigned, sees the
  * roster and the batch's class, and loses both when unassigned. Started by scripts/staff-ui-real-stack.sh.
  */
@@ -16,9 +15,8 @@ const mailpit = process.env.LUMA_REAL_MAILPIT_URL!;
 
 // The acceptance test below continues from the onboarding test's data and accounts.
 test.describe.configure({ mode: "serial" });
-let adminSecret = "";
+let adminSignedIn = false;
 let studentPassword = "";
-let lastAdminStep = 0;
 
 type MailpitList = { messages: { ID: string; Subject: string; To: { Address: string }[] }[] };
 
@@ -36,48 +34,19 @@ async function newestEmailTo(address: string) {
   throw new Error(`No email to ${address} arrived`);
 }
 
-/** RFC 6238 code (SHA-1, 6 digits, 30 s) for a Base32 secret, as an authenticator app computes it. */
-function totp(base32: string, at = Date.now()) {
-  // RFC 4648 Base32: A–Z then 2–7.
-  const alphabet = String.fromCharCode(...Array.from({ length: 26 }, (_, i) => 65 + i)) + "234567";
-  let bits = "";
-  for (const char of base32.replace(/\s/g, "").toUpperCase()) bits += alphabet.indexOf(char).toString(2).padStart(5, "0");
-  const key = Buffer.from(bits.match(/.{8}/g)!.map(byte => parseInt(byte, 2)));
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
-  const hash = createHmac("sha1", key).update(counter).digest();
-  const offset = hash[hash.length - 1] & 0x0f;
-  return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
-}
-
 /**
  * Classes are no longer scheduled in LUMA's screens (Zoom owns schedules). Steps that need a class with history create it
- * through the real API as the administrator (password + authenticator code), with manual scheduling switched on for this
+ * through the real API as the administrator (email and password), with manual scheduling switched on for this
  * test backend only (scripts/staff-ui-real-stack.sh).
  */
 const apiBase = process.env.LUMA_REAL_API_URL!;
 let apiToken = "";
-/** A code for a time step after the last one used (shared with the browser sign-ins), waiting for the clock when one step
- * of drift is not enough. */
-async function adminCode() {
-  for (;;) {
-    const current = Math.floor(Date.now() / 30_000);
-    const step = Math.max(current, lastAdminStep + 1);
-    if (step <= current + 1) {
-      lastAdminStep = step;
-      return totp(adminSecret, step * 30_000);
-    }
-    await new Promise(resolve => setTimeout(resolve, 2_000));
-  }
-}
 async function adminToken() {
   if (apiToken) return apiToken;
-  const login = await (await fetch(`${apiBase}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: adminEmail, password: passphrase }) })).json() as { mfaToken: string };
-  const verified = await fetch(`${apiBase}/api/v1/auth/mfa/verify`, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mfaToken: login.mfaToken, code: await adminCode() }) });
-  expect(verified.status, await verified.clone().text()).toBe(200);
-  apiToken = ((await verified.json()) as { accessToken: string }).accessToken;
+  const login = await fetch(`${apiBase}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: adminEmail, password: passphrase }) });
+  expect(login.status, await login.clone().text()).toBe(200);
+  apiToken = ((await login.json()) as { accessToken: string }).accessToken;
   return apiToken;
 }
 async function createClass(title: string, date: string, start: string, end: string, batch: string, webinar?: string) {
@@ -107,20 +76,12 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.getByRole("button", { name: "Activate account" }).click();
   await expect(page).toHaveURL(/\/sign-in\?activated=1$/);
 
-  // 2. First sign-in enrols an authenticator; recovery codes are shown once.
+  // 2. Email and password open the staff portal directly.
   await page.fill("#email", adminEmail);
   await page.fill("#password", passphrase);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Set up authenticator" })).toBeVisible();
-  const secret = (await page.locator("code.mfa-secret").innerText()).replace(/\s/g, "");
-  adminSecret = secret;
-  lastAdminStep = Math.floor(Date.now() / 30_000);
-  await page.fill("#code", totp(secret, lastAdminStep * 30_000));
-  await page.getByRole("button", { name: "Verify and save" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa\/recovery-codes/);
-  await page.getByLabel("I have safely saved or written down these recovery codes").check();
-  await page.getByRole("button", { name: "Continue to staff portal" }).click();
   await expect(page).toHaveURL(/\/staff$/);
+  adminSignedIn = true;
 
   // 3. Course and batch through the real API.
   await page.goto("/staff/courses");
@@ -324,7 +285,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   // Processing is off for this run, so the replayed event waits in the queue.
   await expect(failed).toContainText("1 event is waiting to be processed.");
 
-  // 8. The instructor activates, signs in with an authenticator (every staff role needs one) and sees only their batch.
+  // 8. The instructor activates, signs in with email and password and sees only their batch.
   const instructorContext = await browser.newContext();
   const instructor = await instructorContext.newPage();
   await instructor.goto(instructorInvite!);
@@ -335,13 +296,6 @@ test("an administrator onboards a student end to end on the real stack", async (
   await instructor.fill("#email", "real.instructor@example.invalid");
   await instructor.fill("#password", passphrase);
   await instructor.getByRole("button", { name: "Sign in" }).click();
-  await expect(instructor.getByRole("heading", { name: "Set up authenticator" })).toBeVisible();
-  const instructorSecret = (await instructor.locator("code.mfa-secret").innerText()).replace(/\s/g, "");
-  await instructor.fill("#code", totp(instructorSecret));
-  await instructor.getByRole("button", { name: "Verify and save" }).click();
-  await expect(instructor).toHaveURL(/\/sign-in\/mfa\/recovery-codes/);
-  await instructor.getByLabel("I have safely saved or written down these recovery codes").check();
-  await instructor.getByRole("button", { name: "Continue to staff portal" }).click();
   await expect(instructor).toHaveURL(/\/staff$/);
   await instructor.goto("/staff/courses");
   const mine = instructor.getByRole("region", { name: "YOUR BATCHES" });
@@ -511,18 +465,12 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.getByText("Finalised attendance of “Past real class”").first()).toBeVisible();
 });
 
-/** Signs the administrator in with password and authenticator code. */
+/** Signs the administrator in with email and password. */
 async function signInAdmin(page: Page) {
   await page.goto("/sign-in");
   await page.fill("#email", adminEmail);
   await page.fill("#password", passphrase);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa/);
-  // A code is accepted once: wait for the next 30-second step after the last one used.
-  while (Math.floor(Date.now() / 30_000) <= lastAdminStep) await page.waitForTimeout(1_000);
-  lastAdminStep = Math.floor(Date.now() / 30_000);
-  await page.fill("#code", totp(adminSecret, lastAdminStep * 30_000));
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
 
@@ -549,7 +497,7 @@ async function noSidewaysScroll(page: Page) {
 
 test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ page, browser }) => {
   test.setTimeout(150_000);
-  expect(adminSecret, "the onboarding test ran first").toBeTruthy();
+  expect(adminSignedIn, "the onboarding test ran first").toBeTruthy();
 
   // UAT 11: the student appeals the corrected class; an administrator accepts it as Present.
   let student = await signInStudent(browser);

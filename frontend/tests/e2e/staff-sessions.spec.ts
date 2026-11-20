@@ -7,9 +7,6 @@ async function signInAsAdmin(page: Page) {
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa/);
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
 
@@ -82,8 +79,6 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await page.fill("#email", "instructor@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.fill("#code", "rec-recovery");
-    await page.getByRole("button", { name: "Verify" }).click();
     await expect(page).toHaveURL(/\/staff$/);
     await page.goto("/staff/sessions?from=2027-01-03");
     await expect(page.locator(".banner")).toContainText("You see the classes of the batches you are assigned to.");

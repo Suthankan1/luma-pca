@@ -25,7 +25,7 @@ export default async function ResetPassword({ searchParams }: { searchParams: Pr
       <h1 className="heading">Choose a new password</h1>
       {message && <p className="session-error" role="alert">{message}</p>}
       {error === "invalid" && <p className="sub"><Link href="/forgot-password">Email me a new reset link</Link></p>}
-      <p className="sub">After this you’ll be signed out on every device. Staff still need their authenticator.</p>
+      <p className="sub">After this you’ll be signed out on every device.</p>
       <form method="post" action="/api/session/reset-confirm" className="session-form">
         <label htmlFor="token">Reset code</label>
         <input id="token" name="token" type="text" autoComplete="off" autoCapitalize="off" spellCheck={false}

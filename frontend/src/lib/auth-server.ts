@@ -5,30 +5,15 @@ import {
   cookieNames,
   hasPortal,
   openAccessSession,
-  openMfa,
-  openRecovery,
   portalPath,
   sessionKey,
   type Identity,
-  type MfaChallengeState,
   type Portal,
-  type RecoveryCodesState,
 } from "./session-policy";
-import {
-  type SessionTokens,
-  type MfaChallengeResponse,
-  type MfaEnrollmentResponse,
-  type MfaVerifiedTokens,
-} from "./auth-parsers";
+import { type SessionTokens } from "./auth-parsers";
 
-export type { SessionTokens, MfaChallengeResponse, MfaEnrollmentResponse, MfaVerifiedTokens };
-export {
-  validateTokens,
-  readTokens,
-  readMfaChallenge,
-  readMfaEnrollment,
-  readMfaVerification,
-} from "./auth-parsers";
+export type { SessionTokens };
+export { validateTokens, readTokens } from "./auth-parsers";
 
 export function config() {
   const origin = new URL(process.env.LUMA_WEB_ORIGIN ?? "http://localhost:3000");
@@ -52,7 +37,7 @@ export function studentIdLoginEnabled() {
 }
 
 export async function authRequest(
-  path: "login" | "student-id-login" | "refresh" | "logout" | "me" | "mfa/enroll" | "mfa/verify" | "activate"
+  path: "login" | "student-id-login" | "refresh" | "logout" | "me" | "activate"
     | "password-reset/request" | "password-reset/confirm",
   options?: ({ body: object } | { access: string }) & { client?: string | null }
 ) {
@@ -99,28 +84,6 @@ export async function currentSession() {
     };
   } catch {
     return { identity: null, canRefresh: hasCookie("refresh"), unavailable: true };
-  }
-}
-
-export async function currentMfaChallenge(): Promise<MfaChallengeState | null> {
-  const cookieJar = await cookies();
-  try {
-    const { names, key } = config();
-    const sealed = cookieJar.get(names.mfa)?.value;
-    return sealed ? openMfa(sealed, key) : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function currentRecoveryCodes(): Promise<RecoveryCodesState | null> {
-  const cookieJar = await cookies();
-  try {
-    const { names, key } = config();
-    const sealed = cookieJar.get(names.recovery)?.value;
-    return sealed ? openRecovery(sealed, key) : null;
-  } catch {
-    return null;
   }
 }
 

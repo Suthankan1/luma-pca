@@ -36,8 +36,6 @@ test("An owner erases a student's personal data after typing the number again", 
   await page.fill("#email", "owner-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 
   await page.goto("/staff/students");

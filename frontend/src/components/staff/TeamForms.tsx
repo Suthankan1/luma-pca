@@ -92,7 +92,7 @@ export function EnableForm({ id, email, hadPassword }: { id: string; email: stri
     <h3 className="form-title">Re-enable account</h3>
     <input type="hidden" name="id" value={id} />
     <p className="panel-sub">{hadPassword
-      ? `${email} can sign in again with their existing password (and 2-step sign-in, if they had it). Sessions ended when the account was disabled stay ended.`
+      ? `${email} can sign in again with their existing password. Sessions ended when the account was disabled stay ended.`
       : `${email} never set a password, so they will need a new invitation.`}</p>
     {hadPassword && <label className="check-row"><input type="checkbox" name="requireNewPassword" value="yes" />
       Make them choose a new password (send a new invitation afterwards)</label>}

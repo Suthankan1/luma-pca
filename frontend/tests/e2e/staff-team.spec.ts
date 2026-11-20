@@ -1,14 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 
-/** Signs in as the mock administrator (role ACADEMY_ADMIN, not owner) with MFA. */
+/** Signs in as the mock administrator (role ACADEMY_ADMIN, not owner). */
 async function signInAsAdmin(page: Page) {
   await page.goto("/sign-in");
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa/);
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
 
@@ -161,8 +158,6 @@ test.describe("Staff accounts and batch assignments", () => {
     await page.fill("#email", "instructor@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.fill("#code", "rec-recovery");
-    await page.getByRole("button", { name: "Verify" }).click();
     await expect(page).toHaveURL(/\/staff$/);
     await page.goto("/staff/team");
     await expect(page.locator(".banner")).toContainText("Only academy owners and administrators manage staff accounts.");

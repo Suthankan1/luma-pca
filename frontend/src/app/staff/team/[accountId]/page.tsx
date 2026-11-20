@@ -8,7 +8,7 @@ import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { accountStatusLabels, canManageStaff, grantableRoles, isAcademyManager, roleList, uuidOrNull } from "@/lib/staff-forms";
 
-type StaffAccount = { id: string; email: string; roles: string[]; status: string; mfaEnrolled: boolean; version: number; passwordSet?: boolean };
+type StaffAccount = { id: string; email: string; roles: string[]; status: string; version: number; passwordSet?: boolean };
 
 export const metadata = { title: "Staff member · LUMA" };
 
@@ -29,7 +29,7 @@ export default async function StaffMemberPage({ params }: { params: Promise<{ ac
   const self = person.id === identity.accountId;
   const manageable = canManageStaff(identity, person);
   return <StaffShell {...base} title={person.email}
-    subtitle={`${roleList(person.roles)} · ${accountStatusLabels[person.status] ?? person.status}${person.status === "ACTIVE" ? (person.mfaEnrolled ? " · 2-step sign-in on" : " · 2-step sign-in off") : ""}`}>
+    subtitle={`${roleList(person.roles)} · ${accountStatusLabels[person.status] ?? person.status}`}>
     <p><Link className="text-link" href="/staff/team">← All staff</Link></p>
     <div className="staff-grid">
       <section className="panel" aria-labelledby="roles-title">
