@@ -681,9 +681,22 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .report-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:14px; }
 .report-options > .panel { min-width:0; }
 .report-selection { display:grid; gap:8px; margin-top:14px; }
-.report-selection label { color:var(--ink-2); font-size:13px; font-weight:600; }
-.report-selection select { width:100%; min-width:0; min-height:42px; padding:8px; border:1px solid #9fb5cb; border-radius:8px; background:#fff; }
-.report-selection button { justify-self:start; margin-top:4px; }
+.report-selection > label { color:var(--ink-2); font-size:13px; font-weight:600; }
+.report-selection input[type="search"] { width:100%; min-width:0; min-height:42px; padding:8px 10px; border:1px solid #9fb5cb; border-radius:9px; background:#fff; color:var(--ink); }
+.report-record-list { min-width:0; min-height:82px; max-height:250px; overflow:auto; border:1px solid var(--line); border-radius:10px; background:#f6f9fc; }
+.report-record { display:flex; align-items:center; gap:10px; padding:10px; min-height:44px; cursor:pointer; }
+.report-record + .report-record { border-top:1px solid var(--line); }
+.report-record:hover { background:#eef5fb; }
+.report-record:has(:checked) { background:#e0f2f7; box-shadow:inset 3px 0 #167c9a; }
+.report-record:has(:focus-visible) { outline:2px solid var(--pca-blue); outline-offset:-2px; }
+.report-record input { flex:none; accent-color:#116d82; }
+.report-record span { min-width:0; overflow-wrap:anywhere; }
+.report-record strong, .report-record small { display:block; }
+.report-record strong { font-size:13px; line-height:1.4; }
+.report-record small { margin-top:2px; color:var(--ink-3); font-size:12px; }
+.report-no-results { padding:4px 10px; }
+.report-selection-footer { display:grid; justify-items:start; gap:8px; }
+.report-selection-footer p { overflow-wrap:anywhere; }
 .student-month-average { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:8px 16px; }
 .student-month-average span { display:block; font-size:13px; color:var(--ink-2); }
 .student-month-average strong, .student-month-summary strong { display:block; color:#116d70; font-size:clamp(24px,4vw,36px); font-variant-numeric:tabular-nums; }

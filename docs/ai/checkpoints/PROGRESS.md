@@ -2696,3 +2696,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The staff Reports tab defaults to the current Sri Lanka month. Staff can choose up to 12 months and export one completed session, class type, or student as an Excel workbook. Each report uses the existing staff-scoped APIs, safe string and numeric cells, and private no-store responses. Successful workbook generation records the actor, academy, report kind, and period in the web server log.
 - Passed 81 unit tests, TypeScript, ESLint, the structure check, and npm audit. Four desktop/mobile mock browser checks opened all three downloaded workbooks, verified month boundaries and staff-only access. The running Supabase-backed API reported UP, sign-in returned 200, and the new routes redirected signed-out requests. Signed-in downloads against original data were not run.
 - Frontend-only rollout with the locked workbook dependency. Revert this commit to roll back. No migration is needed.
+
+## Searchable report selection (2026-11-21)
+
+- Each report uses a scrollable single-selection list with a search field. Students can be found by name or registration ID, including IDs entered without separators. The selected record remains visible in the footer while searching, and the download uses the same validated report route.
+- Passed 81 unit tests, TypeScript, targeted ESLint, and the structure check. Four desktop and mobile mock browser checks covered student search, selection during filtering, all three Excel downloads, and access guards. Live API readiness and the signed-out Reports redirect passed. Signed-in original data was not tested.
+- Frontend-only change. Revert this commit to roll back.
