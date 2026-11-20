@@ -51,7 +51,7 @@ export function describeActivity(event: ActivityEvent): { summary: string; detai
     case "STAFF_ACCOUNT_DISABLED": return { summary: `Disabled ${target}` };
     case "STAFF_ACCOUNT_ENABLED": return { summary: `Re-enabled ${target}`,
       detail: d.newPasswordRequired === "true" ? "A new password is required" : "Existing password kept" };
-    case "OWNER_BOOTSTRAPPED": return { summary: `Created the first staff account, ${target}` };
+    case "OWNER_BOOTSTRAPPED": return { summary: `The operator added staff member ${target}` };
     case "INVITATION_ISSUED": return { summary: `Issued an invitation for ${target}`,
       detail: d.delivery === "EMAIL" ? (d.bulk === "true" ? "Emailed (bulk)" : "Emailed") : "Link copied by staff" };
     case "INVITATIONS_QUEUED": return { summary: `Queued ${count(d.queued, "invitation email")}`,

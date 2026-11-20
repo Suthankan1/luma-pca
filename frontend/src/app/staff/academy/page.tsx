@@ -73,9 +73,9 @@ export default async function AcademyClassesPage() {
           existing batch instead if the class already has one with history.</li>
         <li><strong>Sync students</strong> adds students who joined the Academy class since. Nobody is removed automatically: students
           who left are listed so you can decide on the batch roster.</li>
-        <li>Then add the class’s Zoom webinar under <Link className="text-link" href="/staff/webinars">Webinars</Link> (its ID or link
+        <li>Then track the class’s Zoom link under <Link className="text-link" href="/staff/sessions">Classes</Link> (its ID or link
           only). When the webinar’s Zoom title matches the Academy class, each run expects these students; otherwise choose the class
-          there.</li>
+          under “Tracked Zoom links” there.</li>
         <li>LUMA never changes the Academy’s records and never reads its attendance table.</li>
       </ul>
     </Disclosure>

@@ -136,17 +136,6 @@ export function studentListHref(options: { after?: string | null; status?: strin
   return `/staff/students${query ? `?${query}` : ""}`;
 }
 
-/** Any staff member manages any other staff account except their own (nobody disables themselves). */
-export function canManageStaff(caller: { accountId: string; roles: readonly string[] }, target: { id: string }) {
-  return caller.accountId !== target.id && isStaff(caller.roles);
-}
-
-export function parseStaffForm(form: FormData): { email: string } | { error: string } {
-  const email = text(form, "email");
-  if (email.length > 254 || !emailShape.test(email)) return { error: "Enter a valid email address." };
-  return { email };
-}
-
 // ---- Class sessions -------------------------------------------------------------
 // The API stores instants (UTC) plus the IANA zone the class is taught in. People type
 // a date and clock times in that zone; these helpers convert both ways with Intl only.

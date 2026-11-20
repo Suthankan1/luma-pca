@@ -99,7 +99,7 @@ export default async function SessionPage({ params }: { params: Promise<{ sessio
           <div><dt>Zoom’s report</dt><dd>{run.reported ? "Received (final source)" : run.state === "LIVE" ? "After the webinar" : "Waiting for Zoom"}</dd></div>
           <div><dt>Academy class</dt><dd>{run.classResolved ? run.academyClassName : "Unresolved: no students expected"}</dd></div>
         </dl>
-        <p className="link-row"><Link className="text-link" href="/staff/webinars">Webinars →</Link></p>
+        <p className="link-row"><Link className="text-link" href="/staff/sessions">Tracked Zoom links →</Link></p>
       </section>
       : <section className="panel" aria-labelledby="zoom-run-title">
         <h2 id="zoom-run-title" className="panel-title">ZOOM</h2>

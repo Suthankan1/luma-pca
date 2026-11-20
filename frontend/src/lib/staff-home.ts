@@ -121,7 +121,7 @@ export function calendarEntries(sessions: readonly ClassSession[], monitors: rea
       const endsAt = new Date(start + minutes * 60_000).toISOString();
       add(instantParts(o.startTime, ACADEMY_TIME_ZONE).date, { key: `${m.webinarId}-${o.occurrenceId ?? o.startTime}`, sessionId: null,
         title: m.topic ?? "Zoom webinar", startsAt: o.startTime, endsAt, timeZone: m.timeZone ?? ACADEMY_TIME_ZONE, source: "zoom",
-        state: now < start ? "upcoming" : now < Date.parse(endsAt) ? "now" : "ended", href: "/staff/webinars" });
+        state: now < start ? "upcoming" : now < Date.parse(endsAt) ? "now" : "ended", href: "/staff/sessions" });
     }
   }
   for (const entries of byDay.values()) entries.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));

@@ -5,8 +5,8 @@ import { openSection } from "../e2e/support/ui";
 /**
  * Real stack, real browser: a staff member activates their invitation, signs in with
  * email and password, sets up a course, batch and student, invites and enrols the student,
- * the student activates and signs in, and a colleague is invited, sees everything staff see
- * (two roles: STAFF and STUDENT), and is signed out everywhere when disabled. Started by scripts/staff-ui-real-stack.sh.
+ * the student activates and signs in, and a colleague added by the operator command activates and sees
+ * everything staff see (two roles: STAFF and STUDENT; no staff page). Started by scripts/staff-ui-real-stack.sh.
  */
 const adminEmail = "smoke.admin@example.invalid";
 const adminInvite = process.env.LUMA_REAL_ADMIN_INVITE!;
@@ -198,20 +198,11 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(imported).toHaveURL(/\/sign-in\?activated=1$/);
   await importedContext.close();
 
-  // 7. A colleague is added by email (every staff account has the same STAFF access) and invited.
+  // 7. A colleague was added by the operator command (no staff page); the script passes their activation link.
+  const instructorInvite = process.env.LUMA_REAL_COLLEAGUE_INVITE;
+  expect(instructorInvite).toBeTruthy();
   await page.goto("/staff/team");
-  await page.locator("#staff-email").fill("real.instructor@example.invalid");
-  await page.getByRole("button", { name: "Add staff member" }).click();
-  await expect(page.locator("#staff-feedback")).toHaveText("real.instructor@example.invalid added. Open their record to send an invitation.");
-  await page.getByRole("link", { name: "Open their record →" }).click();
-  // Emailed this time (the student's was a copied link): the link reaches only the colleague.
-  await page.getByRole("button", { name: "Email invitation" }).click();
-  await expect(page.locator("#invite-feedback")).toContainText("Invitation emailed to real.instructor@example.invalid.");
-  await expect(page.getByLabel("Invitation link")).toHaveCount(0);
-  const invitationEmail = await newestEmailTo("real.instructor@example.invalid");
-  expect(invitationEmail.subject).toBe("Your Physics Cube Academy LUMA account");
-  const instructorInvite = /http:\/\/127\.0\.0\.1:\d+\/activate#token=[A-Za-z0-9_-]{43}/.exec(invitationEmail.text)?.[0];
-  expect(instructorInvite, invitationEmail.text).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
 
   await page.goto("/staff/courses");
   await page.getByRole("link", { name: /MON/ }).first().click();
@@ -245,10 +236,10 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(portal.getByRole("region", { name: "MY BATCHES" })).toContainText("from 12 Jan 2027");
   await studentAgain.close();
 
-  // 7b''. LUMA no longer schedules classes or weekly series: the Classes page points to Zoom webinar monitoring.
+  // 7b''. LUMA no longer schedules classes or weekly series: the Classes page tracks Zoom links instead.
   await page.goto("/staff/sessions");
   await expect(page.locator("#schedule-title, #series-title")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "WHERE CLASSES COME FROM" })).toContainText("Zoom owns the schedule");
+  await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" })).toBeVisible();
 
   // 7c. Zoom review against the seeded occurrences: scheduling the class already linked the one
   // on its webinar and time (re-running the matcher finds nothing more); the other occurrence is
@@ -300,21 +291,12 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(colleague.getByRole("region", { name: "CLASSES" })).toContainText("Real stack class");
   await colleague.goto(classUrl);
   await expect(colleague.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
-  for (const path of ["/staff/students", "/staff/zoom", "/staff/team", "/staff/webinars", "/staff/activity"]) {
+  for (const path of ["/staff/students", "/staff/zoom", "/staff/activity"]) {
     await colleague.goto(path);
     await expect(colleague.locator(".banner").filter({ hasText: /Only academy owners/ })).toHaveCount(0);
   }
-  await colleague.goto("/staff/team");
-  await expect(colleague.getByRole("button", { name: "Add staff member" })).toBeVisible();
 
-  // 9. Disabling the colleague signs them out everywhere at once.
-  await page.goto("/staff/team");
-  await page.getByRole("link", { name: "real.instructor@example.invalid" }).click();
-  await page.getByLabel("Sign this person out everywhere and block sign-in").check();
-  await page.getByRole("button", { name: "Disable account" }).click();
-  await expect(page.locator(".sub").first()).toContainText("Account disabled");
-  await colleague.goto(rosterUrl);
-  await expect(colleague).toHaveURL(/\/sign-in/);
+  // 9. Blocking the colleague is the operator's runbook SQL; the script runs it after this test and checks sign-in fails.
   await colleagueContext.close();
 
   // 10. The student forgets their password: the link arrives by real SMTP and works once.

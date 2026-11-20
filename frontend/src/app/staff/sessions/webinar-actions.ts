@@ -20,11 +20,12 @@ export async function addWebinar(_previous: FormState, form: FormData): Promise<
   if (!text || text.length > 500) return { ok: false, message: "Paste the webinar’s ID or join link.", values: { webinar: text.slice(0, 300) } };
   const result = await staffApi<WebinarMonitor>("/api/v1/zoom/monitors", { method: "POST", body: { webinar: text } }, 20000);
   if (!result.ok) return { ok: false, message: zoomProblem(result.status, result.detail), values: { webinar: text.slice(0, 300) } };
-  revalidatePath("/staff/webinars");
-  return { ok: true, message: `Monitoring “${result.data.topic ?? result.data.webinarId}”. Every run Zoom starts is now recorded.` };
+  revalidatePath("/staff/sessions");
+  revalidatePath("/staff");
+  return { ok: true, message: `Tracking “${result.data.topic ?? result.data.webinarId}”. Its Zoom classes now show here, with attendance from each run.` };
 }
 
-/** Refresh from Zoom, stop or resume monitoring, or set the Academy class: one action per webinar card. */
+/** Refresh from Zoom, stop or resume tracking, or set the Academy class: one action per tracked webinar. */
 export async function webinarAction(_previous: FormState, form: FormData): Promise<FormState> {
   await requireSameOriginAction();
   const id = uuidOrNull(form.get("monitorId"));
@@ -37,7 +38,7 @@ export async function webinarAction(_previous: FormState, form: FormData): Promi
     done = result.ok && result.data.syncStatus !== "OK" ? (result.data.syncError ?? "Zoom could not be read.") : "Read again from Zoom.";
   } else if (intent === "stop" || intent === "resume") {
     result = await staffApi<WebinarMonitor>(`/api/v1/zoom/monitors/${id}/${intent}`, { method: "POST", body: {} });
-    done = intent === "stop" ? "Monitoring stopped. The Zoom webinar is unchanged; past runs are kept." : "Monitoring resumed.";
+    done = intent === "stop" ? "Tracking stopped. The Zoom webinar is unchanged; past classes are kept." : "Tracking again.";
   } else if (intent === "class") {
     const name = form.get("academyClassName");
     const className = typeof name === "string" && name.trim() ? name.trim().slice(0, 200) : null;
@@ -47,6 +48,7 @@ export async function webinarAction(_previous: FormState, form: FormData): Promi
     return { ok: false, message: "That request was not valid. Reload the page." };
   }
   if (!result.ok) return { ok: false, message: zoomProblem(result.status, result.detail) };
-  revalidatePath("/staff/webinars");
+  revalidatePath("/staff/sessions");
+  revalidatePath("/staff");
   return { ok: true, message: done };
 }

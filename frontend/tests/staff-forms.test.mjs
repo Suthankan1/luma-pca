@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canManageStaff, parseStaffForm, academyToday, formatDate, isStaff, parseBatchForm, parseCourseForm, parseEnrollForm, parseStudentForm, problemMessage, studentListHref, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
+import { academyToday, formatDate, isStaff, parseBatchForm, parseCourseForm, parseEnrollForm, parseStudentForm, problemMessage, studentListHref, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
 import * as forms from "../src/lib/staff-forms.ts";
 
 const form = fields => {
@@ -94,22 +94,6 @@ test("student list links keep the filter and the paging cursor", () => {
   assert.equal(studentListHref({ status: "active" }), "/staff/students");
   assert.equal(studentListHref({ status: "all", after: "PCA-050" }), "/staff/students?status=all&after=PCA-050");
   assert.equal(studentListHref({ status: "inactive" }), "/staff/students?status=inactive");
-});
-
-test("any staff member manages any other staff account, never their own", () => {
-  const me = { accountId: "me", roles: ["STAFF"] };
-  assert.equal(canManageStaff(me, { id: "me" }), false);
-  assert.equal(canManageStaff(me, { id: "colleague" }), true);
-  assert.equal(canManageStaff({ accountId: "s", roles: ["STUDENT"] }, { id: "colleague" }), false);
-});
-
-test("the staff form needs only a valid email", () => {
-  const data = new FormData();
-  data.set("email", " teacher@example.invalid ");
-  data.append("roles", "ACADEMY_OWNER");
-  assert.deepEqual(parseStaffForm(data), { email: "teacher@example.invalid" }, "a submitted role is ignored");
-  assert.ok("error" in parseStaffForm(form({ email: "nope" })));
-  assert.ok("error" in parseStaffForm(form({ email: `${"a".repeat(250)}@example.invalid` })));
 });
 
 test("class times convert between the academy zone and UTC", () => {

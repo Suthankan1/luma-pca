@@ -55,12 +55,13 @@ test.describe("Classes (Zoom owns schedules)", () => {
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }
     await expect(page.locator("#schedule-title, #series-title")).toHaveCount(0);
-    const where = page.getByRole("region", { name: "WHERE CLASSES COME FROM" });
-    await expect(where).toContainText("Zoom owns the schedule");
-    await expect(where.getByRole("link", { name: "Webinars →" })).toHaveAttribute("href", "/staff/webinars");
-    const row = page.getByRole("listitem").filter({ hasText: `Waves ${p}` });
-    await expect(row).toContainText("Wed 6 Jan 2027 · 18:00–20:00");
-    await expect(row.locator(".status")).toHaveText("Scheduled before");
+    // One screen: tracking a Zoom link sits above the classes, grouped by day.
+    await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" })).toBeVisible();
+    const day = page.getByRole("region", { name: "CLASSES" }).getByRole("group", { name: "Wednesday 6 January 2027" });
+    const row = day.getByRole("listitem").filter({ hasText: `Waves ${p}` });
+    await expect(row).toContainText("18:00–20:00");
+    await expect(row.getByRole("link")).toHaveAttribute("href", `/staff/sessions/${old.id}`);
+    await expect(page.locator("#class-batch")).toHaveCount(0);
 
     // Its page keeps the expected students and attendance, without any way to change the class.
     await page.goto(`/staff/sessions/${old.id}`);
@@ -69,8 +70,8 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await expect(page.locator("#edit-title, #edit-date, #status-select")).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Save changes|Cancel class|Restore class/ })).toHaveCount(0);
 
-    // The old import route now leads to monitoring.
+    // The old import route now leads to the Classes screen, where Zoom links are tracked.
     await page.goto("/staff/zoom/import");
-    await expect(page).toHaveURL(/\/staff\/webinars$/);
+    await expect(page).toHaveURL(/\/staff\/sessions$/);
   });
 });

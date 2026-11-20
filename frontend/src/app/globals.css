@@ -641,6 +641,11 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .home-day-list li + li { border-top:1px solid var(--line-soft); }
 .home-entry a { display:grid; grid-template-columns:92px minmax(0,1fr) auto; align-items:center; gap:12px; padding:11px 6px; border-radius:8px; color:var(--ink); transition:background-color .15s ease; }
 .home-entry a:hover { background:#f5f8fc; }
+/* Classes screen: rows for Zoom's scheduled classes have no page yet, so they are not links. */
+.home-entry-static { display:grid; grid-template-columns:92px minmax(0,1fr) auto; align-items:center; gap:12px; padding:11px 6px; color:var(--ink); }
+.class-day + .class-day { margin-top:14px; }
+.class-day-title { margin:12px 0 2px; color:var(--ink-2); font-size:13px; font-weight:700; }
+.tracked-link .webinar-actions { margin-top:8px; }
 .home-entry-time { color:var(--ink-2); font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
 .home-entry-copy { display:grid; gap:1px; min-width:0; }
 .home-entry-copy .one-line-text { font-size:14px; font-weight:600; }
@@ -715,7 +720,7 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
   .live-row { grid-template-columns:auto minmax(0,1fr); }
   .live-figures { grid-column:1 / -1; justify-content:flex-start; }
   .live-figures div { text-align:start; }
-  .home-entry a { grid-template-columns:minmax(0,1fr) auto; gap:2px 12px; }
+  .home-entry a, .home-entry-static { grid-template-columns:minmax(0,1fr) auto; gap:2px 12px; }
   .home-entry-time { grid-column:1 / -1; }
   .home-strip-when { width:100%; }
 }

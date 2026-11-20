@@ -54,8 +54,7 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
   const current = roster.data.filter(e => !e.withdrawnOn);
   return <StaffShell {...shell} title={`${b.code} ${b.name}`}
     subtitle={`${formatDate(b.startsOn)}${b.endsOn ? ` – ${formatDate(b.endsOn)}` : " onwards"}${b.active ? "" : " · Inactive batch"}`}>
-    <p className="link-row"><Link className="text-link" href="/staff/courses">← Courses &amp; batches</Link>
-      <Link className="text-link" href={`/staff/sessions?batch=${batchId}`}>Classes for this batch →</Link></p>
+    <p className="link-row"><Link className="text-link" href="/staff/courses">← Courses &amp; batches</Link></p>
     <section className="panel" aria-labelledby="roster-title">
       <h2 id="roster-title" className="panel-title">ROSTER</h2>
       <p className="panel-sub">{current.length} enrolled{roster.data.length > current.length ? ` · ${roster.data.length - current.length} withdrawn` : ""}</p>

@@ -35,7 +35,7 @@ const backend = createServer(async (req, res) => {
     return insightsApi(req, send);
   }
 
-  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|class-sessions|zoom|audit-events|attendance|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|class-sessions|zoom|audit-events|attendance|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -219,13 +219,9 @@ const batches = [];
 let nextId = 1;
 const uuid = () => `00000000-0000-4000-8000-${String(nextId++).padStart(12, "0")}`;
 const SELF_ID = "00000000-0000-4000-8000-0000000000aa";
-// The signed-in staff member, a colleague, and staff added by tests. Every staff account has the one STAFF role.
+// Staff accounts are managed by the operator (no staff API); invitations may still target one that is pending.
 const staff = [
   { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["STAFF"], status: "ACTIVE", version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000bb", email: "owner@example.invalid", roles: ["STAFF"], status: "ACTIVE", version: 0 },
-  // Active colleagues the team spec disables and re-enables, one per browser project.
-  { id: "00000000-0000-4000-8000-0000000000d7", email: "former.d@example.invalid", roles: ["STAFF"], status: "ACTIVE", version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000d8", email: "former.m@example.invalid", roles: ["STAFF"], status: "ACTIVE", version: 0 },
 ];
 const students = [];
 const enrollments = [];
@@ -1148,40 +1144,6 @@ function academicApi(req, body, send) {
       if (student.version !== body.version) return stale();
       Object.assign(student, { fullName: body.fullName, active: body.active, version: student.version + 1 });
       return send(200, publicStudent(student));
-    }
-    return send(405);
-  }
-
-  if (collection === "staff-accounts") {
-    const forbidden = detail => send(403, { detail });
-    if (req.method === "GET" && !id) return send(200, staff);
-    if (req.method === "POST" && !id) {
-      const email = String(body.email).trim().toLowerCase();
-      if (staff.some(s => s.email === email) || students.some(s => s.email === email)) return send(409, { detail: "An account with this email already exists" });
-      const created = { id: uuid(), email, roles: ["STAFF"], status: "PENDING_ACTIVATION", version: 0 };
-      staff.push(created);
-      audit("STAFF_ACCOUNT_CREATED", "ACCOUNT", created.id, created.email, { roles: created.roles });
-      return send(201, created);
-    }
-    const person = staff.find(s => s.id === id);
-    if (!person) return notFound();
-    if (req.method === "GET") return send(200, person);
-    if (person.id === SELF_ID) return forbidden("You cannot disable your own account");
-    if (req.method === "POST" && sub === "disable") {
-      if (person.status !== "DISABLED") {
-        person.passwordSet = person.status === "ACTIVE" || person.passwordSet === true;
-        audit("STAFF_ACCOUNT_DISABLED", "ACCOUNT", person.id, person.email, {});
-      }
-      Object.assign(person, { status: "DISABLED" });
-      return send(200, person);
-    }
-    if (req.method === "POST" && sub === "enable") {
-      if (person.status === "DISABLED") {
-        const fresh = body?.requireNewPassword === true || !person.passwordSet;
-        Object.assign(person, { status: fresh ? "PENDING_ACTIVATION" : "ACTIVE", passwordSet: !fresh, version: person.version + 1 });
-        audit("STAFF_ACCOUNT_ENABLED", "ACCOUNT", person.id, person.email, { newPasswordRequired: String(fresh), statusNow: person.status });
-      }
-      return send(200, person);
     }
     return send(405);
   }
