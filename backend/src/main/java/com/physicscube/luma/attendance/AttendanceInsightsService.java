@@ -1,6 +1,7 @@
 package com.physicscube.luma.attendance;
 
 import com.physicscube.luma.attendance.ProvisionalAttendanceService.ClassFacts;
+import com.physicscube.luma.attendance.ProvisionalAttendanceService.FactWindow;
 import com.physicscube.luma.attendance.ProvisionalAttendanceService.FinalOutcome;
 import com.physicscube.luma.attendance.ProvisionalAttendanceService.StudentFacts;
 import com.physicscube.luma.attendance.ProvisionalAttendanceService.Visit;
@@ -33,9 +34,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Semaphore;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -51,8 +49,6 @@ public class AttendanceInsightsService {
     static final ZoneId ACADEMY_ZONE = ZoneId.of(ClassSessionService.DEFAULT_TIME_ZONE);
     /** At most this many classes per dashboard (the most recent); more is reported as truncated. */
     static final int MAX_CLASSES = 80;
-    /** Classes computed at the same time: each takes database connections. */
-    private static final int CONCURRENCY = 6;
     private static final int RECENT_COMPLETED_CLASSES = 5;
 
     private final ClassSessionService sessions;
@@ -185,19 +181,25 @@ public class AttendanceInsightsService {
         boolean truncated = found.size() > MAX_CLASSES;
         List<SessionView> chosen = truncated ? found.subList(found.size() - MAX_CLASSES, found.size()) : found;
 
-        Semaphore permits = new Semaphore(CONCURRENCY);
-        List<CompletableFuture<Selected>> tasks = new ArrayList<>();
+        Map<UUID, Set<UUID>> selectedBatches = new HashMap<>();
         for (SessionView session : chosen) {
             Set<UUID> inSelection = session.batches().stream()
                     .filter(b -> (batchId == null || batchId.equals(b.batchId())) && (courseId == null || courseId.equals(b.courseId())))
                     .map(SessionView.Batch::batchId).collect(Collectors.toSet());
-            tasks.add(Parallel.start(limited(permits, () -> {
-                List<ExpectedStudent> expected = sessions.expectedStudents(caller, session).stream()
-                        .filter(e -> e.batchIds().stream().anyMatch(inSelection::contains)).toList();
-                return new Selected(session, expected, facts.factsFor(caller.academyId(), session.id(), session.startsAt(), session.endsAt()));
-            })));
+            selectedBatches.put(session.id(), inSelection);
         }
-        List<Selected> selected = tasks.stream().map(Parallel::join).toList();
+        List<RosterRequest> requests = chosen.stream().map(s -> new RosterRequest(s.id(), s.localDate(),
+                s.batches().stream().map(SessionView.Batch::batchId).collect(Collectors.toSet()))).toList();
+        var rosters = Parallel.start(() -> enrollments.expectedStudentsBySession(caller.academyId(), requests));
+        Map<UUID, ClassFacts> factsByClass = facts.factsForClasses(caller.academyId(), chosen.stream()
+                .map(s -> new FactWindow(s.id(), s.startsAt(), s.endsAt())).toList());
+        Map<UUID, List<ExpectedStudent>> expectedByClass = Parallel.join(rosters);
+        List<Selected> selected = chosen.stream().map(s -> {
+            Set<UUID> inSelection = selectedBatches.get(s.id());
+            List<ExpectedStudent> expected = expectedByClass.getOrDefault(s.id(), List.of()).stream()
+                    .filter(e -> e.batchIds().stream().anyMatch(inSelection::contains)).toList();
+            return new Selected(s, expected, factsByClass.get(s.id()));
+        }).toList();
 
         List<ClassSummary> classes = new ArrayList<>();
         Map<UUID, StudentAccumulator> byStudent = new LinkedHashMap<>();
@@ -352,19 +354,17 @@ public class AttendanceInsightsService {
         if (classes.size() > MAX_CLASSES) {
             classes = classes.subList(classes.size() - MAX_CLASSES, classes.size());
         }
-        Semaphore permits = new Semaphore(CONCURRENCY);
-        List<CompletableFuture<ClassFacts>> tasks = classes.stream()
-                .map(c -> Parallel.start(limited(permits, () -> facts.factsFor(academyId, c.id(), c.startsAt(), c.endsAt())))).toList();
         var courseInfo = Parallel.start(() -> courses(academyId, enrolled.stream().map(EnrollmentView::courseId).collect(Collectors.toSet())));
+        Map<UUID, ClassFacts> factsByClass = facts.factsForClasses(academyId, classes.stream()
+                .map(c -> new FactWindow(c.id(), c.startsAt(), c.endsAt())).toList());
 
         List<ClassAttendance> rows = new ArrayList<>();
         Map<UUID, BatchAcc> perBatch = new LinkedHashMap<>();
         BatchAcc overall = new BatchAcc(null, null);
         Map<UUID, EnrollmentView> enrolmentByBatch = enrolled.stream()
                 .collect(Collectors.toMap(EnrollmentView::batchId, e -> e, (a, b) -> a));
-        for (int i = 0; i < classes.size(); i++) {
-            StudentClassView c = classes.get(i);
-            ClassFacts classFacts = Parallel.join(tasks.get(i));
+        for (StudentClassView c : classes) {
+            ClassFacts classFacts = factsByClass.get(c.id());
             long classSeconds = heldSeconds(c.startsAt(), c.endsAt(), now);
             StudentFacts seen = classFacts.students().get(studentId);
             FinalOutcome finalOutcome = classFacts.finals().get(studentId);
@@ -451,14 +451,4 @@ public class AttendanceInsightsService {
         return found;
     }
 
-    private static <T> Supplier<T> limited(Semaphore permits, Supplier<T> work) {
-        return () -> {
-            permits.acquireUninterruptibly();
-            try {
-                return work.get();
-            } finally {
-                permits.release();
-            }
-        };
-    }
 }

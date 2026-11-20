@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -327,14 +328,19 @@ public class ZoomParticipantService {
     /** Matched participant IDs per already-authorized class, with bounded batches of Zoom evidence. */
     @Transactional(readOnly = true)
     public Map<UUID, Set<UUID>> joinedStudentsByClass(UUID academyId, Collection<UUID> sessionIds) {
-        List<UUID> ids = List.copyOf(sessionIds);
         Map<UUID, Set<UUID>> result = new HashMap<>();
-        for (int from = 0; from < ids.size(); from += CLASS_ACTIVITY_BATCH) {
-            readClassActivities(academyId, ids.subList(from, Math.min(from + CLASS_ACTIVITY_BATCH, ids.size())))
-                    .forEach((id, activity) -> result.put(id, activity.visits().stream().map(StudentVisit::studentId)
-                            .collect(Collectors.toSet())));
-        }
+        forEachClassActivity(academyId, sessionIds, (id, activity) -> result.put(id,
+                activity.visits().stream().map(StudentVisit::studentId).collect(Collectors.toSet())));
         return result;
+    }
+
+    /** Deliver activity for authorized classes without holding the entire month's raw visits at once. */
+    @Transactional(readOnly = true)
+    public void forEachClassActivity(UUID academyId, Collection<UUID> sessionIds, BiConsumer<UUID, ClassActivity> consumer) {
+        List<UUID> ids = List.copyOf(sessionIds);
+        for (int from = 0; from < ids.size(); from += CLASS_ACTIVITY_BATCH) {
+            readClassActivities(academyId, ids.subList(from, Math.min(from + CLASS_ACTIVITY_BATCH, ids.size()))).forEach(consumer);
+        }
     }
 
     private static final class ClassEvidence {

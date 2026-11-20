@@ -2725,3 +2725,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 
 - Repeated the 60-request synthetic benchmark with backend `46a4a6a` and the same frontend build. There were zero failures. Classes page p95 dropped from 392 ms to 185 ms and Class Types from 412 ms to 131 ms. The report-participant SQL executed 264 times instead of 680. The staff performance checklist records the sample count and limitations.
 - Verified local behavior only. No live service or database configuration changed. This commit records evidence and has no runtime rollout step.
+
+## Batched detailed attendance reads (2026-11-21)
+
+- The attendance dashboard and student detail now batch named rosters, Zoom evidence and final records over authorized classes. Students enrolled in overlapping batches still count once per session, and the existing batch codes and filtering remain intact. The existing range and export contracts still apply.
+- Passed 27 PostgreSQL integration tests across insights, provisional attendance, Zoom reports and participants, and enrollment authorization. A separate repeat benchmark will measure the Students improvement on the same fixture.
+- No migration. Revert this commit to restore the per-class detail reads.

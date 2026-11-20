@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -182,6 +183,9 @@ public class ProvisionalAttendanceService {
     public record FinalOutcome(String outcome, long connectedSeconds) {
     }
 
+    record FactWindow(UUID sessionId, Instant startsAt, Instant endsAt) {
+    }
+
     /** Count expected students with a matched visit, using the same evidence as the detailed dashboard. */
     Map<UUID, Integer> countJoined(UUID academyId, Map<UUID, Set<UUID>> expectedByClass) {
         List<UUID> withRoster = expectedByClass.entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
@@ -192,24 +196,36 @@ public class ProvisionalAttendanceService {
     }
 
     /**
-     * For other services in this module: attendance facts of every matched student of one class. No access check: the
-     * caller has checked the class and filters the students it may show.
+     * Attendance facts for authorized classes. The caller filters the students it may show.
      */
-    ClassFacts factsFor(UUID academyId, UUID sessionId, Instant startsAt, Instant endsAt) {
-        ClassActivity activity = zoom.activityForClass(academyId, sessionId);
-        Map<UUID, FinalOutcome> finals = new java.util.HashMap<>();
-        jdbc.query("SELECT student_id, outcome, connected_seconds FROM attendance_records WHERE academy_id = ? AND class_session_id = ?",
-                (org.springframework.jdbc.core.RowCallbackHandler) r -> finals.put((UUID) r.getObject(1),
-                        new FinalOutcome(r.getString(2), r.getLong(3))), academyId, sessionId);
+    Map<UUID, ClassFacts> factsForClasses(UUID academyId, List<FactWindow> windows) {
+        if (windows.isEmpty()) return Map.of();
+        Map<UUID, FactWindow> byId = windows.stream().collect(Collectors.toMap(FactWindow::sessionId, window -> window));
+        Map<UUID, Map<UUID, FinalOutcome>> finals = new HashMap<>();
+        jdbc.query("""
+                SELECT class_session_id, student_id, outcome, connected_seconds FROM attendance_records
+                WHERE academy_id = ? AND class_session_id = ANY (?)
+                """, row -> {
+            UUID sessionId = row.getObject(1, UUID.class);
+            finals.computeIfAbsent(sessionId, id -> new HashMap<>()).put(row.getObject(2, UUID.class),
+                    new FinalOutcome(row.getString(3), row.getLong(4)));
+        }, academyId, byId.keySet().toArray(UUID[]::new));
         Instant now = DbTime.now();
+        Map<UUID, ClassFacts> result = new HashMap<>();
+        zoom.forEachClassActivity(academyId, byId.keySet(), (id, activity) -> result.put(id,
+                classFacts(activity, byId.get(id), finals.getOrDefault(id, Map.of()), now)));
+        return result;
+    }
+
+    private static ClassFacts classFacts(ClassActivity activity, FactWindow window, Map<UUID, FinalOutcome> finals, Instant now) {
         Map<UUID, List<StudentVisit>> byStudent = activity.visits().stream().collect(Collectors.groupingBy(StudentVisit::studentId));
-        Map<UUID, StudentFacts> facts = new java.util.HashMap<>();
-        byStudent.forEach((id, visits) -> facts.put(id, facts(visits, activity, startsAt, endsAt, now)));
+        Map<UUID, StudentFacts> facts = new HashMap<>();
+        byStudent.forEach((id, visits) -> facts.put(id, facts(visits, activity, window.startsAt(), window.endsAt(), now)));
         boolean reconciled = !activity.occurrences().isEmpty() && activity.reportedOccurrences().containsAll(activity.occurrences());
         boolean ended = !activity.occurrences().isEmpty() && activity.occurrences().stream()
                 .allMatch(o -> activity.endedAt().containsKey(o) || activity.reportedOccurrences().contains(o));
         String state = !finals.isEmpty() ? "FINAL" : activity.occurrences().isEmpty() ? "NO_WEBINAR" : reconciled ? "REPORT"
-                : ended || now.isAfter(endsAt.plus(Duration.ofHours(2))) ? "ENDED" : "LIVE";
+                : ended || now.isAfter(window.endsAt().plus(Duration.ofHours(2))) ? "ENDED" : "LIVE";
         return new ClassFacts(state, facts, finals);
     }
 

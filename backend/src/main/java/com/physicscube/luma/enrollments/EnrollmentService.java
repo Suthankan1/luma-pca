@@ -139,6 +139,10 @@ public class EnrollmentService {
             batchesByStudent.computeIfAbsent(e.getStudentId(), id -> new ArrayList<>()).add(e.getBatchId());
         }
         Map<UUID, StudentView> people = students.viewsInAcademy(academyId, batchesByStudent.keySet());
+        return expectedStudents(batchesByStudent, people);
+    }
+
+    private static List<ExpectedStudent> expectedStudents(Map<UUID, List<UUID>> batchesByStudent, Map<UUID, StudentView> people) {
         return batchesByStudent.entrySet().stream()
                 .map(entry -> new ExpectedStudent(entry.getKey(), people.get(entry.getKey()).studentNumber(),
                         people.get(entry.getKey()).fullName(), entry.getValue().stream().sorted().toList()))
@@ -152,6 +156,29 @@ public class EnrollmentService {
     /** Expected student IDs per session, without names. The caller supplies only batches the requester may see. */
     @Transactional(readOnly = true)
     public Map<UUID, Set<UUID>> expectedStudentIds(UUID academyId, List<RosterRequest> requests) {
+        Map<UUID, List<Enrollment>> rosters = expectedEnrollments(academyId, requests);
+        return rosters.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry ->
+                entry.getValue().stream().map(Enrollment::getStudentId).collect(Collectors.toSet())));
+    }
+
+    /** Named rosters per authorized session, using each session's local date and selected batches. */
+    @Transactional(readOnly = true)
+    public Map<UUID, List<ExpectedStudent>> expectedStudentsBySession(UUID academyId, List<RosterRequest> requests) {
+        Map<UUID, List<Enrollment>> rosters = expectedEnrollments(academyId, requests);
+        Set<UUID> ids = rosters.values().stream().flatMap(List::stream).map(Enrollment::getStudentId).collect(Collectors.toSet());
+        Map<UUID, StudentView> people = students.viewsInAcademy(academyId, ids);
+        Map<UUID, List<ExpectedStudent>> result = new java.util.HashMap<>();
+        rosters.forEach((sessionId, roster) -> {
+            Map<UUID, List<UUID>> batchesByStudent = new TreeMap<>();
+            for (Enrollment e : roster) {
+                batchesByStudent.computeIfAbsent(e.getStudentId(), id -> new ArrayList<>()).add(e.getBatchId());
+            }
+            result.put(sessionId, expectedStudents(batchesByStudent, people));
+        });
+        return result;
+    }
+
+    private Map<UUID, List<Enrollment>> expectedEnrollments(UUID academyId, List<RosterRequest> requests) {
         Set<UUID> batchIds = requests.stream().flatMap(request -> request.batchIds().stream()).collect(Collectors.toSet());
         if (batchIds.isEmpty()) {
             return Map.of();
@@ -163,8 +190,7 @@ public class EnrollmentService {
                 .flatMap(batchId -> byBatch.getOrDefault(batchId, List.of()).stream())
                 .filter(enrollment -> !enrollment.getEnrolledOn().isAfter(request.day())
                         && (enrollment.getWithdrawnOn() == null || enrollment.getWithdrawnOn().isAfter(request.day())))
-                .map(Enrollment::getStudentId)
-                .collect(Collectors.toSet())));
+                .toList()));
     }
 
     private List<EnrollmentView> views(UUID academyId, List<Enrollment> found) {
