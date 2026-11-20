@@ -2708,3 +2708,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Added the [staff performance checklist](../../testing/STAFF-PERFORMANCE.md), HTTP timing at the Next proxy and API response commit, and current Classes, Class Types, Students and Reports paths in the staff load scenario.
 - Verified the Next timing header on a production build. The Testcontainers HTTP test passed for both successful and refused API requests. All 81 frontend unit tests, k6 scenario inspection, and the structure check passed. Signed-in load measurements are still pending.
 - No database or permission changes. Revert this commit to remove the headers and scenario updates.
+
+## Signed-in synthetic performance baseline (2026-11-21)
+
+- Used an isolated Docker PostgreSQL and production build with 150 synthetic students, 28 completed sessions and four k6 staff users. All 60 requests passed. Page p95 was 392 ms for Classes, 412 ms for Class Types, and 658 ms for Students. See the [checklist](../../testing/STAFF-PERFORMANCE.md) for samples, other routes and limitations.
+- The harness supports an alternate jar, Windows Docker Desktop and a configurable Python command. The first run collected browser-facing HTTP and SQL data. Its API access-log parser could not start under the default Windows `python3` alias. A later comparison should set `LUMA_LOAD_PYTHON`.
+- The fixture never used the original database or Zoom credentials. No application migration or deployment was made. Revert this test-tooling commit to restore the previous fixture.

@@ -27,6 +27,7 @@ export const options = {
     "http_req_duration{name:classes}": ["p(95)<1000"],
     "http_req_duration{name:class-types}": ["p(95)<1000"],
     "http_req_duration{name:students}": ["p(95)<1000"],
+    "http_req_duration{name:reports}": ["p(95)<1000"],
     "http_req_duration{name:refresh}": ["p(95)<1000"],
     checks: ["rate>0.999"],
   },
@@ -61,7 +62,7 @@ export default function () {
     ["classes", `/staff/sessions?month=${MONTH}`, "ATTENDANCE BY CLASS"],
     ["class-types", `/staff/class-types?month=${MONTH}`, "Class Types"],
     ["students", `/staff/students?month=${MONTH}`, "Student directory"],
-    ["reports", "/staff/reports", "Student report"],
+    ["reports", `/staff/reports?month=${MONTH}`, "Student report"],
   ];
   for (const [name, path, marker] of pages) {
     let page = http.get(`${BASE}${path}`, { headers, redirects: 0, tags: { name } });

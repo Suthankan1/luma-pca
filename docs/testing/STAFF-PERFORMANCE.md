@@ -5,7 +5,7 @@ Progress is the number of verified local items divided by the ten local items be
 | # | Local slice and acceptance check | Done |
 | --- | --- | --- |
 | 1 | Timing and current-route load coverage. Verify response headers and benchmark configuration. | Verified |
-| 2 | Run a reproducible signed-in synthetic baseline and record request errors and route p95. | Pending |
+| 2 | Run a reproducible signed-in synthetic baseline and record request errors and route p95. | Verified |
 | 3 | Batch Classes attendance facts. Verify expected, joined and academy scope and compare query work. | Pending |
 | 4 | Stream Classes, Students and Class Types with stable fallbacks and independent failure handling. | Pending |
 | 5 | Add and verify a durable, replay-safe completed attendance summary. Prove parity and rollback before enabling reads. | Pending |
@@ -21,6 +21,20 @@ Progress is the number of verified local items divided by the ten local items be
 - `Server-Timing: api` is API time up to setting the response headers, including authentication. Record full request duration separately, especially for downloads.
 - Use synthetic data, a production Next build, and the staff k6 scenario from the load-test guide. Record dataset size, date window, concurrency, failures, p50/p95/p99 and the commit for each comparison. Check meaningful content as well as HTTP status.
 - Measure click feedback, shell and panel content separately in a browser. Warm target budgets are 100 ms for feedback, 200 ms for the shell and 500 ms p95 for the attendance API. Track browser LCP, INP and CLS at p75 in the intended environment.
+
+## Synthetic baseline
+
+Windows Docker Desktop, production Next.js build and backend `904e345`. Run `scripts/load-test-local.sh` with `STUDENTS=150`, `STAFF=4`, `STAFF_DURATION_S=45` and `SCENARIOS=staff`. The isolated fixture uses 28 completed classes from the previous Sri Lanka month, three class types and 150 synthetic Zoom report rows per class. Use `LUMA_LOAD_PYTHON=python` on systems where Python is installed under that command.
+
+| Page | Samples | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: |
+| Classes | 8 | 303 ms | 392 ms | 394 ms |
+| Class Types | 8 | 258 ms | 412 ms | 464 ms |
+| Students | 8 | 471 ms | 658 ms | 664 ms |
+| Session detail | 8 | 114 ms | 220 ms | 236 ms |
+| Report selection | 8 | 51 ms | 78 ms | 82 ms |
+
+All 60 requests passed. The busiest SQL was the student identity lookup with 680 executions and 21.8 seconds total across requests. The short run provides a development comparison with eight samples per page. The API access-log percentile parser did not run because `python3` was unavailable, and the run did not measure browser vitals, Excel export, or original Supabase latency.
 
 ## Hosted acceptance
 
