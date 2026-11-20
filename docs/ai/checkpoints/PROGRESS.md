@@ -2465,3 +2465,11 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The next card puts its time and countdown in a separate row. The last completed card keeps Expected, Joined, and Attendance in three columns below the title and end time. Live rows and the five-class chart retain their layouts.
 - TypeScript, targeted lint, the structure check, and an isolated production build passed. Four Staff Home Playwright cases passed on Edge desktop and Pixel 7 emulation with the mock API, covering card alignment, metric containment, title tooltips, and the live view. Checked the desktop screenshot. The local API reported UP and the sign-in page returned 200. The signed-in Supabase layout was not verified.
 - This change is frontend-only and needs no migration. Revert the commit to roll back.
+
+## Staff Home dashboard refinement (2026-11-20)
+
+- The dashboard groups the day schedule and calendar next to the five-class attendance chart on desktop. It stacks the content on smaller screens. The palette uses blue for schedule controls, teal for attendance values, and colored class status labels. Daily rows show the status once and keep joined counts or Zoom schedule details when available.
+- Calendar dates and overflow links take staff to the selected day’s schedule. Compact calendar cells provide a full-cell touch target. Day and month arrows provide pending feedback, and dashboard links have a visible keyboard focus outline.
+- Class names in Staff Home show the first two nonempty leading parts when the title has at least two `|` separators. Titles with fewer separators keep their text. The full title stays in the accessible link name and appears in the popover on hover or keyboard focus, including when the shorter label fits.
+- Passed 79 frontend unit tests, TypeScript, targeted lint, an isolated production build, and the structure check. Four Playwright Staff Home cases passed on Edge desktop and Pixel 7 emulation with the mock API. Inspected both full-page captures for layout and overflow, then verified the compact calendar legend and full-cell targets in two focused browser checks, including a mobile tap. The local API reported UP and sign-in returned 200. The signed-in Supabase dashboard was not verified.
+- Frontend-only change. Rollback is a revert of this commit. No database migration is needed.

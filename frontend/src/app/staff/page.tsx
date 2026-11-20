@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { StaffShell } from "@/components/StaffShell";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { LinkPending } from "@/components/LinkPending";
 import { OneLineTitle } from "@/components/staff/OneLineTitle";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
@@ -46,7 +47,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const day = chosenDay(params.day, today);
   const month = chosenMonth(params.month, day);
   const grid = gridRange(month);
-  const shell = { active: "overview" as const, crumb: "", title: "Staff portal", subtitle: `${greeting(now)} · ${longDayLabel(today)}`,
+  const shell = { active: "overview" as const, crumb: "", title: "Staff dashboard", subtitle: `${greeting(now)} · ${longDayLabel(today)}`,
     hasStudentPortal: hasPortal(identity, "student") };
 
   if (analystOnly) {
@@ -99,7 +100,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const previousDay = addDays(day, -1), nextDay = addDays(day, 1);
   const recentAttendance = staffApi<CompletedClass[]>("/api/v1/attendance/recent-completed", undefined, ATTENDANCE_SUMMARY_TIMEOUT_MS);
 
-  return <StaffShell {...shell} actions={<Link className="home-button home-button-quiet" href="/staff/dashboard">Attendance reports</Link>}>
+  return <StaffShell {...shell} actions={<Link className="home-button" href="/staff/dashboard">Attendance reports</Link>}>
     <div className="staff-home">
       {live.length > 0
         ? <section className="home-strip home-strip-live" aria-labelledby="live-title">
@@ -108,7 +109,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
             <LiveRefresh until={new Date(now + 3 * 3600_000).toISOString()} seconds={30} label="while a class runs" />
           </section>
         : <div className="home-brief">
-            <section className="home-strip" aria-labelledby="next-title">
+            <section className="home-strip home-strip-next" aria-labelledby="next-title">
               <div className="home-strip-main">
                 <p className="home-strip-label">{next ? "Next class" : "No class is live right now"}</p>
                 <h2 id="next-title" className="home-strip-title">
@@ -128,11 +129,11 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
           </div>}
 
       <div className="home-grid">
-        <section className="home-card home-day" aria-labelledby="day-title">
+        <section id="day-schedule" className="home-card home-day" aria-labelledby="day-title">
           <div className="home-stepper">
             <Link scroll={false} className="home-step" href={href({ day: previousDay, month: previousDay.slice(0, 7) })}
               aria-label={`Previous day, ${shortDayLabel(previousDay)}`}>
-              <span aria-hidden="true">‹</span><span className="home-step-text">{shortDayLabel(previousDay)}</span>
+              <span aria-hidden="true">‹</span><span className="home-step-text">{shortDayLabel(previousDay)}</span><LinkPending />
             </Link>
             <div className="home-stepper-now">
               <h2 id="day-title"><span className="sr-only">Classes on </span>{relativeDayName(day, today)}</h2>
@@ -142,19 +143,20 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
             </div>
             <Link scroll={false} className="home-step home-step-next" href={href({ day: nextDay, month: nextDay.slice(0, 7) })}
               aria-label={`Next day, ${shortDayLabel(nextDay)}`}>
-              <span className="home-step-text">{shortDayLabel(nextDay)}</span><span aria-hidden="true">›</span>
+              <span className="home-step-text">{shortDayLabel(nextDay)}</span><span aria-hidden="true">›</span><LinkPending />
             </Link>
           </div>
           {chosenDays && dayEntries.length > 0 && <ul className="home-day-list" key={day}>
             {dayEntries.map(entry => {
               const done = entry.sessionId ? finished.get(entry.sessionId) : undefined;
+              const detail = entry.source === "zoom" ? "Zoom schedule"
+                : entry.state === "ended" && done ? joinedLabel(done) : null;
               return <li key={entry.key} className={`home-entry home-entry-${entry.state}`}>
                 <Link href={entry.href}>
                   <span className="home-entry-time">{timeRange(entry)}</span>
                   <span className="home-entry-copy">
                     <OneLineTitle text={entry.title} />
-                    <span className="home-entry-meta">{entry.source === "zoom" ? "On Zoom, not in the timetable yet"
-                      : entry.state === "ended" && done ? joinedLabel(done) : entryStateLabels[entry.state]}</span>
+                    {detail && <span className="home-entry-meta">{detail}</span>}
                   </span>
                   <span className={`home-state home-state-${entry.state}`}>{entryStateLabels[entry.state]}</span>
                 </Link>
@@ -171,49 +173,48 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
         </section>}>
           <RecentAttendanceChart attendance={recentAttendance} />
         </Suspense>
+        <section className="home-card home-calendar" aria-labelledby="calendar-title">
+          <div className="home-stepper">
+            <Link scroll={false} className="home-step" href={href({ month: shiftMonth(month, -1) })}
+              aria-label={`Previous month, ${monthLabel(shiftMonth(month, -1))}`}><span aria-hidden="true">‹</span><LinkPending /></Link>
+            <div className="home-stepper-now">
+              <h2 id="calendar-title">{monthLabel(month)}</h2>
+              {month !== today.slice(0, 7) && <p><Link scroll={false} href={href({ day: today, month: today.slice(0, 7) })}>Back to this month</Link></p>}
+            </div>
+            <Link scroll={false} className="home-step home-step-next" href={href({ month: shiftMonth(month, 1) })}
+              aria-label={`Next month, ${monthLabel(shiftMonth(month, 1))}`}><span aria-hidden="true">›</span><LinkPending /></Link>
+          </div>
+          {calendarDays ? <div className="cal">
+            <div className="cal-weekdays" aria-hidden="true">{weekdayShort.map(name => <span key={name}>{name}</span>)}</div>
+            <div className="cal-grid">
+              {monthWeeks(month).flat().map(cell => {
+                const entries = calendarDays.get(cell.date) ?? [];
+                const classes = ["cal-day", cell.inMonth ? "" : "cal-out", cell.date === today ? "cal-today" : "",
+                  cell.date === day ? "cal-selected" : ""].filter(Boolean).join(" ");
+                return <div key={cell.date} className={classes}>
+                  <Link className="cal-date" href={`${href({ day: cell.date })}#day-schedule`} aria-current={cell.date === day ? "date" : undefined}
+                    aria-label={`${longDayLabel(cell.date)}${cell.date === today ? ", today" : ""}: ${entries.length ? `${entries.length} class${entries.length === 1 ? "" : "es"}` : "no classes"}`}>
+                    {Number(cell.date.slice(8))}
+                  </Link>
+                  {entries.length > 0 && <span className="cal-count" aria-hidden="true">{entries.length}</span>}
+                  <ul className="cal-entries">
+                    {entries.slice(0, 2).map(entry => <li key={entry.key}>
+                      <Link href={entry.href} className={`cal-entry cal-entry-${entry.state} cal-entry-${entry.source}`}>
+                        <span className="cal-entry-time">{timeRange(entry).replace(/–.*/, "")}</span>
+                        <OneLineTitle text={entry.title} />
+                      </Link>
+                    </li>)}
+                    {entries.length > 2 && <li><Link className="cal-more" href={`${href({ day: cell.date })}#day-schedule`}>+{entries.length - 2} more</Link></li>}
+                  </ul>
+                </div>;
+              })}
+            </div>
+            {monitorList && <p className="cal-legend" aria-hidden="true">
+              <span className="cal-key" />Class<span className="cal-key cal-key-zoom" />On Zoom, not in the timetable yet
+            </p>}
+          </div> : <p className="home-empty">The calendar couldn’t load. Please reload shortly.</p>}
+        </section>
       </div>
-
-      <section className="home-card home-calendar" aria-labelledby="calendar-title">
-        <div className="home-stepper">
-          <Link scroll={false} className="home-step" href={href({ month: shiftMonth(month, -1) })}
-            aria-label={`Previous month, ${monthLabel(shiftMonth(month, -1))}`}><span aria-hidden="true">‹</span></Link>
-          <div className="home-stepper-now">
-            <h2 id="calendar-title">{monthLabel(month)}</h2>
-            {month !== today.slice(0, 7) && <p><Link scroll={false} href={href({ day: today, month: today.slice(0, 7) })}>Back to this month</Link></p>}
-          </div>
-          <Link scroll={false} className="home-step home-step-next" href={href({ month: shiftMonth(month, 1) })}
-            aria-label={`Next month, ${monthLabel(shiftMonth(month, 1))}`}><span aria-hidden="true">›</span></Link>
-        </div>
-        {calendarDays ? <div className="cal">
-          <div className="cal-weekdays" aria-hidden="true">{weekdayShort.map(name => <span key={name}>{name}</span>)}</div>
-          <div className="cal-grid">
-            {monthWeeks(month).flat().map(cell => {
-              const entries = calendarDays.get(cell.date) ?? [];
-              const classes = ["cal-day", cell.inMonth ? "" : "cal-out", cell.date === today ? "cal-today" : "",
-                cell.date === day ? "cal-selected" : ""].filter(Boolean).join(" ");
-              return <div key={cell.date} className={classes}>
-                <Link scroll={false} className="cal-date" href={href({ day: cell.date })} aria-current={cell.date === day ? "date" : undefined}
-                  aria-label={`${longDayLabel(cell.date)}${cell.date === today ? ", today" : ""}: ${entries.length ? `${entries.length} class${entries.length === 1 ? "" : "es"}` : "no classes"}`}>
-                  {Number(cell.date.slice(8))}
-                </Link>
-                {entries.length > 0 && <span className="cal-count" aria-hidden="true">{entries.length}</span>}
-                <ul className="cal-entries">
-                  {entries.slice(0, 2).map(entry => <li key={entry.key}>
-                    <Link href={entry.href} className={`cal-entry cal-entry-${entry.state} cal-entry-${entry.source}`}>
-                      <span className="cal-entry-time">{timeRange(entry).replace(/–.*/, "")}</span>
-                      <OneLineTitle text={entry.title} />
-                    </Link>
-                  </li>)}
-                  {entries.length > 2 && <li><Link scroll={false} className="cal-more" href={href({ day: cell.date })}>+{entries.length - 2} more</Link></li>}
-                </ul>
-              </div>;
-            })}
-          </div>
-          {monitorList && <p className="cal-legend" aria-hidden="true">
-            <span className="cal-key" />Class<span className="cal-key cal-key-zoom" />On Zoom, not in the timetable yet
-          </p>}
-        </div> : <p className="home-empty">The calendar couldn’t load. Please reload shortly.</p>}
-      </section>
     </div>
   </StaffShell>;
 }

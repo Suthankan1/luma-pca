@@ -27,13 +27,15 @@ test.describe("Staff home", () => {
     const p = test.info().project.name.toUpperCase();
     await signInStaff(page, "admin-enrolled@example.invalid");
     await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "Staff dashboard", level: 1 })).toBeVisible();
     await expect(page.getByRole("region", { name: /^Classes on Today/ })).toBeVisible();
     await expect(page.getByRole("region", { name: "Needs attention" })).toHaveCount(0);
 
     // A long-titled class later today and one tomorrow.
     const course = await api(page, "POST", "/api/v1/courses", { code: `HOME-${p}`, title: "Home page course" });
     const batch = await api(page, "POST", "/api/v1/batches", { courseId: course.id, code: "A", name: "Batch A", startsOn: "2026-01-01" });
-    const long = `Model Paper Class ${p} - November | 2027 Batch & Repeaters | by Eng. Mithukshan Sivakumar | Professional Physics Educator`;
+    const shortTitle = `Model Paper ${p} | 2027 Batch`;
+    const long = `${shortTitle} | by Eng. Mithukshan Sivakumar | Professional Physics Educator`;
     const later = Date.now() + 2 * 60_000;
     for (const [title, start] of [[long, later], [`Theory ${p}`, later + 24 * 3600_000]] as const) {
       await api(page, "POST", "/api/v1/class-sessions", { title, startsAt: new Date(start).toISOString(),
@@ -60,6 +62,8 @@ test.describe("Staff home", () => {
       await expect(recents.getByRole("definition").nth(2)).toHaveText(percent);
       const nextCard = page.getByRole("region", { name: long, exact: true });
       await expect(nextCard.getByText("Next class", { exact: true })).toBeVisible();
+      const nextLink = nextCard.getByRole("link", { name: long, exact: true });
+      await expect(nextLink.locator(".one-line-text")).toHaveText(shortTitle);
       const nextBox = (await nextCard.boundingBox())!;
       const lastBox = (await recents.boundingBox())!;
       expect(Math.abs(nextBox.width - lastBox.width)).toBeLessThanOrEqual(1);
@@ -78,8 +82,21 @@ test.describe("Staff home", () => {
         expect(metricBox.y + metricBox.height).toBeLessThanOrEqual(lastBox.y + lastBox.height);
       }
       if (test.info().project.name === "chromium") {
-        await nextCard.getByRole("link", { name: long, exact: true }).hover();
         const tooltip = nextCard.locator(".one-line-full");
+        expect(await nextLink.locator(".one-line-text").evaluate(el => el.scrollWidth)).toBeLessThanOrEqual(
+          await nextLink.locator(".one-line-text").evaluate(el => el.clientWidth),
+        );
+        await nextLink.focus();
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("Shift+Tab");
+        await expect(nextLink).toBeFocused();
+        await expect(tooltip).toBeVisible();
+        await expect(tooltip).toHaveText(long);
+        await page.keyboard.press("Escape");
+        await expect(tooltip).toBeHidden();
+        await page.keyboard.press("Tab");
+
+        await nextLink.hover();
         await expect(tooltip).toBeVisible();
         await expect(tooltip).toHaveText(long);
         expect(await tooltip.evaluate(el => el.matches(":popover-open"))).toBe(true);
@@ -101,6 +118,7 @@ test.describe("Staff home", () => {
     const day = page.getByRole("region", { name: /^Classes on Today/ });
     const row = day.getByRole("link", { name: new RegExp(long.replace(/[|]/g, "\\|")) });
     await expect(row).toBeVisible();
+    await expect(row.locator(".one-line-text")).toHaveText(shortTitle);
     // A long title never widens the page, on any screen.
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
     // One line; on a pointer device the full title shows on hover, and Escape hides it again.
@@ -130,6 +148,7 @@ test.describe("Staff home", () => {
     await expect(calendar.getByRole("link", { name: /, today: \d+ class/ })).toBeVisible();
     await calendar.getByRole("link", { name: new RegExp(`^${new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", weekday: "long", day: "numeric", month: "long", year: "numeric" })
       .format(new Date(later + 24 * 3600_000)).replace(",", "")}`) }).click();
+    await expect(page).toHaveURL(/#day-schedule$/);
     await expect(page.getByRole("region", { name: /^Classes on Tomorrow/ })).toBeVisible();
     await calendar.getByRole("link", { name: "Next month" }).click();
     await expect(page).toHaveURL(/month=\d{4}-\d{2}/);
@@ -167,7 +186,8 @@ test.describe("Staff home", () => {
     const day = 24 * 3600_000;
     const endedNow = Date.now() - 60_000;
     const monthStart = Date.parse(`${colomboDate(endedNow).slice(0, 7)}-01T00:00:00+05:30`);
-    const current = `Latest class ${project} – Model Papers for Physics | 2027 Batch & Repeaters | Full class name stays readable`;
+    const currentSummary = `Latest class ${project} – Model Papers for Physics | 2027 Batch & Repeaters`;
+    const current = `${currentSummary} | Full class name stays readable`;
     const dates = [endedNow, ...[10, 11, 12, 13].map(offset => monthStart - offset * day)];
     for (const [index, end] of dates.entries()) {
       await api(page, "POST", "/api/v1/class-sessions", { title: index === 0 ? current : `Past class ${project} ${index}`,
@@ -192,6 +212,7 @@ test.describe("Staff home", () => {
       await expect(row).toContainText(date);
     }
     await expect(rows.first()).toContainText("No students expected");
+    await expect(rows.first().locator(".one-line-text")).toHaveText(currentSummary);
     await expect(rows.first().getByText("—", { exact: true })).toBeVisible();
     await expect(rows.first().getByRole("meter")).toHaveCount(0);
     const electricFields = rows.filter({ has: page.getByRole("link", { name: "Electric fields", exact: true }) });

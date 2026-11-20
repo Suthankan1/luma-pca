@@ -3,11 +3,14 @@
 import { useEffect, useRef } from "react";
 
 /**
- * A title kept to one line. The full text stays in the DOM (it is the link's accessible name, and what copy and
- * find-in-page see); when it does not fit, hovering or focusing the surrounding link shows it in full in a small card.
+ * A title kept to one line. Titles with extra pipe-separated details show their first two parts. The full text is
+ * the link's accessible name and appears on hover or keyboard focus when the visible title is shortened or clipped.
  * Escape hides that card until the pointer or focus leaves. On touch, the link's own page shows the full title.
  */
 export function OneLineTitle({ text }: { text: string }) {
+  const parts = text.split("|", 3).map(part => part.trim());
+  const displayText = parts.length === 3 && parts[0] && parts[1] ? `${parts[0]} | ${parts[1]}` : text;
+  const shortened = displayText !== text;
   const line = useRef<HTMLSpanElement>(null);
   const full = useRef<HTMLSpanElement>(null);
 
@@ -41,7 +44,7 @@ export function OneLineTitle({ text }: { text: string }) {
     const update = () => {
       const active = hovered || tip.matches(":hover") || trigger.matches(":focus-visible");
       if (!active) dismissed = false;
-      if (active && !dismissed && label.scrollWidth > label.clientWidth + 1) {
+      if (active && !dismissed && (shortened || label.scrollWidth > label.clientWidth + 1)) {
         const anchor = label.getBoundingClientRect();
         if (anchor.height > 0 && anchor.bottom > 0 && anchor.top < document.documentElement.clientHeight) {
           if (!isOpen()) tip.showPopover();
@@ -91,12 +94,13 @@ export function OneLineTitle({ text }: { text: string }) {
       document.removeEventListener("keydown", dismiss);
       if (isOpen()) tip.hidePopover();
     };
-  }, [text]);
+  }, [shortened, text]);
 
   // The popover sits in the browser's top layer, above adjacent cards and layout containers.
   return <span className="one-line">
-    <span className="one-line-text" ref={line}>{text}</span>
-    {/* Repeats the name for sighted users only; screen readers already read it once. */}
+    <span className="one-line-text" ref={line} aria-hidden={shortened || undefined}>{displayText}</span>
+    {shortened && <span className="sr-only">{text}</span>}
+    {/* Repeats the full title for sighted users only. */}
     <span className="one-line-full" popover="manual" aria-hidden="true" ref={full}>{text}</span>
   </span>;
 }
