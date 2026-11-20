@@ -11,7 +11,7 @@ async function signInStaff(page: Page, email: string) {
 }
 
 /** The mock API, as the signed-in staff member (the mock's fixed token). */
-async function api(page: Page, method: "GET" | "POST", path: string, data?: unknown) {
+async function api(page: Page, method: "GET" | "POST" | "PUT", path: string, data?: unknown) {
   const response = await page.request.fetch(mockApiBase() + path, {
     method, data, headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test", "Content-Type": "application/json" },
   });
@@ -38,6 +38,49 @@ test.describe("Staff home", () => {
       await api(page, "POST", "/api/v1/class-sessions", { title, startsAt: new Date(start).toISOString(),
         endsAt: new Date(start + 3600_000).toISOString(), timeZone: "Asia/Colombo", batchIds: [batch.id], zoomWebinarId: null });
     }
+
+    // The automation spec can leave a live mock run behind when the entire suite shares a server.
+    const monitors = await api(page, "GET", "/api/v1/zoom/monitors") as { live: { classSessionId: string } | null }[];
+    const liveSession = monitors.find(m => m.live)?.live;
+    const livePath = `/api/v1/class-sessions/${liveSession?.classSessionId}`;
+    const cancelled = liveSession && await api(page, "PUT", livePath, {
+      ...(await api(page, "GET", livePath)), status: "CANCELLED", batchIds: [batch.id],
+    });
+    try {
+      await page.reload();
+      const latest = await api(page, "GET", "/api/v1/attendance/latest-completed") as {
+        id: string; title: string; expected: number; joined: number;
+      };
+      const recents = page.getByRole("region", { name: "Last completed class" });
+      await expect(page.getByRole("region", { name: "Live now" })).toHaveCount(0);
+      await expect(recents.getByRole("link", { name: latest.title, exact: true })).toHaveAttribute("href", `/staff/sessions/${latest.id}`);
+      await expect(recents.getByRole("term")).toHaveText(["Expected", "Joined", "Attendance"]);
+      await expect(recents.getByRole("definition").nth(0)).toHaveText(String(latest.expected));
+      await expect(recents.getByRole("definition").nth(1)).toHaveText(String(latest.joined));
+      const percent = latest.expected ? `${Math.round(latest.joined * 100 / latest.expected)}%` : "—";
+      await expect(recents.getByRole("definition").nth(2)).toHaveText(percent);
+      const nextCard = page.getByRole("region", { name: long, exact: true });
+      await expect(nextCard.getByText("Next class", { exact: true })).toBeVisible();
+      if (test.info().project.name === "chromium") {
+        await nextCard.getByRole("link", { name: long, exact: true }).hover();
+        const tooltip = nextCard.locator(".one-line-full");
+        await expect(tooltip).toBeVisible();
+        await expect(tooltip).toHaveText(long);
+        expect(await tooltip.evaluate(el => el.matches(":popover-open"))).toBe(true);
+        const tooltipBox = (await tooltip.boundingBox())!;
+        expect(tooltipBox.x).toBeGreaterThanOrEqual(0);
+        expect(tooltipBox.x + tooltipBox.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+        expect(await tooltip.evaluate(el => {
+          const rect = el.getBoundingClientRect();
+          return el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+        })).toBe(true);
+        await page.keyboard.press("Escape");
+        await expect(tooltip).toBeHidden();
+      }
+    } finally {
+      if (cancelled) await api(page, "PUT", livePath, { ...cancelled, status: "SCHEDULED" });
+    }
+
     await page.reload();
     const day = page.getByRole("region", { name: /^Classes on Today/ });
     const row = day.getByRole("link", { name: new RegExp(long.replace(/[|]/g, "\\|")) });
@@ -83,6 +126,8 @@ test.describe("Staff home", () => {
     const card = live.getByRole("article", { name: "Live: A/L Physics 2027" });
     await expect(card).toBeVisible();
     await expect(card.getByRole("definition").nth(2)).toHaveText("12");
+    await expect(page.getByText("Next class", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Last completed class" })).toHaveCount(0);
     await expect(live.getByRole("button", { name: "Pause" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
     await page.getByRole("link", { name: "Attendance reports" }).click();

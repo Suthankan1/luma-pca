@@ -1855,6 +1855,31 @@ paths:
         '400': {description: Range over 92 days or reversed}
         '401': {description: Sign-in required}
         '403': {description: Staff role with class access required}
+  /api/v1/attendance/latest-completed:
+    get:
+      summary: Most recently completed class visible to staff with joined and expected counts
+      description: Selects the latest non-cancelled class by end time. For a shared class, only students in batches visible to the caller are counted. Joined counts expected students with matched Zoom visits, counting rejoins once.
+      operationId: latestCompletedAttendanceClass
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      responses:
+        '200':
+          description: The latest completed class and its counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, title, endsAt, timeZone, expected, joined]
+                properties:
+                  id: {type: string, format: uuid}
+                  title: {type: string}
+                  endsAt: {type: string, format: date-time}
+                  timeZone: {type: string}
+                  expected: {type: integer, minimum: 0}
+                  joined: {type: integer, minimum: 0}
+        '204': {description: No completed class visible to the caller}
+        '401': {description: Sign-in required}
+        '403': {description: Staff role with class access required}
   /api/v1/students/{studentId}/attendance-overview:
     get: {summary: "One student's courses, batches and every class in a date range with each join and leave (managers)", operationId: studentAttendanceOverview, tags: [Attendance], security: [{bearerAuth: []}], parameters: [{in: path, name: studentId, required: true, schema: {type: string, format: uuid}}, {in: query, name: from, schema: {type: string, format: date}}, {in: query, name: to, schema: {type: string, format: date}}], responses: {'200': {description: "overall, byBatch[], enrolments[], classes[] with timeline[]"}, '404': {description: No such student in the academy}}}
   /api/v1/me/attendance-overview:

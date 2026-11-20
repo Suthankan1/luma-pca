@@ -51,3 +51,4 @@ staff routes.
 
 `GET /api/v1/attendance/class-totals` uses the same staff roles and academy/batch scope as the attendance dashboard.
 It returns completed class IDs and counts of expected and joined students. For a shared class, each student is counted once across the caller's visible batches.
+`GET /api/v1/attendance/latest-completed` uses the same scope for both choosing the latest completed class and counting its students.

@@ -6,7 +6,7 @@ import { OneLineTitle } from "@/components/staff/OneLineTitle";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { ACADEMY_TIME_ZONE, academyToday, addDays, isAcademyManager, zonedToInstant, type ClassSession,
+import { ACADEMY_TIME_ZONE, academyToday, addDays, instantParts, isAcademyManager, zonedToInstant, type ClassSession,
   type ProvisionalAttendance } from "@/lib/staff-forms";
 import { renderTime } from "@/lib/insights";
 import { type WebinarMonitor } from "@/lib/webinars";
@@ -17,7 +17,8 @@ import { calendarEntries, chosenDay, chosenMonth, entryStateLabels, greeting, gr
 const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 /** At most this many classes running at once get their own live row (each costs one attendance request). */
 const MAX_LIVE = 3;
-const MONTH_ATTENDANCE_TIMEOUT_MS = 25_000;
+const ATTENDANCE_SUMMARY_TIMEOUT_MS = 25_000;
+type CompletedClass = ClassAttendanceTotal & { title: string; endsAt: string; timeZone: string };
 
 function sessionsIn(fromInstant: string, toInstant: string) {
   return staffApi<ClassSession[]>(`/api/v1/class-sessions?${new URLSearchParams({ from: fromInstant, to: toInstant })}`);
@@ -59,14 +60,15 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
     </StaffShell>;
   }
 
-  // Today and the next week feed the live row and "next class"; skipped when the calendar's grid already covers them.
+  // Include yesterday for a class that is still running after midnight.
+  const yesterday = addDays(today, -1);
   const soonAfter = addDays(today, 8);
-  const gridCoversSoon = today >= grid.first && soonAfter <= grid.after;
+  const gridCoversSoon = yesterday >= grid.first && soonAfter <= grid.after;
   const gridCoversDay = day >= grid.first && day < grid.after;
   const dayGrid = gridRange(day.slice(0, 7));
   const [calendar, soon, chosen, monitors] = await Promise.all([
     sessionsIn(grid.fromInstant, grid.toInstant),
-    gridCoversSoon ? null : sessionsIn(zonedToInstant(today, "00:00", ACADEMY_TIME_ZONE), zonedToInstant(soonAfter, "00:00", ACADEMY_TIME_ZONE)),
+    gridCoversSoon ? null : sessionsIn(zonedToInstant(yesterday, "00:00", ACADEMY_TIME_ZONE), zonedToInstant(soonAfter, "00:00", ACADEMY_TIME_ZONE)),
     gridCoversDay ? null : sessionsIn(dayGrid.fromInstant, dayGrid.toInstant),
     manager ? staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors") : null,
   ]);
@@ -79,7 +81,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const soonDays = gridCoversSoon ? calendarDays : entriesFrom(soon);
   const chosenDays = gridCoversDay ? calendarDays : entriesFrom(chosen);
   const dayEntries = chosenDays?.get(day) ?? [];
-  const running = (soonDays?.get(today) ?? []).filter(e => e.sessionId && (e.state === "live" || e.state === "now")).slice(0, MAX_LIVE);
+  const running = [...(soonDays?.values() ?? [])].flat()
+    .filter(e => e.sessionId && (e.state === "live" || e.state === "now")).slice(0, MAX_LIVE);
   const next = soonDays ? nextEntry(new Map([...soonDays].filter(([date]) => date >= today && date < soonAfter)), now) : null;
   const endedOnDay = day <= today && dayEntries.some(e => e.state === "ended" && e.sessionId);
 
@@ -102,18 +105,25 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
             {live.map(({ entry, numbers }) => <LiveRow key={entry.key} entry={entry} numbers={numbers} now={now} />)}
             <LiveRefresh until={new Date(now + 3 * 3600_000).toISOString()} seconds={30} label="while a class runs" />
           </section>
-        : <section className="home-strip" aria-labelledby="next-title">
-            <div className="home-strip-main">
-              <p className="home-strip-label">{next ? "Next class" : "No class is live right now"}</p>
-              <h2 id="next-title" className="home-strip-title">
-                {next ? <Link href={next.href}><OneLineTitle text={next.title} /></Link> : "Nothing else scheduled this week"}
-              </h2>
-            </div>
-            {next && <p className="home-strip-when">
-              <span>{relativeDayName(dayOf(next), today)}, {timeRange(next)}</span>
-              <strong>{startsInLabel(next.startsAt, now)}</strong>
-            </p>}
-          </section>}
+        : <div className="home-brief">
+            <section className="home-strip" aria-labelledby="next-title">
+              <div className="home-strip-main">
+                <p className="home-strip-label">{next ? "Next class" : "No class is live right now"}</p>
+                <h2 id="next-title" className="home-strip-title">
+                  {next ? <Link href={next.href}><OneLineTitle text={next.title} /></Link> : "Nothing else scheduled this week"}
+                </h2>
+              </div>
+              {next && <p className="home-strip-when">
+                <span>{relativeDayName(dayOf(next), today)}, {timeRange(next)}</span>
+                <strong>{startsInLabel(next.startsAt, now)}</strong>
+              </p>}
+            </section>
+            <Suspense fallback={<section className="home-strip home-strip-completed" aria-label="Last completed class">
+              <p className="home-strip-label">Loading last completed class…</p>
+            </section>}>
+              <LastCompletedClass />
+            </Suspense>
+          </div>}
 
       <div className="home-grid">
         <section className="home-card home-day" aria-labelledby="day-title">
@@ -206,9 +216,29 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   </StaffShell>;
 }
 
+async function LastCompletedClass() {
+  const result = await staffApi<CompletedClass | null>("/api/v1/attendance/latest-completed", undefined, ATTENDANCE_SUMMARY_TIMEOUT_MS);
+  const last = result.ok ? result.data : null;
+  const ended = last ? instantParts(last.endsAt, last.timeZone) : null;
+  return <section className="home-strip home-strip-completed" aria-labelledby="last-class-title">
+    <div className="home-strip-main">
+      <h2 id="last-class-title" className="home-strip-label">Last completed class</h2>
+      {last && ended ? <>
+        <h3 className="home-strip-title"><Link href={`/staff/sessions/${last.id}`}><OneLineTitle text={last.title} /></Link></h3>
+        <p className="home-strip-ended">Ended {shortDayLabel(ended.date)} at {ended.time}</p>
+      </> : <p className="home-strip-ended">{result.ok ? "No completed classes yet." : "Unable to load the last completed class."}</p>}
+    </div>
+    {last && <dl className="home-completed-figures">
+      <div><dt>Expected</dt><dd>{last.expected}</dd></div>
+      <div><dt>Joined</dt><dd>{last.joined}</dd></div>
+      <div><dt>Attendance</dt><dd>{last.expected > 0 ? `${Math.round(last.joined * 100 / last.expected)}%` : "—"}</dd></div>
+    </dl>}
+  </section>;
+}
+
 async function MonthAttendance({ month, today }: { month: string; today: string }) {
   const range = heldRange(month, today);
-  const result = range ? await classTotals(range, MONTH_ATTENDANCE_TIMEOUT_MS) : null;
+  const result = range ? await classTotals(range, ATTENDANCE_SUMMARY_TIMEOUT_MS) : null;
   const totals = result?.ok ? monthlyAttendance(result.data) : null;
   return <section className="home-card home-chart" aria-labelledby="chart-title">
     <div className="home-card-head">

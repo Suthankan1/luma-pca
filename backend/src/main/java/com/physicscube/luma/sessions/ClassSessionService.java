@@ -12,15 +12,18 @@ import com.physicscube.luma.shared.security.CurrentAccount;
 import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,6 +91,24 @@ public class ClassSessionService {
                     : sessions.inWindowForBatches(caller.academyId(), from, to, scope.batchIds());
         }
         return views(caller, found, scope);
+    }
+
+    public record CompletedSession(UUID id, String title, Instant endsAt, String timeZone, LocalDate localDate,
+                                   Set<UUID> visibleBatchIds) {
+    }
+
+    /** The caller's last completed class with only its readable batches. */
+    @Transactional(readOnly = true)
+    public Optional<CompletedSession> latestCompleted(CurrentAccount caller, Instant now) {
+        BatchScope scope = batches.scope(caller);
+        if (!scope.all() && scope.batchIds().isEmpty()) {
+            return Optional.empty();
+        }
+        return sessions.latestCompleted(caller.academyId(), now, scope.all(), scope.batchIds(), Limit.of(1)).stream()
+                .findFirst()
+                .map(session -> new CompletedSession(session.getId(), session.getTitle(), session.getEndsAt(),
+                        session.getTimeZone(), session.localDate(), session.batchIds().stream()
+                                .filter(scope::includes).collect(Collectors.toUnmodifiableSet())));
     }
 
     /**

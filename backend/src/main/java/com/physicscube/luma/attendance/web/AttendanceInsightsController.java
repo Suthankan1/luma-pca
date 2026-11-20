@@ -3,12 +3,14 @@ package com.physicscube.luma.attendance.web;
 import com.physicscube.luma.attendance.AttendanceInsightsService;
 import com.physicscube.luma.attendance.AttendanceInsightsService.ClassTotals;
 import com.physicscube.luma.attendance.AttendanceInsightsService.Dashboard;
+import com.physicscube.luma.attendance.AttendanceInsightsService.LatestCompletedClass;
 import com.physicscube.luma.attendance.AttendanceInsightsService.StudentOverview;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,6 +40,12 @@ class AttendanceInsightsController {
                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return insights.classTotals(CurrentAccount.from(authentication), AttendanceInsightsService.range(from, to));
+    }
+
+    @GetMapping("/api/v1/attendance/latest-completed")
+    ResponseEntity<LatestCompletedClass> latestCompleted(JwtAuthenticationToken authentication) {
+        return insights.latestCompleted(CurrentAccount.from(authentication)).map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     /** Owners and administrators: one student's courses and every class, with each join and leave. */

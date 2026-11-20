@@ -30,6 +30,7 @@ import org.springframework.context.ApplicationContext;
 class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     private static final String WEBINAR = "81234500077";
     private static final String CLASS_TOTALS = "/api/v1/attendance/class-totals";
+    private static final String LATEST_COMPLETED = "/api/v1/attendance/latest-completed";
 
     @Autowired
     ZoomReceiptProcessor processor;
@@ -198,23 +199,44 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
                 classId, otherBatch, academyId);
 
         assertEquals(List.of(Map.of("id", classId, "expected", 2, "joined", 1)), classTotals(admin));
+        Map<String, Object> latest = ok(api.get(LATEST_COMPLETED, admin));
+        assertEquals(classId, latest.get("id"));
+        assertEquals("Waves", latest.get("title"));
+        assertEquals(start.plus(2, ChronoUnit.HOURS), Instant.parse((String) latest.get("endsAt")));
+        assertEquals("Asia/Colombo", latest.get("timeZone"));
+        assertEquals(2, latest.get("expected"));
+        assertEquals(1, latest.get("joined"));
 
         String instructorEmail = "teacher@example.test";
         accountIdOf(instructorEmail, academyId, Role.INSTRUCTOR);
         String instructor = login(instructorEmail);
         assertEquals(List.of(), classTotals(instructor), "no assigned batches");
+        assertEquals(204, api.get(LATEST_COMPLETED, instructor).statusCode());
         assertEquals(201, api.post("/api/v1/batches/" + otherBatch + "/assignments",
                 HttpApi.json(Map.of("email", instructorEmail, "role", "INSTRUCTOR")), admin).statusCode());
         assertEquals(List.of(Map.of("id", classId, "expected", 1, "joined", 0)), classTotals(instructor),
                 "Amaya is outside the instructor's batch even though she joined the shared class");
+
+        String newer = createClass("More recent class in MON only", start.plus(1, ChronoUnit.DAYS), batch);
+        assertEquals(newer, ok(api.get(LATEST_COMPLETED, admin)).get("id"));
+        Map<String, Object> instructorLatest = ok(api.get(LATEST_COMPLETED, instructor));
+        assertEquals(classId, instructorLatest.get("id"));
+        assertEquals(1, instructorLatest.get("expected"));
+        assertEquals(0, instructorLatest.get("joined"));
     }
 
     @Test
     void classTotalsRequireStaffAndStayInsideTheAcademy() {
-        assertEquals(401, api.get(CLASS_TOTALS, null).statusCode());
-        assertEquals(403, api.get(CLASS_TOTALS, tokenFor(academyId, Role.STUDENT)).statusCode());
-        assertEquals(403, api.get(CLASS_TOTALS, tokenFor(academyId, Role.ANALYST)).statusCode());
-        assertEquals(List.of(), classTotals(tokenFor(academy("Other academy"), Role.ACADEMY_ADMIN)));
+        String student = tokenFor(academyId, Role.STUDENT);
+        String analyst = tokenFor(academyId, Role.ANALYST);
+        for (String path : List.of(CLASS_TOTALS, LATEST_COMPLETED)) {
+            assertEquals(401, api.get(path, null).statusCode());
+            assertEquals(403, api.get(path, student).statusCode());
+            assertEquals(403, api.get(path, analyst).statusCode());
+        }
+        String otherAdmin = tokenFor(academy("Other academy"), Role.ACADEMY_ADMIN);
+        assertEquals(List.of(), classTotals(otherAdmin));
+        assertEquals(204, api.get(LATEST_COMPLETED, otherAdmin).statusCode());
     }
 
     @Test
@@ -231,7 +253,18 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(2, totals.size());
         assertTrue(totals.contains(Map.of("id", classId, "expected", 2, "joined", 1)));
         assertTrue(totals.contains(Map.of("id", empty, "expected", 0, "joined", 0)));
+        assertEquals(empty, ok(api.get(LATEST_COMPLETED, admin)).get("id"));
         assertEquals(400, api.get(CLASS_TOTALS + "?from=2026-01-01&to=2026-12-31", admin).statusCode());
+    }
+
+    @Test
+    void latestCompletedUsesEndTimeWithNoDateCutoff() {
+        Instant older = start.minus(100, ChronoUnit.DAYS);
+        jdbc.update("UPDATE class_sessions SET starts_at = ?, ends_at = ? WHERE id = ?::uuid",
+                Timestamp.from(older), Timestamp.from(older.plus(4, ChronoUnit.HOURS)), classId);
+        createClass("Started later, ended sooner", older.plus(1, ChronoUnit.HOURS), batch);
+
+        assertEquals(classId, ok(api.get(LATEST_COMPLETED, admin)).get("id"));
     }
 
     private String createClass(String title, Instant startsAt, String batchId) {

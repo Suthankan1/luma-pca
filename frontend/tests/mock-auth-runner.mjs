@@ -31,7 +31,7 @@ const backend = createServer(async (req, res) => {
   if (req.url.startsWith("/api/v1/zoom/monitors") || /^\/api\/v1\/class-sessions\/[^/]+\/zoom-run$/.test(req.url)) {
     return monitorsApi(req, body, send);
   }
-  if (/^\/api\/v1\/attendance\/(dashboard|class-totals)(\?|$)/.test(req.url) || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
+  if (/^\/api\/v1\/attendance\/(dashboard|class-totals|latest-completed)(\?|$)/.test(req.url) || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
     return insightsApi(req, send);
   }
 
@@ -868,24 +868,31 @@ function insightsApi(req, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const url = new URL(req.url, "http://mock");
   const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
-  if (url.pathname === "/api/v1/attendance/class-totals") {
+  if (url.pathname === "/api/v1/attendance/class-totals" || url.pathname === "/api/v1/attendance/latest-completed") {
     if (!manager && !roles.some(r => r === "INSTRUCTOR" || r === "ATTENDANCE_OFFICER")) return send(403);
-    if (!manager) return send(200, []); // No staff assignments in this fixture.
+    const latestOnly = url.pathname === "/api/v1/attendance/latest-completed";
+    if (!manager) return latestOnly ? send(204) : send(200, []); // No staff assignments in this fixture.
     const from = url.searchParams.get("from"), to = url.searchParams.get("to");
     const inRange = start => {
       const date = localDate(start, "Asia/Colombo");
-      return from <= date && date <= to;
+      return latestOnly || (from <= date && date <= to);
     };
     const fixtures = INSIGHT_CLASSES.flatMap((c, i) => inRange(c.start) ? [{
-      id: c.id,
+      id: c.id, title: c.title, endsAt: iso(c.start, c.minutes), timeZone: "Asia/Colombo",
       expected: INSIGHT_STUDENTS.length,
       joined: INSIGHT_STUDENTS.filter(s => s.visits[i].length > 0).length,
     }] : []);
     const sessions = classSessions.filter(s => s.status === "SCHEDULED" && Date.parse(s.endsAt) <= Date.now() && inRange(s.startsAt));
-    return send(200, [...fixtures, ...sessions.map(s => {
+    const totals = [...fixtures, ...sessions.map(s => {
       const expected = mockAttendance(s).students.filter(row => row.expected);
-      return { id: s.id, expected: expected.length, joined: expected.filter(row => row.visits > 0).length };
-    })]);
+      return { id: s.id, title: s.title, endsAt: s.endsAt, timeZone: s.timeZone, expected: expected.length,
+        joined: expected.filter(row => row.visits > 0).length };
+    })];
+    if (latestOnly) {
+      const latest = totals.sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt))[0];
+      return latest ? send(200, latest) : send(204);
+    }
+    return send(200, totals.map(({ id, expected, joined }) => ({ id, expected, joined })));
   }
   if (url.pathname !== "/api/v1/attendance/dashboard") {
     if (!manager) return send(403);

@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -39,6 +40,19 @@ interface ClassSessionRepository extends JpaRepository<ClassSession, UUID> {
             """)
     List<ClassSession> inWindowForBatches(@Param("academyId") UUID academyId, @Param("from") Instant from,
                                           @Param("to") Instant to, @Param("batchIds") Collection<UUID> batchIds);
+
+    @Query("""
+            select s from ClassSession s
+            where s.academyId = :academyId and s.endsAt <= :now and s.status <> 'CANCELLED'
+              and (:allBatches = true or exists (
+                  select 1 from ClassSession visible join visible.batches b
+                  where visible.id = s.id and b.batchId in :batchIds
+              ))
+            order by s.endsAt desc, s.id desc
+            """)
+    List<ClassSession> latestCompleted(@Param("academyId") UUID academyId, @Param("now") Instant now,
+                                       @Param("allBatches") boolean allBatches, @Param("batchIds") Collection<UUID> batchIds,
+                                       Limit limit);
 
     List<ClassSession> findByAcademyIdAndSeriesIdOrderByStartsAt(UUID academyId, UUID seriesId);
 }

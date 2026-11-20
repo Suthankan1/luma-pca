@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -126,6 +127,19 @@ public class AttendanceInsightsService {
     }
 
     public record ClassTotals(UUID id, int expected, int joined) {
+    }
+
+    public record LatestCompletedClass(UUID id, String title, Instant endsAt, String timeZone, int expected, int joined) {
+    }
+
+    public Optional<LatestCompletedClass> latestCompleted(CurrentAccount caller) {
+        return sessions.latestCompleted(caller, DbTime.now()).map(session -> {
+            RosterRequest request = new RosterRequest(session.id(), session.localDate(), session.visibleBatchIds());
+            Set<UUID> expected = enrollments.expectedStudentIds(caller.academyId(), List.of(request))
+                    .getOrDefault(session.id(), Set.of());
+            int joined = facts.countJoined(caller.academyId(), session.id(), expected);
+            return new LatestCompletedClass(session.id(), session.title(), session.endsAt(), session.timeZone(), expected.size(), joined);
+        });
     }
 
     /** Counts for every completed class, limited to the caller's academy and visible batches. */
