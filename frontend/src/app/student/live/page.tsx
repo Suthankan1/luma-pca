@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ClassCountdown } from "@/components/ClassCountdown";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { Shell } from "@/components/Shell";
 import { LiveOnlineChart } from "@/components/staff/LiveOnlineChart";
@@ -36,10 +37,10 @@ export default async function StudentLivePage() {
   const next = entries.find(c => !c.cancelled && Date.parse(c.startsAt) > now);
 
   return <Shell active="student" studentSection="live" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
-    <header className="page-head"><div><h1 className="heading staff-heading">Live Now</h1></div></header>
+    <header className="student-live-header"><h1 className="heading staff-heading">Live Now</h1><LiveRefresh dashboard /></header>
     {(unavailable || failed) && <p className="session-error" role="alert">Some class details couldn’t load. The page will retry.</p>}
     <div className="student-live-stack">
-      {active.length ? active.map(({ session, data }) => <section key={session.id} className="panel student-live-card student-portal-enter">
+      {active.length ? active.map(({ session, data }) => <section key={session.id} className="student-live-card student-portal-enter">
         <header>
           <div><span className="student-live-badge">Live now</span><h2>{compactClassTitle(session.title)}</h2>
             <p className="panel-sub">Started {formatClock(session.startsAt, ACADEMY_TIME_ZONE)} · {session.batches.map(b => b.code).join(", ")}</p></div>
@@ -53,31 +54,37 @@ export default async function StudentLivePage() {
           <div><dt>Your connected time</dt><dd>{data.seen ? formatDuration(data.connectedSeconds) : "No join seen yet"}</dd>
             {data.firstJoinAt && <small>First joined {formatClock(data.firstJoinAt, ACADEMY_TIME_ZONE)}</small>}</div>
         </dl>
-        <LiveOnlineChart key={session.id} sessionId={session.id} history={data.onlineHistory} sampledAt={Date.parse(data.sampledAt)}
-          startsAt={session.startsAt} wide />
-        <p className="panel-sub">Live Zoom activity from your enrolled batches. Your final attendance appears in My Report after reconciliation.</p>
+        <div className="student-live-chart-panel">
+          <LiveOnlineChart key={session.id} sessionId={session.id} history={data.onlineHistory} sampledAt={Date.parse(data.sampledAt)}
+            startsAt={session.startsAt} wide />
+          <p className="panel-sub">Live counts cover your enrolled batches. Final attendance appears in <Link href="/student" className="text-link">My Report</Link>.</p>
+        </div>
       </section>) : <>
-        <section className="panel student-live-idle student-portal-enter">
-          <h2>{failed || unavailable ? "Live status unavailable" : "No live class"}</h2>
-          <Link className="text-link" href="/student/calendar">Open calendar →</Link>
+        <section className="student-live-idle student-portal-enter">
+          <div className="student-live-idle-copy">
+            <h2>{failed || unavailable ? "Live status unavailable" : "No live class"}</h2>
+            <Link className="student-live-calendar-link" href="/student/calendar">Open calendar <span aria-hidden="true">↗</span></Link>
+          </div>
+          <div className="student-live-signal" aria-hidden="true"><span /><i /><i /><i /><i /><i /><i /><i /></div>
         </section>
         <div className="student-live-neighbours">
+          <Neighbour label="Next class" entry={next} countdownFrom={now} />
           <Neighbour label="Previous class" entry={previous} />
-          <Neighbour label="Next class" entry={next} />
         </div>
       </>}
     </div>
-    <LiveRefresh label="while this page is visible" />
   </Shell>;
 }
 
-function Neighbour({ label, entry }: { label: string; entry?: TimetableEntry }) {
-  return <section className="panel student-neighbour">
-    <h2 className="panel-title">{label}</h2>
-    {entry ? <>
+function Neighbour({ label, entry, countdownFrom }: { label: string; entry?: TimetableEntry; countdownFrom?: number }) {
+  const upcoming = countdownFrom !== undefined;
+  return <section className="student-neighbour student-portal-enter" data-upcoming={upcoming}>
+    <h2 className="student-neighbour-label"><span aria-hidden="true">{upcoming ? "↗" : "↶"}</span>{label}</h2>
+    {entry ? <div className="student-neighbour-body">
       <p><strong>{compactClassTitle(entry.title)}</strong></p>
       <time dateTime={entry.startsAt}>{formatDay(entry.startsAt, ACADEMY_TIME_ZONE)} · {formatClock(entry.startsAt, ACADEMY_TIME_ZONE)}</time>
-      <Link className="text-link" href={`/student/calendar?month=${entry.date.slice(0, 7)}&day=${entry.date}`}>View in calendar</Link>
-    </> : <p className="panel-sub">No class found within 45 days.</p>}
+      {upcoming && <ClassCountdown key={entry.id} startsAt={entry.startsAt} now={countdownFrom} />}
+      <Link className="student-neighbour-link" href={`/student/calendar?month=${entry.date.slice(0, 7)}&day=${entry.date}`}>View in calendar <span aria-hidden="true">→</span></Link>
+    </div> : <p className="panel-sub">No class found within 45 days.</p>}
   </section>;
 }

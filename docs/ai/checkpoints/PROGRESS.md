@@ -2885,3 +2885,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 
 - Calendar, Live Now, the previous and next class cards, and attendance appeals now use the same compact class title as My Report history. For three-part titles separated by pipes, the visible name keeps the class and batch and drops the suffix.
 - Production build, ESLint, structure, 81 unit tests, and six synthetic desktop/mobile browser tests passed. Restarted the local frontend and verified student sign-in and backend readiness. Revert the frontend commit and rebuild to roll back.
+
+## Student Live Now redesign (2026-11-22)
+
+- Redesigned the idle and active Live Now states with a responsive status panel, animated signal bars, next-class countdown, previous-class card, calendar navigation, and a larger chart. Added manual refresh and pause/resume to the Live Now header. CSS animations honor reduced-motion preferences.
+- Production build, ESLint, structure validation and six synthetic desktop/mobile browser tests passed. Tests exercised countdown ticking, auto and manual refresh, graph interaction, and removal of live metrics at class end. Restarted port 3000 and verified student sign-in and backend readiness. Real signed-in traffic and Zoom were not exercised.
+- Roll out by rebuilding the frontend. Revert the commit and rebuild to roll back. No API or database changes.

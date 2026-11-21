@@ -58,11 +58,21 @@ test("Live Now updates its plotted counts and hides them when the class ends", a
     await expect(page.getByRole("heading", { name: "No live class" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Previous class" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Next class" })).toBeVisible();
+    const countdown = page.getByRole("timer", { name: "Time until the next scheduled class" });
+    await expect(countdown).toBeVisible();
+    const before = await countdown.textContent();
+    await page.clock.fastForward(2_000);
+    await expect(countdown).not.toHaveText(before ?? "");
     await expect(chart).toHaveCount(0);
     await expect(page.locator(".student-live-metrics")).toHaveCount(0);
     const rail = page.getByRole("complementary", { name: "Academy navigation" });
     await rail.getByRole("button", { name: "Collapse sidebar" }).click();
     await expect(rail.getByRole("link", { name: "LUMA PCA Attendance System" })).toBeVisible();
+    await page.getByRole("button", { name: "Pause", exact: true }).click();
+    await expect(page.getByText("Auto-refresh paused")).toBeVisible();
+    await liveState(page, false, 18);
+    await page.getByRole("button", { name: "Refresh now" }).click();
+    await expect(page.locator(".student-live-metrics")).toContainText("Online now18");
   } finally {
     await liveState(page, false);
   }
