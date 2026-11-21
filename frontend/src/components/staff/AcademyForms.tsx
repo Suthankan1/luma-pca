@@ -27,12 +27,13 @@ function SyncDetails({ sync }: { sync: SyncResult }) {
 
 /** Set up, link or sync one Academy class. One action state per row, so the outcome stays after the page refreshes. */
 export function AcademyClassActions({ className, slug, linked, batches, selectedBatch, rosterControls = false }: {
-  className: string; slug: string; linked: boolean; batches: { id: string; label: string }[];
+  className: string; slug: string; linked: boolean; batches: { id: string; label: string; disabled?: boolean }[];
   selectedBatch?: { id: string; label: string };
   rosterControls?: boolean;
 }) {
   const [state, action, pending] = useActionState(academyClassAction, null);
   const feedback = `academy-feedback-${slug}`;
+  const canSync = !!selectedBatch || batches.some(batch => !batch.disabled);
   return <div className="academy-actions">
     {!rosterControls && (linked
       ? <form action={action} className="inline-form">
@@ -55,12 +56,12 @@ export function AcademyClassActions({ className, slug, linked, batches, selected
       <label htmlFor={`link-${slug}`}>{rosterControls ? "Student batch" : "Or use an existing batch"}</label>
       <div className="inline-form">
         <select key={selectedBatch?.id} id={`link-${slug}`} name="batchId" required defaultValue={selectedBatch?.id ?? ""}
-          disabled={pending || (!selectedBatch && batches.length === 0)}>
-          <option value="" disabled>{batches.length ? "Choose a batch" : "No available batch"}</option>
+          disabled={pending || batches.length === 0 && !selectedBatch}>
+          <option value="" disabled>{canSync ? "Choose a batch" : "No selectable batch"}</option>
           {selectedBatch && <option value={selectedBatch.id}>{selectedBatch.label}</option>}
-          {batches.map(batch => <option key={batch.id} value={batch.id}>{batch.label}</option>)}
+          {batches.map(batch => <option key={batch.id} value={batch.id} disabled={batch.disabled}>{batch.label}</option>)}
         </select>
-        <button className="action secondary" type="submit" disabled={pending || (!selectedBatch && batches.length === 0)}>
+        <button className="action secondary" type="submit" disabled={pending || !canSync}>
           {pending ? "Syncing…" : rosterControls ? "Sync" : "Link and sync"}
         </button>
       </div>

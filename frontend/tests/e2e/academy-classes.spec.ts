@@ -84,5 +84,10 @@ test.describe("Academy classes", () => {
     await expect(roster).toContainText("3 enrolled");
     await expect(roster).toContainText("PCA101");
     await expect(roster).toContainText("Amaya Perera");
+    await page.goto("/staff/class-types?month=2027-02");
+    const dropdown = page.getByRole("listitem", { name: "Admission" }).getByLabel("Student batch");
+    const linkedOption = dropdown.locator("option").filter({ hasText: "Linked to A/L Physics 2027" });
+    await expect(linkedOption).toHaveCount(1);
+    await expect(linkedOption).toBeDisabled();
   });
 });

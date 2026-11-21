@@ -2943,3 +2943,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Matched Class Types rows keep the Student batch dropdown and Sync action alongside their sync status. The linked active batch is selected. Selecting another available batch uses the existing link-and-sync operation for future roster mapping.
 - Production build, structure validation and two desktop synthetic browser tests passed. The regression verified sync, reassignment and persistence after reload. Local staff sign-in and backend readiness returned HTTP 200 after the frontend restart. No real roster sync was performed.
 - Revert and rebuild the frontend to roll back. No API or migration changes.
+
+## Show every LUMA batch in Class Types (2026-11-22)
+
+- Display all batches returned by the academy-scoped LUMA batch API. The options now identify inactive batches and those linked to another class type. Those entries are disabled, preserving the server's one-class-per-batch rule. When a class mapping or the Academy roster is unavailable, the batch list is still present for reference and sync is unavailable.
+- Production build, ESLint, structure validation and eight synthetic desktop/mobile browser checks passed. Verified an existing link to another class remains visible and disabled. Restarted the local frontend and verified staff sign-in and backend readiness. Real roster sync was not exercised.
+- Revert and rebuild the frontend to roll back. No API or migration changes.
