@@ -36,7 +36,7 @@ class EnrollmentHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         physics = fixtures.course("PHY-2027");
         batchA = fixtures.batch(physics, "A");
@@ -148,7 +148,7 @@ class EnrollmentHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(200, api.put("/api/v1/students/" + leaver, HttpApi.json(inactive), admin).statusCode());
         assertEquals(409, fixtures.enroll(batchA, leaver, "2027-01-10").statusCode(), "inactive student");
 
-        String otherAdmin = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(academy("Other Academy"), Role.STAFF);
         AcademyFixtures theirs = new AcademyFixtures(api, otherAdmin);
         String theirBatch = theirs.batch(theirs.course("THEIRS"), "X");
         String theirStudent = (String) theirs.student("THEIR-1", "their@example.invalid").get("id");
@@ -212,20 +212,21 @@ class EnrollmentHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void nonManagerStaffHaveNoEnrollmentAccessFromTheirRoleAlone() {
+    void anyStaffMemberManagesEnrollmentsAndStudentsReachOnlyTheirOwn() {
         String student = studentId("PCA-001");
         String id = (String) HttpApi.parse(fixtures.enroll(batchA, student, "2027-01-10")).get("id");
 
-        for (Role role : List.of(Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST)) {
-            String token = tokenFor(academyId, role);
-            int unassignedRoster = role == Role.ANALYST ? 403 : 404;
-            assertEquals(unassignedRoster, api.get("/api/v1/batches/" + batchA + "/enrollments", token).statusCode(), role.name());
-            assertEquals(403, fixturesFor(token).enroll(batchB, student, "2027-01-10").statusCode(), role.name());
-            assertEquals(403, api.put("/api/v1/enrollments/" + id, updateBody("2027-01-10", "2027-02-01", 0), token).statusCode());
-            assertEquals(403, api.get("/api/v1/students/" + student + "/enrollments", token).statusCode(), role.name());
-            assertEquals(403, api.get("/api/v1/me/enrollments", token).statusCode(), role.name());
-        }
-        String outsider = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
+        String colleague = tokenFor(academyId, Role.STAFF);
+        assertEquals(200, api.get("/api/v1/batches/" + batchA + "/enrollments", colleague).statusCode());
+        assertEquals(200, api.get("/api/v1/students/" + student + "/enrollments", colleague).statusCode());
+        assertEquals(403, api.get("/api/v1/me/enrollments", colleague).statusCode(), "staff have no student self-service");
+
+        String otherStudent = tokenFor(academyId, Role.STUDENT);
+        assertEquals(403, api.get("/api/v1/batches/" + batchA + "/enrollments", otherStudent).statusCode());
+        assertEquals(403, fixturesFor(otherStudent).enroll(batchB, student, "2027-01-10").statusCode());
+        assertEquals(403, api.put("/api/v1/enrollments/" + id, updateBody("2027-01-10", "2027-02-01", 0), otherStudent).statusCode());
+        assertEquals(403, api.get("/api/v1/students/" + student + "/enrollments", otherStudent).statusCode());
+        String outsider = tokenFor(academy("Other Academy"), Role.STAFF);
         assertEquals(404, api.get("/api/v1/batches/" + batchA + "/enrollments", outsider).statusCode());
         assertEquals(404, api.put("/api/v1/enrollments/" + id, updateBody("2027-01-10", "2027-02-01", 0), outsider).statusCode());
         assertEquals(404, api.get("/api/v1/students/" + student + "/enrollments", outsider).statusCode());

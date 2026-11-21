@@ -18,7 +18,8 @@ page describes what exists. [ADRs](adr/) record decisions.
   registrants, past occurrences and participant reports.
 - **Async:** a database queue (`FOR UPDATE SKIP LOCKED`) with retries, backoff, dead letters and an audited replay. There is
   no message broker; at one academy's volume none is needed.
-- **Live updates:** the staff and student class pages refresh themselves while a class runs; there is no server push (SSE).
+- **Live updates:** the staff dashboard and session detail poll their live data through the BFF while visible. A confirmed end refreshes surrounding session metadata. The student engagement page keeps its existing refresh behavior.
+- **Completed attendance:** the optional PostgreSQL projection summarizes matched visits for fully reconciled classes. Official records and enrolments stay authoritative. Live and unreconciled data use source evidence. See [ADR 0008](adr/ADR-0008-completed-attendance-projection.md).
 - **Infrastructure as code, not applied:** AWS ECS Fargate, RDS, S3, WAF, CloudWatch alarms, AWS Backup (Terraform,
   validated in CI). Applying it needs the academy's AWS account and budget.
 
@@ -26,14 +27,14 @@ page describes what exists. [ADRs](adr/) record decisions.
 
 | Package | Owns |
 | --- | --- |
-| `identity` | Accounts, passwords (Argon2id), lockout, TOTP MFA for all staff, refresh sessions, JWTs, invitations, resets, email notices |
-| `courses`, `batches`, `enrollments`, `students` | Academic structure, CSV import, staff assignments to batches |
+| `identity` | Accounts, passwords (Argon2id), lockout, refresh sessions, JWTs, invitations, resets, email notices |
+| `courses`, `batches`, `enrollments`, `students` | Academic structure, CSV import (staff see every batch of their academy, ADR-0007) |
 | `sessions` | Classes and weekly series shared by several batches |
 | `zoom` | Webhook ingress and worker, occurrence linking, participant matching (email, registration email, staff decisions), reports, webinar lookup |
 | `attendance` | Provisional facts, the academy rule, finalisation and recalculation, corrections, appeals, histories, CSV exports |
 | `engagement` | Consent, portal reactions, pulse questions, class / batch / course rankings |
 | `audit` | Append-only activity log |
-| `operations` | First-owner bootstrap, student erasure, retention job |
+| `operations` | First-staff bootstrap, student erasure, retention job |
 | `shared` | Errors, rate limits (per visitor and per account), security configuration |
 
 ## Domain identity invariants
@@ -46,7 +47,7 @@ student record, never by a Zoom display name.
 ## Security design
 
 Short-lived RS256 access tokens bound to a rotating refresh session (reuse detection revokes the session). Every staff
-role signs in with TOTP MFA. Roles are scoped to the academy, assigned batches or the student's own records, and checked on
+role signs in with email and password (no MFA). Roles are scoped to the academy, assigned batches or the student's own records, and checked on
 every route with object-level checks. Zoom credentials are separate secrets. See [JWT auth](../security/JWT-AUTH.md),
 [permissions](../security/AUTHORIZATION-MATRIX.md) and [threat model](../security/THREAT-MODEL.md).
 

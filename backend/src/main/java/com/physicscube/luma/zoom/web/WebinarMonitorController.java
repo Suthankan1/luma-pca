@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Webinars LUMA monitors: staff give only a webinar ID or join link; title and schedule come from Zoom, read-only. There
- * is no route that changes a Zoom webinar. Owners and administrators only.
+ * is no route that changes a Zoom webinar. Staff only.
  */
 @RestController
 class WebinarMonitorController {

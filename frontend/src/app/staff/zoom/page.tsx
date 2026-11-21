@@ -5,7 +5,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  candidateClasses, candidateWindow, formatClassTime, formatInstant, formatWebinarId, isAcademyManager, occurrencePeopleHref, occurrenceSource, occurrenceState, reportState, zoomEventLabels,
+  candidateClasses, candidateWindow, formatClassTime, formatInstant, formatWebinarId, occurrencePeopleHref, occurrenceSource, occurrenceState, reportState, zoomEventLabels,
   type ClassSession, type Occurrence, type UnmatchedZoomIdentity, type ZoomReceipt,
 } from "@/lib/staff-forms";
 
@@ -20,7 +20,7 @@ const views = [
 const LIMIT = 50;
 
 /**
- * Owners and administrators review what the webhook worker could not settle on its own:
+ * Staff review what the webhook worker could not settle on its own:
  * webinar occurrences not linked to a class, Zoom accounts that match no student, and
  * receipts that failed processing. Receipt payloads are never shown; Zoom names and emails
  * appear only where staff must match people.
@@ -32,11 +32,6 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
   const shell = { active: "zoom" as const, crumb: "Zoom", title: "Zoom review",
     subtitle: "Webinar occurrences become attendance only once they are linked to a class. Nothing here is shown to students.",
     hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}>
-      <p className="banner">Only academy owners and administrators review Zoom events.</p>
-    </StaffShell>;
-  }
 
   const [occurrences, dead, waiting, unmatched] = await Promise.all([
     staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?limit=${LIMIT}${view.query}`),
@@ -74,7 +69,7 @@ export default async function ZoomReviewPage({ searchParams }: { searchParams: P
           className={`chip ${v.key === view.key ? "cyan" : ""}`} aria-current={v.key === view.key ? "true" : undefined}>{v.label}</Link>)}
       </nav>
       <div className="link-row"><AutoLinkForm /><Link className="text-link" href="/staff/zoom/check">Check a webinar by link or ID →</Link>
-        <Link className="text-link" href="/staff/webinars">Monitored webinars →</Link></div>
+        <Link className="text-link" href="/staff/sessions">Tracked Zoom links →</Link></div>
       {sessions && !sessions.ok && <p className="session-error" role="alert">Class choices couldn’t be loaded; reload to decide.</p>}
       <ul className="dir-list">
         {occurrences.data.map((o, index) => {

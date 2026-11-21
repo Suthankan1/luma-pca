@@ -12,15 +12,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
 
 /** Heavier signed-in actions are limited per account (429 with Retry-After); other accounts are unaffected. */
-@TestPropertySource(properties = {"luma.rate-limit.enabled=true", "luma.rate-limit.sign-in.limit=1000", "luma.rate-limit.mfa.limit=1000",
+@TestPropertySource(properties = {"luma.rate-limit.enabled=true", "luma.rate-limit.sign-in.limit=1000",
         "luma.rate-limit.heavy-staff.limit=2"})
 class AccountRateLimitIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void exportsAreLimitedPerAccount() {
         resetDatabase();
         UUID academyId = academy("Physics Cube Test");
-        String admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
-        String other = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        String admin = tokenFor(academyId, Role.STAFF);
+        String other = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         String path = "/api/v1/batches/" + batch + "/attendance/export?from=2026-02-01&to=2026-02-28";

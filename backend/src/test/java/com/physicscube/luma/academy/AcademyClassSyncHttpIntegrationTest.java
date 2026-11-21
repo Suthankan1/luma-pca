@@ -87,7 +87,7 @@ class AcademyClassSyncHttpIntegrationTest extends StaffApiIntegrationTest {
         details("PCA003", "Nila Silva", "family@example.invalid");
         details("PCA005", "Taken Email", "existing@example.invalid");
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2027"), "ACAD");
     }
@@ -199,10 +199,9 @@ class AcademyClassSyncHttpIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void onlyOwnersAndAdministratorsMayUseAcademyClassesAndLinksAreChecked() {
-        String instructor = tokenFor(academyId, Role.INSTRUCTOR);
+    void onlyStaffMayUseAcademyClassesAndLinksAreChecked() {
         String student = tokenFor(academyId, Role.STUDENT);
-        for (String token : List.of(instructor, student)) {
+        for (String token : List.of(student)) {
             assertEquals(403, api.get("/api/v1/academy/classes", token).statusCode());
             assertEquals(403, link("Physics 2027", batch, token).statusCode());
             assertEquals(403, sync("Physics 2027", token).statusCode());
@@ -213,7 +212,7 @@ class AcademyClassSyncHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(404, sync("Physics 2027", admin).statusCode(), "not linked yet");
 
         UUID otherAcademy = academy("Other academy");
-        String otherAdmin = tokenFor(otherAcademy, Role.ACADEMY_ADMIN);
+        String otherAdmin = tokenFor(otherAcademy, Role.STAFF);
         assertEquals(404, link("Physics 2027", batch, otherAdmin).statusCode(), "another academy's batch");
 
         assertEquals(200, link("Physics 2027", batch, admin).statusCode());

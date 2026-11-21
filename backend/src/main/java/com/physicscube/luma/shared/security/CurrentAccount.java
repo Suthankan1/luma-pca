@@ -13,9 +13,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  * taken from a request path, query or body.
  */
 public record CurrentAccount(UUID accountId, UUID academyId, Set<String> roles) {
-    private static final Set<String> ACADEMY_MANAGERS = Set.of("ACADEMY_OWNER", "ACADEMY_ADMIN");
-    /** Roles whose access comes only from batch assignments. */
-    public static final Set<String> BATCH_SCOPED_ROLES = Set.of("INSTRUCTOR", "ATTENDANCE_OFFICER");
+    public static final String STAFF = "STAFF";
+    public static final String STUDENT = "STUDENT";
 
     public static CurrentAccount from(JwtAuthenticationToken authentication) {
         return new CurrentAccount(UUID.fromString(authentication.getName()),
@@ -25,13 +24,9 @@ public record CurrentAccount(UUID accountId, UUID academyId, Set<String> roles) 
                         .map(authority -> authority.substring(5)).collect(Collectors.toUnmodifiableSet()));
     }
 
-    public boolean isAcademyManager() {
-        return roles.stream().anyMatch(ACADEMY_MANAGERS::contains);
-    }
-
-    /** The batch-scoped staff roles the caller holds now; empty for everyone else. */
-    public Set<String> batchScopedRoles() {
-        return roles.stream().filter(BATCH_SCOPED_ROLES::contains).collect(Collectors.toUnmodifiableSet());
+    /** Staff of the caller's own academy: every staff action, across all its courses and batches. */
+    public boolean isStaff() {
+        return roles.contains(STAFF);
     }
 
     public boolean hasRole(String role) {
@@ -44,10 +39,10 @@ public record CurrentAccount(UUID accountId, UUID academyId, Set<String> roles) 
         }
     }
 
-    /** Owner or administrator of the caller's own academy. */
-    public void requireAcademyManager() {
-        if (!isAcademyManager()) {
-            throw new AccessDeniedException("Academy owner or administrator role required");
+    /** Staff of the caller's own academy. */
+    public void requireStaff() {
+        if (!isStaff()) {
+            throw new AccessDeniedException("Staff role required");
         }
     }
 }

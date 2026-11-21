@@ -1,8 +1,6 @@
 package com.physicscube.luma.attendance;
 
 import com.physicscube.luma.audit.AuditLog;
-import com.physicscube.luma.enrollments.ExpectedStudent;
-import com.physicscube.luma.sessions.ClassSessionService;
 import com.physicscube.luma.shared.api.ConflictException;
 import com.physicscube.luma.shared.api.InvalidRequestException;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
@@ -18,30 +16,26 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Changes to final attendance (slice 004C). Every change is a correction with a reason, kept in an
- * append-only history and the audit trail; the computed outcome is never overwritten. Owners,
- * administrators and attendance officers (for students of their batches) correct; a student
- * appeals their own record, and owners or administrators accept (which corrects it) or reject.
+ * append-only history and the audit trail; the computed outcome is never overwritten. Staff
+ * correct; a student appeals their own record, and staff accept (which corrects it) or reject.
  */
 @Service
 public class AttendanceRecordService {
     static final Set<String> OUTCOMES = Set.of("PRESENT", "LATE", "ABSENT", "EXCUSED");
 
     private final JdbcTemplate jdbc;
-    private final ClassSessionService sessions;
     private final StudentService students;
     private final AuditLog audit;
     private final com.physicscube.luma.identity.AccountNotifier notifier;
 
-    AttendanceRecordService(JdbcTemplate jdbc, ClassSessionService sessions, StudentService students, AuditLog audit,
+    AttendanceRecordService(JdbcTemplate jdbc, StudentService students, AuditLog audit,
                             com.physicscube.luma.identity.AccountNotifier notifier) {
         this.jdbc = jdbc;
-        this.sessions = sessions;
         this.students = students;
         this.audit = audit;
         this.notifier = notifier;
@@ -114,10 +108,10 @@ public class AttendanceRecordService {
 
     // ---- history ----------------------------------------------------------------------------
 
-    /** A student's final records, newest class first. Owners and administrators. */
+    /** A student's final records, newest class first. Staff. */
     @Transactional(readOnly = true)
     public List<RecordView> studentHistory(CurrentAccount caller, UUID studentId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         students.requireInAcademy(caller.academyId(), studentId);
         return history(caller.academyId(), studentId);
     }
@@ -150,8 +144,8 @@ public class AttendanceRecordService {
         jdbc.update("INSERT INTO attendance_appeals (id, academy_id, record_id, student_id, message, status, created_at) VALUES (?, ?, ?, ?, ?, 'OPEN', ?)",
                 id, caller.academyId(), recordId, studentId, text, Timestamp.from(DbTime.now()));
         Context appealed = context(recordId);
-        for (UUID manager : notifier.activeManagers(caller.academyId())) {
-            notifier.notify(manager, "appeal-submitted", "A student appealed their attendance",
+        for (UUID staff : notifier.activeStaff(caller.academyId())) {
+            notifier.notify(staff, "appeal-submitted", "A student appealed their attendance",
                     "A student appealed their attendance for " + appealed.classTitle() + " on " + appealed.classDay()
                             + ". Review it on the Attendance page." + portalLine("/staff/attendance"));
         }
@@ -160,10 +154,10 @@ public class AttendanceRecordService {
         return appealView(caller.academyId(), id);
     }
 
-    /** @param status OPEN, ACCEPTED, REJECTED or {@code null} for all; newest first. Owners and administrators. */
+    /** @param status OPEN, ACCEPTED, REJECTED or {@code null} for all; newest first. Staff. */
     @Transactional(readOnly = true)
     public List<Appeal> appeals(CurrentAccount caller, String status) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (status != null && !Set.of("OPEN", "ACCEPTED", "REJECTED").contains(status)) {
             throw new InvalidRequestException("status must be OPEN, ACCEPTED or REJECTED");
         }
@@ -174,7 +168,7 @@ public class AttendanceRecordService {
     /** Accepting corrects the record to {@code outcome}; rejecting needs a note for the student. */
     @Transactional
     public Appeal resolve(CurrentAccount caller, UUID appealId, boolean accept, String outcome, String note) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<Map<String, Object>> found = jdbc.queryForList("SELECT record_id, status FROM attendance_appeals WHERE id = ? AND academy_id = ? FOR UPDATE",
                 appealId, caller.academyId());
         if (found.isEmpty()) {
@@ -230,29 +224,20 @@ public class AttendanceRecordService {
                 "recordId", record.id().toString(), "from", record.outcome(), "to", next, "reason", reason));
     }
 
-    /** Managers, or an attendance officer who sees the student at that class. Not found otherwise. */
+    /** Staff of the record's academy. Not found otherwise. */
     private Owned requireCorrectable(CurrentAccount caller, UUID recordId) {
-        if (!caller.isAcademyManager() && !caller.hasRole("ATTENDANCE_OFFICER")) {
-            throw new AccessDeniedException("Only owners, administrators and attendance officers correct attendance");
-        }
+        caller.requireStaff();
         Owned record = jdbc.query("SELECT id, class_session_id, student_id, outcome, version FROM attendance_records WHERE id = ? AND academy_id = ? "
                 + "FOR UPDATE", (row, i) -> owned(row), recordId, caller.academyId()).stream().findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Attendance record"));
-        if (!caller.isAcademyManager() && sessions.expectedStudents(caller, record.sessionId()).stream()
-                .map(ExpectedStudent::studentId).noneMatch(record.studentId()::equals)) {
-            throw new ResourceNotFoundException("Attendance record");
-        }
         return record;
     }
 
     private void requireReadable(CurrentAccount caller, UUID recordId) {
-        Owned record = jdbc.query("SELECT id, class_session_id, student_id, outcome, version FROM attendance_records WHERE id = ? AND academy_id = ?",
+        caller.requireStaff();
+        jdbc.query("SELECT id, class_session_id, student_id, outcome, version FROM attendance_records WHERE id = ? AND academy_id = ?",
                 (row, i) -> owned(row), recordId, caller.academyId()).stream().findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Attendance record"));
-        if (!caller.isAcademyManager() && sessions.expectedStudents(caller, record.sessionId()).stream()
-                .map(ExpectedStudent::studentId).noneMatch(record.studentId()::equals)) {
-            throw new ResourceNotFoundException("Attendance record");
-        }
     }
 
     private UUID ownStudent(CurrentAccount caller) {

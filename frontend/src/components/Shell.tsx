@@ -1,11 +1,12 @@
 import Link from "next/link";
-import Image from "next/image";
+import { AcademyBrand } from "./AcademyBrand";
+import { PortalFrame, PortalIcon, PortalRail } from "./PortalRail";
 import type { ReactNode } from "react";
 import type { Portal } from "@/lib/session-policy";
 
 const studentNav = [
-  { key: "home", label: "My classes", href: "/student", icon: "▶" },
-  { key: "attendance", label: "My attendance", href: "/student/attendance", icon: "✓" },
+  { key: "attendance", label: "My attendance", href: "/student", icon: "chart" },
+  { key: "home", label: "My classes", href: "/student/classes", icon: "calendar" },
 ] as const;
 
 /**
@@ -20,41 +21,36 @@ export function Shell({ children, active, otherPortal, studentSection }: {
   studentSection?: (typeof studentNav)[number]["key"];
 }) {
   if (active === "student") {
-    return <div className="shell">
-      <aside className="aside staff-rail student-rail" aria-label="Academy navigation">
-        <Link href="/student" className="brand"><span className="brand-dot" aria-hidden /> luma</Link>
+    return <PortalFrame className="student-shell">
+      <PortalRail portal="student">
         <nav className="staff-nav" aria-label="Student portal">
-          {studentNav.map(item => <Link key={item.key} href={item.href}
+          {studentNav.map(item => <Link key={item.key} href={item.href} title={item.label} aria-label={item.label}
             className={`staff-navitem ${(studentSection ?? "home") === item.key ? "active" : ""}`}
             aria-current={(studentSection ?? "home") === item.key ? "page" : undefined}>
-            <span className="staff-navicon" aria-hidden>{item.icon}</span>{item.label}
+            <PortalIcon name={item.icon} /><span className="portal-rail-copy">{item.label}</span>
           </Link>)}
-          {otherPortal && <Link className="staff-navitem" href={`/${otherPortal}`}>
-            <span className="staff-navicon" aria-hidden>↗</span>{otherPortal === "staff" ? "Staff portal" : "Student portal"}
+          {otherPortal && <Link className="staff-navitem" href={`/${otherPortal}`} title={otherPortal === "staff" ? "Staff portal" : "Student portal"}
+            aria-label={otherPortal === "staff" ? "Staff portal" : "Student portal"}>
+            <PortalIcon name="external" /><span className="portal-rail-copy">{otherPortal === "staff" ? "Staff portal" : "Student portal"}</span>
           </Link>}
         </nav>
-        <div className="staff-railfoot">
-          <p className="staff-academy">PHYSICS CUBE ACADEMY</p>
-          <Link href="/account/password" className="staff-signout staff-password">Change password</Link>
-          <form method="post" action="/api/session/logout">
-            <button className="staff-signout" type="submit">Sign out</button>
-          </form>
-        </div>
-      </aside>
+      </PortalRail>
       <main className="content staff-content">{children}</main>
-    </div>;
+    </PortalFrame>;
   }
-  return <div className="shell">
-    <aside className="aside" aria-label="Academy navigation">
-      <Link href="/" className="brand"><span className="brandmark" aria-hidden>◈</span> luma.</Link>
-      <p className="text-xs tracking-widest text-cyan-200 w-full mt-3 mb-2">PHYSICS CUBE ACADEMY</p>
+  return <div className="public-shell">
+    <header className="public-header" aria-label="Academy navigation">
+      <AcademyBrand href="/" />
+      <div className="public-brand-copy"><strong>PHYSICS CUBE</strong><span>ACADEMY · LUMA</span></div>
+      <nav className="public-nav" aria-label="Platform navigation">
       {active === "staff" ? <>
         <Link className="navitem active" aria-current="page" href="/staff">Staff portal</Link>
         {otherPortal && <Link className="navitem" href={`/${otherPortal}`}>Student portal</Link>}
       </> : <Link className={`navitem ${active === "home" ? "active" : ""}`} href="/"
         aria-current={active === "home" ? "page" : undefined}>Platform home</Link>}
-      <Image className="brandtile" src="/physics-cube-academy-logo.jpg" alt="Physics Cube Academy" width={560} height={300} priority />
-    </aside>
-    <main className="content">{children}</main>
+      </nav>
+    </header>
+    <main className={`public-content ${active === "home" ? "public-home" : "public-auth"}`}>{children}</main>
+    <footer className="public-footer"><span>Physics Cube Academy</span><span>Attendance tracking</span></footer>
   </div>;
 }

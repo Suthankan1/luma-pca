@@ -2,7 +2,7 @@
 # Real-stack auth smoke test: throwaway PostgreSQL 17 + the built Spring backend +
 # the Next.js dev server, driven with curl. Covers invitation activation through the
 # browser page (student) and the API (admin), browser
-# sign-in, MFA enrollment, recovery codes, TOTP verification, recovery code sign-in,
+# sign-in for students and staff (email and password, no second factor),
 # protected portals, refresh rotation, replay revocation and sign-out.
 #
 # Needs: Docker running, JDK 21 as `java` (or JAVA_HOME), Node 22+ as `node`,
@@ -36,7 +36,7 @@ INSERT INTO account_roles (account_id, role) VALUES ('22222222-2222-2222-2222-22
 INSERT INTO account_invitations (id, account_id, token_hash, created_at, expires_at) VALUES ('33333333-3333-3333-3333-333333333333', '22222222-2222-2222-2222-222222222222', '$STUDENT_DIGEST', NOW(), NOW() + INTERVAL '1 hour');
 
 INSERT INTO accounts (id, academy_id, email, status) VALUES ('44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111', 'smoke.admin@example.invalid', 'PENDING_ACTIVATION');
-INSERT INTO account_roles (account_id, role) VALUES ('44444444-4444-4444-4444-444444444444', 'ACADEMY_ADMIN');
+INSERT INTO account_roles (account_id, role) VALUES ('44444444-4444-4444-4444-444444444444', 'STAFF');
 INSERT INTO account_invitations (id, account_id, token_hash, created_at, expires_at) VALUES ('55555555-5555-5555-5555-555555555555', '44444444-4444-4444-4444-444444444444', '$ADMIN_DIGEST', NOW(), NOW() + INTERVAL '1 hour');
 SQL
 
@@ -89,87 +89,18 @@ web -X POST -H "Origin: $ORIGIN" --data-urlencode email=smoke.student@example.in
 check "logout" "$(web -X POST -H "Origin: $ORIGIN" $ORIGIN/api/session/logout)" 303
 check "logout redirect" "$(loc)" "/sign-in?signedOut=1"
 
-# --- Admin MFA Enrollment Flow ---
+# --- Admin sign-in: email and password open the staff portal directly ---
 rm -f "$JAR"
-check "admin login requires MFA" "$(web -X POST -H "Origin: $ORIGIN" --data-urlencode email=smoke.admin@example.invalid --data-urlencode "password=$PHRASE" --data-urlencode portal=staff $ORIGIN/api/session/login)" 303
-check "admin login redirects to mfa" "$(loc)" "/sign-in/mfa"
-check "mfa cookie present" "$([ -n "$(grep 'luma-mfa' "$JAR")" ] && echo yes)" yes
-check "no session access cookie yet" "$([ -z "$(grep 'luma-access' "$JAR")" ] && echo yes)" yes
-web $ORIGIN/staff >/dev/null
-check "staff page redirects unverified admin" "$(loc)" "/sign-in?portal=staff"
-check "mfa enrollment page loads" "$(web $ORIGIN/sign-in/mfa)" 200
-check "qr code rendered" "$(grep -c '<svg' "$S/body.html" | sed 's/[1-9][0-9]*/yes/')" yes
-
-# Wrong code rejection
-web -X POST -H "Origin: $ORIGIN" --data-urlencode code=000000 $ORIGIN/api/session/mfa-verify >/dev/null
-check "wrong code rejected" "$(loc)" "/sign-in/mfa?error=code"
-
-# Cancel MFA
-check "cancel mfa" "$(web -X POST -H "Origin: $ORIGIN" $ORIGIN/api/session/mfa-cancel)" 303
-check "cancel redirects to sign-in" "$(loc)" "/sign-in"
-check "mfa cookie cleared on cancel" "$([ -z "$(grep 'luma-mfa' "$JAR")" ] && echo yes)" yes
-
-# Re-initiate MFA
-web -X POST -H "Origin: $ORIGIN" --data-urlencode email=smoke.admin@example.invalid --data-urlencode "password=$PHRASE" --data-urlencode portal=staff $ORIGIN/api/session/login >/dev/null
-web $ORIGIN/sign-in/mfa >/dev/null
-SECRET=$(grep -o 'class="mfa-secret"[^>]*>[^<]*' "$S/body.html" | sed -E 's/.*>//; s/[[:space:]]//g')
-
-CODE=$(node -e '
-  const crypto = require("crypto");
-  const secret = process.argv[1];
-  function base32Decode(str) {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-    let bits = 0, value = 0, output = [];
-    for (let c of str) {
-      let idx = chars.indexOf(c);
-      if (idx === -1) continue;
-      value = (value << 5) | idx;
-      bits += 5;
-      if (bits >= 8) { output.push((value >>> (bits - 8)) & 255); bits -= 8; }
-    }
-    return Buffer.from(output);
-  }
-  const key = base32Decode(secret);
-  const step = Math.floor(Date.now() / 30000);
-  const buf = Buffer.alloc(8);
-  buf.writeBigUInt64BE(BigInt(step));
-  const hmac = crypto.createHmac("sha1", key).update(buf).digest();
-  const offset = hmac[hmac.length - 1] & 0x0f;
-  const binCode = (hmac.readUInt32BE(offset) & 0x7fffffff) % 1000000;
-  console.log(String(binCode).padStart(6, "0"));
-' "$SECRET")
-
-check "verify code" "$(web -X POST -H "Origin: $ORIGIN" --data-urlencode "code=$CODE" $ORIGIN/api/session/mfa-verify)" 303
-check "verify redirects to recovery codes" "$(loc)" "/sign-in/mfa/recovery-codes"
-check "recovery cookie present" "$([ -n "$(grep 'luma-recovery' "$JAR")" ] && echo yes)" yes
-check "mfa cookie cleared after verify" "$([ -z "$(grep 'luma-mfa' "$JAR")" ] && echo yes)" yes
-
-check "recovery codes page loads" "$(web $ORIGIN/sign-in/mfa/recovery-codes)" 200
-FIRST_RECOVERY=$(grep -o '<code[^>]*>[^<]*' "$S/body.html" | head -1 | sed -E 's/.*>//')
-
-# Acknowledge recovery codes
-check "acknowledge recovery codes" "$(web -X POST -H "Origin: $ORIGIN" --data-urlencode confirmed=on $ORIGIN/api/session/mfa-recovery)" 303
-check "acknowledge redirects to staff portal" "$(loc)" "/staff"
-check "recovery cookie cleared" "$([ -z "$(grep 'luma-recovery' "$JAR")" ] && echo yes)" yes
+check "admin wrong password rejected" "$(web -X POST -H "Origin: $ORIGIN" --data-urlencode email=smoke.admin@example.invalid --data-urlencode "password=wrong $PHRASE" --data-urlencode portal=staff $ORIGIN/api/session/login)" 303
+check "admin wrong password redirect" "$(loc)" "/sign-in?error=invalid&portal=staff"
+check "admin sign-in" "$(web -X POST -H "Origin: $ORIGIN" --data-urlencode email=smoke.admin@example.invalid --data-urlencode "password=$PHRASE" --data-urlencode portal=staff $ORIGIN/api/session/login)" 303
+check "admin sign-in redirects to staff portal" "$(loc)" "/staff"
+check "admin session cookies set" "$([ -n "$(grep 'luma-access' "$JAR")" ] && [ -n "$(grep 'luma-refresh' "$JAR")" ] && echo yes)" yes
 check "staff portal loads for admin" "$(web $ORIGIN/staff)" 200
 check "staff content present" "$(grep -c 'Staff portal' "$S/body.html" | sed 's/[1-9][0-9]*/yes/')" yes
+check "removed second-factor route" "$(web -X POST -H "Origin: $ORIGIN" --data-urlencode code=000000 $ORIGIN/api/session/mfa-verify)" 404
 
 # Logout admin
-web -X POST -H "Origin: $ORIGIN" $ORIGIN/api/session/logout >/dev/null
-
-# --- Enrolled Admin sign-in using Recovery Code ---
-rm -f "$JAR"
-web -X POST -H "Origin: $ORIGIN" --data-urlencode email=smoke.admin@example.invalid --data-urlencode "password=$PHRASE" --data-urlencode portal=staff $ORIGIN/api/session/login >/dev/null
-web $ORIGIN/sign-in/mfa >/dev/null
-check "enrolled mfa page shows enter code" "$(grep -c 'Enter your code' "$S/body.html" | sed 's/[1-9][0-9]*/yes/')" yes
-check "no qr code on enrolled sign-in" "$(grep -c '<svg' "$S/body.html")" 0
-
-# Verify with recovery code
-check "verify with recovery code" "$(web -X POST -H "Origin: $ORIGIN" --data-urlencode "code=$FIRST_RECOVERY" $ORIGIN/api/session/mfa-verify)" 303
-check "recovery login redirects directly to staff" "$(loc)" "/staff"
-check "staff portal loads after recovery login" "$(web $ORIGIN/staff)" 200
-
-# Final logout
 web -X POST -H "Origin: $ORIGIN" $ORIGIN/api/session/logout >/dev/null
 
 check "no token or passphrase in backend log" "$(grep -c -E "eyJ[A-Za-z0-9_-]{20,}|$PHRASE|$INVITE_STUDENT|$INVITE_ADMIN" "$S/backend.log")" 0

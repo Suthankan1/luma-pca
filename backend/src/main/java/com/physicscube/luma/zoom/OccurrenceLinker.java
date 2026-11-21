@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * Links a Zoom webinar occurrence to the class session it belongs to, automatically
  * and only when unambiguous: exactly one SCHEDULED session on the same webinar ID
  * whose time, widened by {@link #SLACK} on both sides, contains the event. No match or
- * several matches leave the occurrence for an administrator. An existing decision,
+ * several matches leave the occurrence for staff. An existing decision,
  * automatic or manual, is never changed here.
  */
 @Component

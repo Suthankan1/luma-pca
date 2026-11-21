@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 test.describe("Staying signed in", () => {
   test("A student stays signed in after the short access token expires, and Sign out still works", async ({ page, context }) => {
     await context.clearCookies();
-    await page.goto("/sign-in?portal=student");
+    await page.goto("/sign-in");
     await page.fill("#email", "student@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -17,7 +17,7 @@ test.describe("Staying signed in", () => {
       await context.clearCookies({ name: "luma-access" });
       await page.goto("/student/attendance");
       await expect(page).toHaveURL(/\/student\/attendance$/);
-      await expect(page.getByRole("heading", { name: "My attendance" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
       expect((await context.cookies()).some(c => c.name === "luma-access"), "renewed").toBe(true);
     }
 
@@ -34,14 +34,12 @@ test.describe("Staying signed in", () => {
     await page.fill("#email", "admin-enrolled@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
-    await page.fill("#code", "rec-recovery");
-    await page.getByRole("button", { name: "Verify" }).click();
     await expect(page).toHaveURL(/\/staff$/);
 
     await context.clearCookies({ name: "luma-access" });
     await page.goto("/staff/dashboard");
-    await expect(page).toHaveURL(/\/staff\/dashboard$/);
-    await expect(page.getByRole("heading", { name: "Attendance reports" })).toBeVisible();
+    await expect(page).toHaveURL(/\/staff\/reports$/);
+    await expect(page.getByRole("heading", { name: "Reports" })).toBeVisible();
 
     await context.clearCookies({ name: "luma-access" });
     await page.goto("/sign-in");

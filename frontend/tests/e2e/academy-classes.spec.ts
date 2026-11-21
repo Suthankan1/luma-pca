@@ -6,9 +6,6 @@ async function signInStaff(page: Page, email: string) {
   await page.fill("#email", email);
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa/);
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
 
@@ -19,7 +16,7 @@ test.describe("Academy classes", () => {
   test("A class from the Academy records is set up in one step and its students synced", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Sets up shared mock data once");
     await signInStaff(page, "admin-enrolled@example.invalid");
-    await page.getByRole("link", { name: /Academy classes/ }).first().click();
+    await page.goto("/staff/academy");
     await expect(page).toHaveURL(/\/staff\/academy$/);
     await expect(page.getByRole("heading", { name: "Academy classes", level: 1 })).toBeVisible();
 
@@ -46,18 +43,5 @@ test.describe("Academy classes", () => {
     await expect(roster).toContainText("3 enrolled");
     await expect(roster).toContainText("PCA101");
     await expect(roster).toContainText("Amaya Perera");
-  });
-
-  test("Staff who are not owners or administrators are pointed elsewhere", async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "chromium", "Shared mock data");
-    await page.context().clearCookies();
-    await page.goto("/sign-in?portal=staff");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.fill("#code", "rec-recovery");
-    await page.getByRole("button", { name: "Verify" }).click();
-    await page.goto("/staff/academy");
-    await expect(page.locator(".banner")).toContainText("Only academy owners and administrators connect Academy classes.");
   });
 });

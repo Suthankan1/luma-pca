@@ -3,26 +3,23 @@ import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
 import { Disclosure } from "@/components/Disclosure";
-import { AssignForm, UnassignButton } from "@/components/staff/TeamForms";
 import { requirePortal, studentIdLoginEnabled } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { AttendanceExportForm } from "@/components/staff/AttendanceExportForm";
-import { academyToday, type BatchAttendanceSummary, type Ranking, formatDate, isAcademyManager, monthStart, rateLabel, staffRoleLabels, uuidOrNull } from "@/lib/staff-forms";
+import { academyToday, type BatchAttendanceSummary, type Ranking, formatDate, monthStart, rateLabel, uuidOrNull } from "@/lib/staff-forms";
 
 type Batch = { courseId: string; id: string; code: string; name: string; startsOn: string; endsOn: string | null; active: boolean };
-type Assignment = { id: string; email: string | null; role: string };
 type Enrollment = { id: string; studentId: string; studentNumber: string; studentName: string; enrolledOn: string; withdrawnOn: string | null };
 
 export const metadata = { title: "Batch roster · LUMA" };
 
-/** Readable by owners and administrators, and by instructors and attendance officers assigned to the batch. */
+/** A batch's roster, attendance summary, invitations and engagement ranking, for staff. */
 export default async function RosterPage({ params, searchParams }: { params: Promise<{ batchId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const identity = await requirePortal("staff");
   const batchId = uuidOrNull((await params).batchId);
   if (!batchId) notFound();
 
-  const manager = isAcademyManager(identity.roles);
   const query = await searchParams;
   const isoDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
   const sumFrom = isoDate(query.sumFrom) ?? monthStart(academyToday());
@@ -35,19 +32,18 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
   const rankingQuery = rankFrom && rankTo ? new URLSearchParams({ from: rankFrom, to: rankTo, limit: String(top) }) : null;
 
   // Single round of parallel requests instead of 4 sequential rounds
-  const [batch, roster, assignments, summary] = await Promise.all([
+  const [batch, roster, summary] = await Promise.all([
     staffApi<Batch>(`/api/v1/batches/${batchId}`),
     staffApi<Enrollment[]>(`/api/v1/batches/${batchId}/enrollments`),
-    manager ? staffApi<Assignment[]>(`/api/v1/batches/${batchId}/assignments`) : Promise.resolve(null),
     staffApi<BatchAttendanceSummary>(`/api/v1/batches/${batchId}/attendance/summary?${new URLSearchParams({ from: sumFrom, to: sumTo })}`),
   ]);
 
-  // The API answers 404 for batches outside the caller's academy or assignments, and 403 for roles with no batch access.
+  // The API answers 404 for a batch outside the caller's academy.
   if (!batch.ok && (batch.status === 404 || batch.status === 403)) notFound();
 
   const rankingBase: `/api/v1/${string}` = wholeCourse && batch.ok ? `/api/v1/courses/${batch.data.courseId}/engagement-ranking`
     : `/api/v1/batches/${batchId}/engagement-ranking`;
-  const ranking = manager && rankingQuery ? await staffApi<Ranking>(`${rankingBase}?${rankingQuery}`) : null;
+  const ranking = rankingQuery ? await staffApi<Ranking>(`${rankingBase}?${rankingQuery}`) : null;
   const shell = { active: "courses" as const, crumb: "Academic setup", hasStudentPortal: hasPortal(identity, "student") };
   if (!batch.ok || !roster.ok) {
     return <StaffShell {...shell} title="Batch roster" subtitle="">
@@ -58,15 +54,13 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
   const current = roster.data.filter(e => !e.withdrawnOn);
   return <StaffShell {...shell} title={`${b.code} ${b.name}`}
     subtitle={`${formatDate(b.startsOn)}${b.endsOn ? ` – ${formatDate(b.endsOn)}` : " onwards"}${b.active ? "" : " · Inactive batch"}`}>
-    <p className="link-row"><Link className="text-link" href="/staff/courses">← Courses &amp; batches</Link>
-      <Link className="text-link" href={`/staff/sessions?batch=${batchId}`}>Classes for this batch →</Link></p>
+    <p className="link-row"><Link className="text-link" href="/staff/courses">← Courses &amp; batches</Link></p>
     <section className="panel" aria-labelledby="roster-title">
       <h2 id="roster-title" className="panel-title">ROSTER</h2>
       <p className="panel-sub">{current.length} enrolled{roster.data.length > current.length ? ` · ${roster.data.length - current.length} withdrawn` : ""}</p>
       <ul className="dir-list">
         {roster.data.map(e => <li key={e.id} className="dir-row dir-course">
-          <div>{manager ? <Link className="text-link" href={`/staff/students/${e.studentId}`}><strong>{e.studentNumber}</strong> <span>{e.studentName}</span></Link>
-            : <><strong>{e.studentNumber}</strong> <span>{e.studentName}</span></>}</div>
+          <div><Link className="text-link" href={`/staff/students/${e.studentId}`}><strong>{e.studentNumber}</strong> <span>{e.studentName}</span></Link></div>
           <span className={`status ${e.withdrawnOn ? "off" : "on"}`}>{e.withdrawnOn ? `Withdrawn ${formatDate(e.withdrawnOn)}` : `Since ${formatDate(e.enrolledOn)}`}</span>
         </li>)}
         {roster.data.length === 0 && <li className="dir-empty muted">No students enrolled yet.</li>}
@@ -79,26 +73,14 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
         Every export is recorded in the activity log.</p>
       <AttendanceExportForm batchId={batchId} from={daysBefore(academyToday(), 30)} to={academyToday()} />
     </section>
-    {manager && <section className="panel panel-gap" aria-labelledby="batch-invite-title">
+    <section className="panel panel-gap" aria-labelledby="batch-invite-title">
       <h2 id="batch-invite-title" className="panel-title">INVITE BY EMAIL</h2>
       <Disclosure summary="Email sign-in links to this batch’s students">
         {studentIdLoginEnabled() && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
           for email sign-in. Students without an email of their own are never emailed.</p>}
         <BulkInviteForm batchId={batchId} scope="this batch’s current students" />
       </Disclosure>
-    </section>}
-    {assignments && <section className="panel panel-gap" aria-labelledby="assigned-title">
-      <h2 id="assigned-title" className="panel-title">ASSIGNED STAFF</h2>
-      {!assignments.ok ? <p className="session-error" role="alert">We couldn’t load assignments right now.</p> : <>
-        <p className="panel-sub">{assignments.data.length === 0 ? "No one is assigned yet. Assigned instructors and attendance officers can open this roster."
-          : "These people can open this roster."}</p>
-        <ul className="dir-list">{assignments.data.map(a => <li key={a.id} className="dir-row dir-course">
-          <div><strong>{a.email}</strong> <span className="muted">{staffRoleLabels[a.role] ?? a.role}</span></div>
-          <UnassignButton id={a.id} batchId={batchId} label={`${a.email} as ${staffRoleLabels[a.role] ?? a.role}`} />
-        </li>)}</ul>
-        <AssignForm batchId={batchId} />
-      </>}
-    </section>}
+    </section>
     <section className="panel panel-gap" aria-labelledby="summary-title">
       <h2 id="summary-title" className="panel-title">ATTENDANCE SUMMARY</h2>
       <p className="panel-sub">Each student’s final attendance in this batch’s classes, lowest rate first. Rate = (present + late) ÷
@@ -121,7 +103,7 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
           {summary.data.students.length === 0 && <li className="dir-empty muted">No final attendance in this range yet.</li>}</ul>
       </>}
     </section>
-    {manager && <section className="panel panel-gap" aria-labelledby="ranking-title">
+    <section className="panel panel-gap" aria-labelledby="ranking-title">
       <h2 id="ranking-title" className="panel-title">ENGAGEMENT RANKING</h2>
       <Disclosure summary="Show the staff-only engagement ranking" defaultOpen={!!rankingQuery}>
       <p className="panel-sub">Staff only. Students who consented to engagement, scored by portal reactions (at most 10 per class) and
@@ -149,7 +131,7 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
             {ranking.data.top.length === 0 && <li className="dir-empty muted">No consenting students took part in this range.</li>}</ol>
         </>)}
       </Disclosure>
-    </section>}
+    </section>
   </StaffShell>;
 }
 

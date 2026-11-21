@@ -44,10 +44,10 @@ public class AccountNotifier {
                 .ifPresent(email -> delivery.afterCommit(accountId, purpose, () -> mailer.notice(email, subject, text)));
     }
 
-    /** Active owners and administrators of the academy, for notices that need someone to act. */
+    /** Active staff of the academy, for notices that need someone to act. */
     @Transactional(readOnly = true)
-    public List<UUID> activeManagers(UUID academyId) {
-        return accounts.withAnyRole(academyId, Set.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN)).stream()
+    public List<UUID> activeStaff(UUID academyId) {
+        return accounts.withAnyRole(academyId, Set.of(Role.STAFF)).stream()
                 .filter(a -> a.getStatus() == AccountStatus.ACTIVE).map(Account::getId).toList();
     }
 }

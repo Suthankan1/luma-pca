@@ -6,7 +6,6 @@ import { requirePortal } from "@/lib/auth-server";
 import { formatSyncedAt, type AcademyClass } from "@/lib/academy";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { isAcademyManager } from "@/lib/staff-forms";
 
 type Course = { id: string; code: string };
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
@@ -18,12 +17,6 @@ export default async function AcademyClassesPage() {
   const shell = { active: "academy" as const, crumb: "Academy database", title: "Academy classes",
     subtitle: "Classes and students come from the Academy’s own records (read-only). Set each class up once; sync whenever students join.",
     hasStudentPortal: hasPortal(identity, "student") };
-
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}>
-      <p className="banner">Only academy owners and administrators connect Academy classes. Your batches are under Courses & batches.</p>
-    </StaffShell>;
-  }
 
   const [classes, courses, batches] = await Promise.all([staffApi<AcademyClass[]>("/api/v1/academy/classes", undefined, 25000),
     staffApi<Course[]>("/api/v1/courses"), staffApi<Batch[]>("/api/v1/batches")]);
@@ -80,9 +73,9 @@ export default async function AcademyClassesPage() {
           existing batch instead if the class already has one with history.</li>
         <li><strong>Sync students</strong> adds students who joined the Academy class since. Nobody is removed automatically: students
           who left are listed so you can decide on the batch roster.</li>
-        <li>Then add the class’s Zoom webinar under <Link className="text-link" href="/staff/webinars">Webinars</Link> (its ID or link
+        <li>Then track the class’s Zoom link under <Link className="text-link" href="/staff/sessions">Classes</Link> (its ID or link
           only). When the webinar’s Zoom title matches the Academy class, each run expects these students; otherwise choose the class
-          there.</li>
+          under “Tracked Zoom links” there.</li>
         <li>LUMA never changes the Academy’s records and never reads its attendance table.</li>
       </ul>
     </Disclosure>

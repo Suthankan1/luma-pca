@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Forgot your password · LUMA" };
 
 const messages = {
   email: "Enter the email address you sign in with.",
-  disabled: "Password reset by email isn’t available yet. Ask a Physics Cube Academy administrator to help you.",
+  disabled: "Password reset by email isn’t available yet. Ask Physics Cube Academy staff to help you.",
   limited: "Too many attempts. Wait a moment and try again.",
   unavailable: "We couldn’t reach the account service. Please try again shortly.",
 };

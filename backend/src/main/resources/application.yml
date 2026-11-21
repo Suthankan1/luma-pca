@@ -1,3 +1,7 @@
+logging:
+  level:
+    # MVC's DEBUG argument/body logging can include credentials or student data.
+    org.springframework.web.servlet.mvc.method.annotation: INFO
 spring:
   threads:
     virtual:
@@ -98,9 +102,6 @@ luma:
     ephemeral-signing-key: ${LUMA_AUTH_EPHEMERAL_SIGNING_KEY:false}
     refresh-token-ttl: ${LUMA_AUTH_REFRESH_TOKEN_TTL:P7D}
     session-max-lifetime: ${LUMA_AUTH_SESSION_MAX_LIFETIME:P30D}
-    # Base64 of 32 random bytes from a secrets manager; encrypts authenticator secrets at rest.
-    # Losing or changing it makes every enrolled authenticator unusable.
-    mfa-encryption-key: ${LUMA_AUTH_MFA_ENCRYPTION_KEY:}
   mail:
     # Email to account holders (invitations, password resets) stays off until an SMTP server
     # is configured with SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME and
@@ -136,9 +137,6 @@ luma:
     sign-in:
       limit: ${LUMA_RATE_LIMIT_SIGN_IN_LIMIT:60}
       window: ${LUMA_RATE_LIMIT_SIGN_IN_WINDOW:PT5M}
-    mfa:
-      limit: ${LUMA_RATE_LIMIT_MFA_LIMIT:60}
-      window: ${LUMA_RATE_LIMIT_MFA_WINDOW:PT5M}
     link-redemption:
       limit: ${LUMA_RATE_LIMIT_LINK_REDEMPTION_LIMIT:30}
       window: ${LUMA_RATE_LIMIT_LINK_REDEMPTION_WINDOW:PT10M}

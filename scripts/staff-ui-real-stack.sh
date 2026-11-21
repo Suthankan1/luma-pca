@@ -33,16 +33,20 @@ DB_URL=jdbc:postgresql://localhost:55433/luma DB_USERNAME=luma DB_PASSWORD=$DBPA
 for i in $(seq 1 90); do curl -sf localhost:$API/actuator/health/readiness >/dev/null && break; sleep 1; done
 curl -sf localhost:$API/actuator/health/readiness >/dev/null || { echo "backend did not start"; tail -20 "$S/backend.log"; exit 1; }
 
-# The academy and its first owner come from the operator command, exactly as in production.
+# The academy and its staff come from the operator command, exactly as in production (there is no staff page).
 bootstrap() {
   DB_URL=jdbc:postgresql://localhost:55433/luma DB_USERNAME=luma DB_PASSWORD=$DBPASS LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true \
-    LUMA_BOOTSTRAP_WEB_ORIGIN=$ORIGIN "$ROOT/scripts/bootstrap-owner.sh" "Real Stack Academy" smoke.admin@example.invalid > "$1" 2>&1
+    LUMA_BOOTSTRAP_WEB_ORIGIN=$ORIGIN "$ROOT/scripts/bootstrap-owner.sh" "Real Stack Academy" "${2:-smoke.admin@example.invalid}" > "$1" 2>&1
 }
 bootstrap "$S/bootstrap.out" || { echo "owner bootstrap failed:"; grep "LUMA owner bootstrap" "$S/bootstrap.out"; exit 1; }
 INVITE=$(grep -oE "^$ORIGIN/activate#token=[A-Za-z0-9_-]{43}$" "$S/bootstrap.out" | head -1 | sed 's/.*token=//')
 [ -n "$INVITE" ] || { echo "the bootstrap printed no activation link"; grep "LUMA owner bootstrap" "$S/bootstrap.out"; exit 1; }
 # The link is printed once, on its own line, and appears in no log line.
 [ "$(grep -c -F -e "$INVITE" "$S/bootstrap.out")" = 1 ] || { echo "the invitation token appeared more than once in the command output"; exit 1; }
+# A colleague added by the operator to the same academy.
+bootstrap "$S/bootstrap-colleague.out" real.instructor@example.invalid || { echo "adding the colleague failed"; exit 1; }
+COLLEAGUE_INVITE=$(grep -oE "^$ORIGIN/activate#token=[A-Za-z0-9_-]{43}$" "$S/bootstrap-colleague.out" | head -1)
+[ -n "$COLLEAGUE_INVITE" ] || { echo "the colleague's bootstrap printed no activation link"; exit 1; }
 ACADEMY_ID=$(docker exec $PG psql -At -U luma -d luma -c "SELECT id FROM academies WHERE name = 'Real Stack Academy'")
 docker exec -i $PG psql -q -U luma -d luma -v ON_ERROR_STOP=1 <<SQL
 -- Zoom data as the (disabled) worker would have left it, without personal data: an occurrence on the
@@ -82,20 +86,27 @@ LUMA_TRUSTED_PROXY_HOPS=1 LUMA_WEB_ORIGIN=$ORIGIN LUMA_SESSION_KEY=$(openssl ran
 for i in $(seq 1 60); do curl -sf -o /dev/null $ORIGIN/sign-in && break; sleep 1; done
 
 for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:$MAILPIT/api/v1/messages && break; sleep 1; done
-LUMA_REAL_STACK_URL=$ORIGIN LUMA_REAL_API_URL=http://127.0.0.1:$API LUMA_REAL_MAILPIT_URL=http://127.0.0.1:$MAILPIT LUMA_REAL_ADMIN_INVITE=$INVITE LUMA_REAL_PASSPHRASE=$PHRASE \
+LUMA_REAL_STACK_URL=$ORIGIN LUMA_REAL_API_URL=http://127.0.0.1:$API LUMA_REAL_MAILPIT_URL=http://127.0.0.1:$MAILPIT LUMA_REAL_ADMIN_INVITE=$INVITE LUMA_REAL_COLLEAGUE_INVITE=$COLLEAGUE_INVITE LUMA_REAL_PASSPHRASE=$PHRASE \
   npx playwright test -c playwright.real-stack.config.ts
 status=$?
 
-# Once the owner is active, the command refuses to add another.
+# An active staff member is never replaced by the command.
 bootstrap "$S/bootstrap-again.out"; again=$?
-echo "bootstrap again: exit $again, $(grep -o 'already has an active owner' "$S/bootstrap-again.out")"
+echo "bootstrap again: exit $again, $(grep -o 'already active' "$S/bootstrap-again.out")"
 [ "$again" = 1 ] || status=1
+
+# The operator blocks the colleague with the runbook SQL: their password no longer signs in.
+sed 's/person@example.com/real.instructor@example.invalid/' "$ROOT/docs/delivery/runbooks/sql/staff-block.sql" | docker exec -i $PG psql -q -U luma -d luma
+blocked=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+  -d "{\"email\":\"real.instructor@example.invalid\",\"password\":\"$PHRASE\"}" localhost:$API/api/v1/auth/login)
+echo "blocked colleague sign-in: $blocked"
+[ "$blocked" = 401 ] || status=1
 
 echo "--- database after the run"
 docker exec $PG psql -At -U luma -d luma -c "SELECT 'courses=' || count(*) FROM courses" -c "SELECT 'batches=' || count(*) FROM batches" \
   -c "SELECT 'students=' || count(*) FROM students" -c "SELECT 'enrollments=' || count(*) || ' withdrawn=' || count(withdrawn_on) FROM enrollments" \
   -c "SELECT 'active accounts=' || count(*) FROM accounts WHERE status = 'ACTIVE'" \
-  -c "SELECT 'staff assignments=' || count(*) FROM staff_assignments" \
+\
   -c "SELECT 'class sessions=' || string_agg(starts_at::text || ' to ' || ends_at::text || ' webinar ' || zoom_webinar_id, ';') FROM class_sessions" \
   -c "SELECT 'occurrence links=' || string_agg(occurrence_uuid || ':' || link_source || ':' || coalesce(class_session_id::text, 'not a class'), ',') FROM zoom_occurrence_links" \
   -c "SELECT 'receipts=' || string_agg(processing_status || ':' || attempts, ',' ORDER BY id) FROM zoom_webhook_receipts" \

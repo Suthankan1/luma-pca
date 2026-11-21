@@ -35,7 +35,7 @@ class ClassLinkRevisionIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2027"), "A");
     }

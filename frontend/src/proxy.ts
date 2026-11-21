@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { config as sessionConfig } from "@/lib/auth-server";
 import { clientAddressFrom, trustedProxyHops } from "@/lib/client-address";
-import { sealAccess, sessionCookie, type Identity } from "@/lib/session-policy";
+import { sealAccess, sessionCookie } from "@/lib/session-policy";
 import { cookieHeaderWith, needsRefresh, refreshesOn } from "@/lib/silent-refresh";
 import { validateTokens } from "@/lib/auth-parsers";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Named pages that live beside the `[id]` pages and are not IDs. */
-const NAMED = new Set(["import"]);
+const NAMED = new Set(["/staff/students/import", "/staff/students/manage", "/staff/sessions/types"]);
 const RECORD_PAGES = /^\/(staff\/(sessions|students|team|batches)|student\/classes)\/[^/]+$/;
 
 type Renewed = { sealed: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number } | null;
@@ -26,10 +26,17 @@ const inFlight = new Map<string, Promise<Renewed>>();
  *    on every request, and sign-out revokes it and clears both cookies.
  */
 export async function proxy(request: NextRequest) {
+  const started = performance.now();
+  const response = await routeRequest(request);
+  response.headers.append("Server-Timing", `next-proxy;dur=${(performance.now() - started).toFixed(1)}`);
+  return response;
+}
+
+async function routeRequest(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (RECORD_PAGES.test(pathname)) {
     const id = pathname.split("/")[3];
-    if (id && !UUID.test(id) && !NAMED.has(id)) {
+    if (id && !UUID.test(id) && !NAMED.has(pathname)) {
       return NextResponse.rewrite(new URL("/_not-found", request.url), { status: 404 });
     }
   }
@@ -77,18 +84,8 @@ async function renew(refreshToken: string, client: string | null, key: Buffer): 
     });
     if (!refreshed.ok) return null;
     const tokens = validateTokens(await refreshed.json());
-    let identity: Identity | null = null;
-    const me = await fetch(new URL("/api/v1/auth/me", api), {
-      cache: "no-store", redirect: "error", signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${tokens.accessToken}` },
-    });
-    if (me.ok) {
-      const data = await me.json();
-      if (typeof data?.accountId === "string" && typeof data?.academyId === "string" && Array.isArray(data?.roles)
-          && data.roles.every((role: unknown) => typeof role === "string")) {
-        identity = { accountId: data.accountId, academyId: data.academyId, roles: data.roles };
-      }
-    }
-    return { sealed: sealAccess({ token: tokens.accessToken, identity }, key), refreshToken: tokens.refreshToken,
+    // The page checks the renewed token with the API before showing any protected content.
+    return { sealed: sealAccess({ token: tokens.accessToken, identity: null }, key), refreshToken: tokens.refreshToken,
       expiresIn: tokens.expiresIn, refreshExpiresIn: tokens.refreshExpiresIn };
   } catch {
     return null;

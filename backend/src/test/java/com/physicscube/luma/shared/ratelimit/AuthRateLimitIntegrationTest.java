@@ -33,7 +33,6 @@ import org.springframework.test.context.TestPropertySource;
 @TestPropertySource(properties = {
     "luma.rate-limit.enabled=true",
     "luma.rate-limit.sign-in.limit=3",
-    "luma.rate-limit.mfa.limit=3",
     "luma.rate-limit.link-redemption.limit=3",
     "luma.rate-limit.reset-request.limit=2"})
 @ExtendWith(OutputCaptureExtension.class)

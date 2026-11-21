@@ -8,12 +8,10 @@ test("An administrator checks a past webinar run from its link and links it to t
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 
   // The student whose Zoom email appears in the mock report (shared by both browser projects).
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill("LK-1");
   await page.locator("#student-name").fill("Lookup Student");

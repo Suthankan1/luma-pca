@@ -31,55 +31,32 @@ public class SecurityConfig {
                             // The emailed reset token is the credential for confirming a reset.
                             "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm",
                             "/api/v1/auth/refresh", "/api/v1/auth/logout",
-                            // The challenge token from the password step is the credential here.
-                            "/api/v1/auth/mfa/enroll", "/api/v1/auth/mfa/verify",
                             // Zoom signs each request; the signature over the raw body is the credential.
                             "/api/v1/zoom/webhooks").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all", "/api/v1/auth/mfa/reset", "/api/v1/auth/password").authenticated()
-                    // First gate only. Services repeat the role check and bind every query to
-                    // the caller's academy; later slices add course and batch scope there.
-                    // Assigned staff may read batches and rosters; services limit them to their assignments.
-                    .requestMatchers(HttpMethod.GET, "/api/v1/batches", "/api/v1/batches/*", "/api/v1/batches/*/enrollments")
-                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
-                    // Analysts read the rule and academy-wide totals without student names.
-                    .requestMatchers(HttpMethod.GET, "/api/v1/attendance-policy")
-                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST")
-                    .requestMatchers(HttpMethod.GET, "/api/v1/attendance/summary").hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "ANALYST")
-                    .requestMatchers(HttpMethod.GET, "/api/v1/class-sessions", "/api/v1/class-sessions/*",
-                            "/api/v1/class-sessions/*/students", "/api/v1/class-sessions/*/attendance",
-                            "/api/v1/class-sessions/*/attendance/export", "/api/v1/batches/*/attendance/export",
-                            "/api/v1/batches/*/attendance/summary", "/api/v1/attendance/dashboard",
-                            "/api/v1/class-sessions/*/zoom-run")
-                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
-                    .requestMatchers(HttpMethod.GET, "/api/v1/me/assignments").hasAnyRole("INSTRUCTOR", "ATTENDANCE_OFFICER")
-                    // Corrections: services limit attendance officers to students of their batches.
-                    // Instructors open and close pulse questions in their classes; services check the class is theirs.
-                    .requestMatchers(HttpMethod.POST, "/api/v1/class-sessions/*/pulses", "/api/v1/class-sessions/*/pulses/*/closure")
-                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR")
-                    .requestMatchers(HttpMethod.GET, "/api/v1/class-sessions/*/engagement")
-                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
-                    .requestMatchers(HttpMethod.POST, "/api/v1/attendance-records/*/corrections")
-                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "ATTENDANCE_OFFICER")
-                    .requestMatchers(HttpMethod.GET, "/api/v1/attendance-records/*/corrections")
-                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER")
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout-all", "/api/v1/auth/password").authenticated()
+                    // First gate only: every staff route needs STAFF (owner decision 2026-11-20: two roles).
+                    // Services repeat the check and bind every query to the caller's academy from the token.
                     .requestMatchers("/api/v1/courses", "/api/v1/courses/**", "/api/v1/batches", "/api/v1/batches/**",
-                            "/api/v1/students", "/api/v1/students/**", "/api/v1/enrollments/**", "/api/v1/assignments/**",
+                            "/api/v1/students", "/api/v1/students/**", "/api/v1/enrollments/**",
                             "/api/v1/class-sessions", "/api/v1/class-sessions/**",
-                            "/api/v1/staff-accounts", "/api/v1/staff-accounts/**", "/api/v1/accounts/*/invitations",
+                            "/api/v1/accounts/*/invitations",
                             "/api/v1/student-invitations", "/api/v1/student-invitations/progress", "/api/v1/student-invitations/failures", "/api/v1/audit-events",
                             "/api/v1/zoom/receipts", "/api/v1/zoom/receipts/**",
                             "/api/v1/zoom/occurrences", "/api/v1/zoom/occurrences/**", "/api/v1/zoom/occurrence-links",
                             "/api/v1/zoom/participants", "/api/v1/zoom/participants/unmatched", "/api/v1/zoom/identity-links", "/api/v1/zoom/identity-links/removals", "/api/v1/zoom/reports",
                             "/api/v1/zoom/webinar-lookup", "/api/v1/zoom/webinar-lookup/**",
                             "/api/v1/zoom/upcoming-webinars", "/api/v1/zoom/upcoming-webinars/*", "/api/v1/zoom/webinar-imports",
-                            "/api/v1/attendance/pending", "/api/v1/attendance/finalisations",
+                            "/api/v1/attendance/pending", "/api/v1/attendance/finalisations", "/api/v1/attendance/summary",
+                            "/api/v1/attendance/dashboard", "/api/v1/attendance/class-totals", "/api/v1/attendance/student-directory",
+                            "/api/v1/attendance-records/*/corrections",
+                            "/api/v1/attendance/latest-completed", "/api/v1/attendance/recent-completed",
                             "/api/v1/attendance-policy", "/api/v1/attendance-appeals", "/api/v1/attendance-appeals/*/resolution",
                             "/api/v1/engagement-settings",
                             "/api/v1/academy/classes", "/api/v1/academy/classes/link", "/api/v1/academy/classes/sync",
                             "/api/v1/zoom/monitors", "/api/v1/zoom/monitors/*/sync", "/api/v1/zoom/monitors/*/stop",
                             "/api/v1/zoom/monitors/*/resume", "/api/v1/zoom/monitors/*/academy-class")
-                        .hasAnyRole("ACADEMY_OWNER", "ACADEMY_ADMIN")
+                        .hasRole("STAFF")
                     // A student's own data; services resolve "own" from the token, never from input.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments", "/api/v1/me/class-sessions",
                             "/api/v1/me/attendance", "/api/v1/me/attendance-overview").hasRole("STUDENT")

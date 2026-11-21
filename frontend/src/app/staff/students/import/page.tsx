@@ -4,7 +4,7 @@ import { StudentImportForm } from "@/components/staff/StudentImportForm";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { academyToday, batchOptions, isAcademyManager, type CourseRef } from "@/lib/staff-forms";
+import { academyToday, batchOptions, type CourseRef } from "@/lib/staff-forms";
 
 type Batch = { id: string; courseId: string; code: string; name: string; active: boolean };
 
@@ -15,11 +15,6 @@ export default async function ImportStudentsPage() {
   const shell = { active: "students" as const, crumb: "Students", title: "Import students",
     subtitle: "Add many students from a spreadsheet. Every row is checked first; nothing is saved unless the whole file is valid.",
     hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}>
-      <p className="banner">Only academy owners and administrators manage student records.</p>
-    </StaffShell>;
-  }
   const [courses, batches] = await Promise.all([staffApi<CourseRef[]>("/api/v1/courses"), staffApi<Batch[]>("/api/v1/batches")]);
   return <StaffShell {...shell}>
     <section className="panel" aria-labelledby="import-title">
@@ -27,7 +22,7 @@ export default async function ImportStudentsPage() {
       {!courses.ok || !batches.ok
         ? <p className="session-error" role="alert">We couldn’t load batches right now. Please reload the page shortly.</p>
         : <StudentImportForm batches={batchOptions(courses.data, batches.data, batch => batch.active)} today={academyToday()} />}
-      <p><Link className="text-link" href="/staff/students">← Back to students</Link></p>
+      <p><Link className="text-link" href="/staff/students/manage">← Back to student management</Link></p>
     </section>
   </StaffShell>;
 }

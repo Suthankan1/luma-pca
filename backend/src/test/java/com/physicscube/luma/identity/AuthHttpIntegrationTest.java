@@ -98,6 +98,18 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
         return api.get("/api/v1/auth/me", token).statusCode();
     }
 
+    @Test
+    void timingHeaderSurvivesSuccessfulAndRefusedApiResponses() {
+        var allowed = api.get("/api/v1/auth/me", accessToken());
+        var refused = api.get("/api/v1/auth/me", null);
+        assertEquals(200, allowed.statusCode());
+        assertEquals(401, refused.statusCode());
+        for (var response : List.of(allowed, refused)) {
+            assertEquals(1, response.headers().allValues("Server-Timing").size());
+            assertTrue(response.headers().firstValue("Server-Timing").orElseThrow().matches("api;dur=[0-9]+\\.[0-9]"));
+        }
+    }
+
     /** A token signed with the real key whose claims start valid and are then altered. */
     private String forged(JWSSigner signer, JWSHeader header, Consumer<JWTClaimsSet.Builder> change) throws Exception {
         String sessionId = decoder.decode(accessToken()).getClaimAsString("sid");
@@ -255,9 +267,11 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
         assertEquals(academyId.toString(), identity.get("academyId"));
         assertEquals(List.of("STUDENT"), identity.get("roles"));
 
-        // Roles are read from the database, not from the token: a staff role added now needs a session that passed MFA.
-        jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'ANALYST')", studentId);
-        assertEquals(401, api.get("/api/v1/auth/me", token).statusCode());
+        // Roles are read from the database, not from the token: a role added now applies to the existing session.
+        jdbc.update("INSERT INTO account_roles (account_id, role) VALUES (?, 'STAFF')", studentId);
+        HttpResponse<String> promoted = api.get("/api/v1/auth/me", token);
+        assertEquals(200, promoted.statusCode(), promoted.body());
+        assertEquals(List.of("STAFF", "STUDENT"), HttpApi.parse(promoted).get("roles"));
     }
 
     @Test
@@ -360,21 +374,23 @@ class AuthHttpIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void staffAccountsNeverReceiveTokensFromThePasswordStepAlone() {
-        for (Role role : List.of(Role.ACADEMY_OWNER, Role.ACADEMY_ADMIN, Role.INSTRUCTOR, Role.ATTENDANCE_OFFICER, Role.ANALYST)) {
+    void staffAccountsSignInDirectlyWithEmailAndPassword() {
+        List<Role> staffRoles = List.of(Role.STAFF);
+        for (Role role : staffRoles) {
             String email = role.name().toLowerCase().replace('_', '.') + "@example.invalid";
             accounts.setPassword(accounts.register(academyId, email, Set.of(role)).id(), PASSPHRASE);
 
+            assertEquals(401, login(email, WRONG).statusCode(), role.name() + " with a wrong password");
             HttpResponse<String> response = login(email, PASSPHRASE);
 
             assertEquals(200, response.statusCode(), role.name());
             Map<String, Object> body = HttpApi.parse(response);
-            assertEquals(Set.of("mfaRequired", "mfaToken", "mfaExpiresIn", "mfaEnrolled"), body.keySet());
-            assertEquals(true, body.get("mfaRequired"));
-            assertEquals(401, me((String) body.get("mfaToken")), "a challenge is not an access token");
-            assertEquals(401, login(email, WRONG).statusCode(), "a wrong password must not reveal the MFA requirement");
+            assertEquals(Set.of("accessToken", "tokenType", "expiresIn", "refreshToken", "refreshExpiresIn"), body.keySet());
+            HttpResponse<String> identity = api.get("/api/v1/auth/me", (String) body.get("accessToken"));
+            assertEquals(200, identity.statusCode(), role.name());
+            assertEquals(List.of(role.name()), HttpApi.parse(identity).get("roles"));
         }
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM refresh_sessions", Integer.class));
+        assertEquals(staffRoles.size(), jdbc.queryForObject("SELECT count(*) FROM refresh_sessions", Integer.class));
     }
 
     @Test

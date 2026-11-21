@@ -5,7 +5,7 @@ import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import {
-  formatClassTime, formatInstant, isAcademyManager, occurrenceIdOrNull, participantMatchLabel,
+  formatClassTime, formatInstant, occurrenceIdOrNull, participantMatchLabel,
   type ClassSession, type OccurrenceParticipants,
 } from "@/lib/staff-forms";
 
@@ -21,9 +21,6 @@ export default async function ZoomParticipantsPage({ searchParams }: { searchPar
   const shell = { active: "zoom" as const, crumb: "Zoom", title: "Zoom participants",
     subtitle: "People Zoom reported for one webinar occurrence. Provisional live data, not attendance.",
     hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...shell}><p className="banner">Only academy owners and administrators review Zoom events.</p></StaffShell>;
-  }
   if (!occurrence) {
     return <StaffShell {...shell}><p className="session-error" role="alert">Choose an occurrence on the <Link className="text-link" href="/staff/zoom">Zoom review</Link> page.</p></StaffShell>;
   }

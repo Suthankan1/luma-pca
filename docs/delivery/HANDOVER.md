@@ -4,8 +4,8 @@
 
 A working web application, tested end to end, that replaces roll call in the academy's Zoom webinars:
 
-- **Staff portal** (owner, administrator, instructor, attendance officer, analyst; every staff sign-in uses an
-  authenticator app): courses, batches, students (one by one or from CSV), enrolments, staff and their batches, classes and
+- **Staff portal** (owner, administrator, instructor, attendance officer, analyst; staff sign in with email and
+  password): courses, batches, students (one by one or from CSV), enrolments, staff and their batches, classes and
   weekly series (or **imported from the academy's upcoming Zoom webinars** in one step), invitations by email, and a home page
   with today's classes and everything that needs attention.
 - **Zoom:** signed webhooks from the academy's Zoom account, automatic linking of each webinar run to its class, people

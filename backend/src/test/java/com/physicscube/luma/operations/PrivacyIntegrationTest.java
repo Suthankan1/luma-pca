@@ -35,8 +35,8 @@ class PrivacyIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        owner = tokenFor(academyId, Role.ACADEMY_OWNER);
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        owner = tokenFor(academyId, Role.STAFF);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         Map<String, Object> student = fixtures.student("S-001", "erase.me@example.test");
@@ -61,7 +61,7 @@ class PrivacyIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void anOwnerErasesAStudentsPersonalDataKeepingAnonymisedAttendance() {
+    void staffEraseAStudentsPersonalDataKeepingAnonymisedAttendance() {
         UUID receipt = receipt("erase.me@example.test", Instant.now(), "PROCESSED");
         jdbc.update("INSERT INTO zoom_occurrence_events (id, academy_id, receipt_id, webinar_id, occurrence_uuid, event_type, event_ts, created_at, "
                 + "visit_key, participant_email, participant_name) VALUES (?, ?, ?, '81234567890', 'Occ==', 'webinar.participant_joined', 1, now(), "
@@ -80,7 +80,7 @@ class PrivacyIntegrationTest extends StaffApiIntegrationTest {
         body.put("confirmStudentNumber", "S-999");
         body.put("reason", "Request from the student's guardian");
         String path = "/api/v1/students/" + studentId + "/erasure";
-        assertEquals(403, api.post(path, HttpApi.json(body), admin).statusCode(), "owners only");
+        assertEquals(403, api.post(path, HttpApi.json(body), tokenFor(academyId, Role.STUDENT)).statusCode(), "staff only");
         assertEquals(400, api.post(path, HttpApi.json(body), owner).statusCode(), "the number must be typed again");
         body.put("confirmStudentNumber", "s-001");
         HttpResponse<String> erased = api.post(path, HttpApi.json(body), owner);

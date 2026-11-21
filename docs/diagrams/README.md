@@ -2,7 +2,7 @@
 
 - `context.mmd` — browsers, Next BFF, Spring API with its background workers, PostgreSQL, Zoom and mail (as built).
 - `domain-erd.mmd` — course/batch/student/session/attendance core domain.
-- `auth-flow.mmd` — login + MFA + refresh + JWT validation (as built).
+- `auth-flow.mmd` — email and password login + refresh + JWT validation (as built; no MFA).
 - `zoom-events.mmd` — verified webhook durable ingress + reconciliation (as built).
 - `deployment.mmd` — the AWS design in `infra/terraform`; **not applied**.
 

@@ -5,7 +5,9 @@ import { activityHref, actorName, describeActivity } from "../src/lib/activity.t
 const event = (action, details = {}, extra = {}) => ({ id: "1", occurredAt: "2027-01-01T00:00:00Z", action, actorAccountId: "a",
   actorEmail: "owner@example.invalid", targetType: "ACCOUNT", targetId: "t", targetLabel: "teacher@example.invalid", details, ...extra });
 
-test("staff actions read as sentences with role names", () => {
+test("staff actions read as sentences with role names, including roles recorded before the two-role change", () => {
+  assert.deepEqual(describeActivity(event("STAFF_ACCOUNT_CREATED", { roles: ["STAFF"] })),
+    { summary: "Added staff member teacher@example.invalid", detail: "Staff" });
   assert.deepEqual(describeActivity(event("STAFF_ACCOUNT_CREATED", { roles: ["INSTRUCTOR", "ATTENDANCE_OFFICER"] })),
     { summary: "Added staff member teacher@example.invalid", detail: "Instructor, Attendance officer" });
   assert.deepEqual(describeActivity(event("STAFF_ROLES_CHANGED", { before: ["INSTRUCTOR"], after: ["ACADEMY_ADMIN"] })),

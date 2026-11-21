@@ -1,13 +1,12 @@
-import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test, expect, devices, type Browser, type Page } from "@playwright/test";
 import { openSection } from "../e2e/support/ui";
 
 /**
- * Real stack, real browser: an administrator activates their invitation, enrols an
- * authenticator, sets up a course, batch and student, invites and enrols the student,
- * the student activates and signs in, and an instructor is invited, assigned, sees the
- * roster and the batch's class, and loses both when unassigned. Started by scripts/staff-ui-real-stack.sh.
+ * Real stack, real browser: a staff member activates their invitation, signs in with
+ * email and password, sets up a course, batch and student, invites and enrols the student,
+ * the student activates and signs in, and a colleague added by the operator command activates and sees
+ * everything staff see (two roles: STAFF and STUDENT; no staff page). Started by scripts/staff-ui-real-stack.sh.
  */
 const adminEmail = "smoke.admin@example.invalid";
 const adminInvite = process.env.LUMA_REAL_ADMIN_INVITE!;
@@ -16,9 +15,8 @@ const mailpit = process.env.LUMA_REAL_MAILPIT_URL!;
 
 // The acceptance test below continues from the onboarding test's data and accounts.
 test.describe.configure({ mode: "serial" });
-let adminSecret = "";
+let adminSignedIn = false;
 let studentPassword = "";
-let lastAdminStep = 0;
 
 type MailpitList = { messages: { ID: string; Subject: string; To: { Address: string }[] }[] };
 
@@ -36,61 +34,32 @@ async function newestEmailTo(address: string) {
   throw new Error(`No email to ${address} arrived`);
 }
 
-/** RFC 6238 code (SHA-1, 6 digits, 30 s) for a Base32 secret, as an authenticator app computes it. */
-function totp(base32: string, at = Date.now()) {
-  // RFC 4648 Base32: A–Z then 2–7.
-  const alphabet = String.fromCharCode(...Array.from({ length: 26 }, (_, i) => 65 + i)) + "234567";
-  let bits = "";
-  for (const char of base32.replace(/\s/g, "").toUpperCase()) bits += alphabet.indexOf(char).toString(2).padStart(5, "0");
-  const key = Buffer.from(bits.match(/.{8}/g)!.map(byte => parseInt(byte, 2)));
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(at / 30_000)));
-  const hash = createHmac("sha1", key).update(counter).digest();
-  const offset = hash[hash.length - 1] & 0x0f;
-  return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
-}
-
 /**
  * Classes are no longer scheduled in LUMA's screens (Zoom owns schedules). Steps that need a class with history create it
- * through the real API as the administrator (password + authenticator code), with manual scheduling switched on for this
+ * through the real API as the administrator (email and password), with manual scheduling switched on for this
  * test backend only (scripts/staff-ui-real-stack.sh).
  */
 const apiBase = process.env.LUMA_REAL_API_URL!;
 let apiToken = "";
-/** A code for a time step after the last one used (shared with the browser sign-ins), waiting for the clock when one step
- * of drift is not enough. */
-async function adminCode() {
-  for (;;) {
-    const current = Math.floor(Date.now() / 30_000);
-    const step = Math.max(current, lastAdminStep + 1);
-    if (step <= current + 1) {
-      lastAdminStep = step;
-      return totp(adminSecret, step * 30_000);
-    }
-    await new Promise(resolve => setTimeout(resolve, 2_000));
-  }
-}
 async function adminToken() {
   if (apiToken) return apiToken;
-  const login = await (await fetch(`${apiBase}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: adminEmail, password: passphrase }) })).json() as { mfaToken: string };
-  const verified = await fetch(`${apiBase}/api/v1/auth/mfa/verify`, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mfaToken: login.mfaToken, code: await adminCode() }) });
-  expect(verified.status, await verified.clone().text()).toBe(200);
-  apiToken = ((await verified.json()) as { accessToken: string }).accessToken;
+  const login = await fetch(`${apiBase}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: adminEmail, password: passphrase }) });
+  expect(login.status, await login.clone().text()).toBe(200);
+  apiToken = ((await login.json()) as { accessToken: string }).accessToken;
   return apiToken;
 }
-async function createClass(title: string, date: string, start: string, end: string, batch: string, webinar?: string) {
+async function createClass(title: string, date: string, start: string, end: string, batch: string, webinar?: string, endDate = date) {
   const token = await adminToken();
   const get = async (path: string) => (await fetch(`${apiBase}${path}`, { headers: { Authorization: `Bearer ${token}` } })).json();
   const [courseCode, batchCode] = batch.split(" · ");
   const course = ((await get("/api/v1/courses")) as { id: string; code: string }[]).find(c => c.code === courseCode)!;
   const found = ((await get("/api/v1/batches")) as { id: string; courseId: string; code: string }[])
     .find(b => b.courseId === course.id && b.code === batchCode)!;
-  const at = (time: string) => new Date(Date.parse(`${date}T${time}:00+05:30`)).toISOString();
+  const at = (day: string, time: string) => new Date(Date.parse(`${day}T${time}:00+05:30`)).toISOString();
   const created = await fetch(`${apiBase}/api/v1/class-sessions`, { method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ title, startsAt: at(start), endsAt: at(end), timeZone: "Asia/Colombo", batchIds: [found.id],
+    body: JSON.stringify({ title, startsAt: at(date, start), endsAt: at(endDate, end), timeZone: "Asia/Colombo", batchIds: [found.id],
       zoomWebinarId: webinar ? webinar.replace(/\s/g, "") : null }) });
   expect(created.status, await created.clone().text()).toBe(201);
   return ((await created.json()) as { id: string }).id;
@@ -107,20 +76,12 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.getByRole("button", { name: "Activate account" }).click();
   await expect(page).toHaveURL(/\/sign-in\?activated=1$/);
 
-  // 2. First sign-in enrols an authenticator; recovery codes are shown once.
+  // 2. Email and password open the staff portal directly.
   await page.fill("#email", adminEmail);
   await page.fill("#password", passphrase);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Set up authenticator" })).toBeVisible();
-  const secret = (await page.locator("code.mfa-secret").innerText()).replace(/\s/g, "");
-  adminSecret = secret;
-  lastAdminStep = Math.floor(Date.now() / 30_000);
-  await page.fill("#code", totp(secret, lastAdminStep * 30_000));
-  await page.getByRole("button", { name: "Verify and save" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa\/recovery-codes/);
-  await page.getByLabel("I have safely saved or written down these recovery codes").check();
-  await page.getByRole("button", { name: "Continue to staff portal" }).click();
   await expect(page).toHaveURL(/\/staff$/);
+  adminSignedIn = true;
 
   // 3. Course and batch through the real API.
   await page.goto("/staff/courses");
@@ -140,7 +101,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator("#batch-feedback")).toHaveText("Batch MON created.");
 
   // 4. Student, invitation and enrolment.
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill("pca-real-001");
   await page.locator("#student-name").fill("Real Stack Student");
@@ -179,11 +140,11 @@ test("an administrator onboards a student end to end on the real stack", async (
   await student.fill("#password", passphrase);
   await student.getByRole("button", { name: "Sign in" }).click();
   await expect(student).toHaveURL(/\/student$/);
-  await expect(student.getByRole("heading", { name: "Student portal" })).toBeVisible();
+  await expect(student.getByRole("heading", { name: "Real Stack Student", exact: true })).toBeVisible();
   await studentContext.close();
 
   // 6. The administrator sees the account as active.
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-001" })).toContainText("Account active");
 
   // 6b. Two more students from a CSV file, enrolled in the same batch; the real API checks then imports.
@@ -203,7 +164,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(page.locator("#import-feedback")).toHaveText("All 2 rows are ready. Nothing has been saved yet.");
   await page.getByRole("button", { name: "Import 2 students" }).click();
   await expect(page.locator("#import-feedback")).toContainText("Imported 2 students and enrolled them in REAL-PHY · MON · Monday evening.");
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-002" })).toContainText("Import, One");
   await expect(page.locator(".dir-course").filter({ hasText: "PCA-REAL-003" })).toContainText("Invitation pending");
   await page.getByRole("search").getByLabel("Find a student").fill("IMPORT,");
@@ -237,29 +198,17 @@ test("an administrator onboards a student end to end on the real stack", async (
   await expect(imported).toHaveURL(/\/sign-in\?activated=1$/);
   await importedContext.close();
 
-  // 7. The owner adds an instructor, invites them and assigns them to the batch.
+  // 7. A colleague was added by the operator command (no staff page); the script passes their activation link.
+  const instructorInvite = process.env.LUMA_REAL_COLLEAGUE_INVITE;
+  expect(instructorInvite).toBeTruthy();
   await page.goto("/staff/team");
-  await page.locator("#staff-email").fill("real.instructor@example.invalid");
-  await page.locator(".role-choices").getByLabel("Instructor", { exact: true }).check();
-  await page.getByRole("button", { name: "Add staff member" }).click();
-  await expect(page.locator("#staff-feedback")).toHaveText("real.instructor@example.invalid added. Open their record to send an invitation.");
-  await page.getByRole("link", { name: "Open their record →" }).click();
-  // Emailed this time (the student's was a copied link): the link reaches only the instructor.
-  await page.getByRole("button", { name: "Email invitation" }).click();
-  await expect(page.locator("#invite-feedback")).toContainText("Invitation emailed to real.instructor@example.invalid.");
-  await expect(page.getByLabel("Invitation link")).toHaveCount(0);
-  const invitationEmail = await newestEmailTo("real.instructor@example.invalid");
-  expect(invitationEmail.subject).toBe("Your Physics Cube Academy LUMA account");
-  const instructorInvite = /http:\/\/127\.0\.0\.1:\d+\/activate#token=[A-Za-z0-9_-]{43}/.exec(invitationEmail.text)?.[0];
-  expect(instructorInvite, invitationEmail.text).toBeTruthy();
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
 
   await page.goto("/staff/courses");
   await page.getByRole("link", { name: /MON/ }).first().click();
   await expect(page).toHaveURL(/\/staff\/batches\/[0-9a-f-]{36}$/);
   const rosterUrl = page.url();
-  await page.locator("#assign-email").fill("real.instructor@example.invalid");
-  await page.getByRole("button", { name: "Assign" }).click();
-  await expect(page.locator("#assign-feedback")).toHaveText("Assigned. They can open this roster from their next request.");
+  await expect(page.getByRole("region", { name: "ASSIGNED STAFF" })).toHaveCount(0);
 
   // 7b. A class for the batch (history: classes now come from Zoom runs, so it is created through the API), in Sri Lanka
   // time; the API stores UTC. The class page has no edit or cancel controls.
@@ -267,7 +216,8 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.goto(`/staff/sessions/${classId}`);
   const classUrl = page.url();
   await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
-  await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
+  await expect(page.getByRole("region", { name: "Student attendance results" })
+    .getByRole("listitem", { name: "Attendance PCA-REAL-001 Real Stack Student" })).toBeVisible();
   // The seeded Zoom occurrence on this webinar at 18:20 was linked as soon as the class existed.
   const zoomLinks = page.getByRole("region", { name: "Zoom occurrences linked" });
   await expect(zoomLinks.getByRole("listitem").locator(".status")).toHaveText(["Linked automatically"]);
@@ -281,16 +231,16 @@ test("an administrator onboards a student end to end on the real stack", async (
   await portal.fill("#password", passphrase);
   await portal.getByRole("button", { name: "Sign in" }).click();
   await expect(portal).toHaveURL(/\/student$/);
-  await portal.goto("/student?from=2027-01-11");
+  await portal.goto("/student/classes?from=2027-01-11");
   await expect(portal.getByRole("region", { name: "MY CLASSES" }).getByRole("listitem", { name: "Real stack class" }))
     .toContainText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
   await expect(portal.getByRole("region", { name: "MY BATCHES" })).toContainText("from 12 Jan 2027");
   await studentAgain.close();
 
-  // 7b''. LUMA no longer schedules classes or weekly series: the Classes page points to Zoom webinar monitoring.
+  // 7b''. LUMA no longer schedules classes or weekly series: the Classes page tracks Zoom links instead.
   await page.goto("/staff/sessions");
   await expect(page.locator("#schedule-title, #series-title")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "WHERE CLASSES COME FROM" })).toContainText("Zoom owns the schedule");
+  await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" })).toBeVisible();
 
   // 7c. Zoom review against the seeded occurrences: scheduling the class already linked the one
   // on its webinar and time (re-running the matcher finds nothing more); the other occurrence is
@@ -309,7 +259,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await manual.getByLabel("Class").selectOption({ label: "Wed 13 Jan 2027 · 18:00–20:30 · Real stack class" });
   await manual.getByLabel(/^Reason/).fill("Checked against the timetable");
   await manual.getByRole("button", { name: "Link to class" }).click();
-  await expect(manual.locator(".status")).toHaveText("Linked by an administrator");
+  await expect(manual.locator(".status")).toHaveText("Linked by staff");
   await manual.getByText("Change decision").click();
   await manual.getByLabel(/^Reason/).fill("Staff rehearsal, not a class");
   await manual.getByRole("button", { name: "Not a class" }).click();
@@ -324,54 +274,32 @@ test("an administrator onboards a student end to end on the real stack", async (
   // Processing is off for this run, so the replayed event waits in the queue.
   await expect(failed).toContainText("1 event is waiting to be processed.");
 
-  // 8. The instructor activates, signs in with an authenticator (every staff role needs one) and sees only their batch.
-  const instructorContext = await browser.newContext();
-  const instructor = await instructorContext.newPage();
-  await instructor.goto(instructorInvite!);
-  await instructor.fill("#password", passphrase);
-  await instructor.fill("#confirm", passphrase);
-  await instructor.getByRole("button", { name: "Activate account" }).click();
-  await expect(instructor).toHaveURL(/\/sign-in\?activated=1$/);
-  await instructor.fill("#email", "real.instructor@example.invalid");
-  await instructor.fill("#password", passphrase);
-  await instructor.getByRole("button", { name: "Sign in" }).click();
-  await expect(instructor.getByRole("heading", { name: "Set up authenticator" })).toBeVisible();
-  const instructorSecret = (await instructor.locator("code.mfa-secret").innerText()).replace(/\s/g, "");
-  await instructor.fill("#code", totp(instructorSecret));
-  await instructor.getByRole("button", { name: "Verify and save" }).click();
-  await expect(instructor).toHaveURL(/\/sign-in\/mfa\/recovery-codes/);
-  await instructor.getByLabel("I have safely saved or written down these recovery codes").check();
-  await instructor.getByRole("button", { name: "Continue to staff portal" }).click();
-  await expect(instructor).toHaveURL(/\/staff$/);
-  await instructor.goto("/staff/courses");
-  const mine = instructor.getByRole("region", { name: "YOUR BATCHES" });
-  await expect(mine).toContainText("MON Monday evening");
-  await mine.getByRole("link", { name: "Roster →" }).click();
-  await expect(instructor.getByRole("region", { name: "ROSTER" }).locator(".dir-list")).toContainText("PCA-REAL-001 Real Stack Student");
-  await instructor.goto("/staff/sessions?from=2027-01-10");
-  await expect(instructor.getByRole("region", { name: "CLASSES" })).toContainText("Real stack class");
-  await expect(instructor.getByRole("button", { name: "Schedule class" })).toHaveCount(0);
-  await instructor.goto(classUrl);
-  await expect(instructor.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
-  await expect(instructor.getByRole("button", { name: "Save changes" })).toHaveCount(0);
-  await instructor.goto("/staff/students");
-  await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators manage student records.");
-  await instructor.goto("/staff/zoom");
-  await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators review Zoom events.");
-  await instructor.goto("/staff/team");
-  await expect(instructor.locator(".banner")).toContainText("Only academy owners and administrators manage staff accounts.");
+  // 8. The colleague activates, signs in with email and password and sees the whole staff portal.
+  const colleagueContext = await browser.newContext();
+  const colleague = await colleagueContext.newPage();
+  await colleague.goto(instructorInvite!);
+  await colleague.fill("#password", passphrase);
+  await colleague.fill("#confirm", passphrase);
+  await colleague.getByRole("button", { name: "Activate account" }).click();
+  await expect(colleague).toHaveURL(/\/sign-in\?activated=1$/);
+  await colleague.fill("#email", "real.instructor@example.invalid");
+  await colleague.fill("#password", passphrase);
+  await colleague.getByRole("button", { name: "Sign in" }).click();
+  await expect(colleague).toHaveURL(/\/staff$/);
+  await colleague.goto(rosterUrl);
+  await expect(colleague.getByRole("region", { name: "ROSTER" }).locator(".dir-list")).toContainText("PCA-REAL-001 Real Stack Student");
+  await colleague.goto("/staff/sessions?from=2027-01-10");
+  await expect(colleague.getByRole("region", { name: "CLASSES" })).toContainText("Real stack class");
+  await colleague.goto(classUrl);
+  await expect(colleague.getByRole("region", { name: "Student attendance results" })
+    .getByRole("listitem", { name: "Attendance PCA-REAL-001 Real Stack Student" })).toBeVisible();
+  for (const path of ["/staff/students", "/staff/zoom", "/staff/activity"]) {
+    await colleague.goto(path);
+    await expect(colleague.locator(".banner").filter({ hasText: /Only academy owners/ })).toHaveCount(0);
+  }
 
-  // 9. The owner removes the assignment; the instructor loses the roster on their next request.
-  await page.goto(rosterUrl);
-  await page.getByRole("button", { name: "Remove real.instructor@example.invalid as Instructor" }).click();
-  await expect(page.getByText("No one is assigned yet.")).toBeVisible();
-  await instructor.goto(rosterUrl);
-  await expect(instructor.getByRole("heading", { name: "Page not found" })).toBeVisible();
-  await instructor.goto("/staff/courses");
-  await expect(instructor.getByText("You are not assigned to any batch yet.")).toBeVisible();
-  await instructor.goto(classUrl);
-  await expect(instructor.getByRole("heading", { name: "Page not found" })).toBeVisible();
-  await instructorContext.close();
+  // 9. Blocking the colleague is the operator's runbook SQL; the script runs it after this test and checks sign-in fails.
+  await colleagueContext.close();
 
   // 10. The student forgets their password: the link arrives by real SMTP and works once.
   const newPassphrase = `${passphrase} again`;
@@ -444,7 +372,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.locator("#batch-starts").fill("2026-01-01");
   await page.getByRole("button", { name: "Create batch" }).click();
   await expect(page.locator("#batch-feedback")).toHaveText("Batch PAST created.");
-  await page.goto("/staff/students?q=PCA-REAL-001");
+  await page.goto("/staff/students/manage?q=PCA-REAL-001");
   await page.getByRole("link", { name: /PCA-REAL-001/ }).first().click();
   await page.locator("#enroll-batch").selectOption({ label: "REAL-PHY · PAST · Past term" });
   await page.locator("#enroll-date").fill("2026-01-05");
@@ -479,22 +407,16 @@ test("an administrator onboards a student end to end on the real stack", async (
   const pastRow = finalAttendance.getByRole("listitem", { name: /Attendance PCA-REAL-001/ });
   await expect(pastRow.locator(".status")).toHaveText("Present");
 
-  // A correction reaches the student by real SMTP; the CSV and the student's portal agree.
-  await pastRow.getByText("Correct", { exact: true }).click();
-  await pastRow.getByLabel("Corrected outcome").selectOption({ label: "Excused" });
-  await pastRow.getByLabel(/^Reason/).fill("Medical note received");
-  await pastRow.getByRole("button", { name: "Save correction" }).click();
-  await expect(pastRow.locator(".status")).toHaveText("Excused");
-  const notice = await newestEmailTo("real.student@example.invalid");
-  expect(notice.subject).toBe("Your attendance was updated");
-  expect(notice.text).toContain("Past real class on 9 Mar 2026 is now Excused (it was Present)");
+  await expect(pastRow.getByText("Correct", { exact: true })).toHaveCount(0);
+
+  // CSV, staff history, and the student portal show the same final outcome.
   const csvDownload = page.waitForEvent("download");
   await finalAttendance.getByRole("link", { name: "Download CSV" }).click();
   const csvText = readFileSync(await (await csvDownload).path(), "utf8");
   expect(csvText).toContain(",PCA-REAL-001,");
-  expect(csvText.trim().split("\r\n").find((l: string) => l.includes(",PCA-REAL-001,"))).toMatch(/,EXCUSED$/);
+  expect(csvText.trim().split("\r\n").find((l: string) => l.includes(",PCA-REAL-001,"))).toMatch(/,PRESENT$/);
   await page.goto(studentRecord);
-  await expect(page.getByRole("region", { name: "ATTENDANCE HISTORY" })).toContainText("corrected from present");
+  await expect(page.getByRole("region", { name: "ATTENDANCE HISTORY" }).getByRole("listitem", { name: "History Past real class" }).locator(".status")).toHaveText("Present");
 
   const finalStudent = await browser.newContext();
   const portalAgain = await finalStudent.newPage();
@@ -503,26 +425,21 @@ test("an administrator onboards a student end to end on the real stack", async (
   await portalAgain.fill("#password", newPassphrase);
   await portalAgain.getByRole("button", { name: "Sign in" }).click();
   await expect(portalAgain).toHaveURL(/\/student$/);
-  await portalAgain.goto("/student/attendance");
-  await expect(portalAgain.getByRole("region", { name: "FINAL ATTENDANCE AND APPEALS" }).getByRole("listitem", { name: "Attendance Past real class" })
-    .locator(".status")).toHaveText("Excused");
+  await portalAgain.goto("/student/attendance?month=2026-03");
+  await portalAgain.getByText("Attendance appeals", { exact: true }).click();
+  await expect(portalAgain.getByRole("listitem", { name: "Attendance Past real class" })
+    .locator(".status")).toHaveText("Present");
   await finalStudent.close();
   await page.goto("/staff/activity?category=classes");
   await expect(page.getByText("Finalised attendance of “Past real class”").first()).toBeVisible();
 });
 
-/** Signs the administrator in with password and authenticator code. */
+/** Signs the administrator in with email and password. */
 async function signInAdmin(page: Page) {
   await page.goto("/sign-in");
   await page.fill("#email", adminEmail);
   await page.fill("#password", passphrase);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa/);
-  // A code is accepted once: wait for the next 30-second step after the last one used.
-  while (Math.floor(Date.now() / 30_000) <= lastAdminStep) await page.waitForTimeout(1_000);
-  lastAdminStep = Math.floor(Date.now() / 30_000);
-  await page.fill("#code", totp(adminSecret, lastAdminStep * 30_000));
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
 
@@ -549,26 +466,28 @@ async function noSidewaysScroll(page: Page) {
 
 test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ page, browser }) => {
   test.setTimeout(150_000);
-  expect(adminSecret, "the onboarding test ran first").toBeTruthy();
+  expect(adminSignedIn, "the onboarding test ran first").toBeTruthy();
 
-  // UAT 11: the student appeals the corrected class; an administrator accepts it as Present.
+  // UAT 11: the student appeals the recorded Present outcome and staff change it to Late.
   let student = await signInStudent(browser);
-  await student.goto("/student/attendance");
-  const record = student.getByRole("region", { name: "FINAL ATTENDANCE AND APPEALS" }).getByRole("listitem", { name: "Attendance Past real class" });
+  await student.goto("/student/attendance?month=2026-03");
+  await student.getByText("Attendance appeals", { exact: true }).click();
+  const record = student.getByRole("listitem", { name: "Attendance Past real class" });
   await record.getByText("Appeal this").click();
-  await record.getByLabel("What should the academy know?").fill("I was in class for the whole session; the note was for another day.");
+  await record.getByLabel("What should the academy know?").fill("I joined this class late.");
   await record.getByRole("button", { name: "Send appeal" }).click();
   await expect(record).toContainText("appeal waiting for a decision");
   await signInAdmin(page);
   await page.goto("/staff/attendance");
   const appeal = page.getByRole("region", { name: "APPEALS" }).getByRole("listitem", { name: "Appeal PCA-REAL-001 Past real class" });
-  await expect(appeal).toContainText("the note was for another day");
-  await appeal.getByLabel("Outcome if accepted").selectOption({ label: "Present" });
+  await expect(appeal).toContainText("I joined this class late.");
+  await appeal.getByLabel("Outcome if accepted").selectOption("LATE");
   await appeal.getByLabel("Note to the student").fill("Checked against Zoom's report");
   await appeal.getByRole("button", { name: "Accept" }).click();
   await expect(appeal).toHaveCount(0);
   await student.reload();
-  await expect(record.locator(".status")).toHaveText("Present");
+  await student.getByText("Attendance appeals", { exact: true }).click();
+  await expect(record.locator(".status")).toHaveText("Late");
   await expect(record).toContainText("appeal accepted");
 
   // UAT 12: the owner switches engagement on; the student agrees (named in rankings) and reacts during a running class.
@@ -578,12 +497,11 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await settings.getByRole("button", { name: "Save engagement settings" }).click();
   await expect(page.locator("#engagement-feedback")).toHaveText("Engagement is on. Students are asked for consent in their portal.");
   const from = colombo(-15), to = colombo(60);
-  if (to.date !== from.date) test.skip(true, "a class across midnight cannot be created in one day; run again later");
-  const liveClassId = await createClass("Live acceptance class", from.date, from.time, to.time, "REAL-PHY · PAST · Past term");
+  const liveClassId = await createClass("Live acceptance class", from.date, from.time, to.time, "REAL-PHY · PAST · Past term", undefined, to.date);
   await page.goto(`/staff/sessions/${liveClassId}`);
   const liveClass = page.url();
 
-  await student.goto("/student");
+  await student.goto("/student/classes");
   const panel = student.getByRole("region", { name: "REACTIONS AND QUESTIONS" });
   await panel.getByLabel("Staff may also see my name in engagement rankings").check();
   await panel.getByRole("button", { name: "I agree" }).click();

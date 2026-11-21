@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
-import { AttendanceOverview } from "@/components/insights/AttendanceOverview";
-import { RangeFilter } from "@/components/insights/RangeFilter";
+import { StudentAttendanceProfile, type ProfileClass } from "@/components/StudentAttendanceProfile";
 import { requirePortal } from "@/lib/auth-server";
-import { dateOrNull, presets, withParams, type StudentOverview } from "@/lib/insights";
+import { dateOrNull, renderTime, withParams, type StudentOverview } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
-import { academyToday, isAcademyManager, uuidOrNull } from "@/lib/staff-forms";
+import { academyToday, uuidOrNull } from "@/lib/staff-forms";
+import { classMonthRange, monthLabel } from "@/lib/staff-home";
+import type { StudentDirectoryEntry } from "@/lib/student-month";
+import { readAttendanceWindows } from "@/lib/student-month-api";
 
 export const metadata = { title: "Student attendance · LUMA" };
 
@@ -18,30 +20,23 @@ export default async function StudentAttendancePage({ params, searchParams }: {
   const studentId = uuidOrNull((await params).studentId);
   if (!studentId) notFound();
   const query = await searchParams;
-  const today = academyToday();
-  const fallback = presets(today)[1];
-  let from = dateOrNull(query.from) ?? fallback.from;
-  let to = dateOrNull(query.to) ?? fallback.to;
-  if (from > to) [from, to] = [to, from];
-  const base = { active: "students" as const, crumb: "People", hasStudentPortal: hasPortal(identity, "student") };
-  if (!isAcademyManager(identity.roles)) {
-    return <StaffShell {...base} title="Student attendance" subtitle="">
-      <p className="banner">Only academy owners and administrators open a student’s attendance. Use the dashboard for your batches.</p>
-    </StaffShell>;
-  }
-  const result = await staffApi<StudentOverview>(withParams(`/api/v1/students/${studentId}/attendance-overview`, { from, to }) as `/api/v1/${string}`,
-    undefined, 30000);
-  if (!result.ok && result.status === 404) notFound();
-  if (!result.ok) {
-    return <StaffShell {...base} title="Student attendance" subtitle="">
-      <p className="session-error" role="alert">We couldn’t load this student’s attendance. Please reload the page shortly.</p>
-    </StaffShell>;
-  }
-  const o = result.data;
-  return <StaffShell {...base} title={o.fullName} subtitle={`Student ID ${o.studentNumber} · attendance in every class, with each time they left and rejoined.`}>
-    <p className="link-row"><Link className="text-link" href={withParams("/staff/dashboard", { from, to })}>← Dashboard</Link>
-      {" · "}<Link className="text-link" href={`/staff/students/${studentId}`}>Student record →</Link></p>
-    <RangeFilter path={`/staff/students/${studentId}/attendance`} from={from} to={to} today={today} />
-    <AttendanceOverview overview={o} self={false} />
+  const now = renderTime();
+  const today = academyToday(new Date(now));
+  const range = classMonthRange(query.month, today, dateOrNull(query.from));
+  const studentRequest = staffApi<StudentDirectoryEntry>(`/api/v1/students/${studentId}`);
+  const reports = readAttendanceWindows(range.first, range.through ?? range.last, (from, to) => staffApi<StudentOverview>(
+    `/api/v1/students/${studentId}/attendance-overview?${new URLSearchParams({ from, to })}`, undefined, 30000),
+  data => data.classes.length >= 80);
+  const student = await studentRequest;
+  if (!student.ok && student.status === 404) notFound();
+  const scheduleRange = new URLSearchParams({ from: range.fromInstant, to: range.toInstant });
+  const back = withParams("/staff/students", { month: range.month, q: typeof query.q === "string" ? query.q : null,
+    type: typeof query.type === "string" ? query.type : null, sort: typeof query.sort === "string" ? query.sort : null });
+  return <StaffShell active="students" crumb="Students / Attendance" title={student.ok ? student.data.fullName : "Student attendance"}
+    subtitle={student.ok ? `${student.data.studentNumber} · ${monthLabel(range.month)}` : monthLabel(range.month)}
+    hasStudentPortal={hasPortal(identity, "student")} actions={<Link href={back} className="text-link">← Back to Students</Link>}>
+    <StudentAttendanceProfile range={range} today={today} now={now} reports={student.ok ? reports : null}
+      schedule={student.ok ? staffApi<ProfileClass[]>(`/api/v1/class-sessions?${scheduleRange}`, undefined, 25000) : null}
+      href={`/staff/students/${studentId}/attendance`} staff />
   </StaffShell>;
 }

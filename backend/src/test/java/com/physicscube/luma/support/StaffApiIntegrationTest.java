@@ -3,11 +3,8 @@ package com.physicscube.luma.support;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.physicscube.luma.identity.AccountService;
-import com.physicscube.luma.identity.Base32;
-import com.physicscube.luma.identity.Totp;
 import com.physicscube.luma.identity.domain.Role;
 import java.net.http.HttpResponse;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -18,12 +15,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Base for tests that call staff routes over real HTTP, signing in the way real staff do, MFA included. */
+/** Base for tests that call staff routes over real HTTP, signing in the way real staff do. */
 public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
     private static final String PASSPHRASE = "quiet river under bridge";
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
-    private static final Map<String, byte[]> SECRETS = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final Map<String, Long> LAST_STEP = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Autowired
     protected AccountService accounts;
@@ -54,9 +49,29 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
     }
 
     protected UUID accountIdOf(String email, UUID academyId, Role... roles) {
-        UUID id = accounts.register(academyId, email, Set.of(roles)).id();
+        UUID id = accounts.register(academyId, email, Set.copyOf(java.util.Arrays.asList(roles))).id();
         accounts.setPassword(id, PASSPHRASE);
         return id;
+    }
+
+    /** A staff account pending activation, as the operator command creates it (there is no staff-account API). */
+    protected UUID pendingStaff(String email, UUID academyId) {
+        return accounts.register(academyId, email, Set.of(Role.STAFF)).id();
+    }
+
+    /**
+     * Runs one of the operator's runbook SQL files (docs/delivery/runbooks/sql) for an address, exactly as written
+     * there apart from the address and the psql transaction lines (the statement is atomic on its own).
+     */
+    protected void runOperatorSql(String file, String email) {
+        try {
+            String sql = java.nio.file.Files.readString(java.nio.file.Path.of("..", "docs", "delivery", "runbooks", "sql", file));
+            String statement = sql.lines().filter(line -> !line.startsWith("--") && !line.equals("BEGIN;") && !line.equals("COMMIT;"))
+                    .collect(java.util.stream.Collectors.joining("\n")).replace("person@example.com", email).strip();
+            jdbc.execute(statement.endsWith(";") ? statement.substring(0, statement.length() - 1) : statement);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
     }
 
     /** Redeems an invitation over HTTP with the test passphrase; returns the HTTP status. */
@@ -67,7 +82,7 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
         return api.post("/api/v1/auth/activate", HttpApi.json(body)).statusCode();
     }
 
-    /** Password sign-in over HTTP, for accounts without MFA; returns the raw response. */
+    /** Password sign-in over HTTP; returns the raw response. */
     protected HttpResponse<String> passwordLogin(String email) {
         Map<String, String> body = new LinkedHashMap<>();
         body.put("email", email);
@@ -80,42 +95,15 @@ public abstract class StaffApiIntegrationTest extends PostgresIntegrationTest {
         accounts.setPassword(accountId, PASSPHRASE);
     }
 
-    /**
-     * Signs in and returns an access token. For accounts that need MFA this enrols an
-     * authenticator on first use and reuses it afterwards, each time with a later time step.
-     */
+    /** Signs in with email and password and returns an access token. */
     protected String login(String email) {
         return (String) loginSession(email).get("accessToken");
     }
 
     /** As {@link #login}, returning the whole session response (access and refresh tokens). */
     protected Map<String, Object> loginSession(String email) {
-        Map<String, String> body = new LinkedHashMap<>();
-        body.put("email", email);
-        body.put("password", PASSPHRASE);
-        HttpResponse<String> response = api.post("/api/v1/auth/login", HttpApi.json(body));
+        HttpResponse<String> response = passwordLogin(email);
         assertEquals(200, response.statusCode(), response.body());
-        Map<String, Object> result = HttpApi.parse(response);
-        if (Boolean.TRUE.equals(result.get("mfaRequired"))) {
-            String challenge = (String) result.get("mfaToken");
-            byte[] secret = Boolean.TRUE.equals(result.get("mfaEnrolled")) ? SECRETS.get(email) : null;
-            if (secret == null) {
-                LAST_STEP.remove(email);
-                HttpResponse<String> enrolment = api.post("/api/v1/auth/mfa/enroll", HttpApi.json(Map.of("mfaToken", challenge)));
-                assertEquals(200, enrolment.statusCode(), enrolment.body());
-                secret = Base32.decode((String) HttpApi.parse(enrolment).get("secret"));
-                SECRETS.put(email, secret);
-            }
-            // Each sign-in uses a later time step than the last (codes cannot be replayed; one step of drift is accepted).
-            long step = Math.max(Totp.step(Instant.now()), LAST_STEP.getOrDefault(email, Long.MIN_VALUE) + 1);
-            LAST_STEP.put(email, step);
-            Map<String, String> verification = new LinkedHashMap<>();
-            verification.put("mfaToken", challenge);
-            verification.put("code", Totp.code(secret, step));
-            response = api.post("/api/v1/auth/mfa/verify", HttpApi.json(verification));
-            assertEquals(200, response.statusCode(), response.body());
-            result = HttpApi.parse(response);
-        }
-        return result;
+        return HttpApi.parse(response);
     }
 }

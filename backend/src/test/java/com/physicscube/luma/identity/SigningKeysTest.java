@@ -132,10 +132,10 @@ class SigningKeysTest {
     void startupFailsWithoutAKeyUnlessEphemeralIsExplicitlyEnabled() {
         TokenConfig config = new TokenConfig();
         AuthProperties none = new AuthProperties(ISSUER, AUDIENCE, java.time.Duration.ofMinutes(10), " ", List.of(),
-                false, null, 5, java.time.Duration.ofMinutes(15),
+                false, 5, java.time.Duration.ofMinutes(15),
                 java.time.Duration.ofDays(7), java.time.Duration.ofDays(30));
         AuthProperties ephemeral = new AuthProperties(ISSUER, AUDIENCE, java.time.Duration.ofMinutes(10), null, List.of(),
-                true, null, 5, java.time.Duration.ofMinutes(15),
+                true, 5, java.time.Duration.ofMinutes(15),
                 java.time.Duration.ofDays(7), java.time.Duration.ofDays(30));
 
         assertThrows(IllegalStateException.class, () -> config.signingKeys(none));
@@ -155,7 +155,7 @@ class SigningKeysTest {
     void accessTokenLifetimeIsBounded() {
         for (long minutes : new long[] {0, 16, 60 * 24}) {
             assertThrows(IllegalArgumentException.class, () -> new AuthProperties(ISSUER, AUDIENCE,
-                    java.time.Duration.ofMinutes(minutes), null, List.of(), true, null, 5, java.time.Duration.ofMinutes(15),
+                    java.time.Duration.ofMinutes(minutes), null, List.of(), true, 5, java.time.Duration.ofMinutes(15),
                 java.time.Duration.ofDays(7), java.time.Duration.ofDays(30)));
         }
     }

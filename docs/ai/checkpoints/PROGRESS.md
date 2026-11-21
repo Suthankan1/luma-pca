@@ -2334,3 +2334,509 @@ Tests:
 - Real stack: pass.
 
 Next: consider collapsing the Team and Courses forms, and enlarging the inline links on Zoom review.
+
+
+## Local startup verification — 2026-11-19 (Windows)
+
+- Installed frontend dependencies with `npm ci` (397 packages audited, zero reported vulnerabilities).
+- Stopped the unrelated SwiftDrop frontend/gateway using ports 3000/8080 at the user's request.
+- Started Next.js at http://localhost:3000 and Spring Boot at http://localhost:8080, with isolated local PostgreSQL 17 on port 5433. All 29 local migrations applied; readiness returned UP and frontend HTTP returned 200.
+- Existing root environment points to hosted services. The first backend attempt loaded it and was stopped; subsequent startup explicitly overrides config import and uses local database settings with Academy payments, mail and Zoom integrations disabled.
+- No application code or contracts changed. No full test suite run; verification covers startup and HTTP availability only. Fresh local database has no owner account, so sign-in requires owner bootstrap. Integrations were not verified.
+- No deployment performed. Stop the local development processes/container to roll back; the local database volume persists. Development signing/MFA keys are ephemeral.
+
+## PCA logo reuse — 2026-11-19
+
+- Reused the existing unchanged PCA image as the sole navigation logo across public, staff and student shells through `AcademyBrand.tsx`; removed the separate LUMA symbols/wordmarks and duplicate public logo tile. Updated shared logo sizing in `globals.css`.
+- Verified sign-in in Edge at 1440px and 390px: one decoded logo and no horizontal overflow; inspected the mobile screenshot. ESLint passed. TypeScript verification recorded below after completion.
+- No API, authorization, contracts or diagrams changed. Authenticated staff/student views were not exercised in the browser; both use the same shared logo component. No deployment; rollback is reverting the component/shell/style changes.
+- Typecheck: `npm run typecheck` passed.
+
+## Premium visual refresh — 2026-11-19
+
+- Reworked public `Shell.tsx` into a compact PCA header/footer; redesigned `app/page.tsx` with an editorial hero, CSS orbital illustration and glass portal cards. Added sign-in context in `sign-in/page.tsx`. `globals.css` adds a procedural grain texture, translucent surfaces, restrained entrance/orbit animations and shared portal surface styling. PCA remains the navigation logo.
+- Checks passed: ESLint, TypeScript, Edge browser home at 1440/768/390/320px without horizontal overflow; both student/staff links reached sign-in. Reduced-motion emulation disabled orbital animation. Desktop/mobile screenshots reviewed; fixed clipping on floating illustration notes.
+- No backend/auth contracts changed. Authenticated portal screens and full end-to-end suite not exercised; shared portal changes are surface styling only. No deployment. Rollback: revert this slice's page, shell and CSS changes; no database changes.
+
+## Attendance landing copy cleanup — 2026-11-19
+
+- Simplified `app/page.tsx` to “Track your attendance.” and student/staff sign-in cards. Removed learning-portal messaging, slogans, explanatory paragraphs and orbital illustration. Retained the PCA logo, glass surfaces and textured background. Updated the public footer in `Shell.tsx` and compact landing spacing in `globals.css`.
+- Passed: targeted ESLint; Edge checks at 1440/390/320px for heading, removal of old copy and no horizontal overflow; both portal links reach sign-in.
+- No backend/contracts changed; full suite and authenticated views not rerun. No deployment or database changes; rollback by reverting this slice's UI edits.
+
+## Local version history workflow - 2026-11-19
+
+- Created `feat/pca-attendance-ui` from main and recorded the prior local startup, logo reuse, visual refresh and attendance copy cleanup as four focused commits.
+- Added the owner's standing instruction to `AGENTS.md`: use a descriptive branch and automatically commit each small verified change; push only on explicit request.
+- Verified commit scope and whitespace with Git; no application behavior changed in this workflow slice. Prior UI checks remain recorded above. No deployment. All commits are local.
+
+## Extension root-attribute hydration warning - 2026-11-19
+
+- Branch: `fix/extension-hydration-warning`. The reported stack points to an extension content script adding `crxlauncher` / `crxlauncher-bridged` on the document root before React hydration.
+- Changed only `frontend/src/app/layout.tsx` to suppress unavoidable hydration warnings on the root HTML element, with a comment explaining the scope. No application content or authentication behavior changed.
+- Passed: targeted ESLint and TypeScript. Edge response-mutation verification injected both reported attributes before hydration: zero hydration warnings on HTML; the same injected attributes on a nested H1 still produced a hydration warning. Test browser disabled Edge local-network checks after the initial control failed to hydrate under that browser restriction. Actual installed extension was not controlled or modified.
+- No full suite, deployment or database changes. Limitation: other root-attribute mismatches are also suppressed. Rollback: remove the root suppression and explanatory comment.
+
+## Landing classroom animation - 2026-11-19
+
+- Branch: `feat/landing-classroom-animation` (from `fix/extension-hydration-warning`). Added `frontend/src/components/ClassroomScene.tsx`, a decorative, `aria-hidden` inline SVG: a teacher points at a whiteboard (kinematics formulas and a projectile curve are written in), while three students take turns raising a hand ("Present, sir!") and each answer ticks a row on a small attendance register. A single 10.5 s CSS loop with no client JavaScript; the ball uses SVG `animateMotion`. Fictional figures only, no real names or data.
+- `app/page.tsx` now places the scene beside the intro and sign-in cards (two columns at 900 px and wider; below the cards on narrower screens). `globals.css` adds the `.classroom-scene` / `cs-*` styles and widens `.public-home` to 1160 px. Under reduced motion every scene animation stops and a still frame is shown.
+- Fixed the stale landing e2e step in `tests/e2e/student-portal.spec.ts` (it looked for the removed "I’m a student" link; now "Student sign in").
+- Passed: targeted ESLint, `npm run typecheck`. Edge (Playwright, dev server): no horizontal overflow at 1440/1024/390/320 px; loop frames inspected at 1.6/4.5/7.6 s; reduced-motion emulation reports 0 running animations. The only console error is the existing missing `/favicon.ico` (404).
+- Not run: full Playwright suite (including the edited landing step), unit tests. No backend, contract or database changes; no deployment. Rollback: revert this commit.
+
+## Public pages fit the viewport - 2026-11-19
+
+- Branch: `feat/landing-classroom-animation`. CSS only (`frontend/src/app/globals.css`). The public shell is now a full-height column (header, main, footer). The main area centres sign-in, forgot-password and the other account forms, and the landing hero, vertically and horizontally. Header, card padding, heading, inputs and gaps scale with viewport height (`clamp(..vh..)`), so the sign-in card no longer gets cut off at the bottom of laptop screens.
+- Before the change, `globals.css` in the working tree had been re-saved with CRLF line endings and about 1.5 KB of trailing NUL bytes after the previous commit. The CSS rules were identical (verified with a diff that ignores those bytes), so the file was restored from HEAD.
+- Verified in Edge (Playwright against the dev server), with no horizontal overflow anywhere: staff sign-in with the error message, student sign-in, plain sign-in and forgot-password show no vertical scroll and a card offset of 0 px from centre at 1920x969, 1536x730, 1440x900, 1366x657, 1280x600, 390x844 and 360x740. The only exception is 320x568 with the error showing (33 px of scroll). Landing: no scroll at desktop sizes; it scrolls on phones by design (scene below the cards). Screenshots reviewed.
+- Not run: the full e2e suite. Authenticated portals use `.shell`, which is unchanged. No backend changes, no deployment. Rollback: revert this commit.
+
+## Session redirect loop fix (2026-11-19)
+
+The BFF now validates the access token against the identity endpoint before it uses the session for portal redirects. After the local backend switched databases and signing keys, an older sealed cookie could otherwise keep sending the browser from sign-in back to a portal that rejected the token. The HTTP smoke test covers a rejected token inside a valid sealed cookie and checks both the sign-in page and the session status endpoint.
+
+Validation passed on Windows with Next.js 16.4.6: `npm test` (79 tests), `npm run build`, and `npm run test:smoke`. Targeted ESLint passed on both changed frontend files. Live Supabase sign-in and MFA were not exercised by the smoke test. The change adds an identity lookup to authenticated frontend requests. No schema or cookie format changed. Revert the frontend commit to roll back.
+
+## MFA Cancel button contrast (2026-11-19)
+
+Public authentication forms now keep the light secondary button background so the navy Cancel label is readable in both MFA states. Verified the computed secondary colors and primary gradient in Edge using the running sign-in page and the MFA button classes. Full MFA sign-in was not rerun. This stylesheet-only change requires no migration. Revert the commit to roll back.
+
+## Staff Home redesign (2026-11-20)
+
+Staff Home focuses on today’s schedule, confirmed live webinars and actionable attendance reviews. Analyst-only accounts get a direct link to batch totals. The Home sidebar uses a lighter palette, the overview link is labelled Home, and entry motion respects reduced-motion preferences. Removed weekly totals, recently finished webinars and Zoom troubleshooting counts from Home. The existing destination pages still provide those workflows. Role checks and API contracts are unchanged.
+
+Verified the Next.js production build and the Staff Home Playwright spec on desktop Edge and Pixel 7 emulation with the mock backend (both passed). The bundled Chromium executable was missing on this machine, so verification used installed Edge. Live Supabase sign-in was not exercised for this slice. There are no migrations or deployment settings. Revert this commit to roll back.
+
+## MFA removed: email and password sign-in for every role (2026-11-20)
+
+- Branch: `feat/remove-mfa`. Owner decision: staff and everyone else sign in directly with email and password; the TOTP second factor (001F/001G, every staff role since FIX-3) is gone. Risk accepted by the owner: a leaked or guessed staff password alone now opens that staff portal.
+- Backend: `AuthService.login` and `studentIdLogin` return session tokens; `MfaService`, `Totp`, `SecretCipher`, `Base32`, `InvalidMfaException`, the `/auth/mfa/enroll|verify|reset` routes, the MFA rate-limit bucket and `LUMA_AUTH_MFA_ENCRYPTION_KEY` are removed. Bearer authentication and refresh no longer require an MFA-verified session for owners and administrators. `StaffAccountView` drops `mfaEnrolled`; the reset email no longer mentions an authenticator.
+- Database: no migration. The V6 tables and `refresh_sessions.mfa_verified` (default false) stay but are unused; student erasure still clears them. Dropping them would be a separate, irreversible migration.
+- Frontend: removed `/sign-in/mfa`, `/sign-in/mfa/recovery-codes`, `CopyRecoveryCodes`, the `mfa-verify|mfa-cancel|mfa-recovery` session actions and the `luma-mfa`/`luma-recovery` cookies; the team pages no longer show "2-step on/off". Contract, auth diagram, JWT-AUTH, staff guide, runbooks, smoke scripts and the key generator updated.
+- Passed: full backend suite with Testcontainers (`mvn test`, 410 tests, 0 failures); frontend `npm test` (73), typecheck, lint, production build, `npm run test:smoke`; Playwright desktop suite in installed Edge against the mock backend: all specs pass except `attendance-dashboard`, which fails because commit 90611f7 removed the "Attendance reports →" link from Staff Home (unrelated to sign-in, not fixed here). OpenAPI lint: 112 errors vs 114 before (none new).
+- Not run: mobile Playwright project, `scripts/auth-stack-smoke.sh` and `scripts/staff-ui-real-stack.sh` (need bash + shasum/real stack), live Supabase sign-in. Staging Terraform still creates the unused `auth-mfa-encryption-key` secret (left to avoid destroying a resource on apply).
+- Rollback: revert these commits; previously enrolled authenticators would work again because their rows were not deleted.
+
+## Staff Home dashboard: live class, day view and month calendar (2026-11-20)
+
+- Branch: `feat/staff-home-dashboard` (from `feat/remove-mfa`). Owner request: replace the purple Staff Home with a simple, modern page in the logo's colours (navy, royal blue, sky) showing live class numbers, the day's classes with day-to-day navigation, and the month's classes as in Zoom.
+- `/staff` now shows, top to bottom: a live card per running class (at most three) with Expected, Joined, Online (Zoom's connected count when Zoom reports the run live, else students with an open visit) and attendance % (joined of expected) as an animated ring, refreshed every 30 s with a Pause control; when nothing runs, the next class with "starts in …". Then the chosen day's classes (`?day=`, previous/next/Today) with Live/In progress/Upcoming/Ended and, for finished classes, "joined of expected · %" from the attendance dashboard; Needs attention (managers). Then a Monday-first month calendar (`?month=`) of timetable classes plus, for owners/administrators, Zoom occurrences of monitored webinars that no class covers yet (same webinar within an hour counts as covered).
+- Titles stay on one line (`OneLineTitle`): the full text is still the link's name; when cut off, hover or keyboard focus shows it in a small card (Escape hides it); touch users open the class page. Motion (entrance, live ping ×3, ring fill, tooltip fade) only under `prefers-reduced-motion: no-preference`. The Home sidebar uses the standard navy menu again. Instructors/attendance officers see their classes; "In progress" (not "Live") is used when Zoom's live list is unavailable to the role. Analysts keep the reports entry.
+- Data: existing endpoints only (`class-sessions` over the calendar grid ≤ 42 days, `zoom/monitors`, `class-sessions/{id}/attendance`, `attendance/dashboard` for the chosen day). No backend or contract change.
+- Tests: `tests/staff-home.test.mjs` (6) for the pure helpers in `src/lib/staff-home.ts`; `tests/e2e/staff-overview.spec.ts` rewritten (day navigation, calendar, one-line titles with hover/Escape, live card); `attendance-dashboard.spec.ts` follows the restored "Attendance reports" link. Screenshots checked in Edge at 1440 px and 390 px with no horizontal overflow.
+
+### Staff Home, second pass (2026-11-20, owner feedback: "looks AI-made")
+
+- Calmer design: flat white cards, hairline borders, 12px corners, sentence-case labels, no gradients or glow. The staff portal now uses Plus Jakarta Sans (self-hosted by `next/font`, so the CSP's `font-src 'self'` still holds).
+- "Needs attention" removed from Home (its tasks remain on the Attendance page). The top strip is compact: one short row per live class (joined of expected, attendance %, online) or the next class.
+- Day and month navigation: previous on the left, the current day/month in the middle (with "Back to today"/"Back to this month"), next on the right.
+- New "Attendance in <month>" column chart (`AttendanceBars`): one column per class held so far in the calendar's month, joined of expected students, the average as a line, a readout on hover/focus, and "Show as table". Classes with nobody expected are counted in a note, not drawn. Streamed with `Suspense` so the month's sums don't delay the page.
+- Fix: the home grid's single column is now `minmax(0,1fr)`, so a long one-line title cannot widen the page on phones (caught by the phone e2e run; the spec now checks overflow right after adding a long title).
+
+## Staff Home monthly attendance average (2026-11-20)
+
+- Staff Home shows a single bar for the selected month's average. Each completed class with expected students contributes its joined-to-expected percentage with equal weight. The UI rounds only the final average and shows how many classes were counted. Classes with no expected students are excluded, while a class with expected students and zero recorded joins contributes 0%.
+- Staff Home now uses `GET /api/v1/attendance/class-totals` for the selected day and month. The previous chart loaded the detailed attendance matrix and reported an error on the Supabase-backed page. The new route batches enrolment reads, uses the existing matched Zoom visits, and returns only each completed class's ID and expected and joined counts. It uses the same academy and batch access checks as the detailed attendance dashboard and includes every completed class in range. Updated the OpenAPI contract and authorization matrix.
+- Backend Testcontainers passed 19 tests in `AttendanceInsightsIntegrationTest` and `ClassSessionHttpIntegrationTest`. Coverage includes duplicate joins and shared enrollments, completed-class filtering, no expected students, invalid ranges, and cross-role, batch and academy isolation. Frontend unit tests (81), typecheck, targeted lint, and the isolated production build passed. Playwright passed 12 Staff Home and Attendance Dashboard tests on Edge desktop and Pixel 7 emulation with the mock API. The OpenAPI contract parsed and `scripts/verify_structure.py` passed.
+- The local backend restarted with the original Supabase database. Readiness returned UP, the new route returned 401 without a session, and the frontend sign-in page returned 200. The Windows browser tool could not determine the Chrome URL, so the signed-in Supabase chart was not verified in that browser.
+- No migration is needed. Roll out the backend before or alongside the frontend so Staff Home can reach the counts route. Roll back both together by reverting this commit.
+
+## Staff Home class summaries and full titles (2026-11-20)
+
+- When no class is running, Staff Home displays the next class and the last completed class with expected and joined counts and the percentage who joined. A class with nobody expected shows a dash for the percentage. While a class is running, the top section shows only running classes, including a class that started before midnight and is still running.
+- Full titles open in a viewport-clamped popover above adjoining cards when the link is hovered or keyboard-focused. Escape dismisses the popover. The link keeps its full accessible name.
+- `GET /api/v1/attendance/latest-completed` selects the latest non-cancelled class by end time within the caller's academy and readable batches. It uses the existing enrollment and matched Zoom visit rules and returns 204 when no completed class is visible. The OpenAPI contract and authorization matrix document the route.
+- Targeted Testcontainers passed 20 tests in `AttendanceInsightsIntegrationTest` and `ClassSessionHttpIntegrationTest`. Frontend unit tests (81), TypeScript, targeted lint, and an isolated production build passed. Playwright passed four Staff Home tests on Edge desktop and Pixel 7 emulation, plus four tests in a combined Staff Automation and Staff Home run on desktop, using the mock API. The OpenAPI contract parsed and the structure check passed.
+- Restarted the local API with the original Supabase database. Readiness returned UP, the new route returned 401 without a session, and the sign-in page returned 200. The signed-in Supabase page was not verified.
+- No migration is needed. Roll out the backend before or alongside the frontend and revert both together to roll back.
+
+## Staff Home attendance for the last five classes (2026-11-20)
+
+- Replaced the monthly average with a horizontal bar per completed class, newest first. The chart covers the latest five classes across dates, independent of the calendar month, and displays each class title, end date, joined and expected counts, and the percentage who joined. Classes without expected students show a dash and an empty track. The first result also supplies the last-completed card when no class is live.
+- `GET /api/v1/attendance/recent-completed` applies academy and batch scope before selecting at most five non-cancelled classes by end time. It reads expected rosters in one batch and uses matched Zoom visits. The existing latest-completed and date-range endpoints remain available. Updated the OpenAPI contract and authorization matrix.
+- Passed 20 targeted Testcontainers tests, 79 frontend unit tests, TypeScript, targeted lint, an isolated production build, and four mock API Playwright tests on Edge desktop and Pixel 7 emulation. Browser coverage includes class order across dates, calendar independence, displayed rates, and empty rosters. The OpenAPI contract parsed and the structure check passed.
+- The local API restarted with the original Supabase database. Readiness returned UP, the new route returned 401 without a session, and the sign-in page returned 200. The signed-in chart against Supabase was not verified.
+- No migration is needed. Roll out the backend before or alongside the frontend so Staff Home can use the new route. Revert both together to roll back.
+
+## Compact Staff Home class cards (2026-11-20)
+
+- Next class and Last completed class use equal-width columns when the content area can fit both cards and stack on narrow screens. The class title uses smaller type and one line. The existing full-title popover stays available on hover and keyboard focus.
+- The next card puts its time and countdown in a separate row. The last completed card keeps Expected, Joined, and Attendance in three columns below the title and end time. Live rows and the five-class chart retain their layouts.
+- TypeScript, targeted lint, the structure check, and an isolated production build passed. Four Staff Home Playwright cases passed on Edge desktop and Pixel 7 emulation with the mock API, covering card alignment, metric containment, title tooltips, and the live view. Checked the desktop screenshot. The local API reported UP and the sign-in page returned 200. The signed-in Supabase layout was not verified.
+- This change is frontend-only and needs no migration. Revert the commit to roll back.
+
+## Staff Home dashboard refinement (2026-11-20)
+
+- The dashboard groups the day schedule and calendar next to the five-class attendance chart on desktop. It stacks the content on smaller screens. The palette uses blue for schedule controls, teal for attendance values, and colored class status labels. Daily rows show the status once and keep joined counts or Zoom schedule details when available.
+- Calendar dates and overflow links take staff to the selected day’s schedule. Compact calendar cells provide a full-cell touch target. Day and month arrows provide pending feedback, and dashboard links have a visible keyboard focus outline.
+- Class names in Staff Home show the first two nonempty leading parts when the title has at least two `|` separators. Titles with fewer separators keep their text. The full title stays in the accessible link name and appears in the popover on hover or keyboard focus, including when the shorter label fits.
+- Passed 79 frontend unit tests, TypeScript, targeted lint, an isolated production build, and the structure check. Four Playwright Staff Home cases passed on Edge desktop and Pixel 7 emulation with the mock API. Inspected both full-page captures for layout and overflow, then verified the compact calendar legend and full-cell targets in two focused browser checks, including a mobile tap. The local API reported UP and sign-in returned 200. The signed-in Supabase dashboard was not verified.
+- Frontend-only change. Rollback is a revert of this commit. No database migration is needed.
+
+## Staff Home live online chart and split layout (2026-11-20)
+
+- Running classes show a chart of the observed online count beside the live figures. It uses the existing 30-second refresh and its Pause control, with no extra requests. It keeps up to 30 minutes of observations in the open page for that class. Missing reads retain the last observations with an unavailable state.
+- Today’s schedule and the last-five attendance chart stack on the left at desktop widths, with the calendar on the right. The two columns align at the bottom. Narrow screens use one column, and the live chart moves below the figures when space is limited.
+- Passed 79 frontend unit tests, TypeScript, targeted lint, the structure check, and an isolated production build. Six Staff Home cases passed in desktop Edge and Pixel 7 emulation with the mock API, including an observed count change from 12 to 17 after resuming refresh and the two-column alignment. Two focused browser checks verified the final live row width. Reviewed desktop and mobile screenshots. The local API reported UP and sign-in returned 200. A signed-in Supabase webinar was not tested.
+- Frontend-only change. Revert the commit to roll back. No database migration is needed.
+
+## Staff Home calendar class previews (2026-11-20)
+
+- Date links show a hover preview with each scheduled class title and time range. Medium-width calendar cells show the first two class start times and an overflow count. Narrow cells keep the number of classes, and wide cells keep their class links. Selecting the date still opens that day’s schedule.
+- TypeScript, targeted lint, the structure check, and two targeted Staff Home Playwright cases passed with the mock API on desktop Edge and Pixel 7 emulation. The local API reported UP. The signed-in Supabase calendar was not verified.
+- Frontend-only change. Revert the commit to roll back. No migration or schedule data changes.
+
+## Staff Home live chart scale and motion (2026-11-20)
+
+- The online chart scales to the observed count range with padding, including zero when it was recorded. Each 30-second refresh draws the newest segment and fades in the new point. Reduced-motion preferences disable the animation.
+- The timeline starts at class start and shows the scheduled end when known. For an open-ended class it extends to the latest observation, labeled to the second. The chart retains observations from the current page for the run, bounded to 1,441 points. Time before the first observation stays empty.
+- Passed 79 frontend unit tests, TypeScript, targeted lint, the structure check, an isolated production build, and the live chart Playwright case in desktop Edge and Pixel 7 emulation with the mock API. A focused check verified the actual axis boundary for a run that started only seconds earlier. The local API reported UP and sign-in returned 200. A signed-in Supabase webinar was not tested.
+- Frontend-only change. Revert the commit to roll back. No database migration is needed.
+
+## Staff Home current-time chart and compact calendar times (2026-11-20)
+
+- The live chart now runs from class start to the latest refresh time, labeled `Now` to the second. If a count is unavailable, the time axis still advances and the chart ends at the last observed count. Existing scaling and reduced-motion behavior apply.
+- Compact calendar cells now show up to two actual class start times at all widths and an overflow count when needed. Hovering the date displays the names and times. Selecting it still opens the day schedule. Wide calendar cells keep their class links.
+- Passed 79 frontend unit tests, TypeScript, targeted lint, the structure check, an isolated production build, and four targeted Staff Home Playwright cases in desktop Edge and Pixel 7 emulation against the mock API. The cases cover both current-time axes, the refresh animation, compact start times, hover preview text, and date navigation. Layout measurements use reduced motion so they check the settled card positions.
+- Restarted the local frontend and the API with the original Supabase connection. API readiness returned UP and the sign-in page returned HTTP 200. The signed-in Supabase dashboard was not verified.
+- Frontend-only change. Revert the commit to roll back. No migration or schedule data changes.
+
+## Staff Home live online history from Zoom evidence (2026-11-20)
+
+- The live dashboard asks for `includeOnlineHistory=true` on the existing class attendance API. It reconstructs 30-second samples from stored Zoom visits, merges simultaneous visits by student, and includes a final sample through the current count or the end of available evidence. A newly opened or reloaded tab shows earlier observations immediately. Time before the first visible join stays empty. Missing history shows an unavailable state and a temporary fetch failure keeps the last successful plot.
+- The graph and Students online figure count matched students. Managers can see matched students across the academy for the class, while assigned staff see only the class roster in their readable batches. The history contains counts and timestamps. The route’s existing scope checks also apply to the history.
+- Passed 16 targeted backend tests in `OnlineHistoryTest`, `ProvisionalAttendanceIntegrationTest`, and `AttendanceInsightsIntegrationTest`. Coverage includes Zoom reports, rejoins and overlaps, missing joins, end-time clipping, the twelve-hour bound, and academy and batch scope. Passed 79 frontend unit tests, TypeScript, lint, the structure check, and an isolated production build. Six Staff Home Playwright cases passed on Edge desktop and Pixel 7 emulation with the mock API, including pre-existing history on first visit and hard reload, refresh animation and pause, and no-evidence behavior. OpenAPI YAML parsed.
+- Restarted the local API with the original Supabase connection. Readiness returned UP, the attendance history request returned 401 without a session, and sign-in returned 200. The signed-in Supabase dashboard and live Zoom delivery were not exercised.
+- Roll out the backend before or alongside the frontend. No migration is needed. Revert both together to roll back.
+## Two roles: STAFF and STUDENT (2026-11-20)
+
+- Branch: `feat/two-roles` (from `0674ff1`), worked in the worktree `.claude/worktrees/two-roles` because the main
+  checkout had another session's uncommitted "latest completed class" work. Plan and progress table:
+  `docs/delivery/TWO-ROLES-REFACTOR-PLAN.md`; decision: `docs/architecture/adr/ADR-0007-two-roles.md`.
+- Owner decision: only two roles. `STAFF` does every staff action in its academy; `STUDENT` is unchanged. The five staff
+  roles and batch assignments are gone. Risk accepted by the owner: every staff member can disable colleagues, erase a
+  student's data and change the attendance rule; the audit log records who did it.
+- Database: `V30__two_roles.sql` gives each account holding any former staff role one `STAFF` row (earliest grant kept),
+  deletes the old rows and narrows the CHECK to `STAFF`/`STUDENT`. An account that also held `STUDENT` keeps it.
+  `staff_assignments` is kept for history (table comment) but no longer read or written.
+- Backend: `Role { STAFF, STUDENT }`; `CurrentAccount.isStaff()/requireStaff()` replace the manager checks;
+  `SecurityConfig` has one `hasRole("STAFF")` rule for every staff route. Batch scoping, `BatchScope` and the assignment
+  entity, service, controller and routes (`/batches/{id}/assignments`, `/assignments/{id}`, `/me/assignments`) are
+  removed. Former owner-only (rule, engagement switch, erasure) and role-specific actions (corrections, pulses, academy
+  totals) are staff actions. Staff accounts: create takes only an email (any `roles` sent is ignored),
+  `PUT /staff-accounts/{id}/roles` is removed, nobody disables themselves and the academy keeps one active staff account.
+  Auto-finalisation runs as the staff member who switched it on while they are active staff. Bootstrap creates the first
+  `STAFF` account and refuses when the academy has active staff (command name and env vars unchanged).
+- Frontend: `isStaff` replaces `isAcademyManager`; the staff portal opens for `STAFF` only. Dead "only owners and
+  administrators" banners are removed from 11 pages; Home, Attendance, Classes, class page, batch roster and dashboard
+  show every section to every staff member; Team has no role pickers (email only) and the batch roster no assignments.
+  The activity log still names roles recorded before the change. Sealed session cookies are unaffected: pages read
+  roles from `/auth/me` on every request.
+- Contract and docs: OpenAPI (assignment and roles routes removed, `StaffRole` = `STAFF`, summaries say "staff"),
+  authorization matrix (current model on top, earlier notes kept as history), JWT-AUTH, README, PRD, overview, schema
+  plan, staff guide, first-staff and webhook runbooks, sign-off sheet, Zoom rules, load-test and smoke scripts. Rollback
+  aid: `docs/delivery/runbooks/TWO-ROLES-ROLLBACK.sql`.
+- Passed: backend `mvn test` with Testcontainers PostgreSQL 17, 402 tests, 0 failures (includes
+  `TwoRolesMigrationIntegrationTest`: V29 data with every former role migrated by V30, and `BatchAccessServiceIntegrationTest`);
+  frontend `npm test` (79), typecheck, ESLint, production build, `npm run test:smoke`; Playwright in installed Edge
+  (bundled Chromium missing) against the mock backend, desktop and Pixel 7: 126 passed, 2 skipped (skips unchanged);
+  `scripts/check-openapi.py` (115 endpoints match) and `scripts/verify_structure.py`.
+- Not run: `scripts/auth-stack-smoke.sh`, `scripts/staff-ui-real-stack.sh` (real stack spec updated but not executed),
+  `scripts/load-test-local.sh`, and the backend against the local Supabase database: starting it there applies V30 to
+  real accounts, which needs the owner's go-ahead.
+- Rollout: deploy backend and frontend together (the web app recognises only STAFF). Before rollout, review the staff
+  list: every former instructor, attendance officer and analyst gains full staff access. Rollback: run
+  `docs/delivery/runbooks/TWO-ROLES-ROLLBACK.sql` before starting older code, then revert these commits.
+- Merge note: the main checkout's open "latest completed class" work (`GET /api/v1/attendance/latest-completed`) touches
+  `SecurityConfig`, `ClassSessionService`, Staff Home, the contract and the authorization matrix; on merge the new route
+  joins the single STAFF rule and its batch-scope code collapses to staff-wide access.
+
+## One Classes screen; no Staff page (2026-11-20)
+
+- Branch `feat/two-roles` (worktree `.claude/worktrees/two-roles`). Plan and progress:
+  `docs/delivery/CLASSES-AND-STAFF-SIMPLIFY-PLAN.md`. Owner request: Webinars and Classes become one screen showing only
+  the classes Zoom has scheduled and the ones held, with "track a Zoom link" on the same screen; and, with one STAFF
+  role, no Staff page at all.
+- Classes (`/staff/sessions`): "Track a Zoom link" (ID or join link only) at the top, the tracked links collapsed under
+  it (refresh from Zoom, stop/track again, Academy class), then two weeks of classes grouped by day from the shared
+  `calendarEntries` helper: Zoom's scheduled dates of tracked webinars ("Expected", not links) and held classes
+  (Live/Ended, linking to attendance). The batch filter, live cards, run history and the "where classes come from"
+  panel are gone. `/staff/webinars` and `/staff/zoom/import` redirect to Classes; the Webinars and Staff menu items are
+  removed; webinar actions moved to `app/staff/sessions/webinar-actions.ts`.
+- Staff page and API removed: `/staff/team` pages and forms; `GET/POST /api/v1/staff-accounts`, `GET /{id}`, `/enable`,
+  `/disable` (now 403 by the deny-all rule); `StaffAccountService/Controller/View`, `Account.enable`,
+  `AccountRepository.activeStaffOtherThan`. `POST /api/v1/accounts/{id}/invitations` stays
+  (`AccountInvitationService`/`AccountInvitationController`) for pending accounts (students).
+- Operator path: `scripts/bootstrap-owner.sh` now adds any staff member (new pending STAFF account and invitation, or a
+  fresh invitation for a pending one) and refuses active, blocked, student or other-academy addresses. Blocking and
+  unblocking are `docs/delivery/runbooks/sql/staff-block.sql` and `staff-unblock.sql` (runbook `STAFF-ACCOUNTS.md`):
+  block ends every session, cancels unused activation links (the test caught that this was missing at first) and is
+  audited without an actor. `staff-ui-real-stack.sh` adds the colleague with the command and checks the block SQL.
+- Contract: staff-account paths and `StaffAccount`/`StaffRole` schemas removed; `check-openapi.py`: 110 endpoints match.
+  Docs: authorization matrix, ADR-0007 follow-up, README, staff guide, FIRST-OWNER runbook.
+- Passed: backend `mvn test` 393 tests, 0 failures (new `StaffAccountOperatorIntegrationTest` runs the runbook SQL files
+  as written; bootstrap tests cover adding a colleague and the refusals); frontend `npm test` (77), typecheck, ESLint,
+  production build; Playwright in installed Edge against the mock backend, desktop and Pixel 7: 118 passed, 2 skipped
+  (unchanged skips); `scripts/check-openapi.py` (110 endpoints) and `scripts/verify_structure.py`.
+- Not run: `scripts/staff-ui-real-stack.sh` (updated: the colleague comes from the operator command, the block SQL is
+  checked by a refused sign-in), and nothing against the Supabase database.
+- Rollout: as for the two-role change (backend and frontend together). Anyone who must add or block staff after this
+  needs the operator command or database access.
+
+## Integrated Claude’s Classes and staff-role changes with Staff Home (2026-11-20)
+
+- Merged the committed `feat/two-roles` work through `202af21` into `integrate/claude-staff-dashboard`. The Claude worktree and its in-progress merge were left in place. The combined app keeps the single Classes screen, operator-managed staff accounts, and the dashboard’s current-time graph, saved online history, calendar previews, and recent attendance.
+- The dashboard’s class totals, latest and recent classes, and online history require `STAFF`, with data limited to the authenticated academy. The history includes matched students who joined the class, including those outside its roster. Students retain own-record access. The OpenAPI contract and authorization matrix reflect these rules.
+- Packaged the backend and ran the combined application on loopback with a separate PostgreSQL 17 preview database. Flyway applied V30 there. Verified activation and sign-in for a fictional preview staff account, the Staff dashboard and Classes pages, the Webinars redirect, the removed Staff page and API, and the recent attendance API. Backend readiness returned UP. Runtime preview uses debug logging disabled.
+- A clean full backend run passed all 398 tests with Testcontainers and debug logging disabled. The first run failed one log-privacy assertion under an inherited debug setting. The OpenAPI checker matched all 112 routes, the structure check passed, and the frontend’s 75 unit tests, lint, production build, and session smoke passed. The focused desktop and mobile browser suite passed 13 cases with one expected skip.
+- The broad mobile run completed with 58 passes, two expected skips, and one Staff Home failure caused by a running-class fixture left by the live-refresh test. Added fixture cleanup and verified the affected sequence on desktop and mobile. The broad desktop run was partial because of browser timeouts. The affected desktop academy and bulk invitation cases passed in isolated reruns.
+- The original Supabase database was left unchanged. Applying V30 there would replace original staff role records with one academy-wide role. The branch’s rollback aid maps `STAFF` to `ACADEMY_OWNER` and cannot recover individual prior roles. Use a backup that preserves roles for faithful rollback. The combined frontend and backend need to roll out together.
+
+## Original Supabase cutover (2026-11-20)
+
+- After the owner requested the combined version on the original Supabase database, exported and verified a pre-V30 snapshot of all 289 `account_roles` rows outside the repository. The snapshot preserves the role names, account IDs, and grant timestamps for an exact role rollback. Retain it privately alongside the rollback runbook.
+- The combined backend applied V30 through Flyway. Verified that the final `STAFF` account count matches the distinct former staff account count, the `STUDENT` count matches the snapshot, and no former role names remain. API readiness returned UP and the sign-in page returned 200. Signed-in access with an existing Supabase account was not tested.
+- The frontend and API still run on loopback. Stopped the isolated demo database. Local background processing for Zoom, mail, retention, and auto-finalisation was disabled for this run.
+
+## Classes month-to-date overview (2026-11-20)
+
+- Kept the two-week Classes schedule and added an adjacent month-to-date list of class types. Narrow screens stack the panels. Expanding a type shows its completed session dates and times in Sri Lanka time, newest first. Grouping uses the visible class and batch title and ignores suffixes after the second pipe. Older timetable entries keep their scheduled-time label.
+- Uses the existing academy-scoped class-sessions API. Passed 76 frontend unit tests, regenerated route types and TypeScript, targeted lint, and the structure check. The original Supabase-backed API reported UP, and sign-in returned 200. Signed-in browser rendering of the new panel was not verified.
+- Frontend-only change. Revert the commit to roll back. No migration is needed.
+
+## Classes panel order and scrolling (2026-11-20)
+
+- The two equal-height Classes panels sit above the Zoom tracking form. Each list scrolls independently with its heading and controls still visible. On narrow screens the panels stack.
+- TypeScript, targeted lint, and the structure check passed. Supabase-backed API readiness was UP and sign-in returned 200. A signed-in visual check was not run. Frontend-only change, reversible by reverting the commit.
+
+## Attendance charts on Classes (2026-11-20)
+
+- The two-week list displays joined-of-expected percentages for completed sessions, and the monthly class-type list displays an equal-weight average of its completed session percentages. A missing count or empty expected roster has no rate. Both use the existing scoped class totals endpoint.
+- A separate animated column chart sits above each list. The charts support horizontal scrolling, descriptive labels, and reduced motion. The lists remain equal height with independent scrolling.
+- Passed 77 frontend unit tests, TypeScript, targeted lint, and the structure check. The original Supabase-backed API reported UP and sign-in returned 200. Signed-in visual verification was not run. No migration is needed. Revert the frontend commit to roll back.
+
+## Class type attendance detail (2026-11-20)
+
+- The Classes tab links each monthly class type to a staff-only detail page with distinct active enrolments across its batches, an equal-weight average of completed session percentages, and an animated month-to-date trend. Each plotted point shows the session date, time, and rate on hover or focus and links to the attendance record. Student and completed session lists scroll independently and stack on narrow screens.
+- The detail page uses the existing academy-scoped schedule, roster, and attendance APIs. Each student's rate uses sessions of that type where the student was expected. Missing rates leave gaps in the chart. The frontend proxy recognises the named route and still rejects malformed class record IDs.
+- Passed 77 frontend unit tests, TypeScript, targeted ESLint, the structure check, and two focused signed-in Playwright checks in desktop and mobile Edge with mock data. The original Supabase-backed API reported UP. Its frontend redirected an unauthenticated detail request to staff sign-in and returned 404 for a malformed class record ID. Signed-in production data rendering was not tested.
+- Frontend-only rollout. No migration is needed. Revert this commit to roll back.
+
+## Class type roster controls and chart alignment (2026-11-20)
+
+- The class-type detail excludes sessions with zero recorded joins from the completed list, trend, class average, and each student's expected-session denominator. Unavailable attendance still displays as unavailable. Sessions with actual joins and a rate that rounds to zero display as less than 1%.
+- Added live name and registration-number search and name or attendance sorting above the roster. Unknown rates sort after known rates. The line and interactive points now share the same fixed plot bounds at desktop and mobile widths.
+- Passed 77 frontend unit tests, TypeScript, targeted ESLint, and the structure check. Desktop and mobile Edge mock checks verified search, sorting, zero-join exclusion and averages, point focus, and line-to-point alignment within one pixel. The Supabase-backed API reported UP and sign-in returned 200. Signed-in verification with original data was not run.
+- Frontend-only rollout. No migration is needed. Revert this commit to roll back.
+
+## Individual session attendance overview (2026-11-20)
+
+- Reordered the staff session page to show expected students, matched student joins, expected students with no recorded join, final attendance credit, duration, and mean time connected before the timeline and student roster. Attendance credit counts final Present and Late outcomes. Mean time connected uses students who joined. Legacy sessions label the scheduled duration and Zoom runs use the available actual timings.
+- The interactive timeline uses all online samples reconstructed by the existing academy-scoped attendance API. Its range spans the session through the recorded end, or the current time while live. Missing sample coverage stays blank. Staff can inspect counts by pointer or keyboard, and the existing 30-second refresh keeps live results current.
+- The scrollable roster shows student identity, connected time, first join, visits, and outcome or pending status. Finalisation, corrections, CSV export, Zoom details, and engagement are still available on the page.
+- Passed 77 frontend unit tests, TypeScript, targeted ESLint, and the structure check. Focused desktop and mobile Edge checks with mock data passed for the 221-sample finished timeline, keyboard scrubbing, plot alignment, and live pause. The broader browser run passed 16 cases with three configured or midnight-window skips. A desktop Zoom replay sign-in timeout passed in isolation. One rerun hit a tracked-link disclosure timeout before reaching the session page. Supabase-backed readiness was UP and sign-in returned 200. No signed-in test against original data was run.
+- Frontend-only rollout with the existing attendance API. No migration is needed. Revert this commit to roll back.
+
+## Simplified individual session attendance (2026-11-20)
+
+- The timeline draws a smooth curve through each recorded sample without overshooting adjacent counts. The timeline readout and keyboard scrubber still use the original sample values.
+- Summary cards show labels and values only. The Final Attendance panel uses one roster with name and registration-number search, outcome filters, and name or connected-time sorting. Removed its explanatory text and recalculation control. Removed the duplicate Expected Students panel and legacy Zoom placeholder. The remaining session details provide links to batch rosters and linked occurrences.
+- Passed 77 frontend unit tests, TypeScript, targeted ESLint, and the structure check. Desktop and mobile Edge mock checks covered the 221-sample timeline, point alignment and keyboard scrubbing, search by name and registration number, combined status filters, time sorting, correction, CSV export, and the legacy layout. The initial roster test used an incorrect select locator and the corrected attendance-rule suite passed on both devices. Supabase-backed readiness and sign-in returned successfully. Signed-in verification with original data was not run.
+- Individual corrections and CSV export remain available from the main roster. No migration is needed for the frontend rollout. Revert this commit to roll back.
+
+## Session attendance recovery on Supabase (2026-11-20)
+
+- Supabase rejected runtime connections with `EMAXCONNSESSION` on the session pooler. The class shell loaded while the attendance request failed. The session attendance read now has a 25-second timeout for its roster and samples, failed reads use a neutral heading, and slow transport failures are logged without query strings, IDs, or credentials.
+- Restarted the existing loopback API against the same Supabase database using a process-only JDBC override for the transaction pooler on port 6543 with `prepareThreshold=0` and `DB_POOL_MAX=8`. Used the already migrated schema with Flyway and the existing background workers disabled for this run. The original configuration files were preserved.
+- Eight concurrent readiness checks passed before the switch and again on port 8080 after the switch. Frontend sign-in returned 200, an unauthenticated attendance request returned 401, and the replacement API log showed no pool errors during verification. Passed 77 frontend unit tests, TypeScript, targeted ESLint, the structure check, and two desktop and mobile timeline checks with mock data. Signed-in verification on the original session was not run.
+- To retain the runtime fix on another restart, reapply the transaction-pooler JDBC override to the app process. Keep Flyway on a direct or session-pool connection for future migrations. Rollback uses the previous session-pool runtime connection and may restore the connection-limit failure. No database migration was made.
+
+## Compact session attendance controls (2026-11-21)
+
+- Removed the average connected-time summary card and the per-student correction control. The final roster offers All statuses, Present, Late and Absent filters. The filter and right-aligned status column use a fixed compact width on desktop, with a flexible layout on mobile.
+- Passed 77 frontend unit tests, TypeScript, targeted ESLint, the structure check, and four desktop/mobile Edge checks against the mock backend. Updated the real-stack onboarding test for the new roster and final outcome display. The real-stack suite and the signed-in Supabase page were not run.
+- The frontend change needs no database migration. Revert this commit to roll back.
+
+## Simplified staff sidebar (2026-11-21)
+
+- The sidebar lists Home, Classes, and Students. Removed the Attendance, Academy classes, Courses & batches, Zoom review, and Activity log tabs and the menu group headings. Supporting screens can still be reached through their existing links and URLs.
+- Passed 77 unit tests, TypeScript, targeted ESLint, and the structure check. Desktop and mobile mock browser coverage passed 21 cases across the main run and the Activity log rerun after correcting a test fixture race. One shared Academy setup case was skipped on mobile by design. API readiness and sign-in smoke passed. Signed-in verification with original data was not run.
+- Frontend-only change. Revert this commit to roll back.
+
+## Shared monthly Classes schedule (2026-11-21)
+
+- The month picker controls the schedule, class-type list, and charts together. Sri Lanka midnight bounds each calendar month. The current month's independently scrollable schedule opens at today's group, and older class-type pages keep their selected month on the detail page and back link.
+- The class chart includes every ended class record from the selected month through today. Classes without a rate show a dash. Upcoming schedule entries do not appear in the attendance chart. Both panels share one schedule and one attendance totals request. Legacy date links still select the corresponding month.
+- Passed 78 frontend unit tests, TypeScript, targeted ESLint, the structure check, and desktop/mobile mock browser checks for the legacy schedule and the new month picker, scroll position, leap-month boundaries, chart coverage, and detail links. API readiness and sign-in smoke passed. Signed-in verification with original data was not run.
+- Frontend-only change with existing APIs. Revert this commit to roll back. No migration is needed.
+
+## Standalone Class Types page (2026-11-21)
+
+- Added Class Types to staff navigation. The standalone page reuses the monthly class-type list, attendance chart, and staff data requests from Classes. Opening a detail from the new tab preserves the month and returns to Class Types. The Classes panel still opens details in the Classes navigation context.
+- Passed 78 unit tests, TypeScript, targeted ESLint, the structure check, and all six desktop and mobile mock browser checks. The live route redirected an unauthenticated request to staff sign-in and API readiness was UP. Signed-in verification with original data was not run.
+- Frontend-only change with existing APIs. Revert this commit to roll back. No migration is needed.
+
+## Monthly Students attendance directory (2026-11-21)
+
+- Students now loads the academy directory across API pages and shows a monthly attendance average, scrollable registration-ID chart, and scrollable list. Name and registration-ID search, class-type filtering, and sorting operate across the full directory. The average uses the visible students with measurable attendance.
+- Student details group completed expected sessions by class type and show connected time and final outcomes. Pending and unavailable records are identified separately. The rate is the share of tracked expected sessions the student joined. Returning to the directory retains the month and filters. Capped attendance reports are read in smaller date ranges rather than showing partial totals.
+- Passed 79 unit tests, TypeScript, full frontend lint, and the structure check. The new flow passed two focused desktop/mobile mock checks with 208 student records, including pagination, search, chart labels, averages, sorting, drill-down and return. All 18 existing attendance, student and navigation browser checks in the regression run passed. Live API readiness and staff sign-in redirects passed. Signed-in original data and the full real-stack suite were not verified.
+- Student management, invitations, and import remain available separately. The monthly routes call the existing staff APIs and require no migration. Revert this commit to roll back.
+
+## Student directory filter placement (2026-11-21)
+
+- Search, class type, and sort controls sit above the scrolling list inside Student directory. Their selection drives the directory, bar chart, and overall average.
+- TypeScript, targeted ESLint, and the structure check passed. Desktop and mobile mock browser checks verified the controls inside the directory and their effect on attendance. Signed-in verification with original data was not run.
+- Frontend-only layout change. Revert this commit to roll back.
+
+## Excel attendance reports (2026-11-21)
+
+- Started and verified the local project against the original Supabase database before implementing Reports. The runtime uses the existing transaction-pool override and already migrated schema.
+- The staff Reports tab defaults to the current Sri Lanka month. Staff can choose up to 12 months and export one completed session, class type, or student as an Excel workbook. Each report uses the existing staff-scoped APIs, safe string and numeric cells, and private no-store responses. Successful workbook generation records the actor, academy, report kind, and period in the web server log.
+- Passed 81 unit tests, TypeScript, ESLint, the structure check, and npm audit. Four desktop/mobile mock browser checks opened all three downloaded workbooks, verified month boundaries and staff-only access. The running Supabase-backed API reported UP, sign-in returned 200, and the new routes redirected signed-out requests. Signed-in downloads against original data were not run.
+- Frontend-only rollout with the locked workbook dependency. Revert this commit to roll back. No migration is needed.
+
+## Searchable report selection (2026-11-21)
+
+- Each report uses a scrollable single-selection list with a search field. Students can be found by name or registration ID, including IDs entered without separators. The selected record remains visible in the footer while searching, and the download uses the same validated report route.
+- Passed 81 unit tests, TypeScript, targeted ESLint, and the structure check. Four desktop and mobile mock browser checks covered student search, selection during filtering, all three Excel downloads, and access guards. Live API readiness and the signed-out Reports redirect passed. Signed-in original data was not tested.
+- Frontend-only change. Revert this commit to roll back.
+
+## Staff performance instrumentation (2026-11-21)
+
+- Added the [staff performance checklist](../../testing/STAFF-PERFORMANCE.md), HTTP timing at the Next proxy and API response commit, and current Classes, Class Types, Students and Reports paths in the staff load scenario.
+- Verified the Next timing header on a production build. The Testcontainers HTTP test passed for both successful and refused API requests. All 81 frontend unit tests, k6 scenario inspection, and the structure check passed. Signed-in load measurements are still pending.
+- No database or permission changes. Revert this commit to remove the headers and scenario updates.
+
+## Signed-in synthetic performance baseline (2026-11-21)
+
+- Used an isolated Docker PostgreSQL and production build with 150 synthetic students, 28 completed sessions and four k6 staff users. All 60 requests passed. Page p95 was 392 ms for Classes, 412 ms for Class Types, and 658 ms for Students. See the [checklist](../../testing/STAFF-PERFORMANCE.md) for samples, other routes and limitations.
+- The harness supports an alternate jar, Windows Docker Desktop and a configurable Python command. The first run collected browser-facing HTTP and SQL data. Its API access-log parser could not start under the default Windows `python3` alias. A later comparison should set `LUMA_LOAD_PYTHON`.
+- The fixture never used the original database or Zoom credentials. No application migration or deployment was made. Revert this test-tooling commit to restore the previous fixture.
+
+## Batched attendance totals (2026-11-21)
+
+- Monthly and recent completed totals now read linked Zoom evidence in batches of up to 16 authorized classes. Identity lookup is shared within each batch. Host exclusion, registration matching, report precedence and expected-roster filtering remain class-specific.
+- Passed 26 PostgreSQL integration tests across attendance insights, provisional attendance, Zoom participants and Zoom reports. The new parity case combines report evidence, host and registrant roles across two sessions. The before/after k6 comparison is tracked separately.
+- No API contract or migration change. Revert this commit to restore per-class reads.
+
+## Batched Classes load comparison (2026-11-21)
+
+- Repeated the 60-request synthetic benchmark with backend `46a4a6a` and the same frontend build. There were zero failures. Classes page p95 dropped from 392 ms to 185 ms and Class Types from 412 ms to 131 ms. The report-participant SQL executed 264 times instead of 680. The staff performance checklist records the sample count and limitations.
+- Verified local behavior only. No live service or database configuration changed. This commit records evidence and has no runtime rollout step.
+
+## Batched detailed attendance reads (2026-11-21)
+
+- The attendance dashboard and student detail now batch named rosters, Zoom evidence and final records over authorized classes. Students enrolled in overlapping batches still count once per session, and the existing batch codes and filtering remain intact. The existing range and export contracts still apply.
+- Passed 27 PostgreSQL integration tests across insights, provisional attendance, Zoom reports and participants, and enrollment authorization. A separate repeat benchmark will measure the Students improvement on the same fixture.
+- No migration. Revert this commit to restore the per-class detail reads.
+
+## Streamed staff attendance pages (2026-11-21)
+
+- Classes, Class Types and Students stream the month controls and page layout before their heavier reads. On Classes the tracked Zoom links and class types have independent loading boundaries. Both columns share the same monthly requests. Errors show a Retry action inline and retry the current route without a browser reload.
+- The production Next build, ESLint and TypeScript passed. All 14 desktop and mobile Chromium checks passed, including a held Zoom response and the failure and retry flow. A first browser run could not start because the Playwright Chromium revision was missing. Installed that revision for the successful rerun.
+- Frontend-only slice. No hosted timing or visual check on original data was run. Revert this commit to restore the earlier rendering strategy.
+
+## Completed attendance projection and compact monthly API (2026-11-21)
+
+- V31 adds an opt-in projection of reconciled Zoom visits. It stores counts and duration per matched student, validates source and academy identity revisions, and falls back to source reads when stale. Roster membership and official attendance remain live reads. The worker uses bounded leases and compare-and-publish. Erasure removes projected student rows transactionally.
+- Added the staff-only monthly directory API with academy scope, private no-store responses, full directory coverage and compact class-type totals. Updated the OpenAPI contract, authorization matrix and architecture. The frontend integration is a separate slice.
+- Passed 19 PostgreSQL integration tests for compact directory access and participation, projection parity, concurrent claims, stale and empty results, corrections and erasure. No original Supabase benchmark or migration was performed. Apply the additive V31 in a reviewed rollout, then enable `LUMA_ATTENDANCE_PROJECTION_ENABLED` after the hosted gate. Set it to false to return to source reads and leave the schema in place on rollback.
+
+## On-demand report options (2026-11-21)
+
+- Reports opens on three report type cards and the month controls. The selected type loads its searchable picker without fetching unrelated options. The download route and date rules stay the same.
+- Production build, 81 frontend unit tests and desktop/mobile browser checks passed. The browser checks opened and verified each of the three generated Excel files, including a student selected by registration ID without separators. A first run exposed a shadowed variable in the mock for the new student fixture. Fixed it and passed the rerun.
+- Frontend-only. Revert this commit to restore the three eagerly loaded pickers. Original Supabase exports were not tested.
+
+## Compact Students month view (2026-11-21)
+
+- The directory makes one request for student identities and class-type totals. Full-result search, sorting and averages stay immediate in the browser, and offscreen rows and chart bars defer layout. A 404 from an older backend uses the previous read path.
+- The backend scope, no-store, unenrolled student and attendance parity tests passed. The production build and signed-in k6 run passed. With all 28 projections ready, Students page p95 was 109 ms versus 658 ms at baseline, and its compact API p95 was 65 ms. The frontend made eight compact calls and no attendance-dashboard calls during this run.
+- The monthly API uses V31 on the current backend. Revert this frontend integration to restore the prior reads. No hosted configuration or data changed.
+
+## Authentication round trip and debug log safety (2026-11-21)
+
+- Silent renewal leaves one current identity check in the protected render. Backend permission, role and revocation checks remain in the request path. Browser cache settings stay at their previous lifetimes.
+- The first full Maven suite detected that Spring MVC body debugging could print sensitive request or response fields when debug was enabled. Kept MVC body-processor logs at INFO. All 403 Maven tests passed on rerun with the same environment. The Next HTTP session smoke passed and asserted one identity call during renewal. Two browser projects verified private no-store behavior, logout and switching to a student account.
+- No migration or credentials change for this slice. The benchmark recorded `/auth/me` at p95 58 ms. Revert without re-enabling MVC request-body debug logging.
+
+## Staff performance regression gates (2026-11-21)
+
+- The pull-request load workflow runs the synthetic signed-in staff scenario with warmed projections. Frontend checks include the signed-in Lighthouse budgets. The Lighthouse harness uses loopback mock data and a temporary tool install. No student data or browser logs are uploaded by the Lighthouse harness.
+- The exact targeted k6 scenario passed all 60 checks with zero failures. The local Edge Lighthouse run passed all nine route and metric assertions using the median of three runs per route. The [performance checklist](../../testing/STAFF-PERFORMANCE.md) records numbers, budgets, the hosted verification gate and rollback.
+- GitHub workflows have yet to run remotely. No hosted metrics, database settings, or deployments were changed. Revert the workflow and harness commit to remove the new gates.
+
+## Targeted live staff polling (2026-11-21)
+
+- The staff dashboard polls only live counts and sample history while the tab is visible. Session detail polls attendance, Zoom state and enabled engagement. Both retain pause, recover history on arrival and coordinate a refresh when a class ends. The BFF endpoints authorize and scope each read and return private no-store responses.
+- Passed the production build, full ESLint, 81 frontend unit tests, the 113-endpoint contract check and six final desktop/mobile browser checks. The browser cases verify timeline recovery, pause, targeted data requests, finalisation, and removal of an ended run while another class stays active.
+- The ten local slices in the [performance checklist](../../testing/STAFF-PERFORMANCE.md) are complete. Original Supabase and hosted performance checks remain open. This slice is frontend-only and can be rolled back independently by reverting the commit.
+
+## Quick return to staff sidebar tabs (2026-11-21)
+
+- Classes, Class Types, Students and Reports reuse recent page data in the Next.js client router for up to 90 seconds. Leaving through the sidebar remembers the exact selection URL in the signed-in layout. Links to remembered query variants prefetch that route. The prefetch lifetime is also 90 seconds. No HTTP, CDN or persistent browser data caching was added.
+- The browser regression reproduced an extra Students request after 45 seconds on the prior build. The new build reused the default page and the selected month after 45 seconds and fetched again after expiry. All 12 focused desktop and mobile checks, 81 unit tests, production build, ESLint and the structure check passed. Browser checks used synthetic data. Sign-out and account switching still kept student data private.
+- Restarted the frontend on port 3000 and verified HTTP 200 on sign-in. Backend readiness on port 8080 was UP. Signed-in navigation against original Supabase was not timed. Revert the commit, rebuild and restart the frontend to restore the earlier behavior. No migration is needed.
+
+## Shared student attendance and portal navigation (2026-11-21)
+
+- Home and the attendance work queue link to Reports. The old `/staff/dashboard` redirects to Reports, and its reporting UI was removed. Attendance work, settings and batch totals are still available through their existing routes.
+- The staff directory opens the selected student’s monthly attendance. A signed-in student lands on the same profile layout with their own data, using the existing `/me` endpoints. The month picker uses Colombo dates. Clickable bars filter completed sessions by class type. The profile shows batch enrolments, join rates, connection durations and recorded attendance outcomes. Unfinalised evidence is labelled pending. The timetable, class participation and attendance appeals remain available from the student portal.
+- Both portals use the new collapsible LUMA PCA Attendance System sidebar. Collapse state is carried across navigation within the signed-in layout. Existing staff tab caching is retained. Registration-number-only sign-in was left disabled because a registration number does not prove ownership of private attendance records.
+- The production build, ESLint, 81 unit tests, session HTTP smoke test, structure check and all 46 focused Playwright tests passed. Desktop and mobile tests cover WCAG checks via axe, student ownership, Excel downloads, caching, timetable and appeals. Mobile screenshots and viewport checks verified that the sidebar and profile fit without page overflow.
+- Restarted the frontend on port 3000. Sign-in returned 200, an anonymous student profile redirected with 307, and the original Supabase-backed API on port 8080 reported UP. Signed-in validation used synthetic data. The real-stack browser suite and original student records were not exercised. Revert the commit, rebuild and restart the frontend for rollback. No database migration or API change is required.
+
+## Faster navigation to a student profile (2026-11-21)
+
+- Runtime logs showed attendance overview reads taking 6–7 seconds and blocking the staff profile. The directory links now prefetch the route’s loading shell. The authorized student header and month picker render as soon as the identity read returns, and the shared profile streams its attendance panels with a skeleton and an inline retry.
+- The production build, ESLint, 81 unit tests, structure check and 10 focused desktop and mobile Playwright tests passed. The regression holds the attendance response and verifies that the selected student and month picker are already visible before release. Privacy and staff tab-cache checks also passed.
+- Restarted the frontend on port 3000. Sign-in returned 200, the anonymous staff profile redirected with 307, and the original Supabase-backed API returned UP. The browser tests used synthetic data. Signed-in Supabase timings and underlying API latency were not remeasured. Revert the frontend commit, rebuild and restart to roll back. No migration is required.
+
+## Enrolled class types on the student profile (2026-11-21)
+
+- The shared staff and student profile replaces the batch count and list with distinct class types for the selected month. Scheduled sessions count when enrolment covers the session date and batch ID. Cancelled sessions are excluded. Upcoming types appear in the enrolment panel while the attendance chart still uses completed sessions.
+- The profile reads the existing authorized timetable routes. The class-type panel loads independently from the attendance chart and history. The production build, ESLint, 81 unit tests, structure check and 16 focused desktop and mobile browser tests passed. The browser checks verified deduplication and a scheduled class type in a future month with no completed classes.
+- Restarted the frontend. Sign-in returned 200 and the original Supabase-backed API reported UP. Signed-in verification used synthetic data. Revert the frontend commit and rebuild to roll back. No schema or API change is needed.
+
+## Username field in the Student ID sign-in preview (2026-11-21)
+
+- When the existing Student ID mode is enabled, the landing page’s student link shows just the username and password form. The username accepts registration ID text. The shared sign-in route still supports existing email accounts.
+- Production build, ESLint, 81 unit tests, session smoke, structure and 30 synthetic desktop/mobile browser checks passed. The sign-in regression starts at the landing page, verifies the absence of an email field and opens the student’s attendance profile with the test ID.
+- Restarted the isolated preview on port 3450 and confirmed its username form. The main frontend was rebuilt with its existing settings. It still requires email sign-in and the original Supabase-backed API reports UP. No database or auth configuration changed. Revert the commit and rebuild to roll back.
+
+## Student sign-in with registration ID only (2026-11-21)
+
+- Owner decision: students type only their registration ID and land on their attendance report. The student form has one Registration ID field; `POST /api/v1/auth/student-id-login` takes `{studentId}` and ignores any extra field, so an older form that still sends a password keeps working. Staff sign-in (email and password) is unchanged.
+- The session behind the ID is kept: student-only accounts, own records only, staff routes 403, per-client rate limit, same refusal for unknown, deactivated, staff or other-academy IDs. Students without a linked account are refused rather than failing. Anyone who knows a registration ID can view that student's attendance; the risk is in `docs/security/STUDENT-ID-LOGIN.md`.
+- Passed 8 backend integration tests (`StudentIdLogin*`), TypeScript, targeted ESLint, 81 frontend unit tests and 6 desktop/mobile Playwright sign-in checks against the mock backend after a fresh build. `student-import.spec.ts` failed on its student-directory step on both devices in the same run; it does not touch sign-in and was not investigated. Signed-in verification against original data was not run.
+- Rollout: set `LUMA_STUDENT_ID_LOGIN_ENABLED=true` in the API and web environments (the API also needs `LUMA_STUDENT_ID_LOGIN_ACADEMY_ID`, defaulting to `LUMA_ZOOM_WEBHOOK_ACADEMY_ID`) and restart both. No migration. Rollback: set the switch to false, or revert this commit.
+
+## Main integration review (2026-11-21)
+
+- Aligned the OpenAPI request with the registration-ID-only endpoint. Updated browser tests to enter through the active student sign-in and check imported students on both the monthly directory and the management record.
+- Production frontend build, ESLint, TypeScript, 81 unit tests, session HTTP smoke, structure and the 113-endpoint contract check passed. The desktop import regression passed on synthetic data. GitHub CI covers the full integration branch against its own fixtures.
+- Opening a PR leaves `main` and the running environments alone. V30 and V31 require their documented rollout steps before merge. The registration-ID-only mode is off by default and impersonation remains possible when enabled.
+
+## PR #116 CI check failures resolution (2026-11-21)
+
+- Fixed student portal sign-in button locator in `attendance-dashboard.spec.ts` (`View my attendance`).
+- Fixed subpixel scrolling assertion and animation frame alignment in `ClassScheduleScroll.tsx` and `staff-sessions.spec.ts`.
+- Updated obsolete `EXPECTED STUDENTS` region assertions in `staff-onboarding.spec.ts` to `Student attendance results`.
+- Hardened Maven Central download retries with backoff in `backend/Dockerfile` to guard against 429 rate-limiting.
+- Verified: production frontend build, ESLint, TypeScript, 81 unit tests, session HTTP smoke test, and Playwright tests locally.
+
+## Zoom auto-tracking baseline (2026-11-21)
+
+- Started the existing build with original Supabase, API on port 8088 and Next.js on port 3000. API health and readiness returned UP, sign-in returned 200, and anonymous attendance redirected with 307. Automatic migrations were disabled for startup.
+- Auto-tracking implementation, signed-in validation, and a licensed Zoom test are pending. The [work log](ZOOM-AUTO-TRACKING.md) records acceptance criteria, outstanding slices, and the planned rollout and rollback.
+
+## Integration CI repair (2026-11-21)
+
+- PR 116's real-stack browser test found a stale text-order assertion in the attendance roster. It now checks the student row by its accessible name for both staff sessions. The Lighthouse test isolates measurements in fresh Chrome instances and reports the exact runtime error or final path on failure. The performance budgets are unchanged.
+- Changes are confined to CI tests and documentation. No database migration or runtime rollout is required. Revert the test commit to restore the former checks.
+
+- Subsequent GitHub runs reproduced Chrome's intermittent `NO_NAVSTART` trace error in the push workflow while the PR workflow met the budgets. The check now retries only that trace error and still requires three valid samples per route. The reports browser test waits for the React search control to respond and uses separate fixtures for retries.
+
+- The next real-stack run passed onboarding and exposed an appeal fixture selecting the current outcome, which the form correctly excludes. The fixture now verifies a real Present-to-Late change and can create a session spanning Colombo midnight. The reports fixture now checks the canonical uppercase registration ID. Production frontend build, lint, 81 unit tests, and four repeated desktop/mobile report checks passed locally. Hosted checks are recorded on PR 116.

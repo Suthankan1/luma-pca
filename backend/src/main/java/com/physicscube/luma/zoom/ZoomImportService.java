@@ -31,7 +31,7 @@ import org.springframework.stereotype.Service;
  * The academy's upcoming webinars, read from Zoom, so staff turn them into classes in one step instead of typing each
  * date and webinar ID. Every run of a recurring webinar is listed; runs that already have a class are marked. Importing
  * re-reads the webinar from Zoom (nothing from the browser is trusted for times) and creates an ordinary class per run,
- * so linking, attendance and finalisation work exactly as for classes scheduled by hand. Owners and administrators only.
+ * so linking, attendance and finalisation work exactly as for classes scheduled by hand. Staff only.
  */
 @Service
 public class ZoomImportService {
@@ -93,7 +93,7 @@ public class ZoomImportService {
 
     /** The configured hosts' upcoming webinars, soonest first; {@code query} filters by topic or ID. */
     public List<WebinarSummary> upcoming(CurrentAccount caller, String query) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         ZoomApiClient client = client();
         Map<Long, ZoomApiClient.ListedWebinar> listed = new LinkedHashMap<>();
         try {
@@ -122,7 +122,7 @@ public class ZoomImportService {
 
     /** One webinar's upcoming runs (next 120 days), read from Zoom when staff open it. */
     public UpcomingWebinar webinar(CurrentAccount caller, String webinarId) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (webinarId == null || !webinarId.matches("[0-9]{9,20}")) {
             throw new InvalidRequestException("webinarId must be a Zoom webinar ID");
         }
@@ -132,7 +132,7 @@ public class ZoomImportService {
     /** Creates a class for each chosen upcoming run (all when {@code occurrenceIds} is empty) that has none yet; all or nothing. */
     @org.springframework.transaction.annotation.Transactional
     public ImportResult importRuns(CurrentAccount caller, String webinarId, List<UUID> batchIds, List<String> occurrenceIds, String title) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         manualScheduling.require();
         if (webinarId == null || !webinarId.replaceAll("[\\s-]", "").matches("[0-9]{9,20}")) {
             throw new InvalidRequestException("webinarId must be a Zoom webinar ID");

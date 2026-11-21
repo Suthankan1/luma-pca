@@ -58,7 +58,7 @@ public class StudentImportService {
 
     @Transactional
     public Result importStudents(CurrentAccount caller, List<Row> rows, UUID batchId, LocalDate enrolledOn, boolean dryRun) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (rows == null || rows.isEmpty() || rows.size() > MAX_ROWS) {
             throw new InvalidRequestException("Send between 1 and " + MAX_ROWS + " rows");
         }

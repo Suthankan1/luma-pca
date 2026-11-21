@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 
 let down = false;
 let identityDown = false;
+let accessRejected = false;
+let identityChecks = 0;
 let rotation = 0;
 let latestRefresh = "";
 const jwt = "fake-access-token.for-bff.integration-test";
@@ -24,67 +26,20 @@ const backend = createServer(async (req, res) => {
       if (body.email === "student@example.invalid") {
         roles = ["STUDENT"];
       } else if (body.email === "staff@example.invalid") {
-        roles = ["INSTRUCTOR"];
-      } else if (body.email === "admin-unenrolled@example.invalid") {
-        return send(200, {
-          mfaRequired: true,
-          mfaToken: "challenge-token-unenrolled",
-          mfaExpiresIn: 300,
-          mfaEnrolled: false,
-        });
-      } else if (body.email === "admin-enrolled@example.invalid") {
-        return send(200, {
-          mfaRequired: true,
-          mfaToken: "challenge-token-enrolled",
-          mfaExpiresIn: 300,
-          mfaEnrolled: true,
-        });
+        roles = ["STAFF"];
+      } else if (body.email === "admin@example.invalid") {
+        roles = ["STAFF"];
       } else {
         return send(401);
       }
       break;
-    case "/api/v1/auth/mfa/enroll":
-      if (body.mfaToken === "challenge-token-unenrolled") {
-        return send(200, {
-          secret: "JBSWY3DPEHPK3PXP",
-          otpauthUri: "otpauth://totp/Physics%20Cube%20Academy:admin@example.invalid?secret=JBSWY3DPEHPK3PXP&issuer=Physics%20Cube%20Academy",
-        });
-      }
-      return send(401);
-    case "/api/v1/auth/mfa/verify":
-      if (body.mfaToken === "challenge-token-unenrolled") {
-        if (body.code !== "123456") return send(401);
-        roles = ["ACADEMY_ADMIN"];
-        latestRefresh = `fake-opaque-refresh-${++rotation}`;
-        return send(200, {
-          accessToken: jwt,
-          tokenType: "Bearer",
-          expiresIn: 300,
-          refreshToken: latestRefresh,
-          refreshExpiresIn: 600,
-          recoveryCodes: ["rec-1111", "rec-2222", "rec-3333"],
-        });
-      }
-      if (body.mfaToken === "challenge-token-enrolled") {
-        if (body.code !== "654321" && body.code !== "rec-recovery") return send(401);
-        roles = ["ACADEMY_ADMIN"];
-        latestRefresh = `fake-opaque-refresh-${++rotation}`;
-        return send(200, {
-          accessToken: jwt,
-          tokenType: "Bearer",
-          expiresIn: 300,
-          refreshToken: latestRefresh,
-          refreshExpiresIn: 600,
-          recoveryCodes: null,
-        });
-      }
-      return send(401);
     case "/api/v1/auth/refresh":
       if (body.refreshToken !== latestRefresh) return send(401);
       break;
     case "/api/v1/auth/me":
+      identityChecks++;
       if (identityDown) return send(503);
-      if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+      if (accessRejected || req.headers.authorization !== `Bearer ${jwt}`) return send(401);
       return send(200, { accountId: "test-account", academyId: "test-academy", roles });
     case "/api/v1/auth/logout":
       if (body.refreshToken === latestRefresh) latestRefresh = "";
@@ -128,7 +83,7 @@ try {
   const recordCookies = (response) => {
     const values = response.headers.getSetCookie();
     for (const value of values) {
-      assert.match(value, /^__Host-luma-(access|refresh|mfa|recovery)=/);
+      assert.match(value, /^__Host-luma-(access|refresh)=/);
       assert.match(value, /; Path=\//);
       assert.match(value, /; HttpOnly/);
       assert.match(value, /; Secure/);
@@ -165,6 +120,15 @@ try {
   assert.equal(html.includes(jwt), false);
   assert.equal(html.includes(latestRefresh), false);
 
+  // A still-sealed access cookie must not redirect back to a portal after the API rejects it.
+  accessRejected = true;
+  const expiredSignIn = await call("/sign-in?portal=student&error=expired");
+  assert.equal(expiredSignIn.status, 200);
+  assert.match(await expiredSignIn.text(), /Your session ended/);
+  const expiredStatus = await (await call("/api/session/status")).json();
+  assert.equal(expiredStatus.authenticated, false);
+  accessRejected = false;
+
   // 2. Refresh rotation
   // 2a. The short access cookie expired: the proxy renews the session quietly and the page opens (no sign-in page).
   jar.delete("__Host-luma-access");
@@ -174,6 +138,7 @@ try {
   assert.equal(jar.get("__Host-luma-refresh"), beforeRenewal);
   assert.match(await (await call("/sign-in")).text(), /Continue session/);
   down = false;
+  const beforeIdentityCheck = identityChecks;
   const renewed = await call("/student");
   assert.equal(renewed.status, 200);
   recordCookies(renewed);
@@ -183,6 +148,7 @@ try {
   assert.match(renewedHtml, /Student portal/);
   assert.equal(renewedHtml.includes(jwt), false);
   assert.equal(renewedHtml.includes(latestRefresh), false);
+  assert.equal(identityChecks - beforeIdentityCheck, 1, "silent renewal checks identity once in the protected render");
 
   // 2b. The "Continue session" action still works when renewal could not happen on its own.
   jar.delete("__Host-luma-access");
@@ -207,116 +173,23 @@ try {
   assert.equal(jar.has("__Host-luma-access"), false);
   assert.equal(jar.has("__Host-luma-refresh"), false);
 
-  // 4. MFA Enrollment flow (admin unenrolled)
-  const mfaLogin = await post("login", {
-    email: "admin-unenrolled@example.invalid",
-    password: "example-password",
-    portal: "staff",
-  });
-  location(mfaLogin, "/sign-in/mfa");
-  recordCookies(mfaLogin);
-  assert.equal(jar.has("__Host-luma-mfa"), true);
-  assert.equal(jar.has("__Host-luma-access"), false);
-  assert.equal(jar.has("__Host-luma-refresh"), false);
+  // 4. Staff sign in with email and password alone, straight into the dashboard.
+  const wrongAdmin = await post("login", { email: "admin@example.invalid", password: "wrong-password", portal: "staff" });
+  assert.match(wrongAdmin.headers.get("location"), /error=invalid/);
+  assert.equal(wrongAdmin.headers.getSetCookie().length, 0);
 
-  // Protected staff portal must reject unverified MFA challenge
-  location(await call("/staff"), "/sign-in");
-
-  // Load MFA enrollment page
-  const mfaPage = await call("/sign-in/mfa");
-  assert.equal(mfaPage.status, 200);
-  const mfaPageHtml = await mfaPage.text();
-  assert.match(mfaPageHtml, /Set up authenticator/);
-  assert.match(mfaPageHtml, /<svg/);
-  assert.match(mfaPageHtml, /JBSW Y3DP/);
-  assert.equal(mfaPageHtml.includes("challenge-token-unenrolled"), false);
-
-  // Forbidden cross-origin on MFA verify
-  assert.equal((await post("mfa-verify", { code: "123456" }, "https://evil.example")).status, 403);
-
-  // Invalid MFA code
-  const wrongCode = await post("mfa-verify", { code: "999999" });
-  location(wrongCode, "/sign-in/mfa");
-  assert.match(wrongCode.headers.get("location"), /error=code/);
-  assert.equal(jar.has("__Host-luma-access"), false);
-
-  // MFA Cancel
-  const cancelMfa = await post("mfa-cancel", {});
-  location(cancelMfa, "/sign-in");
-  recordCookies(cancelMfa);
-  assert.equal(jar.has("__Host-luma-mfa"), false);
-
-  // Visit MFA page when cancelled -> redirects to sign-in with expired
-  location(await call("/sign-in/mfa"), "/sign-in");
-
-  // Re-login to complete enrollment
-  const mfaLogin2 = await post("login", {
-    email: "admin-unenrolled@example.invalid",
-    password: "example-password",
-    portal: "staff",
-  });
-  location(mfaLogin2, "/sign-in/mfa");
-  recordCookies(mfaLogin2);
-
-  // Verify valid code
-  const mfaVerified = await post("mfa-verify", { code: "123456" });
-  location(mfaVerified, "/sign-in/mfa/recovery-codes");
-  recordCookies(mfaVerified);
+  const adminLogin = await post("login", { email: "admin@example.invalid", password: "example-password", portal: "staff" });
+  location(adminLogin, "/staff");
+  recordCookies(adminLogin);
   assert.equal(jar.has("__Host-luma-access"), true);
   assert.equal(jar.has("__Host-luma-refresh"), true);
-  assert.equal(jar.has("__Host-luma-recovery"), true);
-  assert.equal(jar.has("__Host-luma-mfa"), false);
 
-  // Load recovery codes page
-  const recoveryPage = await call("/sign-in/mfa/recovery-codes");
-  assert.equal(recoveryPage.status, 200);
-  const recoveryHtml = await recoveryPage.text();
-  assert.match(recoveryHtml, /Save recovery codes/);
-  assert.match(recoveryHtml, /rec-1111/);
-  assert.match(recoveryHtml, /rec-2222/);
+  // The removed second-factor routes no longer exist.
+  assert.equal((await post("mfa-verify", { code: "123456" })).status, 404);
 
-  // Acknowledge recovery codes
-  const ackRecovery = await post("mfa-recovery", { confirmed: "on" });
-  location(ackRecovery, "/staff");
-  recordCookies(ackRecovery);
-  assert.equal(jar.has("__Host-luma-recovery"), false);
-
-  // Visiting recovery page again redirects to staff (codes cannot be seen again)
-  location(await call("/sign-in/mfa/recovery-codes"), "/staff");
-
-  // Staff portal is accessible
   const adminStaff = await call("/staff");
   assert.equal(adminStaff.status, 200);
-  assert.match(await adminStaff.text(), /Staff portal/);
-
-  // Logout admin
-  const logoutAdmin = await post("logout", {});
-  recordCookies(logoutAdmin);
-
-  // 5. MFA already-enrolled flow
-  const enrolledLogin = await post("login", {
-    email: "admin-enrolled@example.invalid",
-    password: "example-password",
-    portal: "staff",
-  });
-  location(enrolledLogin, "/sign-in/mfa");
-  recordCookies(enrolledLogin);
-
-  const enrolledMfaPage = await call("/sign-in/mfa");
-  assert.equal(enrolledMfaPage.status, 200);
-  const enrolledHtml = await enrolledMfaPage.text();
-  assert.match(enrolledHtml, /Enter your code/);
-  assert.equal(enrolledHtml.includes("<svg"), false);
-
-  // Verify with recovery code
-  const enrolledVerified = await post("mfa-verify", { code: "rec-recovery" });
-  location(enrolledVerified, "/staff");
-  recordCookies(enrolledVerified);
-  assert.equal(jar.has("__Host-luma-access"), true);
-  assert.equal(jar.has("__Host-luma-recovery"), false);
-  assert.equal(jar.has("__Host-luma-mfa"), false);
-
-  assert.equal((await call("/staff")).status, 200);
+  assert.match(await adminStaff.text(), /Staff dashboard/);
 
   // Final logout
   const finalLogout = await post("logout", {});

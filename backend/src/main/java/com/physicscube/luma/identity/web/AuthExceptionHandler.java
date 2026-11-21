@@ -3,7 +3,6 @@ package com.physicscube.luma.identity.web;
 import com.physicscube.luma.identity.InvalidCredentialsException;
 import com.physicscube.luma.identity.InvalidInvitationException;
 import com.physicscube.luma.identity.InvalidSessionException;
-import com.physicscube.luma.identity.InvalidMfaException;
 import com.physicscube.luma.identity.InvalidPasswordResetException;
 import com.physicscube.luma.identity.domain.PasswordPolicyException;
 import org.springframework.http.HttpStatus;
@@ -21,11 +20,6 @@ class AuthExceptionHandler {
 
     @ExceptionHandler(InvalidSessionException.class)
     ProblemDetail invalidSession(InvalidSessionException e) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
-    }
-
-    @ExceptionHandler(InvalidMfaException.class)
-    ProblemDetail invalidMfa(InvalidMfaException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
     }
 

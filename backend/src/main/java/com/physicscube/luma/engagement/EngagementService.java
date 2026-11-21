@@ -23,7 +23,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Engagement from LUMA's own student portal (slices 006A–C), with consent.
  *
  * <ul>
- *   <li>Off until an owner switches it on, with the consent wording students will see.</li>
+ *   <li>Off until staff switch it on, with the consent wording students will see.</li>
  *   <li>A student opts in (and, separately, into appearing by name in staff rankings); without that,
  *       nothing about them is recorded.</li>
  *   <li>Reactions (006A) and pulse answers (006B) are accepted only from students expected at the class,
@@ -88,19 +87,17 @@ public class EngagementService {
     public record Ranking(int limit, int classes, int studentsCounted, List<Ranked> top, String method) {
     }
 
-    // ---- settings (owners) -------------------------------------------------------------------
+    // ---- settings (staff) -------------------------------------------------------------------
 
     @Transactional(readOnly = true)
     public Optional<Settings> settings(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         return find(caller.academyId());
     }
 
     @Transactional
     public Settings configure(CurrentAccount caller, boolean enabled, String consentText, Long expectedVersion) {
-        if (!caller.hasRole("ACADEMY_OWNER")) {
-            throw new AccessDeniedException("Only an academy owner switches engagement on or off");
-        }
+        caller.requireStaff();
         String text = consentText == null ? "" : consentText.strip();
         if (text.length() < 20 || text.length() > 2000) {
             throw new InvalidRequestException("The consent wording must be 20 to 2000 characters");
@@ -228,12 +225,10 @@ public class EngagementService {
 
     // ---- staff: pulses and class view -----------------------------------------------------------
 
-    /** Instructors and managers who see the class open a question for 1 to 10 minutes. */
+    /** Staff open a question for 1 to 10 minutes. */
     @Transactional
     public PulseView openPulse(CurrentAccount caller, UUID sessionId, String prompt, List<String> options, int minutes) {
-        if (!caller.isAcademyManager() && !caller.hasRole("INSTRUCTOR")) {
-            throw new AccessDeniedException("Only instructors and managers open questions");
-        }
+        caller.requireStaff();
         SessionView session = sessions.get(caller, sessionId);
         requireEnabled(caller.academyId());
         String text = prompt == null ? "" : prompt.strip();
@@ -278,9 +273,7 @@ public class EngagementService {
 
     @Transactional
     public void closePulse(CurrentAccount caller, UUID sessionId, UUID questionId) {
-        if (!caller.isAcademyManager() && !caller.hasRole("INSTRUCTOR")) {
-            throw new AccessDeniedException("Only instructors and managers close questions");
-        }
+        caller.requireStaff();
         sessions.get(caller, sessionId);
         int closed = jdbc.update("UPDATE pulse_questions SET closed_early_at = ? WHERE id = ? AND academy_id = ? AND class_session_id = ? "
                 + "AND closed_early_at IS NULL AND closes_at > ?", Timestamp.from(DbTime.now()), questionId, caller.academyId(), sessionId,
@@ -330,7 +323,7 @@ public class EngagementService {
      * Top students over the classes of a batch in a date range (inclusive, at most 92 days): score =
      * (reactions per class, capped at 10 per class) + 3 × pulse answers, divided by the classes the
      * student was expected at. Only students who consented are counted; only those who also opted in
-     * to rankings are named. Managers only.
+     * to rankings are named. Staff only.
      */
     @Transactional(readOnly = true)
     public Ranking ranking(CurrentAccount caller, UUID batchId, java.time.LocalDate from, java.time.LocalDate to, int limit) {
@@ -340,7 +333,7 @@ public class EngagementService {
     /** As the batch ranking, over every batch of a course: classes of any of them, students of any of them. */
     @Transactional(readOnly = true)
     public Ranking courseRanking(CurrentAccount caller, UUID courseId, java.time.LocalDate from, java.time.LocalDate to, int limit) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         java.util.Set<UUID> batchIds = new java.util.HashSet<>(jdbc.queryForList("SELECT id FROM batches WHERE academy_id = ? AND course_id = ?",
                 UUID.class, caller.academyId(), courseId));
         if (batchIds.isEmpty()) {
@@ -350,7 +343,7 @@ public class EngagementService {
     }
 
     private Ranking ranking(CurrentAccount caller, java.util.Set<UUID> batchIds, java.time.LocalDate from, java.time.LocalDate to, int limit) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (limit != 10 && limit != 100) {
             throw new InvalidRequestException("limit must be 10 or 100");
         }

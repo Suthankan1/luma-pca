@@ -19,6 +19,7 @@ export async function createStudent(_previous: FormState, form: FormData): Promi
   const result = await staffApi<{ id: string; studentNumber: string }>("/api/v1/students", { method: "POST", body: input });
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values };
   revalidatePath("/staff/students");
+  revalidatePath("/staff/students/manage");
   return { ok: true, message: `Student ${result.data.studentNumber} added. Open the record to send an invitation.`,
     values: { link: `/staff/students/${result.data.id}` } };
 }
@@ -37,6 +38,7 @@ export async function updateStudent(_previous: FormState, form: FormData): Promi
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail), values: { fullName } };
   revalidatePath(`/staff/students/${id}`);
   revalidatePath("/staff/students");
+  revalidatePath("/staff/students/manage");
   return { ok: true, message: "Saved." };
 }
 
@@ -91,6 +93,7 @@ export async function importStudents(input: { rows: unknown; batchId: unknown; e
   if (!result.ok) return { ok: false, message: problemMessage(result.status, result.detail) };
   if (result.data.imported) {
     revalidatePath("/staff/students");
+  revalidatePath("/staff/students/manage");
     if (batchId) revalidatePath(`/staff/batches/${batchId}`);
   }
   return { ok: true, ...result.data };
@@ -121,7 +124,7 @@ export async function inviteProgress(): Promise<InviteProgress | null> {
   return result.ok ? result.data : null;
 }
 
-/** Erases a student's personal data on request (owners only; the student's number must be typed again). Audited. */
+/** Erases a student's personal data on request (staff only; the student's number must be typed again). Audited. */
 export async function eraseStudent(_previous: FormState, form: FormData): Promise<FormState> {
   await requireSameOriginAction();
   const studentId = uuidOrNull(form.get("studentId"));
@@ -133,10 +136,11 @@ export async function eraseStudent(_previous: FormState, form: FormData): Promis
   if (reason.length < 3 || reason.length > 300) return { ok: false, message: "Give a reason of 3 to 300 characters.", values };
   const result = await staffApi<{ placeholderNumber: string }>(`/api/v1/students/${studentId}/erasure`, { method: "POST", body: { confirmStudentNumber, reason } });
   if (!result.ok) {
-    return { ok: false, values, message: result.status === 403 ? "Only an academy owner can erase a student’s data."
+    return { ok: false, values, message: result.status === 403 ? "Only staff can erase a student’s data."
       : result.status === 400 && result.detail?.includes("confirm") ? "That isn’t this student’s number." : problemMessage(result.status, result.detail) };
   }
   revalidatePath(`/staff/students/${studentId}`);
   revalidatePath("/staff/students");
+  revalidatePath("/staff/students/manage");
   return { ok: true, message: `Erased. The record is now ${result.data.placeholderNumber}.` };
 }

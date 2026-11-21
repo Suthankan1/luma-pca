@@ -48,6 +48,7 @@ async function callApi<T>(portal: "staff" | "student", path: `/api/v1/${string}`
       body: requestBody,
     });
   } catch {
+    logIfSlow(init?.method ?? "GET", path, 503, performance.now() - started);
     return { ok: false, status: 503 };
   }
   if (response.status === 401) redirect(`/sign-in?portal=${portal}&error=expired`);

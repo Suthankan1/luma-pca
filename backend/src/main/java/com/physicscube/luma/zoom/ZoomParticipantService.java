@@ -12,6 +12,7 @@ import com.physicscube.luma.students.StudentView;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -21,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -31,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * reports (the same across rejoins; registration with Zoom sign-in makes it the person's own),
  * never by display name. A participant is matched to a student by, in order:
  * <ol>
- *   <li>an administrator's decision for that email (a student, or "not a student"), which
+ *   <li>a staff member's decision for that email (a student, or "not a student"), which
  *       applies to every webinar and is audited;</li>
  *   <li>the email being a student's LUMA sign-in email.</li>
  * </ol>
@@ -42,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ZoomParticipantService {
     static final int MAX_EVENTS_PER_OCCURRENCE = 50_000;
     private static final int EMAIL_BATCH = 500;
+    private static final int CLASS_ACTIVITY_BATCH = 16;
 
     private final JdbcTemplate jdbc;
     private final StudentService students;
@@ -88,7 +91,7 @@ public class ZoomParticipantService {
 
     @Transactional(readOnly = true)
     public OccurrenceParticipants participants(CurrentAccount caller, String occurrenceUuid) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<Map<String, Object>> rows = jdbc.queryForList("""
                 SELECT event_type, event_ts, visit_key, participant_email, participant_name, host, registrant_id
                 FROM zoom_occurrence_events
@@ -163,7 +166,7 @@ public class ZoomParticipantService {
      */
     @Transactional(readOnly = true)
     public List<UnmatchedIdentity> unmatched(CurrentAccount caller, int limit) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (limit < 1 || limit > 200) {
             throw new InvalidRequestException("limit must be between 1 and 200");
         }
@@ -212,7 +215,7 @@ public class ZoomParticipantService {
     /** Every decision, newest first. */
     @Transactional(readOnly = true)
     public List<IdentityDecision> decisions(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT email, student_id, reason, linked_at FROM zoom_identity_links "
                 + "WHERE academy_id = ? ORDER BY linked_at DESC, email LIMIT 1000", caller.academyId());
         Map<UUID, StudentView> named = students.viewsInAcademy(caller.academyId(),
@@ -227,7 +230,7 @@ public class ZoomParticipantService {
      */
     @Transactional
     public IdentityDecision decide(CurrentAccount caller, String email, UUID studentId, String reason) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String normalized = email == null ? "" : email.strip().toLowerCase(Locale.ROOT);
         if (normalized.isEmpty() || normalized.length() > 254 || normalized.indexOf('@') < 1) {
             throw new InvalidRequestException("A Zoom email address is required");
@@ -261,12 +264,12 @@ public class ZoomParticipantService {
     }
 
     /**
-     * Removes an administrator's decision about a Zoom email, so the automatic match by sign-in or
+     * Removes a staff member's decision about a Zoom email, so the automatic match by sign-in or
      * registration email applies again. Audited with the reason.
      */
     @Transactional
     public void removeDecision(CurrentAccount caller, String email, String reason) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String normalized = email == null ? "" : email.strip().toLowerCase(Locale.ROOT);
         String why = reason == null ? "" : reason.strip();
         if (why.length() < 3 || why.length() > 300) {
@@ -319,15 +322,52 @@ public class ZoomParticipantService {
     /** For other modules: the Zoom activity of the occurrences linked to a class. No role check; the caller checks access. */
     @Transactional(readOnly = true)
     public ClassActivity activityForClass(UUID academyId, UUID sessionId) {
-        List<String> occurrences = jdbc.queryForList("SELECT occurrence_uuid FROM zoom_occurrence_links WHERE academy_id = ? "
-                + "AND class_session_id = ? ORDER BY occurrence_uuid", String.class, academyId, sessionId);
-        Map<String, Instant> started = new HashMap<>();
-        Map<String, Instant> ended = new HashMap<>();
-        Map<String, Map<String, Visit>> visitsByOccurrence = new LinkedHashMap<>();
-        Set<String> hosts = new HashSet<>();
-        Set<String> reported = new HashSet<>();
-        if (!occurrences.isEmpty()) {
-            String[] occArray = occurrences.toArray(String[]::new);
+        return readClassActivities(academyId, List.of(sessionId)).get(sessionId);
+    }
+
+    /** Matched participant IDs per already-authorized class, with bounded batches of Zoom evidence. */
+    @Transactional(readOnly = true)
+    public Map<UUID, Set<UUID>> joinedStudentsByClass(UUID academyId, Collection<UUID> sessionIds) {
+        Map<UUID, Set<UUID>> result = new HashMap<>();
+        forEachClassActivity(academyId, sessionIds, (id, activity) -> result.put(id,
+                activity.visits().stream().map(StudentVisit::studentId).collect(Collectors.toSet())));
+        return result;
+    }
+
+    /** Deliver activity for authorized classes without holding the entire month's raw visits at once. */
+    @Transactional(readOnly = true)
+    public void forEachClassActivity(UUID academyId, Collection<UUID> sessionIds, BiConsumer<UUID, ClassActivity> consumer) {
+        List<UUID> ids = List.copyOf(sessionIds);
+        for (int from = 0; from < ids.size(); from += CLASS_ACTIVITY_BATCH) {
+            readClassActivities(academyId, ids.subList(from, Math.min(from + CLASS_ACTIVITY_BATCH, ids.size()))).forEach(consumer);
+        }
+    }
+
+    private static final class ClassEvidence {
+        final List<String> occurrences = new ArrayList<>();
+        final Map<String, Instant> started = new HashMap<>();
+        final Map<String, Instant> ended = new HashMap<>();
+        final Map<String, Map<String, Visit>> visitsByOccurrence = new LinkedHashMap<>();
+        final Set<String> hosts = new HashSet<>();
+        final Set<String> reported = new HashSet<>();
+        final Map<String, String> registrationByEmail = new HashMap<>();
+        final Map<String, String> registrantIdByEmail = new HashMap<>();
+    }
+
+    private Map<UUID, ClassActivity> readClassActivities(UUID academyId, List<UUID> sessionIds) {
+        Map<UUID, ClassEvidence> byClass = new HashMap<>();
+        sessionIds.forEach(id -> byClass.put(id, new ClassEvidence()));
+        Map<String, ClassEvidence> byOccurrence = new HashMap<>();
+        jdbc.query("SELECT class_session_id, occurrence_uuid FROM zoom_occurrence_links WHERE academy_id = ? "
+                + "AND class_session_id = ANY (?) ORDER BY occurrence_uuid", row -> {
+            String occurrence = row.getString("occurrence_uuid");
+            ClassEvidence evidence = byClass.get(row.getObject("class_session_id", UUID.class));
+            evidence.occurrences.add(occurrence);
+            byOccurrence.put(occurrence, evidence);
+        }, academyId, sessionIds.toArray(UUID[]::new));
+
+        if (!byOccurrence.isEmpty()) {
+            String[] occArray = byOccurrence.keySet().toArray(String[]::new);
             Map<String, Instant> firstEvents = new HashMap<>();
             jdbc.query("""
                     SELECT occurrence_uuid, event_type, event_ts, visit_key, participant_email, host, registrant_id
@@ -336,14 +376,15 @@ public class ZoomParticipantService {
                     ORDER BY occurrence_uuid, event_ts, id
                     """, row -> {
                 String occurrence = row.getString("occurrence_uuid");
-                Map<String, Visit> visits = visitsByOccurrence.computeIfAbsent(occurrence, o -> new LinkedHashMap<>());
+                ClassEvidence evidence = byOccurrence.get(occurrence);
+                Map<String, Visit> visits = evidence.visitsByOccurrence.computeIfAbsent(occurrence, o -> new LinkedHashMap<>());
                 String type = row.getString("event_type");
                 Instant at = Instant.ofEpochMilli(row.getLong("event_ts"));
                 firstEvents.putIfAbsent(occurrence, at);
                 if ("webinar.started".equals(type)) {
-                    started.putIfAbsent(occurrence, at);
+                    evidence.started.putIfAbsent(occurrence, at);
                 } else if ("webinar.ended".equals(type)) {
-                    ended.merge(occurrence, at, (a, b) -> a.isAfter(b) ? a : b);
+                    evidence.ended.merge(occurrence, at, (a, b) -> a.isAfter(b) ? a : b);
                 }
                 String visitKey = row.getString("visit_key");
                 String email = row.getString("participant_email");
@@ -351,7 +392,7 @@ public class ZoomParticipantService {
                     return;
                 }
                 if (row.getBoolean("host")) {
-                    hosts.add(email);
+                    evidence.hosts.add(email);
                     return;
                 }
                 Visit visit = visits.computeIfAbsent(visitKey, k -> new Visit(email));
@@ -364,23 +405,26 @@ public class ZoomParticipantService {
                     visit.joined = at;
                 }
             }, academyId, occArray);
-            firstEvents.forEach((occ, at) -> started.putIfAbsent(occ, at));
+            firstEvents.forEach((occ, at) -> byOccurrence.get(occ).started.putIfAbsent(occ, at));
 
             // Where Zoom's participant report has been fetched, it replaces the live visits (004B).
-            reported.addAll(jdbc.queryForList("SELECT occurrence_uuid FROM zoom_report_fetches WHERE academy_id = ? "
-                    + "AND status = 'FETCHED' AND occurrence_uuid = ANY (?)", String.class, academyId, occArray));
+            List<String> reported = jdbc.queryForList("SELECT occurrence_uuid FROM zoom_report_fetches WHERE academy_id = ? "
+                    + "AND status = 'FETCHED' AND occurrence_uuid = ANY (?)", String.class, academyId, occArray);
             if (!reported.isEmpty()) {
                 String[] repArray = reported.toArray(String[]::new);
                 for (String occurrence : reported) {
-                    visitsByOccurrence.put(occurrence, new LinkedHashMap<>());
+                    ClassEvidence evidence = byOccurrence.get(occurrence);
+                    evidence.reported.add(occurrence);
+                    evidence.visitsByOccurrence.put(occurrence, new LinkedHashMap<>());
                 }
                 jdbc.query("SELECT occurrence_uuid, id, email, joined_at, left_at, host, registrant_email "
                         + "FROM zoom_report_participants WHERE academy_id = ? "
                         + "AND occurrence_uuid = ANY (?) AND email IS NOT NULL ORDER BY occurrence_uuid, joined_at, id", row -> {
                     String occurrence = row.getString("occurrence_uuid");
-                    Map<String, Visit> visits = visitsByOccurrence.get(occurrence);
+                    ClassEvidence evidence = byOccurrence.get(occurrence);
+                    Map<String, Visit> visits = evidence.visitsByOccurrence.get(occurrence);
                     if (row.getBoolean("host")) {
-                        hosts.add(row.getString("email"));
+                        evidence.hosts.add(row.getString("email"));
                         return;
                     }
                     Visit visit = new Visit(row.getString("email"));
@@ -391,37 +435,49 @@ public class ZoomParticipantService {
                 }, academyId, repArray);
             }
         }
-        // Registration emails: stored with report rows, or looked up from registrants for live visits.
-        Map<String, String> registrantIdByEmail = new HashMap<>();
-        Map<String, String> byEmail = new HashMap<>();
-        visitsByOccurrence.values().stream().flatMap(v -> v.values().stream()).filter(v -> !hosts.contains(v.email)).forEach(v -> {
-            byEmail.putIfAbsent(v.email, null);
-            if (v.registrationEmail != null) {
-                byEmail.put(v.email, v.registrationEmail);
-            } else if (v.registrantId != null) {
-                registrantIdByEmail.putIfAbsent(v.email, v.registrantId);
-            }
-        });
-        registrationEmails(academyId, registrantIdByEmail).forEach((email, registered) -> {
-            if (byEmail.get(email) == null) {
-                byEmail.put(email, registered);
-            }
-        });
-        Map<String, Resolved> resolved = resolveWithRegistration(academyId, byEmail);
+        // Keep host exclusion and registration identity local to the class even when emails repeat across classes.
+        Set<String> registrantIds = new HashSet<>();
+        for (ClassEvidence evidence : byClass.values()) {
+            evidence.visitsByOccurrence.values().stream().flatMap(v -> v.values().stream())
+                    .filter(v -> !evidence.hosts.contains(v.email)).forEach(v -> {
+                evidence.registrationByEmail.putIfAbsent(v.email, null);
+                if (v.registrationEmail != null) {
+                    evidence.registrationByEmail.put(v.email, v.registrationEmail);
+                } else if (v.registrantId != null) {
+                    evidence.registrantIdByEmail.putIfAbsent(v.email, v.registrantId);
+                }
+            });
+            registrantIds.addAll(evidence.registrantIdByEmail.values());
+        }
+        Map<String, String> registeredById = registrationEmailsById(academyId, registrantIds);
+        Set<String> emails = new HashSet<>();
+        for (ClassEvidence evidence : byClass.values()) {
+            evidence.registrationByEmail.replaceAll((email, registered) -> registered != null ? registered
+                    : registeredById.get(evidence.registrantIdByEmail.get(email)));
+            emails.addAll(evidence.registrationByEmail.keySet());
+            evidence.registrationByEmail.values().stream().filter(java.util.Objects::nonNull).forEach(emails::add);
+        }
+        Map<String, Resolved> direct = resolve(academyId, emails);
+        Map<UUID, ClassActivity> result = new HashMap<>();
+        byClass.forEach((id, evidence) -> result.put(id, assembleClassActivity(evidence, direct)));
+        return result;
+    }
+
+    private static ClassActivity assembleClassActivity(ClassEvidence evidence, Map<String, Resolved> direct) {
         List<StudentVisit> matched = new ArrayList<>();
         Set<String> unmatched = new HashSet<>();
-        visitsByOccurrence.forEach((occurrence, visits) -> visits.values().forEach(visit -> {
-            if (hosts.contains(visit.email)) {
+        evidence.visitsByOccurrence.forEach((occurrence, visits) -> visits.values().forEach(visit -> {
+            if (evidence.hosts.contains(visit.email)) {
                 return;
             }
-            Resolved match = resolved.get(visit.email);
+            Resolved match = resolveRegistration(direct, visit.email, evidence.registrationByEmail.get(visit.email));
             if (match == null) {
                 unmatched.add(visit.email);
             } else if (match.match() == Match.STUDENT && match.student() != null) {
                 matched.add(new StudentVisit(match.student().id(), occurrence, visit.joined, visit.left));
             }
         }));
-        return new ClassActivity(occurrences, started, ended, matched, unmatched.size(), reported);
+        return new ClassActivity(evidence.occurrences, evidence.started, evidence.ended, matched, unmatched.size(), evidence.reported);
     }
 
     /** Registration email per participant email, from stored registrants (registrant id → email). */
@@ -430,15 +486,21 @@ public class ZoomParticipantService {
         if (registrantIdByEmail.isEmpty()) {
             return result;
         }
-        Map<String, String> emailById = new HashMap<>();
-        jdbc.query("SELECT registrant_id, email FROM zoom_registrants WHERE academy_id = ? AND registrant_id = ANY (?)",
-                row -> { emailById.put(row.getString(1), row.getString(2)); }, academyId,
-                registrantIdByEmail.values().stream().distinct().toArray(String[]::new));
+        Map<String, String> emailById = registrationEmailsById(academyId, new HashSet<>(registrantIdByEmail.values()));
         registrantIdByEmail.forEach((email, id) -> {
             if (emailById.containsKey(id)) {
                 result.put(email, emailById.get(id));
             }
         });
+        return result;
+    }
+
+    private Map<String, String> registrationEmailsById(UUID academyId, Set<String> registrantIds) {
+        Map<String, String> result = new HashMap<>();
+        if (!registrantIds.isEmpty()) {
+            jdbc.query("SELECT registrant_id, email FROM zoom_registrants WHERE academy_id = ? AND registrant_id = ANY (?)",
+                    row -> { result.put(row.getString(1), row.getString(2)); }, academyId, registrantIds.toArray(String[]::new));
+        }
         return result;
     }
 
@@ -454,17 +516,18 @@ public class ZoomParticipantService {
         Map<String, Resolved> direct = resolve(academyId, all);
         Map<String, Resolved> result = new HashMap<>();
         registrationByEmail.forEach((email, registered) -> {
-            Resolved own = direct.get(email);
-            if (own != null) {
-                result.put(email, own);
-                return;
-            }
-            Resolved viaRegistration = registered == null ? null : direct.get(registered);
-            if (viaRegistration != null && viaRegistration.match() == Match.STUDENT) {
-                result.put(email, new Resolved(Match.STUDENT, "REGISTRATION_EMAIL", viaRegistration.student()));
-            }
+            Resolved match = resolveRegistration(direct, email, registered);
+            if (match != null) result.put(email, match);
         });
         return result;
+    }
+
+    private static Resolved resolveRegistration(Map<String, Resolved> direct, String email, String registered) {
+        Resolved own = direct.get(email);
+        if (own != null) return own;
+        Resolved viaRegistration = registered == null ? null : direct.get(registered);
+        return viaRegistration != null && viaRegistration.match() == Match.STUDENT
+                ? new Resolved(Match.STUDENT, "REGISTRATION_EMAIL", viaRegistration.student()) : null;
     }
 
     record Resolved(Match match, String source, StudentView student) {

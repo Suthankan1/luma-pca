@@ -28,13 +28,13 @@ student by email (ZOOM-TEST-WEBINAR.md). Not yet proven with real Zoom: a recurr
 ## As built (003C, processing)
 - A poller in the API process (`LUMA_ZOOM_PROCESSING_ENABLED`, default on, every 5 s) claims due receipts with `FOR UPDATE SKIP LOCKED`, so several instances can run at once; each receipt is handled and marked in one transaction, so a crashed worker leaves it due again.
 - Handler failures are undone with a JDBC savepoint while the claim is kept, then recorded: retry after 30 s doubling to 1 h (ten attempts over about 3 hours), or `DEAD` at once for malformed payloads and unknown types. Stored error text is the exception type or our own fixed message, never payload content.
-- Owners and administrators list receipts by status (`GET /api/v1/zoom/receipts`, no payloads) and requeue dead letters with a reason that is written to the audit trail (`POST /api/v1/zoom/receipts/{id}/replay`).
+- Staff list receipts by status (`GET /api/v1/zoom/receipts`, no payloads) and requeue dead letters with a reason that is written to the audit trail (`POST /api/v1/zoom/receipts/{id}/replay`).
 - The only handler so far writes `zoom_occurrence_events` (webinar ID, occurrence UUID, event type, Zoom event time), one row per receipt, read in event-time order so late or out-of-order deliveries are harmless. It reads only `payload.object.id` and `payload.object.uuid`, which Zoom's event reference lists as required strings (checked 2026-11-11). Participant fields are documented there too but stay unparsed until a real test webinar confirms them.
 
 ## As built (003D part 1, occurrence mapping)
 - A class session may carry a Zoom webinar ID (`zoomWebinarId`; spaces and hyphens as Zoom displays them are removed; digits, 9 to 20 long, is our assumption to confirm in 003A).
 - When the worker files an event, the occurrence is linked automatically only if exactly one SCHEDULED class on that webinar ID has a time, widened by 60 minutes on both sides, that contains the event. Recurring webinars (one ID, many days) and restarted webinars (new occurrence UUID, same class) link correctly. No match or several matches leave it for review; cancelled classes and other academies' classes never match.
-- Owners and administrators review occurrences (`GET /api/v1/zoom/occurrences?decided=false`), record a decision with a reason (`POST /api/v1/zoom/occurrence-links`, link or `sessionId: null` for "not a class"), and re-run matching after adding webinar IDs (`POST /api/v1/zoom/occurrences/auto-link`). Manual decisions are audited and never changed automatically.
+- Staff review occurrences (`GET /api/v1/zoom/occurrences?decided=false`), record a decision with a reason (`POST /api/v1/zoom/occurrence-links`, link or `sessionId: null` for "not a class"), and re-run matching after adding webinar IDs (`POST /api/v1/zoom/occurrences/auto-link`). Manual decisions are audited and never changed automatically.
 - Still open: matching participants to students (registrant and participant fields need a real test webinar), and attendance.
 
 ## As built (003D part 2, participant identity)
@@ -43,13 +43,13 @@ student by email (ZOOM-TEST-WEBINAR.md). Not yet proven with real Zoom: a recurr
   and whether it is the host (`participant.id` equals `object.host_id`). IP addresses are not copied. Missing participant
   fields are stored as unknown instead of failing the event. V19 fills the same fields for events processed earlier.
 - A person in an occurrence is identified by email, never by display name; a visitor without email is listed alone and
-  cannot be matched. Matching order: an administrator's decision for the email (a student, or "not a student"; applies to
+  cannot be matched. Matching order: a staff decision for the email (a student, or "not a student"; applies to
   every webinar, audited as `ZOOM_IDENTITY_LINKED` / `ZOOM_IDENTITY_MARKED_NOT_STUDENT`), then a student's LUMA sign-in
   email. The host is never matched.
 - `GET /api/v1/zoom/participants?occurrence=` lists people with visits, open visits (no leave yet), first/last seen,
   the match and, when the occurrence is linked to a class, whether the student is expected there.
   `GET /api/v1/zoom/participants/unmatched` lists emails waiting for review; `GET|POST /api/v1/zoom/identity-links` lists
-  and records decisions. Owners and administrators only. This is provisional live data, not attendance (004A).
+  and records decisions. Staff only. This is provisional live data, not attendance (004A).
 - Receipts are stored without participant IP addresses, location, device, network type or MAC address (PRIV-1, V24 for older rows);
   a decision can be replaced but not removed; matching by `registrant_id` against Zoom's registrant list is not used,
   because email already identifies registrants and the registrant list needs an API call per webinar.
@@ -65,7 +65,7 @@ Full research citations: [`docs/research/zoom-feasibility-full.md`](../research/
 - After a webinar linked to a class ends, a poller (`luma.zoom.reports.*`, every 5 minutes, 15 minutes after the end) fetches
   `GET /past_webinars/{uuid}/participants` outside any transaction and stores it, replacing earlier copies; failures retry
   from 15 minutes doubling to 8 hours (or Zoom's Retry-After), six attempts. A later failure never discards a stored report.
-  Administrators can fetch one now (`POST /api/v1/zoom/reports`, audited). Rows keep only email, name, registrant ID,
+  Staff can fetch one now (`POST /api/v1/zoom/reports`, audited). Rows keep only email, name, registrant ID,
   join/leave and duration. Where every linked occurrence has a report, attendance says RECONCILED.
 - Field mapping of the report was confirmed against the real test webinar by `scripts/zoom-api-check.sh` (13 Nov: 5 join
   sessions by 4 people); storage, retry and replacement are tested against a fake Zoom server.
@@ -76,7 +76,7 @@ Academy decision (`docs/product/ZOOM-WEBINAR-ID-ONLY-ACCEPTANCE.md`). Verified w
 Testcontainers; **not yet proven against the academy's real Zoom account** (needs the webinar read scope and the four
 webinar event subscriptions on the existing app, and a test webinar run).
 
-- **Monitoring:** `POST /api/v1/zoom/monitors {webinar}` takes only a webinar ID or join link (owners/admins, audited).
+- **Monitoring:** `POST /api/v1/zoom/monitors {webinar}` takes only a webinar ID or join link (staff, audited).
   LUMA calls Zoom's Get a Webinar (read-only) to prove the academy's account can read it and copies title, timezone,
   scheduled start and duration (null when Zoom has none, never invented), recurrence and occurrences into
   `zoom_webinar_monitors` (V29). It re-reads Zoom every 30 minutes and on "Refresh from Zoom"; a failed read keeps the
@@ -94,7 +94,7 @@ webinar event subscriptions on the existing app, and a test webinar run).
 - **Reconciliation:** ended runs get Zoom's participant report as before. A run whose `webinar.ended` never arrived is
   fetched once older than the class limit plus the report delay; the report closes it at the last leave.
 - **Course association:** a run expects the students of the webinar's Academy class only when that class is certain: the
-  Zoom title equals exactly one Academy `class_type` (case and spacing ignored) or an administrator chose it (audited),
+  Zoom title equals exactly one Academy `class_type` (case and spacing ignored) or staff chose it (audited),
   and the class is set up as a LUMA batch. Otherwise the run has no expected students: evidence is kept, nobody is marked
   absent. Students are matched by Zoom email/registration or an audited staff decision, never by display name.
 - **Webhook allow-list:** a monitored webinar's events are stored even when `LUMA_ZOOM_WEBHOOK_WEBINAR_ALLOW_LIST` does

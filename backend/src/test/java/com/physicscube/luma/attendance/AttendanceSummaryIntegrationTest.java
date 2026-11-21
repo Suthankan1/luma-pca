@@ -17,7 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Attendance over a period: per student for a batch, per batch for the academy (analysts included, without names). */
+/** Attendance over a period: per student for a batch, per batch for the academy (staff only). */
 class AttendanceSummaryIntegrationTest extends StaffApiIntegrationTest {
     UUID academyId;
     String admin;
@@ -28,7 +28,7 @@ class AttendanceSummaryIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String course = fixtures.course("PHY-2026");
         batchA = fixtures.batch(course, "A");
@@ -119,8 +119,8 @@ class AttendanceSummaryIntegrationTest extends StaffApiIntegrationTest {
     @Test
     @SuppressWarnings("unchecked")
     void theAcademyReportGivesTotalsPerBatchWithoutNames() {
-        String analyst = tokenFor(academyId, Role.ANALYST);
-        HttpResponse<String> response = api.get("/api/v1/attendance/summary?from=2026-03-01&to=2026-03-31", analyst);
+        String colleague = tokenFor(academyId, Role.STAFF);
+        HttpResponse<String> response = api.get("/api/v1/attendance/summary?from=2026-03-01&to=2026-03-31", colleague);
         assertEquals(200, response.statusCode(), response.body());
         assertFalse(response.body().contains("S-00"), "no student numbers");
         assertFalse(response.body().contains("@example.test"), "no emails");
@@ -130,33 +130,28 @@ class AttendanceSummaryIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(1, batches.get(0).get("classesNotFinal"));
         assertEquals(Map.of("present", 1, "late", 1, "absent", 2, "excused", 0, "ratePercent", 50), asMap(batches.get(1).get("totals")));
         assertEquals(200, api.get("/api/v1/attendance/summary?from=2026-03-01&to=2026-03-31", admin).statusCode());
-        assertEquals(204, api.get("/api/v1/attendance-policy", analyst).statusCode(), "analysts read the rule (none recorded yet)");
+        assertEquals(204, api.get("/api/v1/attendance-policy", colleague).statusCode(), "staff read the rule (none recorded yet)");
 
         Map<String, Object> empty = HttpApi.parse(api.get("/api/v1/attendance/summary?from=2025-01-01&to=2025-01-31", admin));
         assertEquals(List.of(), empty.get("batches"), "batches without classes in the range are left out");
     }
 
     @Test
-    void eachRoleSeesOnlyWhatItMay() {
-        accountIdOf("teacher.a@example.invalid", academyId, Role.INSTRUCTOR);
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("email", "teacher.a@example.invalid");
-        fields.put("role", "INSTRUCTOR");
-        assertEquals(201, api.post("/api/v1/batches/" + batchA + "/assignments", HttpApi.json(fields), admin).statusCode());
-        String teacher = login("teacher.a@example.invalid");
+    void everyStaffMemberSeesEveryBatchAndStudentsNothing() {
+        String colleague = tokenFor(academyId, Role.STAFF);
         String range = "/attendance/summary?from=2026-03-01&to=2026-03-31";
-        assertEquals(200, api.get("/api/v1/batches/" + batchA + range, teacher).statusCode());
-        assertEquals(404, api.get("/api/v1/batches/" + batchB + range, teacher).statusCode(), "not their batch");
-        assertEquals(403, api.get("/api/v1/attendance/summary?from=2026-03-01&to=2026-03-31", teacher).statusCode(), "no academy totals");
+        assertEquals(200, api.get("/api/v1/batches/" + batchA + range, colleague).statusCode());
+        assertEquals(200, api.get("/api/v1/batches/" + batchB + range, colleague).statusCode());
+        assertEquals(HttpApi.parse(api.get("/api/v1/attendance/summary?from=2026-03-01&to=2026-03-31", admin)),
+                HttpApi.parse(api.get("/api/v1/attendance/summary?from=2026-03-01&to=2026-03-31", colleague)), "academy totals too");
 
-        String analyst = tokenFor(academyId, Role.ANALYST);
-        assertEquals(403, api.get("/api/v1/batches/" + batchA + range, analyst).statusCode(), "analysts never see named rows");
         String student = tokenFor(academyId, Role.STUDENT);
         assertEquals(403, api.get("/api/v1/batches/" + batchA + range, student).statusCode());
         assertEquals(403, api.get("/api/v1/attendance/summary?from=2026-03-01&to=2026-03-31", student).statusCode());
+        assertEquals(403, api.get("/api/v1/attendance-policy", student).statusCode());
 
         UUID other = academy("Another academy");
-        String outsider = tokenFor(other, Role.ACADEMY_ADMIN);
+        String outsider = tokenFor(other, Role.STAFF);
         assertEquals(404, api.get("/api/v1/batches/" + batchA + range, outsider).statusCode(), "another academy's batch does not exist");
         assertEquals(List.of(), HttpApi.parse(api.get("/api/v1/attendance/summary?from=2026-03-01&to=2026-03-31", outsider)).get("batches"));
     }

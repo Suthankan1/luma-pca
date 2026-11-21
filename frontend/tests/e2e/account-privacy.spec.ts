@@ -2,7 +2,7 @@ import { openSection } from "./support/ui";
 import { test, expect } from "@playwright/test";
 
 test("A student changes their password with the current one and is signed out", async ({ page }) => {
-  await page.goto("/sign-in?portal=student");
+  await page.goto("/sign-in");
   await page.fill("#email", "student@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -36,11 +36,9 @@ test("An owner erases a student's personal data after typing the number again", 
   await page.fill("#email", "owner-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill(`${p}-1`);
   await page.locator("#student-name").fill("Leaving Student");

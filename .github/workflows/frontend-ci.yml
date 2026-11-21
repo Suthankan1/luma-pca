@@ -27,6 +27,16 @@ jobs:
         run: npm --prefix frontend run build
       - name: Session HTTP smoke test
         run: npm --prefix frontend run test:smoke
+      - name: Signed-in Lighthouse budgets
+        working-directory: frontend
+        run: |
+          export LUMA_LIGHTHOUSE_TOOLS="$RUNNER_TEMP/luma-lighthouse"
+          npm --prefix "$LUMA_LIGHTHOUSE_TOOLS" install --no-save --package-lock=false lighthouse@12.8.2 chrome-launcher@1.2.1
+          node tests/mock-auth-runner.mjs &
+          mock_pid=$!
+          trap 'kill "$mock_pid" 2>/dev/null || true' EXIT
+          for n in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:3090/sign-in && break; sleep 1; done
+          node tests/staff-lighthouse.mjs
 
   e2e:
     runs-on: ubuntu-latest

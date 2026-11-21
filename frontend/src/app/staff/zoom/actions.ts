@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireSameOriginAction, staffApi } from "@/lib/staff-api";
 import { occurrenceIdOrNull, parseReason, problemMessage, submittedValues, uuidOrNull, zoomEmailOrNull, type FormState } from "@/lib/staff-forms";
 
-// Owners and administrators only; the API re-checks the role and academy, and records
+// Staff only; the API re-checks the role and academy, and records
 // every decision and replay with its reason in the audit trail.
 
 const invalid: FormState = { ok: false, message: "That request was not valid. Reload the page." };

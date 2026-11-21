@@ -12,13 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Attendance over a period, from final records only: per student for one batch (staff who may read the batch), and
- * per batch for the whole academy without names (owners, administrators and analysts).
+ * per batch for the whole academy without names (staff).
  *
  * <p>A record counts for a batch when its class served that batch and the student is enrolled in it. A class's date is
  * its date in its own time zone. Rate = (present + late) / (present + late + absent); excused classes are left out.
@@ -107,9 +106,7 @@ public class AttendanceSummaryService {
     /** Totals per batch for the academy, without student names. */
     @Transactional(readOnly = true)
     public AcademySummary forAcademy(CurrentAccount caller, LocalDate from, LocalDate to) {
-        if (!caller.isAcademyManager() && !caller.hasRole("ANALYST")) {
-            throw new AccessDeniedException("Owner, administrator or analyst role required");
-        }
+        caller.requireStaff();
         checkRange(from, to);
         UUID academy = caller.academyId();
         Map<UUID, int[]> counts = new LinkedHashMap<>();

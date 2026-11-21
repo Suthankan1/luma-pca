@@ -213,15 +213,15 @@ class PasswordResetHttpIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void aSecondFactorIsStillRequiredForAdministratorsAfterAReset() throws Exception {
-        UUID admin = accounts.register(academyId, "admin@example.invalid", Set.of(Role.ACADEMY_ADMIN)).id();
+    void administratorsSignInWithTheNewPasswordAfterAReset() throws Exception {
+        UUID admin = accounts.register(academyId, "admin@example.invalid", Set.of(Role.STAFF)).id();
         accounts.setPassword(admin, OLD);
         request("admin@example.invalid");
         assertEquals(204, confirm(nextToken("admin@example.invalid"), NEW).statusCode());
+        assertEquals(401, login("admin@example.invalid", OLD).statusCode());
         HttpResponse<String> response = login("admin@example.invalid", NEW);
         assertEquals(200, response.statusCode(), response.body());
-        assertEquals(true, HttpApi.parse(response).get("mfaRequired"));
-        assertFalse(HttpApi.parse(response).containsKey("accessToken"));
+        assertTrue(HttpApi.parse(response).containsKey("accessToken"));
     }
 
     @Test

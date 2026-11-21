@@ -1,6 +1,7 @@
 package com.physicscube.luma.attendance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.physicscube.luma.identity.domain.Role;
@@ -40,7 +41,7 @@ class ProvisionalAttendanceIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         batch = fixtures.batch(fixtures.course("PHY-2026"), "A");
         for (String n : List.of("1", "2", "3", "4")) {
@@ -90,11 +91,27 @@ class ProvisionalAttendanceIntegrationTest extends StaffApiIntegrationTest {
         processor.runOnce();
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> attendance(String token) {
-        HttpResponse<String> response = api.get("/api/v1/class-sessions/" + session + "/attendance", token);
+        return attendance(token, false);
+    }
+
+    private String attendancePath(boolean onlineHistory) {
+        return "/api/v1/class-sessions/" + session + "/attendance" + (onlineHistory ? "?includeOnlineHistory=true" : "");
+    }
+
+    private Map<String, Object> attendance(String token, boolean onlineHistory) {
+        HttpResponse<String> response = api.get(attendancePath(onlineHistory), token);
         assertEquals(200, response.statusCode(), response.body());
         return HttpApi.parse(response);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> onlineHistory(Map<String, Object> body) {
+        return (List<Map<String, Object>>) body.get("onlineHistory");
+    }
+
+    private static Map<String, Object> sample(String time, int online) {
+        return Map.of("at", "2026-02-02T" + time + "Z", "online", online);
     }
 
     @SuppressWarnings("unchecked")
@@ -161,25 +178,42 @@ class ProvisionalAttendanceIntegrationTest extends StaffApiIntegrationTest {
         Map<String, Map<String, Object>> rows = byNumber(body);
         assertEquals(List.of("S-001", "S-002", "S-004"), List.copyOf(rows.keySet()));
         rows.values().forEach(row -> assertEquals(false, row.get("seen")));
+        assertFalse(body.containsKey("onlineHistory"));
+        assertEquals(List.of(), onlineHistory(attendance(admin, true)));
     }
 
     @Test
-    void assignedStaffSeeTheirClassOnlyAndNoStudentsFromOtherBatches() {
-        runClass(true);
-        accountIdOf("teacher.a@example.invalid", academyId, Role.INSTRUCTOR);
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("email", "teacher.a@example.invalid");
-        fields.put("role", "INSTRUCTOR");
-        assertEquals(201, api.post("/api/v1/batches/" + batch + "/assignments", HttpApi.json(fields), admin).statusCode());
-        String assigned = login("teacher.a@example.invalid");
-        assertEquals(List.of("S-001", "S-002", "S-004"), List.copyOf(byNumber(attendance(assigned)).keySet()),
-                "a student outside the instructor's batches is not shown");
+    void onlineHistoryStartsWithAnObservedJoinAndDoesNotBackfillZeros() {
+        event("webinar.started", "08:30", null);
+        visit("webinar.participant_left", "08:35", "leave-only", "student1@example.test");
+        visit("webinar.participant_joined", "08:45", "s2", "student2@example.test");
+        visit("webinar.participant_left", "08:46", "s2", "student2@example.test");
+        event("webinar.ended", "08:47", null);
+        processor.runOnce();
 
-        String unassigned = tokenFor(academyId, Role.INSTRUCTOR);
-        assertEquals(404, api.get("/api/v1/class-sessions/" + session + "/attendance", unassigned).statusCode());
+        assertEquals(List.of(sample("08:45:00", 1), sample("08:45:30", 1), sample("08:46:00", 0),
+                sample("08:46:30", 0), sample("08:47:00", 0)), onlineHistory(attendance(admin, true)));
+    }
+
+    @Test
+    void everyStaffMemberSeesTheWholeClassAndOtherAcademiesNothing() {
+        runClass(true);
+        String colleague = tokenFor(academyId, Role.STAFF);
+        assertEquals(List.copyOf(byNumber(attendance(admin)).keySet()), List.copyOf(byNumber(attendance(colleague)).keySet()),
+                "no batch assignments: every staff member sees the same rows, including students seen but not expected");
+
+        List<Map<String, Object>> history = onlineHistory(attendance(colleague, true));
+        assertEquals(onlineHistory(attendance(admin, true)), history);
+        assertEquals(sample("08:30:00", 1), history.getFirst(), "early student's visit clips to class start");
+        assertEquals(sample("08:55:00", 2), history.get(50), "overlapping visits count as one student");
+        assertEquals(sample("09:05:00", 3), history.get(70), "matched extra student is counted, guest and host are not");
+        assertEquals(sample("09:50:00", 1), history.get(160), "open visit lasts to the webinar's end");
+        assertEquals(sample("10:00:00", 0), history.getLast());
+
+        assertEquals(401, api.get(attendancePath(true), null).statusCode());
         String student = tokenFor(academyId, Role.STUDENT);
-        assertEquals(403, api.get("/api/v1/class-sessions/" + session + "/attendance", student).statusCode());
-        String otherAdmin = tokenFor(academy("Other Academy"), Role.ACADEMY_ADMIN);
-        assertEquals(404, api.get("/api/v1/class-sessions/" + session + "/attendance", otherAdmin).statusCode());
+        assertEquals(403, api.get(attendancePath(true), student).statusCode());
+        String otherAcademy = tokenFor(academy("Other Academy"), Role.STAFF);
+        assertEquals(404, api.get(attendancePath(true), otherAcademy).statusCode());
     }
 }

@@ -101,36 +101,6 @@ public class Account {
         authVersion++;
     }
 
-    /** Replaces every role grant. Callers enforce who may grant which role. */
-    public void replaceRoles(Set<Role> newRoles) {
-        if (newRoles == null || newRoles.isEmpty()) {
-            throw new IllegalArgumentException("At least one role is required");
-        }
-        roles.clear();
-        roles.addAll(newRoles);
-    }
-
-    /**
-     * Lets a disabled account sign in again: ACTIVE with its existing password, or back to
-     * PENDING_ACTIVATION (password removed, so a new invitation is needed) when
-     * {@code requireNewPassword} or when it never had one. Lockout is cleared and tokens
-     * issued before stay invalid.
-     */
-    public void enable(boolean requireNewPassword) {
-        if (status != AccountStatus.DISABLED) {
-            return;
-        }
-        if (requireNewPassword || passwordHash == null) {
-            passwordHash = null;
-            status = AccountStatus.PENDING_ACTIVATION;
-        } else {
-            status = AccountStatus.ACTIVE;
-        }
-        failedLoginCount = 0;
-        lockedUntil = null;
-        authVersion++;
-    }
-
     public void disable() {
         if (status != AccountStatus.DISABLED) {
             status = AccountStatus.DISABLED;

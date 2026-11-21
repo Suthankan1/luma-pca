@@ -1,14 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 
-/** Owners and administrators sign in with MFA; the mock accepts recovery code "rec-recovery". */
+/** Owners and administrators sign in with email and password. */
 async function signInAsAdmin(page: Page) {
   await page.goto("/sign-in");
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa/);
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
 
@@ -21,10 +18,9 @@ test.describe("Staff courses and batches", () => {
 
   test("An administrator creates a course and a batch, sees refusals inline, and deactivates and reactivates", async ({ page }) => {
     await signInAsAdmin(page);
-    await page.getByRole("link", { name: /Courses & batches/ }).first().click();
+    await page.goto("/staff/courses");
     await expect(page).toHaveURL(/\/staff\/courses$/);
     await expect(page.getByRole("heading", { level: 1, name: "Courses & batches" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Courses & batches/ }).first()).toHaveAttribute("aria-current", "page");
 
     const course = `phy-${suffix}`;
     await page.getByLabel("Code", { exact: true }).first().fill(course);
@@ -64,19 +60,6 @@ test.describe("Staff courses and batches", () => {
     await expect(page.getByLabel("Course", { exact: true }).locator("option", { hasText: course.toUpperCase() })).toHaveCount(0);
     await courseRow.getByRole("button", { name: `Reactivate course ${course.toUpperCase()}` }).click();
     await expect(courseRow.locator(".dir-row").first()).toContainText("Active");
-  });
-
-  test("Instructors see an explanation instead of the forms", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.fill("#code", "rec-recovery");
-    await page.getByRole("button", { name: "Verify" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/courses");
-    await expect(page.locator(".banner")).toContainText("Only academy owners and administrators manage courses and batches");
-    await expect(page.getByRole("button", { name: "Create course" })).toHaveCount(0);
   });
 
   test("Signed-out visitors are sent to sign-in and the layout fits a phone", async ({ page }, testInfo) => {

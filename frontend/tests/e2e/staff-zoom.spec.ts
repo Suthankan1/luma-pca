@@ -7,9 +7,6 @@ async function signInAsAdmin(page: Page) {
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa/);
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
 
@@ -40,7 +37,7 @@ test.describe("Zoom review", () => {
     await page.goto("/staff/sessions");
     await scheduleClass(page, { title: `Zoom class ${p}`, date: `2027-03-0${n}`, start: "18:00", end: "20:00", batch: `${C} · A · Batch A`, webinar: `987 6543 210${n}` });
 
-    await page.getByRole("link", { name: /Zoom review$/ }).first().click();
+    await page.goto("/staff/zoom");
     await expect(page).toHaveURL(/\/staff\/zoom$/);
     const auto = page.getByRole("listitem", { name: `Webinar 987 6543 210${n} at ${n} Mar 2027 18:05` });
     const manual = page.getByRole("listitem", { name: `Webinar 555 0001 110${n} at ${n} Mar 2027 09:30` });
@@ -62,7 +59,7 @@ test.describe("Zoom review", () => {
     await expect(manual.getByLabel(/^Reason/)).toHaveValue("no");
     await manual.getByLabel(/^Reason/).fill("Checked against the timetable");
     await manual.getByRole("button", { name: "Link to class" }).click();
-    await expect(manual.locator(".status")).toHaveText("Linked by an administrator");
+    await expect(manual.locator(".status")).toHaveText("Linked by staff");
     await expect(manual.getByRole("link", { name: new RegExp(`^Zoom class ${p}, `) })).toBeVisible();
 
     // A decision can be changed; it is never overridden automatically.
@@ -96,7 +93,7 @@ test.describe("Zoom review", () => {
     await signInAsAdmin(page);
     const P = p.toUpperCase();
     // A student whose sign-in email is the one Zoom reports for them, and one with another Zoom account.
-    await page.goto("/staff/students");
+    await page.goto("/staff/students/manage");
     for (const [number, name, email] of [[`ZM-${P}-1`, "Zoom Student", `zoom.student${n}@example.invalid`],
       [`ZM-${P}-2`, "Guest Student", `guest.student${n}@example.invalid`]]) {
       await openSection(page, "Add a student who is not in the Academy records");
@@ -169,7 +166,7 @@ test.describe("Zoom review", () => {
     await page.locator("#batch-starts").fill("2027-01-01");
     await page.getByRole("button", { name: "Create batch" }).click();
     await expect(page.locator("#batch-feedback")).toHaveText("Batch A created.");
-    await page.goto(`/staff/students?q=ZM-${P}-1`);
+    await page.goto(`/staff/students/manage?q=ZM-${P}-1`);
     await page.getByRole("link", { name: new RegExp(`ZM-${P}-1`) }).first().click();
     await page.locator("#enroll-batch").selectOption({ label: `${C} · A · Batch A` });
     await page.locator("#enroll-date").fill("2027-01-05");
@@ -191,7 +188,7 @@ test.describe("Zoom review", () => {
     await select.selectOption({ label: `${weekday} ${n} Mar 2027 · 09:00–11:00 · Attendance class ${p}` });
     await occurrence.getByLabel(/^Reason/).fill("Checked against the timetable");
     await occurrence.getByRole("button", { name: "Link to class" }).click();
-    await expect(occurrence.locator(".status")).toHaveText("Linked by an administrator");
+    await expect(occurrence.locator(".status")).toHaveText("Linked by staff");
     await occurrence.getByRole("link", { name: new RegExp(`^Attendance class ${p}, `) }).click();
 
     const attendance = page.getByRole("region", { name: "PROVISIONAL ATTENDANCE" });
@@ -228,18 +225,5 @@ test.describe("Zoom review", () => {
     await receipt.getByRole("button", { name: "Replay" }).click();
     await expect(receipt).toHaveCount(0);
     await expect(page.getByRole("region", { name: "FAILED EVENTS" })).toContainText(/\d+ events? (is|are) waiting to be processed/);
-  });
-
-  test("Only owners and administrators review Zoom events", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.fill("#code", "rec-recovery");
-    await page.getByRole("button", { name: "Verify" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/zoom");
-    await expect(page.locator(".banner")).toContainText("Only academy owners and administrators review Zoom events.");
-    await expect(page.getByRole("button", { name: "Run automatic linking" })).toHaveCount(0);
   });
 });

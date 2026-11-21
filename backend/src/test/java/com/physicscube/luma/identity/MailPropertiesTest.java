@@ -1,6 +1,7 @@
 package com.physicscube.luma.identity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -62,7 +63,8 @@ class MailPropertiesTest {
         assertEquals("person@example.invalid", reset.getTo()[0]);
         assertEquals("Reset your LUMA password", reset.getSubject());
         assertTrue(reset.getText().contains("within 30 minutes:\nhttps://luma.example.invalid/reset-password#token=abc\n"), reset.getText());
-        assertTrue(reset.getText().contains("still need their authenticator code"));
+        assertTrue(reset.getText().contains("signed out on every device.\n"), reset.getText());
+        assertFalse(reset.getText().contains("authenticator"), "there is no second factor");
 
         SimpleMailMessage invitation = sent.get(1);
         assertEquals("Your Physics Cube Academy LUMA account", invitation.getSubject());

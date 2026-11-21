@@ -1,129 +1,255 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { StaffShell } from "@/components/StaffShell";
+import { LinkPending } from "@/components/LinkPending";
+import { OneLineTitle } from "@/components/staff/OneLineTitle";
+import { StaffLiveStrip } from "@/components/staff/StaffLiveStrip";
 import { requirePortal } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
-import { staffApi } from "@/lib/staff-api";
-import { academyToday, classPhase, classTimeLabel, isAcademyManager, sessionWindow, type AttendanceAppeal, type ClassSession, type PendingAttendance } from "@/lib/staff-forms";
-import { formatDuration, presets, renderTime, type Dashboard } from "@/lib/insights";
-import { formatElapsed, formatTime, runStart, type WebinarMonitor } from "@/lib/webinars";
+import { staffApi, type ApiResult } from "@/lib/staff-api";
+import { ACADEMY_TIME_ZONE, academyToday, addDays, instantParts, zonedToInstant, type ClassSession } from "@/lib/staff-forms";
+import { MAX_LIVE_CLASSES, readLiveAttendance } from "@/lib/staff-live";
+import { renderTime } from "@/lib/insights";
+import { type WebinarMonitor } from "@/lib/webinars";
+import { attendancePercent, calendarEntries, chosenDay, chosenMonth, entryStateLabels, greeting, gridRange, homeHref, joinedLabel,
+  longDayLabel, monthLabel, monthWeeks, nextEntry, relativeDayName, shiftMonth, shortDayLabel,
+  startsInLabel, timeRange, type ClassAttendanceTotal, type DayEntry } from "@/lib/staff-home";
 
-/**
- * What is happening and what needs doing, in that order: live webinars (from Zoom's actual runs, never the timetable),
- * then open tasks, today's classes, webinars that just finished, and a one-line week summary that leads to Reports.
- */
-export default async function StaffPage() {
+const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const ATTENDANCE_SUMMARY_TIMEOUT_MS = 25_000;
+type CompletedClass = ClassAttendanceTotal & { title: string; endsAt: string; timeZone: string };
+type RecentAttendanceResult = Promise<ApiResult<CompletedClass[]>>;
+
+function sessionsIn(fromInstant: string, toInstant: string) {
+  return staffApi<ClassSession[]>(`/api/v1/class-sessions?${new URLSearchParams({ from: fromInstant, to: toInstant })}`);
+}
+function classTotals(range: { from: string; to: string }, timeoutMs?: number) {
+  return staffApi<ClassAttendanceTotal[]>(`/api/v1/attendance/class-totals?${new URLSearchParams(range)}`, undefined, timeoutMs);
+}
+
+/** The academy date an entry starts on. */
+function dayOf(entry: DayEntry) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: ACADEMY_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(new Date(entry.startsAt));
+}
+
+export default async function StaffPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const identity = await requirePortal("staff");
-  const manager = isAcademyManager(identity.roles);
-  const today = sessionWindow(null, undefined, 1);
-  const teaches = manager || identity.roles.some(r => r === "INSTRUCTOR" || r === "ATTENDANCE_OFFICER");
-  const week = presets(academyToday())[0];
-  const [classes, pending, appeals, unmatched, failed, summary, monitors] = await Promise.all([
-    staffApi<ClassSession[]>(`/api/v1/class-sessions?${new URLSearchParams({ from: today.fromInstant, to: today.toInstant })}`),
-    manager ? staffApi<PendingAttendance>("/api/v1/attendance/pending") : Promise.resolve(null),
-    manager ? staffApi<AttendanceAppeal[]>("/api/v1/attendance-appeals?status=OPEN") : Promise.resolve(null),
-    manager ? staffApi<unknown[]>("/api/v1/zoom/participants/unmatched?limit=200") : Promise.resolve(null),
-    manager ? staffApi<unknown[]>("/api/v1/zoom/receipts?status=DEAD&limit=200") : Promise.resolve(null),
-    teaches ? staffApi<Dashboard>(`/api/v1/attendance/dashboard?from=${week.from}&to=${week.to}`, undefined, 20000) : Promise.resolve(null),
-    manager ? staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors") : Promise.resolve(null),
-  ]);
+  const params = await searchParams;
   const now = renderTime();
-  const todayLabel = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Colombo", weekday: "long", day: "numeric", month: "long", year: "numeric" })
-    .format(new Date(now));
-  const todays = classes.ok ? classes.data.filter(c => c.status === "SCHEDULED") : [];
-  const ready = pending?.ok ? pending.data.classes.filter(c => c.state === "READY").length : 0;
-  const waiting = pending?.ok ? pending.data.classes.length - ready : 0;
-  const tasks = manager ? [
-    { label: "Classes ready to finalise", count: ready, href: "/staff/attendance", ok: !!pending?.ok },
-    { label: "Ended classes waiting for Zoom", count: waiting, href: "/staff/attendance", ok: !!pending?.ok },
-    { label: "Appeals waiting for a decision", count: appeals?.ok ? appeals.data.length : 0, href: "/staff/attendance", ok: !!appeals?.ok },
-    { label: "Zoom accounts to match", count: unmatched?.ok ? unmatched.data.length : 0, href: "/staff/zoom", ok: !!unmatched?.ok },
-    { label: "Failed Zoom events", count: failed?.ok ? failed.data.length : 0, href: "/staff/zoom", ok: !!failed?.ok },
-  ] : [];
-  const openTasks = tasks.filter(t => t.count > 0).length;
-  // Live = a run Zoom actually started and has not ended (owners/administrators see webinars; others their live classes).
-  const liveRuns = monitors?.ok ? monitors.data.filter(m => m.live).map(m => ({ m, run: m.live! })) : [];
-  const liveClasses = !manager ? todays.filter(c => classPhase(c.startsAt, c.endsAt, now) === "live") : [];
-  const finished = monitors?.ok ? monitors.data.flatMap(m => m.runs.filter(r => r.state === "ENDED" && r.actualEndedAt
-    && now - Date.parse(r.actualEndedAt) < 36 * 3600_000).map(r => ({ m, r })))
-    .sort((a, b) => Date.parse(b.r.actualEndedAt!) - Date.parse(a.r.actualEndedAt!)).slice(0, 5) : [];
-  const t = summary?.ok ? summary.data.totals : null;
+  const today = academyToday(new Date(now));
+  const day = chosenDay(params.day, today);
+  const month = chosenMonth(params.month, day);
+  const grid = gridRange(month);
+  const shell = { active: "overview" as const, crumb: "", title: "Staff dashboard", subtitle: `${greeting(now)} · ${longDayLabel(today)}`,
+    hasStudentPortal: hasPortal(identity, "student") };
 
-  return <StaffShell active="overview" crumb="Today" title="Staff portal"
-    subtitle={todayLabel} hasStudentPortal={hasPortal(identity, "student")}
-    actions={teaches ? <Link className="action secondary" href="/staff/dashboard">Attendance reports →</Link> : undefined}>
-    {teaches && <section className={`panel live-panel ${liveRuns.length || liveClasses.length ? "is-live" : ""}`} aria-labelledby="live-title">
-      <h2 id="live-title" className="panel-title">LIVE NOW</h2>
-      {manager ? (liveRuns.length === 0
-        ? <p className="panel-sub">No webinar is live right now. When Zoom starts a monitored webinar it appears here, from its actual start.</p>
-        : <ul className="dir-list">{liveRuns.map(({ m, run }) => {
-          const start = runStart(run);
-          return <li key={run.occurrenceUuid} className="dir-row live-row" aria-label={`Live ${m.topic ?? m.webinarId}`}>
-            <span><span className="pill pill-live">Live</span> <strong>{m.topic ?? "Zoom webinar"}</strong>
-              <span className="muted"> · started {formatTime(start.at, m.timeZone)} · {formatElapsed((now - Date.parse(start.at)) / 1000)} so far
-                · {run.connectedNow} connected now</span></span>
-            <Link className="action" href={`/staff/sessions/${run.classSessionId}`}>Live attendance →</Link>
-          </li>;
-        })}</ul>)
-        : liveClasses.length === 0 ? <p className="panel-sub">None of your classes is live right now.</p>
-          : <ul className="dir-list">{liveClasses.map(c => <li key={c.id} className="dir-row live-row">
-            <span><span className="pill pill-live">Live</span> <strong>{c.title}</strong> <span className="muted">{classTimeLabel(c, now)}</span></span>
-            <Link className="action" href={`/staff/sessions/${c.id}`}>Live attendance →</Link></li>)}</ul>}
-    </section>}
+  // Include yesterday for a class that is still running after midnight.
+  const yesterday = addDays(today, -1);
+  const soonAfter = addDays(today, 8);
+  const gridCoversSoon = yesterday >= grid.first && soonAfter <= grid.after;
+  const gridCoversDay = day >= grid.first && day < grid.after;
+  const dayGrid = gridRange(day.slice(0, 7));
+  const [calendar, soon, chosen, monitors] = await Promise.all([
+    sessionsIn(grid.fromInstant, grid.toInstant),
+    gridCoversSoon ? null : sessionsIn(zonedToInstant(yesterday, "00:00", ACADEMY_TIME_ZONE), zonedToInstant(soonAfter, "00:00", ACADEMY_TIME_ZONE)),
+    gridCoversDay ? null : sessionsIn(dayGrid.fromInstant, dayGrid.toInstant),
+    staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors"),
+  ]);
 
-    <div className="staff-grid panel-gap">
-      {manager ? <section className="panel" aria-labelledby="tasks-title">
-        <h2 id="tasks-title" className="panel-title">NEEDS ATTENTION</h2>
-        <p className="panel-sub">{openTasks === 0 ? "Nothing is waiting." : `${openTasks} kind${openTasks === 1 ? "" : "s"} of work waiting.`}</p>
-        <ul className="dir-list">{tasks.map(task => <li key={task.label} className={`dir-row task-row ${task.count > 0 ? "has-work" : ""}`} aria-label={task.label}>
-          <Link className="text-link" href={task.href}>{task.label}</Link>
-          <strong className={task.count > 0 ? "attention" : "muted"}>{task.ok ? task.count : "—"}</strong>
-        </li>)}</ul>
-        {pending?.ok && pending.data.autoFinalise && <p className="panel-sub">Automatic finalisation is on.</p>}
-      </section> : <section className="panel" aria-labelledby="setup-title">
-        {identity.roles.includes("ANALYST") && !teaches ? <>
-          <h2 id="setup-title" className="panel-title">REPORTS</h2>
-          <p className="panel-sub">Attendance totals per batch, without student names.</p>
-          <div className="nav-links"><Link className="action" href="/staff/attendance?section=totals">Attendance by batch →</Link></div>
-        </> : <>
-          <h2 id="setup-title" className="panel-title">YOUR BATCHES</h2>
-          <p className="panel-sub">Your batches’ rosters, classes and attendance. Owners and administrators manage everything else.</p>
-          <div className="nav-links">
-            <Link className="action" href="/staff/courses">Courses &amp; batches →</Link>
-            <Link className="action secondary" href="/staff/sessions">Classes →</Link>
+  const monitorList = monitors.ok ? monitors.data : null;
+  const liveIds = new Set((monitorList ?? []).flatMap(m => m.live ? [m.live.classSessionId] : []));
+  const entriesFrom = (result: typeof calendar | null) => result?.ok ? calendarEntries(result.data, monitorList, liveIds, now) : null;
+  const calendarDays = entriesFrom(calendar);
+  const soonDays = gridCoversSoon ? calendarDays : entriesFrom(soon);
+  const chosenDays = gridCoversDay ? calendarDays : entriesFrom(chosen);
+  const dayEntries = chosenDays?.get(day) ?? [];
+  const running = [...(soonDays?.values() ?? [])].flat()
+    .filter((e): e is DayEntry & { sessionId: string } => Boolean(e.sessionId && (e.state === "live" || e.state === "now")))
+    .slice(0, MAX_LIVE_CLASSES);
+  const next = soonDays ? nextEntry(new Map([...soonDays].filter(([date]) => date >= today && date < soonAfter)), now) : null;
+  const endedOnDay = day <= today && dayEntries.some(e => e.state === "ended" && e.sessionId);
+
+  // Second round: live numbers for running classes, and joined/expected for the chosen day's finished classes.
+  const [liveAttendance, dayTotals] = await Promise.all([
+    readLiveAttendance(running.map(entry => entry.sessionId)),
+    endedOnDay ? classTotals({ from: day, to: day }) : null,
+  ]);
+  const liveEntries = running.filter((_, index) => !liveAttendance[index].ended);
+  const activeAttendance = liveAttendance.filter(snapshot => !snapshot.ended);
+  const finished = new Map(dayTotals?.ok ? dayTotals.data.map(c => [c.id, c] as const) : []);
+  const href = (options: { day?: string; month?: string }) => homeHref({ day: options.day ?? day, month: options.month ?? month }, today);
+  const previousDay = addDays(day, -1), nextDay = addDays(day, 1);
+  const recentAttendance = staffApi<CompletedClass[]>("/api/v1/attendance/recent-completed", undefined, ATTENDANCE_SUMMARY_TIMEOUT_MS);
+
+  return <StaffShell {...shell} actions={<Link className="home-button" href="/staff/reports">Attendance reports</Link>}>
+    <div className="staff-home">
+      {liveEntries.length > 0
+        ? <StaffLiveStrip entries={liveEntries} initial={activeAttendance} />
+        : <div className="home-brief">
+            <section className="home-strip home-strip-next" aria-labelledby="next-title">
+              <div className="home-strip-main">
+                <p className="home-strip-label">{next ? "Next class" : "No class is live right now"}</p>
+                <h2 id="next-title" className="home-strip-title">
+                  {next ? <Link href={next.href}><OneLineTitle text={next.title} /></Link> : "Nothing else scheduled this week"}
+                </h2>
+              </div>
+              {next && <p className="home-strip-when">
+                <span>{relativeDayName(dayOf(next), today)}, {timeRange(next)}</span>
+                <strong>{startsInLabel(next.startsAt, now)}</strong>
+              </p>}
+            </section>
+            <Suspense fallback={<section className="home-strip home-strip-completed" aria-label="Last completed class">
+              <p className="home-strip-label">Loading last completed class…</p>
+            </section>}>
+              <LastCompletedClass attendance={recentAttendance} />
+            </Suspense>
+          </div>}
+
+      <div className="home-grid">
+        <div className="home-grid-main">
+          <section id="day-schedule" className="home-card home-day" aria-labelledby="day-title">
+            <div className="home-stepper">
+              <Link scroll={false} className="home-step" href={href({ day: previousDay, month: previousDay.slice(0, 7) })}
+                aria-label={`Previous day, ${shortDayLabel(previousDay)}`}>
+                <span aria-hidden="true">‹</span><span className="home-step-text">{shortDayLabel(previousDay)}</span><LinkPending />
+              </Link>
+              <div className="home-stepper-now">
+                <h2 id="day-title"><span className="sr-only">Classes on </span>{relativeDayName(day, today)}</h2>
+                <p>{day === today ? shortDayLabel(day) : <>
+                  {shortDayLabel(day)} · <Link scroll={false} href={href({ day: today, month: today.slice(0, 7) })}>Back to today</Link>
+                </>}</p>
+              </div>
+              <Link scroll={false} className="home-step home-step-next" href={href({ day: nextDay, month: nextDay.slice(0, 7) })}
+                aria-label={`Next day, ${shortDayLabel(nextDay)}`}>
+                <span className="home-step-text">{shortDayLabel(nextDay)}</span><span aria-hidden="true">›</span><LinkPending />
+              </Link>
+            </div>
+            {chosenDays && dayEntries.length > 0 && <ul className="home-day-list" key={day}>
+              {dayEntries.map(entry => {
+                const done = entry.sessionId ? finished.get(entry.sessionId) : undefined;
+                const detail = entry.source === "zoom" ? "Zoom schedule"
+                  : entry.state === "ended" && done ? joinedLabel(done) : null;
+                return <li key={entry.key} className={`home-entry home-entry-${entry.state}`}>
+                  <Link href={entry.href}>
+                    <span className="home-entry-time">{timeRange(entry)}</span>
+                    <span className="home-entry-copy">
+                      <OneLineTitle text={entry.title} />
+                      {detail && <span className="home-entry-meta">{detail}</span>}
+                    </span>
+                    <span className={`home-state home-state-${entry.state}`}>{entryStateLabels[entry.state]}</span>
+                  </Link>
+                </li>;
+              })}
+            </ul>}
+            {chosenDays && dayEntries.length === 0 && <p className="home-empty">No classes on this day.</p>}
+            {!chosenDays && <p className="home-empty">{calendar.status === 403 ? "You don’t have access to these classes." : "Classes couldn’t load. Please reload shortly."}</p>}
+            {!monitors.ok && <p className="home-empty">Zoom’s live status couldn’t load.</p>}
+          </section>
+
+          <Suspense fallback={<section className="home-card home-chart" aria-label="Attendance for the last 5 classes">
+            <p className="home-empty">Loading recent attendance…</p>
+          </section>}>
+            <RecentAttendanceChart attendance={recentAttendance} />
+          </Suspense>
+        </div>
+        <section className="home-card home-calendar" aria-labelledby="calendar-title">
+          <div className="home-stepper">
+            <Link scroll={false} className="home-step" href={href({ month: shiftMonth(month, -1) })}
+              aria-label={`Previous month, ${monthLabel(shiftMonth(month, -1))}`}><span aria-hidden="true">‹</span><LinkPending /></Link>
+            <div className="home-stepper-now">
+              <h2 id="calendar-title">{monthLabel(month)}</h2>
+              {month !== today.slice(0, 7) && <p><Link scroll={false} href={href({ day: today, month: today.slice(0, 7) })}>Back to this month</Link></p>}
+            </div>
+            <Link scroll={false} className="home-step home-step-next" href={href({ month: shiftMonth(month, 1) })}
+              aria-label={`Next month, ${monthLabel(shiftMonth(month, 1))}`}><span aria-hidden="true">›</span><LinkPending /></Link>
           </div>
-        </>}
-      </section>}
-      <section className="panel" aria-labelledby="today-title">
-        <h2 id="today-title" className="panel-title">TODAY’S CLASSES</h2>
-        {!classes.ok ? <p className="panel-sub">{classes.status === 403 ? "Your role has no classes." : "We couldn’t load today’s classes."}</p> : <>
-          <ul className="dir-list">{todays.map(c => {
-            const phase = classPhase(c.startsAt, c.endsAt, now);
-            return <li key={c.id} className="dir-row" aria-label={`Today ${c.title}`}>
-              <span><Link className="text-link" href={`/staff/sessions/${c.id}`}><strong>{c.title}</strong></Link>
-                {" "}<span className="muted">{classTimeLabel(c, now)}</span></span>
-              <span className={`status ${phase === "live" ? "on" : "off"}`}>{phase === "live" ? "Live now" : phase === "over" ? "Ended"
-                : c.zoomWebinarId ? "Upcoming" : "No webinar ID"}</span>
-            </li>;
-          })}
-            {todays.length === 0 && <li className="dir-empty muted">No classes today.</li>}</ul>
-          {manager && <p className="link-row"><Link className="text-link" href="/staff/webinars">Monitor a webinar →</Link></p>}
-        </>}
-      </section>
+          {calendarDays ? <div className="cal">
+            <div className="cal-weekdays" aria-hidden="true">{weekdayShort.map(name => <span key={name}>{name}</span>)}</div>
+            <div className="cal-grid">
+              {monthWeeks(month).flat().map(cell => {
+                const entries = calendarDays.get(cell.date) ?? [];
+                const preview = entries.map(entry => `${timeRange(entry)} · ${entry.title}`).join("\n");
+                const classes = ["cal-day", cell.inMonth ? "" : "cal-out", cell.date === today ? "cal-today" : "",
+                  cell.date === day ? "cal-selected" : ""].filter(Boolean).join(" ");
+                return <div key={cell.date} className={classes}>
+                  <Link className="cal-date" href={`${href({ day: cell.date })}#day-schedule`} aria-current={cell.date === day ? "date" : undefined}
+                    title={preview || undefined}
+                    aria-label={`${longDayLabel(cell.date)}${cell.date === today ? ", today" : ""}: ${entries.length ? `${entries.length} class${entries.length === 1 ? "" : "es"}` : "no classes"}`}>
+                    {Number(cell.date.slice(8))}
+                  </Link>
+                  {entries.length > 0 && <span className="cal-compact-times" aria-hidden="true">
+                    {entries.slice(0, 2).map(entry => <time key={entry.key} dateTime={entry.startsAt}>
+                      {instantParts(entry.startsAt, entry.timeZone).time}
+                    </time>)}
+                    {entries.length > 2 && <span>+{entries.length - 2}</span>}
+                  </span>}
+                  <ul className="cal-entries">
+                    {entries.slice(0, 2).map(entry => <li key={entry.key}>
+                      <Link href={entry.href} className={`cal-entry cal-entry-${entry.state} cal-entry-${entry.source}`}>
+                        <span className="cal-entry-time">{timeRange(entry).replace(/–.*/, "")}</span>
+                        <OneLineTitle text={entry.title} />
+                      </Link>
+                    </li>)}
+                    {entries.length > 2 && <li><Link className="cal-more" href={`${href({ day: cell.date })}#day-schedule`}>+{entries.length - 2} more</Link></li>}
+                  </ul>
+                </div>;
+              })}
+            </div>
+            {monitorList && <p className="cal-legend" aria-hidden="true">
+              <span className="cal-key" />Class<span className="cal-key cal-key-zoom" />On Zoom, not in the timetable yet
+            </p>}
+          </div> : <p className="home-empty">The calendar couldn’t load. Please reload shortly.</p>}
+        </section>
+      </div>
     </div>
-
-    {manager && finished.length > 0 && <section className="panel panel-gap" aria-labelledby="finished-title">
-      <h2 id="finished-title" className="panel-title">RECENTLY FINISHED</h2>
-      <ul className="dir-list">{finished.map(({ m, r }) => <li key={r.occurrenceUuid} className="dir-row">
-        <span><strong>{m.topic ?? "Zoom webinar"}</strong> <span className="muted">ended {formatTime(r.actualEndedAt!, m.timeZone)}
-          · {r.people} {r.people === 1 ? "person" : "people"}</span></span>
-        <span className="dir-meta"><span className={`state ${r.reported ? "state-report" : ""}`}>{r.reported ? "Zoom report in" : "Waiting for Zoom’s report"}</span>
-          <Link className="text-link" href={`/staff/sessions/${r.classSessionId}`}>Attendance →</Link></span>
-      </li>)}</ul>
-    </section>}
-
-    {t && <p className="week-line panel-gap">Last 7 days: <strong>{t.classes}</strong> class{t.classes === 1 ? "" : "es"} held
-      {t.classes ? <> ({formatDuration(t.classSeconds)})</> : null} · <strong>{t.students}</strong> students expected
-      · average attendance <strong>{t.averagePercent}%</strong>{t.minPercent ? ` (rule ${t.minPercent}%)` : ""}
-      {" "}· <Link className="text-link" href="/staff/dashboard">Reports →</Link></p>}
   </StaffShell>;
+}
+
+async function LastCompletedClass({ attendance }: { attendance: RecentAttendanceResult }) {
+  const result = await attendance;
+  const last = result.ok ? result.data[0] : null;
+  const ended = last ? instantParts(last.endsAt, last.timeZone) : null;
+  const percent = last ? attendancePercent(last) : null;
+  return <section className="home-strip home-strip-completed" aria-labelledby="last-class-title">
+    <div className="home-strip-main">
+      <h2 id="last-class-title" className="home-strip-label">Last completed class</h2>
+      {last && ended ? <>
+        <h3 className="home-strip-title"><Link href={`/staff/sessions/${last.id}`}><OneLineTitle text={last.title} /></Link></h3>
+        <p className="home-strip-ended">Ended {shortDayLabel(ended.date)} at {ended.time}</p>
+      </> : <p className="home-strip-ended">{result.ok ? "No completed classes yet." : "Unable to load the last completed class."}</p>}
+    </div>
+    {last && <dl className="home-completed-figures">
+      <div><dt>Expected</dt><dd>{last.expected}</dd></div>
+      <div><dt>Joined</dt><dd>{last.joined}</dd></div>
+      <div><dt>Attendance</dt><dd>{percent == null ? "—" : `${percent}%`}</dd></div>
+    </dl>}
+  </section>;
+}
+
+async function RecentAttendanceChart({ attendance }: { attendance: RecentAttendanceResult }) {
+  const result = await attendance;
+  return <section className="home-card home-chart" aria-labelledby="chart-title">
+    <div className="home-card-head">
+      <h2 id="chart-title">Attendance for the last 5 classes</h2>
+    </div>
+    {!result.ok ? <p className="home-empty">{result.status === 403 ? "You don’t have access to these attendance figures." : "Attendance couldn’t load. Please reload shortly."}</p>
+      : result.data.length === 0 ? <p className="home-empty">No completed classes yet.</p>
+      : <ul className="recent-attendance">
+        {result.data.map(item => {
+          const percent = attendancePercent(item);
+          const { date } = instantParts(item.endsAt, item.timeZone);
+          return <li key={item.id}>
+            <div className="recent-attendance-title">
+              <Link href={`/staff/sessions/${item.id}`}><OneLineTitle text={item.title} /></Link>
+              <strong>{percent == null ? "—" : `${percent}%`}</strong>
+            </div>
+            <p className="recent-attendance-meta">{shortDayLabel(date)} · {item.expected > 0
+              ? `${item.joined} of ${item.expected} joined` : "No students expected"}</p>
+            {percent == null ? <span className="recent-attendance-bar" aria-hidden="true" />
+              : <meter className="recent-attendance-bar" min={0} max={100} value={percent} aria-label={`${item.title} attendance`} />}
+          </li>;
+        })}
+      </ul>}
+  </section>;
 }

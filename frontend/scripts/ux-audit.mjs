@@ -20,15 +20,14 @@ async function call(method, path, body) {
 }
 
 const browser = await chromium.launch(process.platform === "darwin" ? { channel: "chrome" } : {});
-async function signIn(email, mfa) {
+async function signIn(email, staffPortal) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(`${base}/sign-in?portal=${mfa ? "staff" : "student"}`);
+  await page.goto(`${base}/sign-in?portal=${staffPortal ? "staff" : "student"}`);
   await page.fill("#email", email);
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  if (mfa) { await page.waitForURL(/mfa/); await page.fill("#code", "rec-recovery"); await page.getByRole("button", { name: "Verify" }).click(); }
-  await page.waitForURL(mfa ? /\/staff$/ : /\/student$/);
+  await page.waitForURL(staffPortal ? /\/staff$/ : /\/student$/);
   return { context, page };
 }
 

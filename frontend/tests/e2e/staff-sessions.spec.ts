@@ -1,15 +1,12 @@
 import { openSection } from "./support/ui";
 import { test, expect, type Page } from "@playwright/test";
-import { scheduleClass } from "./support/classes";
+import { mockApiBase, scheduleClass } from "./support/classes";
 
 async function signInAsAdmin(page: Page) {
   await page.goto("/sign-in");
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/sign-in\/mfa/);
-  await page.fill("#code", "rec-recovery");
-  await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/staff$/);
 }
 
@@ -27,7 +24,7 @@ async function setUp(page: Page, code: string) {
     await page.getByRole("button", { name: "Create batch" }).click();
     await expect(page.locator("#batch-feedback")).toHaveText(`Batch ${batch} created.`);
   }
-  await page.goto("/staff/students");
+  await page.goto("/staff/students/manage");
   await openSection(page, "Add a student who is not in the Academy records");
   await page.locator("#student-number").fill(`${code}-001`);
   await page.locator("#student-name").fill("Class Student");
@@ -46,6 +43,27 @@ test.describe("Classes (Zoom owns schedules)", () => {
     p = (testInfo.project.name === "mobile" ? "m" : "d") + (testInfo.retry ? String(testInfo.retry) : "");
   });
 
+  test("Classes streams the month control and class types while Zoom is still loading", async ({ page }) => {
+    await signInAsAdmin(page);
+    const setMonitors = (mode: string) => page.request.put(`${mockApiBase()}/__test__/zoom-monitor-response`, {
+      data: { mode }, headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" },
+    });
+    expect((await setMonitors("hold")).status()).toBe(204);
+    try {
+      await page.goto("/staff/sessions", { waitUntil: "commit" });
+      await expect(page.getByLabel("Class month", { exact: true })).toBeVisible();
+      await expect(page.getByRole("region", { name: "CLASS TYPES", exact: true })).toBeVisible();
+      await expect(page.getByText("Loading tracked links…")).toBeVisible();
+      expect((await setMonitors("fail")).status()).toBe(204);
+      await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" }).getByRole("alert")).toContainText("couldn’t load");
+      expect((await setMonitors("normal")).status()).toBe(204);
+      await page.getByRole("region", { name: "TRACK A ZOOM LINK" }).getByRole("button", { name: "Retry" }).click();
+      await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" }).getByRole("alert")).toHaveCount(0);
+    } finally {
+      await setMonitors("normal");
+    }
+  });
+
   test("Classes are read-only: no scheduling, editing, moving or cancelling controls remain", async ({ page }) => {
     await signInAsAdmin(page);
     await setUp(page, `cl-${p}`);
@@ -58,36 +76,87 @@ test.describe("Classes (Zoom owns schedules)", () => {
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }
     await expect(page.locator("#schedule-title, #series-title")).toHaveCount(0);
-    const where = page.getByRole("region", { name: "WHERE CLASSES COME FROM" });
-    await expect(where).toContainText("Zoom owns the schedule");
-    await expect(where.getByRole("link", { name: "Webinars →" })).toHaveAttribute("href", "/staff/webinars");
-    const row = page.getByRole("listitem").filter({ hasText: `Waves ${p}` });
-    await expect(row).toContainText("Wed 6 Jan 2027 · 18:00–20:00");
-    await expect(row.locator(".status")).toHaveText("Scheduled before");
+    // One screen: tracking a Zoom link sits above the classes, grouped by day.
+    await expect(page.getByRole("region", { name: "TRACK A ZOOM LINK" })).toBeVisible();
+    const day = page.getByRole("region", { name: "CLASSES" }).getByRole("group", { name: "Wednesday 6 January 2027" });
+    const row = day.getByRole("listitem").filter({ hasText: `Waves ${p}` });
+    await expect(row).toContainText("18:00–20:00");
+    await expect(row.getByRole("link")).toHaveAttribute("href", `/staff/sessions/${old.id}`);
+    await expect(page.locator("#class-batch")).toHaveCount(0);
 
-    // Its page keeps the expected students and attendance, without any way to change the class.
+    // Its attendance roster includes expected students and the class stays read-only.
     await page.goto(`/staff/sessions/${old.id}`);
-    await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText(`cl-${p}-001`.toUpperCase());
-    await expect(page.getByRole("region", { name: "ZOOM", exact: true })).toContainText("can no longer be edited or cancelled here");
+    await expect(page.getByRole("region", { name: "Student attendance results" })).toContainText(`cl-${p}-001`.toUpperCase());
+    await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "ZOOM", exact: true })).toHaveCount(0);
     await expect(page.locator("#edit-title, #edit-date, #status-select")).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Save changes|Cancel class|Restore class/ })).toHaveCount(0);
 
-    // The old import route now leads to monitoring.
+    // The old import route now leads to the Classes screen, where Zoom links are tracked.
     await page.goto("/staff/zoom/import");
-    await expect(page).toHaveURL(/\/staff\/webinars$/);
+    await expect(page).toHaveURL(/\/staff\/sessions$/);
   });
 
-  test("Instructors see classes for their batches only", async ({ page }) => {
-    await page.goto("/sign-in");
-    await page.fill("#email", "instructor@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.fill("#code", "rec-recovery");
-    await page.getByRole("button", { name: "Verify" }).click();
-    await expect(page).toHaveURL(/\/staff$/);
-    await page.goto("/staff/sessions?from=2027-01-03");
-    await expect(page.locator(".banner")).toContainText("You see the classes of the batches you are assigned to.");
-    await expect(page.getByText("No classes in these two weeks.")).toBeVisible();
-    await expect(page.getByRole("region", { name: "WHERE CLASSES COME FROM" })).toHaveCount(0);
+  test("the schedule and class types share a month, with completed classes charted and today in view", async ({ page }) => {
+    await signInAsAdmin(page);
+    const code = `month-${p}`;
+    await setUp(page, code);
+    const batch = `${code.toUpperCase()} · A · Batch A`;
+    const year = p.startsWith("m") ? "2020" : "2024";
+    for (const [date, title] of [["02-01", "February opening"], ["02-29", "February review"], ["03-01", "March opening"]]) {
+      await scheduleClass(page, { title, date: `${year}-${date}`, start: "18:00", end: "19:00", batch });
+    }
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo", year: "numeric", month: "2-digit", day: "2-digit" })
+      .format(new Date());
+    await scheduleClass(page, { title: "Today's fixture", date: today, start: "20:00", end: "21:00", batch });
+    if (!today.endsWith("-01")) {
+      for (let i = 0; i < 10; i++) {
+        await scheduleClass(page, { title: `Earlier fixture ${i}`, date: `${today.slice(0, 7)}-01`,
+          start: `${String(8 + i).padStart(2, "0")}:00`, end: `${String(9 + i).padStart(2, "0")}:00`, batch });
+      }
+    }
+
+    await page.goto("/staff/sessions");
+    const schedule = page.getByRole("region", { name: "Monthly schedule" });
+    const todayGroup = schedule.locator(`[data-schedule-day="${today}"]`);
+    await expect(todayGroup.getByText("Today", { exact: true })).toBeVisible();
+    await expect.poll(() => todayGroup.locator("h3").evaluate(heading => {
+      const panel = heading.closest(".classes-panel-scroll")!.getBoundingClientRect();
+      const bounds = heading.getBoundingClientRect();
+      return bounds.top >= panel.top - 2 && bounds.bottom <= panel.bottom + 2;
+    })).toBe(true);
+    if (!today.endsWith("-01")) {
+      await expect.poll(() => schedule.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+    }
+
+    await page.getByLabel("Class month", { exact: true }).fill(`${year}-02`);
+    await page.getByRole("button", { name: "View", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`month=${year}-02$`));
+    const classes = page.getByRole("region", { name: "CLASSES", exact: true });
+    const types = page.getByRole("region", { name: "CLASS TYPES", exact: true });
+    await expect(classes).toContainText(`February ${year}`);
+    await expect(types).toContainText(`February ${year}`);
+    await expect(schedule.getByRole("listitem", { name: /February/ })).toHaveCount(2);
+    await expect(schedule.getByRole("listitem", { name: /March opening/ })).toHaveCount(0);
+    const chart = page.getByRole("list", { name: "ATTENDANCE BY CLASS", exact: true });
+    await expect(chart.getByRole("listitem")).toHaveCount(2);
+    await expect(chart.getByRole("listitem", { name: new RegExp(`February review.*29 Feb ${year}`) })).toBeVisible();
+    await types.getByRole("link", { name: /February review/ }).click();
+    await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Back to Classes/ })).toHaveAttribute("href", `/staff/sessions?month=${year}-02`);
+
+    const menuLink = page.getByRole("navigation", { name: "Staff sections" }).getByRole("link", { name: "Class Types", exact: true });
+    await menuLink.click();
+    await expect(page.getByRole("heading", { name: "Class Types", level: 1 })).toBeVisible();
+    await expect(menuLink).toHaveAttribute("aria-current", "page");
+    await expect(schedule).toHaveCount(0);
+    await page.getByLabel("Class month", { exact: true }).fill(`${year}-02`);
+    await page.getByRole("button", { name: "View", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));
+    await page.getByRole("region", { name: "Completed class types" }).getByRole("link", { name: /February review/ }).click();
+    await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
+    await expect(menuLink).toHaveAttribute("aria-current", "page");
+    await page.getByRole("link", { name: /Back to Class Types/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));
   });
 });

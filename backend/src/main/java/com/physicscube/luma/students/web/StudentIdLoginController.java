@@ -1,7 +1,7 @@
 package com.physicscube.luma.students.web;
 
-import com.physicscube.luma.identity.AuthService.LoginOutcome;
 import com.physicscube.luma.identity.InvalidCredentialsException;
+import com.physicscube.luma.identity.SessionTokens;
 import com.physicscube.luma.students.StudentIdLoginService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -26,13 +26,11 @@ class StudentIdLoginController {
         this.login = login;
     }
 
-    record StudentIdLoginRequest(@NotBlank @Size(max = 60) String studentId, @NotBlank @Size(max = 60) String password) {
+    /** Only the registration ID; any other field (such as the earlier repeated ID as a password) is ignored. */
+    record StudentIdLoginRequest(@NotBlank @Size(max = 60) String studentId) {
     }
 
     record TokenResponse(String accessToken, String tokenType, long expiresIn, String refreshToken, long refreshExpiresIn) {
-    }
-
-    record MfaRequiredResponse(boolean mfaRequired, String mfaToken, long mfaExpiresIn, boolean mfaEnrolled) {
     }
 
     record Availability(boolean enabled) {
@@ -45,14 +43,10 @@ class StudentIdLoginController {
     }
 
     @PostMapping("/api/v1/auth/student-id-login")
-    Object login(@Valid @RequestBody StudentIdLoginRequest request) {
-        LoginOutcome outcome = login.login(request.studentId(), request.password());
-        if (outcome.challenge() != null) {
-            return new MfaRequiredResponse(true, outcome.challenge().mfaToken(), outcome.challenge().expiresInSeconds(),
-                    outcome.challenge().enrolled());
-        }
-        return new TokenResponse(outcome.tokens().accessToken(), "Bearer", outcome.tokens().expiresInSeconds(),
-                outcome.tokens().refreshToken(), outcome.tokens().refreshExpiresInSeconds());
+    TokenResponse login(@Valid @RequestBody StudentIdLoginRequest request) {
+        SessionTokens tokens = login.login(request.studentId());
+        return new TokenResponse(tokens.accessToken(), "Bearer", tokens.expiresInSeconds(),
+                tokens.refreshToken(), tokens.refreshExpiresInSeconds());
     }
 
     @ExceptionHandler(InvalidCredentialsException.class)

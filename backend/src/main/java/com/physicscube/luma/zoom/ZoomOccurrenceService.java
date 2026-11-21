@@ -45,7 +45,7 @@ public class ZoomOccurrenceService {
      */
     @Transactional(readOnly = true)
     public List<OccurrenceView> list(CurrentAccount caller, Boolean decided, UUID sessionId, int limit) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         if (limit < 1 || limit > 200) {
             throw new InvalidRequestException("limit must be between 1 and 200");
         }
@@ -111,13 +111,13 @@ public class ZoomOccurrenceService {
     }
 
     /**
-     * Records an administrator's decision for an occurrence, replacing any earlier
+     * Records a staff member's decision for an occurrence, replacing any earlier
      * one: link it to a class session, or, with {@code sessionId == null}, mark it
      * "not a class". The matcher never changes a manual decision afterwards.
      */
     @Transactional
     public OccurrenceView decide(CurrentAccount caller, String occurrenceUuid, UUID sessionId, String reason) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         String why = reason == null ? "" : reason.strip();
         if (why.length() < 3 || why.length() > 300) {
             throw new InvalidRequestException("A reason of 3 to 300 characters is required");
@@ -156,7 +156,7 @@ public class ZoomOccurrenceService {
      */
     @Transactional
     public AutoLinkResult autoLinkUndecided(CurrentAccount caller) {
-        caller.requireAcademyManager();
+        caller.requireStaff();
         List<Map<String, Object>> undecided = jdbc.queryForList("""
                 SELECT e.occurrence_uuid, min(e.webinar_id) AS webinar_id, min(e.event_ts) AS first_ts
                 FROM zoom_occurrence_events e

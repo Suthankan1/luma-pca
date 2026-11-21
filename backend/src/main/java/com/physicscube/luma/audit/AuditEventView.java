@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * One audited action as shown to owners and administrators.
+ * One audited action as shown to staff.
  *
  * @param actorEmail the account that acted, if it still exists; {@code null} for system actions or a removed account
  * @param targetLabel a readable name for the target where one exists (an account's email, a batch code, a class title)

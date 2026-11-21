@@ -26,14 +26,12 @@ class AuditEventHttpIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        accountIdOf("owner@example.invalid", academyId, Role.ACADEMY_OWNER);
+        accountIdOf("owner@example.invalid", academyId, Role.STAFF);
         owner = login("owner@example.invalid");
-        HttpResponse<String> created = api.post("/api/v1/staff-accounts",
-                "{\"email\":\"teacher@example.invalid\",\"roles\":[\"INSTRUCTOR\"]}", owner);
-        assertEquals(201, created.statusCode(), created.body());
-        teacherId = (String) HttpApi.parse(created).get("id");
+        // The operator adds and blocks staff (no staff-account API); staff invite pending accounts.
+        teacherId = pendingStaff("teacher@example.invalid", academyId).toString();
         assertEquals(201, api.post("/api/v1/accounts/" + teacherId + "/invitations", "", owner).statusCode());
-        assertEquals(200, api.post("/api/v1/staff-accounts/" + teacherId + "/disable", "", owner).statusCode());
+        runOperatorSql("staff-block.sql", "teacher@example.invalid");
         AcademyFixtures fixtures = new AcademyFixtures(api, owner);
         String batch = fixtures.batch(fixtures.course("PHY-2027"), "MON");
         assertEquals(200, api.post("/api/v1/students/import", "{\"rows\":[{\"studentNumber\":\"PCA-1\",\"fullName\":\"Ann\","
@@ -55,9 +53,9 @@ class AuditEventHttpIntegrationTest extends StaffApiIntegrationTest {
     void ownersSeeTheirAcademysActivityNewestFirstWithReadableNames() {
         List<Map<String, Object>> all = items("", owner);
 
-        assertEquals(List.of("STUDENTS_IMPORTED", "STAFF_ACCOUNT_DISABLED", "INVITATION_ISSUED", "STAFF_ACCOUNT_CREATED"), actions(all));
+        assertEquals(List.of("STUDENTS_IMPORTED", "STAFF_ACCOUNT_DISABLED", "INVITATION_ISSUED"), actions(all));
         Map<String, Object> disabled = all.get(1);
-        assertEquals("owner@example.invalid", disabled.get("actorEmail"));
+        assertNull(disabled.get("actorEmail"), "blocked by the operator");
         assertEquals("ACCOUNT", disabled.get("targetType"));
         assertEquals(teacherId, disabled.get("targetId"));
         assertEquals("teacher@example.invalid", disabled.get("targetLabel"));
@@ -71,11 +69,11 @@ class AuditEventHttpIntegrationTest extends StaffApiIntegrationTest {
 
     @Test
     void activityIsFilteredByAreaOrByOneRecord() {
-        assertEquals(List.of("STAFF_ACCOUNT_DISABLED", "STAFF_ACCOUNT_CREATED"), actions(items("?category=staff", owner)));
+        assertEquals(List.of("STAFF_ACCOUNT_DISABLED"), actions(items("?category=staff", owner)));
         assertEquals(List.of("INVITATION_ISSUED"), actions(items("?category=sign-in", owner)));
         assertEquals(List.of("STUDENTS_IMPORTED"), actions(items("?category=students", owner)));
         assertEquals(List.of(), actions(items("?category=zoom", owner)));
-        assertEquals(List.of("STAFF_ACCOUNT_DISABLED", "INVITATION_ISSUED", "STAFF_ACCOUNT_CREATED"),
+        assertEquals(List.of("STAFF_ACCOUNT_DISABLED", "INVITATION_ISSUED"),
                 actions(items("?targetId=" + teacherId, owner)), "one staff member's history");
         assertEquals(400, api.get("/api/v1/audit-events?category=everything", owner).statusCode());
     }
@@ -97,19 +95,18 @@ class AuditEventHttpIntegrationTest extends StaffApiIntegrationTest {
             before = (String) page.get("nextBefore");
             pages++;
         } while (before != null && pages < 10);
-        assertEquals(9, ids.size());
-        assertEquals(9, new HashSet<>(ids).size());
+        assertEquals(8, ids.size());
+        assertEquals(8, new HashSet<>(ids).size());
         assertEquals(3, pages);
         assertNull(HttpApi.parse(api.get("/api/v1/audit-events?limit=200", owner)).get("nextBefore"));
     }
 
     @Test
-    void onlyOwnersAndAdministratorsOfTheAcademySeeIt() {
-        assertEquals(4, items("", tokenFor(academyId, Role.ACADEMY_ADMIN)).size());
-        assertEquals(403, api.get("/api/v1/audit-events", tokenFor(academyId, Role.INSTRUCTOR)).statusCode());
-        assertEquals(403, api.get("/api/v1/audit-events", tokenFor(academyId, Role.ANALYST)).statusCode());
+    void onlyStaffOfTheAcademySeeIt() {
+        assertEquals(3, items("", tokenFor(academyId, Role.STAFF)).size());
+        assertEquals(403, api.get("/api/v1/audit-events", tokenFor(academyId, Role.STUDENT)).statusCode());
         assertEquals(401, api.get("/api/v1/audit-events", null).statusCode());
-        assertEquals(List.of(), items("", tokenFor(academy("Other Academy"), Role.ACADEMY_OWNER)), "another academy sees none of it");
+        assertEquals(List.of(), items("", tokenFor(academy("Other Academy"), Role.STAFF)), "another academy sees none of it");
         for (String bad : List.of("?limit=0", "?limit=201", "?before=yesterday", "?before=1_not-a-uuid", "?targetId=nope")) {
             assertEquals(400, api.get("/api/v1/audit-events" + bad, owner).statusCode(), bad);
         }

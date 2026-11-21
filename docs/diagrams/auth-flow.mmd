@@ -1,40 +1,17 @@
 sequenceDiagram
   participant User as Staff / Student
   participant BFF as Next.js BFF
-  participant Client as Staff API client
   participant API as Spring Identity API
   participant DB as PostgreSQL
-  alt Student sign-in (no MFA unless the student set one up)
-    User->>BFF: Login credentials over HTTPS
-    BFF->>API: POST /auth/login
-    API->>DB: Check password, account status and lockout
-    API-->>BFF: Access JWT and opaque refresh token
-    BFF-->>User: HttpOnly SameSite session cookies
-    User->>BFF: Protected request with session cookie
-    Note over User,BFF: BFF checks Origin on mutations
-    BFF->>API: Bearer JWT on server-side request
-  else Staff sign-in, every staff role (001G; all roles since FIX-3)
-    User->>BFF: Login credentials over HTTPS
-    BFF->>API: POST /auth/login
-    API->>DB: Check password and store challenge digest
-    API-->>BFF: MFA challenge with enrolment status
-    BFF-->>User: Sealed HttpOnly MFA challenge cookie, redirect to /sign-in/mfa
-    opt First sign-in or authenticator reset
-      BFF->>API: POST /auth/mfa/enroll with challenge
-      API->>DB: Store encrypted authenticator secret
-      API-->>BFF: Setup secret and authenticator URI
-      BFF-->>User: QR code and manual setup secret
-    end
-    User->>BFF: Verification or recovery code (POST /api/session/mfa-verify)
-    BFF->>API: POST /auth/mfa/verify with challenge and code
-    API->>DB: Verify factor, consume challenge and start MFA session
-    API-->>BFF: Access JWT, refresh token and recovery codes on enrolment
-    opt First sign-in: recovery codes presentation
-      BFF-->>User: Sealed recovery cookie, redirect to /sign-in/mfa/recovery-codes
-      User->>BFF: Acknowledge recovery codes (POST /api/session/mfa-recovery)
-      BFF-->>User: Clear recovery cookie, redirect to /staff
-    end
-    BFF-->>User: HttpOnly SameSite session cookies, redirect to /staff
-  end
-  API->>API: Check token, session, privileged MFA, roles and resource scope
+  Note over User,API: Every role signs in with email and password; there is no second factor (MFA removed 2026-11-20)
+  User->>BFF: Login credentials over HTTPS (POST /api/session/login)
+  Note over User,BFF: BFF checks Origin and Sec-Fetch-Site on mutations
+  BFF->>API: POST /auth/login
+  API->>DB: Check password, account status and lockout; start refresh session
+  API-->>BFF: Access JWT and opaque refresh token
+  BFF->>API: GET /auth/me (current roles)
+  BFF-->>User: HttpOnly SameSite session cookies, redirect to /staff or /student
+  User->>BFF: Protected request with session cookie
+  BFF->>API: Bearer JWT on server-side request
+  API->>API: Check token, live session, auth version, roles and resource scope
   Note over BFF,API: Refresh rotates the opaque token and reuse revokes the session

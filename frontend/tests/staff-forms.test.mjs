@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canManageStaff, grantableRoles, parseAssignForm, parseRoles, parseStaffForm, academyToday, formatDate, isAcademyManager, parseBatchForm, parseCourseForm, parseEnrollForm, parseStudentForm, problemMessage, studentListHref, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
+import { academyToday, formatDate, isStaff, parseBatchForm, parseCourseForm, parseEnrollForm, parseStudentForm, problemMessage, studentListHref, submittedValues, uuidOrNull } from "../src/lib/staff-forms.ts";
 import * as forms from "../src/lib/staff-forms.ts";
 
 const form = fields => {
@@ -10,11 +10,13 @@ const form = fields => {
 };
 const id = "6f2d3c1e-0000-4000-8000-000000000001";
 
-test("only owners and administrators are academy managers", () => {
-  assert.equal(isAcademyManager(["ACADEMY_OWNER"]), true);
-  assert.equal(isAcademyManager(["INSTRUCTOR", "ACADEMY_ADMIN"]), true);
-  assert.equal(isAcademyManager(["INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST", "STUDENT"]), false);
-  assert.equal(isAcademyManager(["academy_admin"]), false);
+test("only the STAFF role is staff; former role names grant nothing", () => {
+  assert.equal(isStaff(["STAFF"]), true);
+  assert.equal(isStaff(["STAFF", "STUDENT"]), true);
+  assert.equal(isStaff(["STUDENT"]), false);
+  assert.equal(isStaff(["ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST"]), false);
+  assert.equal(isStaff(["staff"]), false);
+  assert.equal(isStaff([]), false);
 });
 
 test("ids from hidden fields must be lower-case UUIDs before they reach an API path", () => {
@@ -46,7 +48,7 @@ test("batch forms need a course, valid dates and an end on or after the start", 
 test("API refusals become clear sentences without leaking generic framework text", () => {
   assert.equal(problemMessage(409, "A course with this code already exists"), "A course with this code already exists");
   assert.match(problemMessage(409, "The record was changed by someone else; reload and retry"), /Someone else changed/);
-  assert.match(problemMessage(403), /owners and administrators/);
+  assert.match(problemMessage(403), /academy staff/);
   assert.match(problemMessage(404), /no longer exists/);
   assert.match(problemMessage(400, "Invalid request content."), /not valid/);
   assert.match(problemMessage(400, "Failed to read request"), /not valid/);
@@ -88,52 +90,10 @@ test("the academy's today is the Colombo calendar date", () => {
 });
 
 test("student list links keep the filter and the paging cursor", () => {
-  assert.equal(studentListHref({}), "/staff/students");
-  assert.equal(studentListHref({ status: "active" }), "/staff/students");
-  assert.equal(studentListHref({ status: "all", after: "PCA-050" }), "/staff/students?status=all&after=PCA-050");
-  assert.equal(studentListHref({ status: "inactive" }), "/staff/students?status=inactive");
-});
-
-test("only owners may grant owner or administrator", () => {
-  assert.deepEqual(grantableRoles(["ACADEMY_ADMIN"]), ["INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST"]);
-  assert.deepEqual(grantableRoles(["ACADEMY_OWNER"]), ["ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST"]);
-});
-
-test("nobody manages themselves, and administrators never manage owners or administrators", () => {
-  const admin = { accountId: "me", roles: ["ACADEMY_ADMIN"] };
-  const owner = { accountId: "boss", roles: ["ACADEMY_OWNER"] };
-  assert.equal(canManageStaff(admin, { id: "me", roles: ["ACADEMY_ADMIN"] }), false);
-  assert.equal(canManageStaff(admin, { id: "t", roles: ["INSTRUCTOR"] }), true);
-  assert.equal(canManageStaff(admin, { id: "o", roles: ["ACADEMY_OWNER"] }), false);
-  assert.equal(canManageStaff(admin, { id: "a", roles: ["INSTRUCTOR", "ACADEMY_ADMIN"] }), false);
-  assert.equal(canManageStaff(owner, { id: "a", roles: ["ACADEMY_ADMIN"] }), true);
-  assert.equal(canManageStaff({ accountId: "i", roles: ["INSTRUCTOR"] }, { id: "t", roles: ["INSTRUCTOR"] }), false);
-});
-
-test("staff and assignment forms check roles and emails", () => {
-  const data = new FormData();
-  data.set("email", " teacher@example.invalid ");
-  data.append("roles", "INSTRUCTOR");
-  data.append("roles", "ANALYST");
-  assert.deepEqual(parseStaffForm(data), { email: "teacher@example.invalid", roles: ["INSTRUCTOR", "ANALYST"] });
-  const none = new FormData();
-  assert.ok("error" in parseRoles(none));
-  const bad = new FormData();
-  bad.append("roles", "STUDENT");
-  assert.ok("error" in parseRoles(bad), "students are not staff");
-  const twice = new FormData();
-  twice.append("roles", "ANALYST");
-  twice.append("roles", "ANALYST");
-  assert.ok("error" in parseRoles(twice));
-  assert.deepEqual(parseAssignForm(form({ email: "t@example.invalid", role: "ATTENDANCE_OFFICER" })), { email: "t@example.invalid", role: "ATTENDANCE_OFFICER" });
-  assert.ok("error" in parseAssignForm(form({ email: "t@example.invalid", role: "ANALYST" })));
-  assert.ok("error" in parseAssignForm(form({ email: "nope", role: "INSTRUCTOR" })));
-});
-
-test("roles are listed senior first whatever order the API returns", async () => {
-  const { roleList } = await import("../src/lib/staff-forms.ts");
-  assert.equal(roleList(["ATTENDANCE_OFFICER", "INSTRUCTOR"]), "Instructor, Attendance officer");
-  assert.equal(roleList(["ANALYST", "ACADEMY_OWNER"]), "Owner, Analyst");
+  assert.equal(studentListHref({}), "/staff/students/manage");
+  assert.equal(studentListHref({ status: "active" }), "/staff/students/manage");
+  assert.equal(studentListHref({ status: "all", after: "PCA-050" }), "/staff/students/manage?status=all&after=PCA-050");
+  assert.equal(studentListHref({ status: "inactive" }), "/staff/students/manage?status=inactive");
 });
 
 test("class times convert between the academy zone and UTC", () => {
@@ -195,7 +155,7 @@ test("Zoom review: reasons, occurrence ids, states and class candidates", () => 
   assert.equal(forms.occurrenceState(occurrence), "Needs review");
   assert.equal(forms.occurrenceState({ ...occurrence, linkSource: "MANUAL" }), "Marked not a class");
   assert.equal(forms.occurrenceState({ ...occurrence, linkSource: "AUTOMATIC", classSessionId: "s" }), "Linked automatically");
-  assert.equal(forms.occurrenceState({ ...occurrence, linkSource: "MANUAL", classSessionId: "s" }), "Linked by an administrator");
+  assert.equal(forms.occurrenceState({ ...occurrence, linkSource: "MANUAL", classSessionId: "s" }), "Linked by staff");
 
   const session = (id, startsAt, extra = {}) => ({ id, title: id, startsAt, endsAt: new Date(Date.parse(startsAt) + 3600_000).toISOString(),
     timeZone: "Asia/Colombo", status: "SCHEDULED", zoomWebinarId: null, ...extra });

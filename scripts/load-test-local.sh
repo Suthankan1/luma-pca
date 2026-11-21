@@ -16,7 +16,8 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 S="$(mktemp -d)"
 JAVA="${JAVA_HOME:+$JAVA_HOME/bin/}java"
-JAR="$(ls "$ROOT"/backend/target/luma-backend-*.jar | grep -v '\.original$' | head -1)"
+JAR="${LUMA_BACKEND_JAR:-$(ls "$ROOT"/backend/target/luma-backend-*.jar | grep -v '\.original$' | head -1)}"
+[ -f "$JAR" ] || { echo "Build the backend jar first"; exit 2; }
 K6_IMAGE=grafana/k6:1.4.2
 PG=luma-load-pg; API=18082; WEB=3300; ORIGIN=http://127.0.0.1:$WEB
 STUDENTS=${STUDENTS:-150}
@@ -38,10 +39,14 @@ cleanup() { [ -n "${STATS_PID:-}" ] && kill $STATS_PID 2>/dev/null; [ -n "${BPID
   [ -n "${FPID:-}" ] && kill $FPID 2>/dev/null; docker rm -f $PG >/dev/null 2>&1; rm -rf "$S"; }
 trap cleanup EXIT
 
-# k6 in Docker reaches this machine's loopback through host.docker.internal on macOS
-# (Docker Desktop) and directly with host networking on Linux. It always sends the web
+# k6 reaches loopback through host.docker.internal on Docker Desktop and host networking on Linux. It sends the web
 # app's real origin in the Origin header, as a browser on this machine would.
-if [ "$(uname)" = Darwin ]; then K6_NET=(); TARGET=host.docker.internal; else K6_NET=(--network host); TARGET=127.0.0.1; fi
+K6_SCRIPTS="$ROOT/load-tests/k6"
+case "$(uname)" in
+  Darwin) K6_NET=(); TARGET=host.docker.internal ;;
+  MINGW*|MSYS*) K6_NET=(); TARGET=host.docker.internal; K6_SCRIPTS="$(cygpath -m "$K6_SCRIPTS")" ;;
+  *) K6_NET=(--network host); TARGET=127.0.0.1 ;;
+esac
 
 docker rm -f $PG >/dev/null 2>&1
 docker run -d --rm --name $PG -e POSTGRES_USER=luma -e POSTGRES_PASSWORD=$DBPASS -e POSTGRES_DB=luma \
@@ -50,6 +55,12 @@ docker run -d --rm --name $PG -e POSTGRES_USER=luma -e POSTGRES_PASSWORD=$DBPASS
 for i in $(seq 1 60); do docker exec $PG pg_isready -U luma -d luma >/dev/null 2>&1 && break; sleep 1; done; sleep 2
 psql_q() { docker exec -i $PG psql -At -q -U luma -d luma -v ON_ERROR_STOP=1 "$@"; }
 export DB_URL=jdbc:postgresql://localhost:55434/luma DB_USERNAME=luma DB_PASSWORD=$DBPASS LUMA_AUTH_EPHEMERAL_SIGNING_KEY=true
+export LUMA_ACADEMY_PAYMENTS_ENABLED=false LUMA_MAIL_ENABLED=false
+export LUMA_ZOOM_API_ACCOUNT_ID= LUMA_ZOOM_API_CLIENT_ID= LUMA_ZOOM_API_CLIENT_SECRET=
+export LUMA_ATTENDANCE_PROJECTION_ENABLED=${LUMA_LOAD_PROJECTION:-false}
+export LUMA_ATTENDANCE_PROJECTION_INITIAL_DELAY=PT2S LUMA_ATTENDANCE_PROJECTION_INTERVAL=PT2S
+# Run Java outside the checkout so the app cannot import a developer's database or Zoom settings from .env.
+cd "$S"
 
 # The academy and its owner come from the operator command (which also applies the migrations).
 LUMA_BACKEND_JAR="$JAR" LUMA_BOOTSTRAP_WEB_ORIGIN=$ORIGIN "$ROOT/scripts/bootstrap-owner.sh" "Load Test Academy" load.owner@example.invalid \
@@ -75,12 +86,12 @@ printf '{"token":"%s","password":"%s"}' "$INVITE" "$PASSWORD" > "$S/activate.jso
   || { echo "owner activation failed"; exit 1; }
 rm -f "$S/activate.json"
 
-echo "--- seeding $STUDENTS students, 3 batches, $STAFF instructors, one class"
+echo "--- seeding $STUDENTS students, 3 batches, $STAFF instructors, one live-test class and 28 completed classes"
 psql_q <<SQL
 CREATE TEMP TABLE seed AS SELECT password_hash AS hash FROM accounts WHERE email = 'load.owner@example.invalid';
 INSERT INTO courses (id, academy_id, code, title) VALUES (gen_random_uuid(), '$ACADEMY', 'LOAD', 'Load test course');
 INSERT INTO batches (id, academy_id, course_id, code, name, starts_on)
-  SELECT gen_random_uuid(), '$ACADEMY', (SELECT id FROM courses WHERE code = 'LOAD'), b, 'Batch ' || b, DATE '2027-01-01'
+  SELECT gen_random_uuid(), '$ACADEMY', (SELECT id FROM courses WHERE code = 'LOAD'), b, 'Batch ' || b, DATE '2020-01-01'
   FROM unnest(ARRAY['A', 'B', 'C']) b;
 INSERT INTO accounts (id, academy_id, email, password_hash, status, password_changed_at)
   SELECT gen_random_uuid(), '$ACADEMY', 'load.student' || g || '@example.invalid', (SELECT hash FROM seed), 'ACTIVE', now()
@@ -92,21 +103,43 @@ INSERT INTO students (id, academy_id, account_id, student_number, full_name)
   FROM accounts a WHERE a.email LIKE 'load.student%';
 INSERT INTO enrollments (id, academy_id, batch_id, student_id, enrolled_on)
   SELECT gen_random_uuid(), '$ACADEMY',
-         (SELECT id FROM batches WHERE code = chr(65 + (substring(s.student_number from '[0-9]+')::int % 3))), s.id, DATE '2027-01-01'
+         (SELECT id FROM batches WHERE code = chr(65 + (substring(s.student_number from '[0-9]+')::int % 3))), s.id, DATE '2020-01-01'
   FROM students s;
 INSERT INTO accounts (id, academy_id, email, password_hash, status, password_changed_at)
   SELECT gen_random_uuid(), '$ACADEMY', 'load.instructor' || g || '@example.invalid', (SELECT hash FROM seed), 'ACTIVE', now()
   FROM generate_series(1, $STAFF) g;
-INSERT INTO account_roles (account_id, role) SELECT id, 'INSTRUCTOR' FROM accounts WHERE email LIKE 'load.instructor%';
-INSERT INTO staff_assignments (id, academy_id, account_id, batch_id, role)
-  SELECT gen_random_uuid(), '$ACADEMY', a.id, b.id, 'INSTRUCTOR' FROM accounts a CROSS JOIN batches b WHERE a.email LIKE 'load.instructor%';
+INSERT INTO account_roles (account_id, role) SELECT id, 'STAFF' FROM accounts WHERE email LIKE 'load.instructor%';
 INSERT INTO class_sessions (id, academy_id, title, starts_at, ends_at, time_zone, zoom_webinar_id)
   VALUES (gen_random_uuid(), '$ACADEMY', 'Load test class', TIMESTAMPTZ '2027-01-13 12:30Z', TIMESTAMPTZ '2027-01-13 15:00Z', 'Asia/Colombo', '81234567890');
 INSERT INTO session_batches (session_id, batch_id, academy_id) SELECT (SELECT id FROM class_sessions), id, '$ACADEMY' FROM batches;
+INSERT INTO class_sessions (id, academy_id, title, starts_at, ends_at, time_zone, zoom_webinar_id)
+  SELECT gen_random_uuid(), '$ACADEMY', 'Load class type ' || (d % 3 + 1), timing.starts_at,
+         timing.starts_at + interval '90 minutes', 'Asia/Colombo', '81234567891'
+  FROM generate_series(0, 27) d
+  CROSS JOIN LATERAL (SELECT (date_trunc('month', now() AT TIME ZONE 'Asia/Colombo') - interval '1 month'
+    + d * interval '1 day' + interval '18 hours') AT TIME ZONE 'Asia/Colombo' AS starts_at) timing;
+INSERT INTO session_batches (session_id, batch_id, academy_id)
+  SELECT c.id, b.id, c.academy_id FROM class_sessions c CROSS JOIN batches b WHERE c.zoom_webinar_id = '81234567891';
+INSERT INTO zoom_occurrence_links (academy_id, occurrence_uuid, webinar_id, class_session_id, link_source, linked_at)
+  SELECT academy_id, id::text, zoom_webinar_id, id, 'AUTOMATIC', ends_at
+  FROM class_sessions WHERE zoom_webinar_id = '81234567891';
+INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, fetched_at, join_sessions)
+  SELECT academy_id, id::text, 'FETCHED', ends_at, $STUDENTS FROM class_sessions WHERE zoom_webinar_id = '81234567891';
+INSERT INTO zoom_report_participants (id, academy_id, occurrence_uuid, email, joined_at, left_at, duration_seconds)
+  SELECT gen_random_uuid(), c.academy_id, c.id::text, a.email, c.starts_at + interval '5 minutes', c.ends_at, 5100
+  FROM class_sessions c CROSS JOIN accounts a WHERE c.zoom_webinar_id = '81234567891' AND a.email LIKE 'load.student%';
 SQL
+if [ "$?" -ne 0 ]; then echo "synthetic data seeding failed"; exit 1; fi
 BATCH_IDS=$(psql_q -c "SELECT string_agg(id::text, ',') FROM batches")
-SESSION_ID=$(psql_q -c "SELECT id FROM class_sessions")
+SESSION_ID=$(psql_q -c "SELECT id FROM class_sessions WHERE zoom_webinar_id = '81234567891' ORDER BY starts_at LIMIT 1")
+MONTH=$(psql_q -c "SELECT to_char(min(starts_at) AT TIME ZONE 'Asia/Colombo', 'YYYY-MM') FROM class_sessions WHERE zoom_webinar_id = '81234567891'")
 echo "students=$(psql_q -c 'SELECT count(*) FROM students') enrollments=$(psql_q -c 'SELECT count(*) FROM enrollments')"
+if [ "$LUMA_ATTENDANCE_PROJECTION_ENABLED" = true ]; then
+  projected() { psql_q -c 'SELECT count(*) FROM attendance_projection_jobs WHERE published_revision = source_revision'; }
+  for i in $(seq 1 60); do [ "$(projected)" = 28 ] && break; sleep 1; done
+  [ "$(projected)" = 28 ] || { echo "Completed attendance projection did not finish warming"; exit 1; }
+  echo "--- 28 completed attendance projections ready"
+fi
 
 cd "$ROOT/frontend"
 LUMA_TRUSTED_PROXY_HOPS=1 LUMA_WEB_ORIGIN=$ORIGIN LUMA_SESSION_KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=') \
@@ -137,7 +170,7 @@ disown $STATS_PID
 
 k6() { # name, script, env...
   local name=$1 script=$2; shift 2
-  docker run --rm ${K6_NET[@]+"${K6_NET[@]}"} -v "$ROOT/load-tests/k6:/scripts:ro" -e K6_NO_USAGE_REPORT=true "$@" \
+  MSYS2_ARG_CONV_EXCL='*' docker run --rm ${K6_NET[@]+"${K6_NET[@]}"} --mount "type=bind,source=$K6_SCRIPTS,target=/scripts,readonly" -e K6_NO_USAGE_REPORT=true "$@" \
     $K6_IMAGE run --quiet "/scripts/$script" > "$S/k6-$name.txt" 2>&1
   echo "k6 $name exit $?" >> "$S/k6-exits.txt"
 }
@@ -155,7 +188,7 @@ for scenario in $SCENARIOS; do
                -e JOIN_S=$JOIN_S -e CLASS_S=$CLASS_S -e LEAVE_S=$LEAVE_S -e OCCURRENCE=$OCCURRENCE & K6_PIDS+=($!) ;;
     staff) k6 staff staff-reads.js "${WEB_ENV[@]}" -e STAFF=$STAFF \
                -e DURATION_S=${STAFF_DURATION_S:-$(( WINDOW_S > JOIN_S + CLASS_S + LEAVE_S ? WINDOW_S : JOIN_S + CLASS_S + LEAVE_S ))} \
-               -e BATCH_IDS=$BATCH_IDS -e SESSION_ID=$SESSION_ID & K6_PIDS+=($!) ;;
+               -e BATCH_IDS=$BATCH_IDS -e SESSION_ID=$SESSION_ID -e MONTH=$MONTH & K6_PIDS+=($!) ;;
     *) echo "unknown scenario $scenario"; exit 2 ;;
   esac
 done
@@ -189,7 +222,7 @@ delta() { awk -v a="${1:-0}" -v b="${2:-0}" 'BEGIN { printf "%.1f", b - a }'; }
 echo "--- CPU seconds used during the scenarios ($(( BURST_END - T0 )) s):" \
   "api $(delta "$CPU0_API" "$CPU1_API") web $(delta "$CPU0_WEB" "$CPU1_WEB") db $(delta "$CPU0_DB" "$CPU1_DB")"
 echo "--- API time per route (server side, from the access log): count p50 p95 max ms"
-cat "$S"/api-access*.log 2>/dev/null | python3 -c '
+cat "$S"/api-access*.log 2>/dev/null | "${LUMA_LOAD_PYTHON:-python3}" -c '
 import re, sys, collections
 routes = collections.defaultdict(list)
 for line in sys.stdin:

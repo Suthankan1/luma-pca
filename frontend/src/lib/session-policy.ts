@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-export const staffRoles = ["ACADEMY_OWNER", "ACADEMY_ADMIN", "INSTRUCTOR", "ATTENDANCE_OFFICER", "ANALYST"];
+/** LUMA has two roles (owner decision 2026-11-20): STAFF opens the staff portal, STUDENT the student portal. */
+export const staffRoles = ["STAFF"];
 export type Portal = "staff" | "student";
 export type Identity = { accountId: string; academyId: string; roles: string[] };
 
@@ -26,8 +27,6 @@ export function cookieNames(secure: boolean) {
   return {
     access: `${prefix}luma-access`,
     refresh: `${prefix}luma-refresh`,
-    mfa: `${prefix}luma-mfa`,
-    recovery: `${prefix}luma-recovery`,
   };
 }
 
@@ -42,24 +41,7 @@ export function sessionKey(value: string | undefined) {
   return key;
 }
 
-export type MfaChallengeState = {
-  mfaToken: string;
-  enrolled: boolean;
-  portal?: Portal | null;
-  secret?: string;
-  otpauthUri?: string;
-  expiresAt: number;
-};
-
-export type RecoveryCodesState = {
-  codes: string[];
-  portal?: Portal | null;
-  expiresAt: number;
-};
-
 const purpose = Buffer.from("luma/bff/access/v1");
-const mfaPurpose = Buffer.from("luma/bff/mfa/v1");
-const recoveryPurpose = Buffer.from("luma/bff/recovery/v1");
 
 function sealWithPurpose(data: string, key: Buffer, aad: Buffer) {
   const iv = randomBytes(12);
@@ -116,71 +98,6 @@ export function openAccess(cookie: string, key: Buffer): string | null {
   return session ? session.token : null;
 }
 
-export function sealMfa(state: MfaChallengeState, key: Buffer) {
-  return sealWithPurpose(JSON.stringify(state), key, mfaPurpose);
-}
-
-export function openMfa(cookie: string, key: Buffer): MfaChallengeState | null {
-  const plain = openWithPurpose(cookie, key, mfaPurpose);
-  if (!plain) return null;
-  try {
-    const parsed = JSON.parse(plain);
-    if (typeof parsed?.mfaToken !== "string" || !parsed.mfaToken || parsed.mfaToken.length > 128
-        || typeof parsed?.enrolled !== "boolean"
-        || !Number.isSafeInteger(parsed?.expiresAt) || parsed.expiresAt <= 0) {
-      return null;
-    }
-    if (Date.now() > parsed.expiresAt) return null;
-    if (parsed.portal !== undefined && parsed.portal !== null && parsed.portal !== "staff" && parsed.portal !== "student") {
-      return null;
-    }
-    if (parsed.secret !== undefined && (typeof parsed.secret !== "string" || parsed.secret.length > 128)) {
-      return null;
-    }
-    if (parsed.otpauthUri !== undefined && (typeof parsed.otpauthUri !== "string" || parsed.otpauthUri.length > 512)) {
-      return null;
-    }
-    return {
-      mfaToken: parsed.mfaToken,
-      enrolled: parsed.enrolled,
-      portal: parsed.portal ?? null,
-      secret: parsed.secret,
-      otpauthUri: parsed.otpauthUri,
-      expiresAt: parsed.expiresAt,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export function sealRecovery(state: RecoveryCodesState, key: Buffer) {
-  return sealWithPurpose(JSON.stringify(state), key, recoveryPurpose);
-}
-
-export function openRecovery(cookie: string, key: Buffer): RecoveryCodesState | null {
-  const plain = openWithPurpose(cookie, key, recoveryPurpose);
-  if (!plain) return null;
-  try {
-    const parsed = JSON.parse(plain);
-    if (!Array.isArray(parsed?.codes) || parsed.codes.length === 0 || parsed.codes.length > 20
-        || !parsed.codes.every((c: unknown) => typeof c === "string" && c.length > 0 && c.length <= 32)
-        || !Number.isSafeInteger(parsed?.expiresAt) || parsed.expiresAt <= 0) {
-      return null;
-    }
-    if (Date.now() > parsed.expiresAt) return null;
-    if (parsed.portal !== undefined && parsed.portal !== null && parsed.portal !== "staff" && parsed.portal !== "student") {
-      return null;
-    }
-    return {
-      codes: parsed.codes,
-      portal: parsed.portal ?? null,
-      expiresAt: parsed.expiresAt,
-    };
-  } catch {
-    return null;
-  }
-}
-
 const activationTokenShape = /^[A-Za-z0-9_-]{20,128}$/;
 
 /**
@@ -233,7 +150,6 @@ export function isGuestPath(pathname: string): boolean {
   return (
     clean === "/" ||
     clean === "/sign-in" ||
-    clean === "/sign-in/mfa" ||
     clean === "/activate" ||
     clean === "/forgot-password" ||
     clean === "/reset-password"

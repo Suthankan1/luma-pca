@@ -61,8 +61,7 @@ class SmtpAccountMailer implements AccountMailer {
                 To choose a new password, open this link within %d minutes:
                 %s
 
-                The link works once. Afterwards you are signed out on every device. Owners and
-                administrators still need their authenticator code to sign in.
+                The link works once. Afterwards you are signed out on every device.
 
                 If you did not ask for this, ignore this email; your password has not changed.
                 """.formatted(minutes, link);

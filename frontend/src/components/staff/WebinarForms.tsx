@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { addWebinar, webinarAction } from "@/app/staff/webinars/actions";
+import { addWebinar, webinarAction } from "@/app/staff/sessions/webinar-actions";
 
 function Feedback({ state, id }: { state: { ok: boolean; message: string } | null; id: string }) {
   return <p id={id} className={state ? (state.ok ? "form-ok" : "session-error") : "sr-only"} role={state?.ok === false ? "alert" : "status"}>
@@ -12,11 +12,11 @@ function Feedback({ state, id }: { state: { ok: boolean; message: string } | nul
 export function AddWebinarForm() {
   const [state, action, pending] = useActionState(addWebinar, null);
   return <form key={state?.ok ? "done" : "editing"} action={action} className="add-webinar" aria-describedby="add-webinar-feedback">
-    <label htmlFor="add-webinar">Zoom webinar ID or join link</label>
+    <label htmlFor="add-webinar">Zoom link or webinar ID to track</label>
     <div className="add-webinar-row">
       <input id="add-webinar" name="webinar" required maxLength={500} inputMode="url" autoComplete="off" spellCheck={false}
         placeholder="844 0000 0101 or https://zoom.us/j/84400000101" defaultValue={state?.values?.webinar} />
-      <button className="action" type="submit" disabled={pending}>{pending ? "Checking with Zoom…" : "Monitor webinar"}</button>
+      <button className="action" type="submit" disabled={pending}>{pending ? "Checking with Zoom…" : "Track"}</button>
     </div>
     <p className="panel-sub">Title, time and recurrence are read from Zoom. LUMA never changes the webinar.</p>
     <Feedback state={state} id="add-webinar-feedback" />
@@ -39,8 +39,8 @@ export function WebinarActions({ monitorId, topic, active, academyClassName, cla
     <form action={action} className="inline-form">
       <input type="hidden" name="monitorId" value={monitorId} />
       <input type="hidden" name="intent" value={active ? "stop" : "resume"} />
-      <button className="action secondary" type="submit" disabled={pending} aria-label={`${active ? "Stop monitoring" : "Resume monitoring"} ${topic}`}
-        aria-describedby={feedback}>{active ? "Stop monitoring" : "Resume monitoring"}</button>
+      <button className="action secondary" type="submit" disabled={pending} aria-label={`${active ? "Stop tracking" : "Track again"} ${topic}`}
+        aria-describedby={feedback}>{active ? "Stop tracking" : "Track again"}</button>
     </form>
     {classOptions && <form action={action} className="class-choice">
       <input type="hidden" name="monitorId" value={monitorId} />

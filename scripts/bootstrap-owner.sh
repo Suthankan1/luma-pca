@@ -1,21 +1,22 @@
 #!/bin/bash
-# Creates an academy's first owner and issues their activation invitation.
+# Adds a staff member to an academy (creating the academy the first time) and issues their activation invitation.
+# There is no staff page: this is how every staff account is added (blocking: docs/delivery/runbooks/STAFF-ACCOUNTS.md).
 #
-#   scripts/bootstrap-owner.sh "Physics Cube Academy" owner@academy.example [PRINT|EMAIL]
+#   scripts/bootstrap-owner.sh "Physics Cube Academy" person@academy.example [PRINT|EMAIL]
 #
-# Run it once per new academy, with the same environment as the API (DB_URL, DB_USERNAME,
-# DB_PASSWORD, the signing and MFA keys, and for EMAIL the LUMA_MAIL_* and SPRING_MAIL_*
+# Run it once per staff member, with the same environment as the API (DB_URL, DB_USERNAME,
+# DB_PASSWORD, the signing key, and for EMAIL the LUMA_MAIL_* and SPRING_MAIL_*
 # settings). It starts the backend jar without a web server, prints the outcome and exits:
-# 0 done, 1 refused (for example the academy already has an active owner), 2 bad arguments,
-# 3 saved but the email failed. Running it again before the owner activates sends a new
-# invitation and cancels the old one; it never replaces an active owner.
+# 0 done, 1 refused (for example the address is already an active staff member), 2 bad arguments,
+# 3 saved but the email failed. Running it again before they activate sends a new
+# invitation and cancels the old one; it never takes over an active or blocked account.
 #
 # PRINT (default) writes the link to this terminal only, never to the log. It is a
 # credential for 72 hours: run this where the output is not collected, and send the link
 # privately. Set LUMA_BOOTSTRAP_WEB_ORIGIN (or LUMA_MAIL_WEB_ORIGIN) so the full link is shown.
 set -u
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-  echo "usage: $0 \"Academy name\" owner@example.com [PRINT|EMAIL]" >&2
+  echo "usage: $0 \"Academy name\" person@example.com [PRINT|EMAIL]" >&2
   exit 2
 fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

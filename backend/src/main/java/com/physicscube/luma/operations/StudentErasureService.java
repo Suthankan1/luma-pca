@@ -1,6 +1,7 @@
 package com.physicscube.luma.operations;
 
 import com.physicscube.luma.audit.AuditLog;
+import com.physicscube.luma.attendance.AttendanceProjectionStore;
 import com.physicscube.luma.shared.api.InvalidRequestException;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
 import com.physicscube.luma.shared.security.CurrentAccount;
@@ -11,12 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Erases a student's personal data on request, in one transaction (owners only; audited without
+ * Erases a student's personal data on request, in one transaction (staff only; audited without
  * personal data). The student record stays, anonymised, so classes and attendance figures remain
  * consistent: name and number are replaced, the sign-in account is disabled with its email replaced,
  * and every Zoom name, email and registration linked to the student's known emails is removed,
@@ -27,10 +27,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudentErasureService {
     private final JdbcTemplate jdbc;
     private final AuditLog audit;
+    private final AttendanceProjectionStore projections;
 
-    StudentErasureService(JdbcTemplate jdbc, AuditLog audit) {
+    StudentErasureService(JdbcTemplate jdbc, AuditLog audit, AttendanceProjectionStore projections) {
         this.jdbc = jdbc;
         this.audit = audit;
+        this.projections = projections;
     }
 
     public record ErasureResult(UUID studentId, String placeholderNumber, int zoomRowsCleared) {
@@ -39,9 +41,7 @@ public class StudentErasureService {
     /** @param confirmNumber the student's current number, typed again to confirm */
     @Transactional
     public ErasureResult erase(CurrentAccount caller, UUID studentId, String confirmNumber, String reason) {
-        if (!caller.hasRole("ACADEMY_OWNER")) {
-            throw new AccessDeniedException("Only an academy owner erases a student's data");
-        }
+        caller.requireStaff();
         String why = reason == null ? "" : reason.strip();
         if (why.length() < 3 || why.length() > 300) {
             throw new InvalidRequestException("A reason of 3 to 300 characters is required");
@@ -87,6 +87,7 @@ public class StudentErasureService {
                 + "WHERE academy_id = ? AND (email = ANY (?) OR registrant_email = ANY (?))", caller.academyId(), known, known);
         cleared += jdbc.update("DELETE FROM zoom_registrants WHERE academy_id = ? AND email = ANY (?)", caller.academyId(), known);
         jdbc.update("DELETE FROM zoom_identity_links WHERE academy_id = ? AND (student_id = ? OR email = ANY (?))", caller.academyId(), studentId, known);
+        projections.eraseProjectedVisits(caller.academyId(), studentId);
         jdbc.update("DELETE FROM portal_reactions WHERE academy_id = ? AND student_id = ?", caller.academyId(), studentId);
         jdbc.update("DELETE FROM pulse_answers WHERE academy_id = ? AND student_id = ?", caller.academyId(), studentId);
         jdbc.update("DELETE FROM engagement_consents WHERE academy_id = ? AND student_id = ?", caller.academyId(), studentId);

@@ -39,7 +39,7 @@ class AttendanceExportIntegrationTest extends StaffApiIntegrationTest {
     @BeforeEach
     void seed() {
         academyId = academy("Physics Cube Test");
-        admin = tokenFor(academyId, Role.ACADEMY_ADMIN);
+        admin = tokenFor(academyId, Role.STAFF);
         AcademyFixtures fixtures = new AcademyFixtures(api, admin);
         String course = fixtures.course("PHY-2026");
         batchA = fixtures.batch(course, "A");
@@ -127,21 +127,19 @@ class AttendanceExportIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
-    void assignedStaffExportOnlyTheirBatchAndStudentsCannotExport() {
-        accountIdOf("teacher.b@example.invalid", academyId, Role.INSTRUCTOR);
-        Map<String, Object> fields = new LinkedHashMap<>();
-        fields.put("email", "teacher.b@example.invalid");
-        fields.put("role", "INSTRUCTOR");
-        assertEquals(201, api.post("/api/v1/batches/" + batchB + "/assignments", HttpApi.json(fields), admin).statusCode());
-        String teacher = login("teacher.b@example.invalid");
+    void anyStaffMemberExportsEveryBatchAndStudentsCannotExport() {
+        String staff = tokenFor(academyId, Role.STAFF);
 
-        List<String> own = lines(api.get("/api/v1/batches/" + batchB + "/attendance/export?from=2026-02-01&to=2026-02-28", teacher));
-        assertEquals(2, own.size());
-        assertTrue(own.get(1).contains(",S-005,"));
-        List<String> sharedClass = lines(api.get("/api/v1/class-sessions/" + shared + "/attendance/export", teacher));
-        assertEquals(2, sharedClass.size(), "a shared class shows the instructor only their batch's student");
+        List<String> batch = lines(api.get("/api/v1/batches/" + batchB + "/attendance/export?from=2026-02-01&to=2026-02-28", staff));
+        assertEquals(2, batch.size());
+        assertTrue(batch.get(1).contains(",S-005,"));
+        assertEquals(lines(api.get("/api/v1/class-sessions/" + shared + "/attendance/export", admin)),
+                lines(api.get("/api/v1/class-sessions/" + shared + "/attendance/export", staff)),
+                "a shared class shows every staff member the students of all its batches");
+        assertEquals(200, api.get("/api/v1/batches/" + batchA + "/attendance/export?from=2026-02-01&to=2026-02-28", staff).statusCode());
+        assertEquals(404, api.get("/api/v1/batches/" + batchA + "/attendance/export?from=2026-02-01&to=2026-02-28",
+                tokenFor(academy("Other"), Role.STAFF)).statusCode());
 
-        assertEquals(404, api.get("/api/v1/batches/" + batchA + "/attendance/export?from=2026-02-01&to=2026-02-28", teacher).statusCode());
         String student = tokenFor(academyId, Role.STUDENT);
         assertEquals(403, api.get("/api/v1/class-sessions/" + shared + "/attendance/export", student).statusCode());
         assertEquals(403, api.get("/api/v1/batches/" + batchA + "/attendance/export?from=2026-02-01&to=2026-02-28", student).statusCode());

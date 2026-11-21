@@ -12,6 +12,11 @@ let roles = [];
 let studentHasEnrolments = true;
 const activatedTokens = new Set();
 const usedResetTokens = new Set();
+let blockedMonitors;
+let releaseMonitors;
+let monitorsUnavailable = false;
+let blockedStudentOverview;
+let releaseStudentOverview;
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -28,14 +33,50 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
+  const mockOnline = req.url.match(/^\/__test__\/zoom-online\/([^/]+)$/);
+  if (req.method === "PUT" && mockOnline) {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    const run = runSessions.get(mockOnline[1]);
+    if (run && typeof body.ended === "boolean") {
+      const session = classSessions.find(row => row.id === run.classSessionId);
+      run.state = body.ended ? "ENDED" : "LIVE";
+      run.actualEndedAt = body.ended ? new Date().toISOString() : null;
+      session.endsAt = run.actualEndedAt ?? new Date(Date.parse(run.firstSeenAt) + 12 * 3600_000).toISOString();
+      return send(200, { ended: body.ended });
+    }
+    if (!run || run.state !== "LIVE") return send(404);
+    if (!Number.isInteger(body.connectedNow) || body.connectedNow < 0) return send(400);
+    run.connectedNow = body.connectedNow;
+    onlineHistories.get(mockOnline[1]).push({ at: new Date().toISOString(), online: run.connectedNow });
+    return send(200, { connectedNow: run.connectedNow });
+  }
+
+  if (req.method === "PUT" && req.url === "/__test__/zoom-monitor-response") {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    releaseMonitors?.();
+    blockedMonitors = body.mode === "hold" ? new Promise(resolve => { releaseMonitors = resolve; }) : undefined;
+    monitorsUnavailable = body.mode === "fail";
+    return send(204);
+  }
+  if (req.method === "GET" && req.url === "/api/v1/zoom/monitors") {
+    await blockedMonitors;
+    if (monitorsUnavailable) return send(503);
+  }
   if (req.url.startsWith("/api/v1/zoom/monitors") || /^\/api\/v1\/class-sessions\/[^/]+\/zoom-run$/.test(req.url)) {
     return monitorsApi(req, body, send);
   }
-  if (req.url.startsWith("/api/v1/attendance/dashboard") || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
+  if (req.method === "PUT" && req.url === "/__test__/student-overview-response") {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    releaseStudentOverview?.();
+    blockedStudentOverview = body.mode === "hold" ? new Promise(resolve => { releaseStudentOverview = resolve; }) : undefined;
+    return send(204);
+  }
+  if (/^\/api\/v1\/students\/[^/]+\/attendance-overview\?/.test(req.url)) await blockedStudentOverview;
+  if (/^\/api\/v1\/attendance\/(dashboard|class-totals|latest-completed|recent-completed)(\?|$)/.test(req.url) || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
     return insightsApi(req, send);
   }
 
-  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|staff-accounts|assignments|class-sessions|zoom|audit-events|attendance|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
+  if (/^\/api\/v1\/(courses|batches|students|student-invitations|enrollments|accounts|class-sessions|zoom|audit-events|attendance|attendance-policy|attendance-records|attendance-appeals|engagement-settings)(\/|\?|$)/.test(req.url)) {
     return academicApi(req, body, send);
   }
 
@@ -48,36 +89,19 @@ const backend = createServer(async (req, res) => {
       if (body.email === "student@example.invalid" || body.email === "new-student@example.invalid") {
         roles = ["STUDENT"];
         studentHasEnrolments = body.email === "student@example.invalid";
-      } else if (body.email === "instructor@example.invalid") {
-        // Every staff role signs in with a second factor, as the API requires.
-        return send(200, { mfaRequired: true, mfaToken: "challenge-token-instructor", mfaExpiresIn: 300, mfaEnrolled: true });
-      } else if (body.email === "analyst@example.invalid") {
-        return send(200, { mfaRequired: true, mfaToken: "challenge-token-analyst", mfaExpiresIn: 300, mfaEnrolled: true });
-      } else if (body.email === "admin-unenrolled@example.invalid") {
-        return send(200, {
-          mfaRequired: true,
-          mfaToken: "challenge-token-unenrolled",
-          mfaExpiresIn: 300,
-          mfaEnrolled: false,
-        });
-      } else if (body.email === "owner-enrolled@example.invalid") {
-        return send(200, { mfaRequired: true, mfaToken: "challenge-token-owner", mfaExpiresIn: 300, mfaEnrolled: true });
-      } else if (body.email === "admin-enrolled@example.invalid") {
-        return send(200, {
-          mfaRequired: true,
-          mfaToken: "challenge-token-enrolled",
-          mfaExpiresIn: 300,
-          mfaEnrolled: true,
-        });
+      } else if (body.email === "admin-enrolled@example.invalid" || body.email === "admin-unenrolled@example.invalid"
+          || body.email === "owner-enrolled@example.invalid") {
+        // As the API: two roles; every staff account gets STAFF and its tokens straight from email and password.
+        roles = ["STAFF"];
       } else {
         return send(401);
       }
       break;
 
     case "/api/v1/auth/student-id-login": {
-      // As the API: the Academy student ID is both username and password, letter case ignored.
+      // As the API: the Academy registration ID alone, letter case ignored.
       const id = String(body.studentId ?? "").trim().toUpperCase();
-      if (id !== "PCA001" || String(body.password ?? "").trim().toUpperCase() !== id) return send(401);
+      if (id !== "PCA001") return send(401);
       roles = ["STUDENT"];
       studentHasEnrolments = true;
       break;
@@ -89,62 +113,6 @@ const backend = createServer(async (req, res) => {
       if (body.currentPassword !== "correct-password") return send(400, { detail: "The current password is not correct" });
       if ([...String(body.newPassword ?? "")].length < 12) return send(422, { detail: "Password too short" });
       return send(204);
-
-    case "/api/v1/auth/mfa/enroll":
-      if (body.mfaToken === "challenge-token-unenrolled") {
-        return send(200, {
-          secret: "JBSWY3DPEHPK3PXP",
-          otpauthUri: "otpauth://totp/Physics%20Cube%20Academy:admin@example.invalid?secret=JBSWY3DPEHPK3PXP&issuer=Physics%20Cube%20Academy",
-        });
-      }
-      return send(401);
-
-    case "/api/v1/auth/mfa/verify":
-      if (body.mfaToken === "challenge-token-unenrolled") {
-        if (body.code !== "123456") return send(401);
-        roles = ["ACADEMY_ADMIN"];
-        latestRefresh = issueRefresh();
-        return send(200, {
-          accessToken: jwt,
-          tokenType: "Bearer",
-          expiresIn: 300,
-          refreshToken: latestRefresh,
-          refreshExpiresIn: 600,
-          recoveryCodes: ["rec-1111", "rec-2222", "rec-3333", "rec-4444"],
-        });
-      }
-      if (body.mfaToken === "challenge-token-analyst") {
-        if (body.code !== "rec-recovery") return send(401);
-        roles = ["ANALYST"];
-        latestRefresh = issueRefresh();
-        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
-      }
-      if (body.mfaToken === "challenge-token-instructor") {
-        if (body.code !== "rec-recovery") return send(401);
-        roles = ["INSTRUCTOR"];
-        latestRefresh = issueRefresh();
-        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
-      }
-      if (body.mfaToken === "challenge-token-owner") {
-        if (body.code !== "rec-recovery") return send(401);
-        roles = ["ACADEMY_OWNER"];
-        latestRefresh = issueRefresh();
-        return send(200, { accessToken: jwt, tokenType: "Bearer", expiresIn: 300, refreshToken: latestRefresh, refreshExpiresIn: 600 });
-      }
-      if (body.mfaToken === "challenge-token-enrolled") {
-        if (body.code !== "654321" && body.code !== "rec-recovery") return send(401);
-        roles = ["ACADEMY_ADMIN"];
-        latestRefresh = issueRefresh();
-        return send(200, {
-          accessToken: jwt,
-          tokenType: "Bearer",
-          expiresIn: 300,
-          refreshToken: latestRefresh,
-          refreshExpiresIn: 600,
-          recoveryCodes: null,
-        });
-      }
-      return send(401);
 
     // Activation codes: one letter repeated 43 times activates once ("U" is always used up),
     // so each browser project can use its own code. Anything else is unknown.
@@ -206,7 +174,10 @@ function studentApi(req, send, body) {
   const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
   const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
   const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
-  if (url.pathname === "/api/v1/me/attendance-overview") return send(200, insightsOverview(INSIGHT_STUDENTS[0]));
+  if (url.pathname === "/api/v1/me/attendance-overview") {
+    const overview = insightsOverview(INSIGHT_STUDENTS[0]);
+    return send(200, studentHasEnrolments ? overview : { ...overview, enrolments: [], classes: [] });
+  }
   if (url.pathname === "/api/v1/me/student") {
     return send(200, { id: "00000000-0000-4000-8000-0000000000a1", studentNumber: "PCA001", fullName: "Amaya Perera" });
   }
@@ -292,23 +263,15 @@ const batches = [];
 let nextId = 1;
 const uuid = () => `00000000-0000-4000-8000-${String(nextId++).padStart(12, "0")}`;
 const SELF_ID = "00000000-0000-4000-8000-0000000000aa";
-// The signed-in administrator, an owner, an analyst, and staff added by tests.
+// Staff accounts are managed by the operator (no staff API); invitations may still target one that is pending.
 const staff = [
-  { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["ACADEMY_ADMIN"], status: "ACTIVE", mfaEnrolled: true, version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000bb", email: "owner@example.invalid", roles: ["ACADEMY_OWNER"], status: "ACTIVE", mfaEnrolled: true, version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000cc", email: "analyst@example.invalid", roles: ["ANALYST"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
-  // Active instructors the team spec disables and re-enables, one per browser project.
-  { id: "00000000-0000-4000-8000-0000000000d7", email: "former.d@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
-  { id: "00000000-0000-4000-8000-0000000000d8", email: "former.m@example.invalid", roles: ["INSTRUCTOR"], status: "ACTIVE", mfaEnrolled: false, version: 0 },
+  { id: SELF_ID, email: "admin-enrolled@example.invalid", roles: ["STAFF"], status: "ACTIVE", version: 0 },
 ];
-const assignments = [];
-const ELEVATED = ["ACADEMY_OWNER", "ACADEMY_ADMIN"];
 const students = [];
 const enrollments = [];
 const invitationLetters = "PQRSTVWXYZ";
 let invitations = 0;
 const emailedInvitations = [];
-const staffRoles = ["INSTRUCTOR", "ATTENDANCE_OFFICER"];
 const publicStudent = student => {
   const copy = { ...student };
   delete copy.invitationToken;
@@ -825,6 +788,7 @@ const zoomWebinars = {
 };
 const monitors = [];
 const runSessions = new Map(); // class id -> run
+const onlineHistories = new Map(); // class id -> observed matched student counts
 function monitorView(m) {
   const runs = [...runSessions.values()].filter(r => r.monitorId === m.id).sort((a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt))
     .map(r => { const copy = { ...r }; delete copy.monitorId; return copy; });
@@ -833,7 +797,7 @@ function monitorView(m) {
 }
 function monitorsApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
-  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  const manager = roles.includes("STAFF");
   const runPage = req.url.match(/^\/api\/v1\/class-sessions\/([^/]+)\/zoom-run$/);
   if (runPage) {
     const run = runSessions.get(runPage[1]);
@@ -872,6 +836,16 @@ function monitorsApi(req, body, send) {
           runSessions.set(session.id, { monitorId: m.id, occurrenceUuid: `run-${state}-${session.id.slice(-4)}==`, classSessionId: session.id,
             state, firstSeenAt: started, actualStartedAt: started, actualEndedAt: ended, reported: state === "ENDED",
             connectedNow: state === "LIVE" ? 12 : 0, people: state === "LIVE" ? 15 : 18 });
+          if (state === "LIVE") {
+            onlineHistories.set(session.id, [[1, 4], [6, 8], [24, 12]].map(([minutes, online]) => ({
+              at: new Date(Date.parse(started) + minutes * 60_000).toISOString(), online,
+            })));
+          } else {
+            onlineHistories.set(session.id, Array.from({ length: length * 2 + 1 }, (_, i) => ({
+              at: new Date(Date.parse(started) + i * 30_000).toISOString(),
+              online: i === length * 2 ? 0 : Math.min(i + 1, 18),
+            })));
+          }
         }
       }
     } else {
@@ -935,13 +909,39 @@ function insightsOverview(student) {
 function insightsApi(req, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
   const url = new URL(req.url, "http://mock");
-  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
-  if (url.pathname !== "/api/v1/attendance/dashboard") {
-    if (!manager) return send(403);
-    const student = INSIGHT_STUDENTS.find(s => url.pathname.includes(s.id));
-    return student ? send(200, insightsOverview(student)) : send(404);
+  if (!roles.includes("STAFF")) return send(403);
+  const latestOnly = url.pathname === "/api/v1/attendance/latest-completed";
+  const recentOnly = url.pathname === "/api/v1/attendance/recent-completed";
+  if (url.pathname === "/api/v1/attendance/class-totals" || latestOnly || recentOnly) {
+    const from = url.searchParams.get("from"), to = url.searchParams.get("to");
+    const inRange = start => {
+      const date = localDate(start, "Asia/Colombo");
+      return latestOnly || recentOnly || (from <= date && date <= to);
+    };
+    const fixtures = INSIGHT_CLASSES.flatMap((c, i) => inRange(c.start) ? [{
+      id: c.id, title: c.title, endsAt: iso(c.start, c.minutes), timeZone: "Asia/Colombo",
+      expected: INSIGHT_STUDENTS.length,
+      joined: INSIGHT_STUDENTS.filter(s => s.visits[i].length > 0).length,
+    }] : []);
+    const sessions = classSessions.filter(s => s.status === "SCHEDULED" && Date.parse(s.endsAt) <= Date.now() && inRange(s.startsAt));
+    const totals = [...fixtures, ...sessions.map(s => {
+      const expected = mockAttendance(s).students.filter(row => row.expected);
+      return { id: s.id, title: s.title, endsAt: s.endsAt, timeZone: s.timeZone, expected: expected.length,
+        joined: expected.filter(row => row.visits > 0).length };
+    })];
+    if (latestOnly || recentOnly) {
+      totals.sort((a, b) => Date.parse(b.endsAt) - Date.parse(a.endsAt) || b.id.localeCompare(a.id));
+      if (recentOnly) return send(200, totals.slice(0, 5));
+      return totals.length ? send(200, totals[0]) : send(204);
+    }
+    return send(200, totals.map(({ id, expected, joined }) => ({ id, expected, joined })));
   }
-  if (!manager && !roles.some(r => r === "INSTRUCTOR" || r === "ATTENDANCE_OFFICER")) return send(403);
+  if (url.pathname !== "/api/v1/attendance/dashboard") {
+    const student = INSIGHT_STUDENTS.find(s => url.pathname.includes(s.id));
+    if (student) return send(200, insightsOverview(student));
+    const id = url.pathname.split("/")[4];
+    return students.some(row => row.id === id) ? send(200, { classes: [] }) : send(404);
+  }
   const from = url.searchParams.get("from"), to = url.searchParams.get("to");
   if (from && to && (Date.parse(to) - Date.parse(from)) / 86400_000 > 91) return send(400, { detail: "from must not be after to, and the range is at most 92 days" });
   const empty = url.searchParams.get("batchId") === "00000000-0000-4000-8000-0000000000d2";
@@ -952,7 +952,7 @@ function insightsApi(req, send) {
       averagePercent: Math.round(cells.reduce((s, x) => s + x.percent, 0) / 3) };
   });
   const indexes = classes.map(c => INSIGHT_CLASSES.findIndex(x => x.id === c.id));
-  const students = classes.length === 0 ? [] : INSIGHT_STUDENTS.map(s => {
+  const rows = classes.length === 0 ? [] : INSIGHT_STUDENTS.map(s => {
     const cells = indexes.map(i => insightCell(s, i));
     const connected = cells.reduce((sum, x) => sum + x.connectedSeconds, 0);
     const total = classes.reduce((sum, c) => sum + c.classSeconds, 0);
@@ -961,10 +961,10 @@ function insightsApi(req, send) {
       present: cells.filter(x => x.outcome === "PRESENT").length, late: 0, absent: cells.filter(x => x.outcome === "ABSENT").length, excused: 0,
       rejoins: cells.reduce((sum, x) => sum + Math.max(0, x.visits - 1), 0), cells };
   });
-  const average = students.length ? Math.round(students.reduce((sum, x) => sum + x.percent, 0) / students.length) : 0;
+  const average = rows.length ? Math.round(rows.reduce((sum, x) => sum + x.percent, 0) / rows.length) : 0;
   return send(200, { from, to, courseId: url.searchParams.get("courseId"), batchId: url.searchParams.get("batchId"), truncated: false,
-    totals: { classes: classes.length, students: students.length, averagePercent: average, classSeconds: classes.reduce((sum, c) => sum + c.classSeconds, 0),
-      belowThreshold: students.filter(x => x.percent < 75).length, minPercent: 75, connectedNow: 0 }, classes, students });
+    totals: { classes: classes.length, students: rows.length, averagePercent: average, classSeconds: classes.reduce((sum, c) => sum + c.classSeconds, 0),
+      belowThreshold: rows.filter(x => x.percent < 75).length, minPercent: 75, connectedNow: 0 }, classes, students: rows });
 }
 
 // The Academy's own records (read-only in the real API): classes from payment rows, students by Academy ID.
@@ -976,7 +976,7 @@ const academyLinks = new Map();
 
 function academyApi(req, body, send) {
   if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
-  if (!roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN")) return send(403, { detail: "Forbidden" });
+  if (!roles.includes("STAFF")) return send(403, { detail: "Forbidden" });
   if (req.url === "/api/v1/academy/classes" && req.method === "GET") {
     return send(200, Object.entries(academySource).sort(([a], [b]) => a.localeCompare(b)).map(([className, rows]) => {
       const link = academyLinks.get(className);
@@ -1026,10 +1026,10 @@ function academicApi(req, body, send) {
   const [path, query = ""] = req.url.split("?");
   const [, , , collection, id, sub] = path.split("/");
   if (collection === "audit-events" && req.method === "GET") {
-    if (!roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN")) return send(403, { detail: "Forbidden" });
+    if (!roles.includes("STAFF")) return send(403, { detail: "Forbidden" });
     return auditApi(query, send);
   }
-  const manager = roles.some(role => role === "ACADEMY_OWNER" || role === "ACADEMY_ADMIN");
+  const manager = roles.includes("STAFF");
   if (collection === "attendance-appeals") {
     if (!manager) return send(403, { detail: "Forbidden" });
     if (req.method === "GET") {
@@ -1050,7 +1050,7 @@ function academicApi(req, body, send) {
     return send(200, { ...appeal, outcome: myRecord.outcome });
   }
   if (collection === "attendance-records" && sub === "corrections" && req.method === "POST") {
-    if (!manager && !roles.includes("ATTENDANCE_OFFICER")) return send(403, { detail: "Forbidden" });
+    if (!manager) return send(403, { detail: "Forbidden" });
     const record = attendanceRecords.find(r => r.id === id);
     if (!record) return send(404, { detail: "Attendance record not found" });
     if (record.version !== body.version) return send(409, { detail: "This record was changed by someone else; reload and try again" });
@@ -1064,7 +1064,7 @@ function academicApi(req, body, send) {
   if (collection === "engagement-settings") {
     if (!manager) return send(403, { detail: "Forbidden" });
     if (req.method === "GET") return engagementSettings ? send(200, engagementSettings) : send(204);
-    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner switches engagement on or off" });
+    if (!roles.includes("STAFF")) return send(403, { detail: "Staff role required" });
     if ((engagementSettings?.version ?? null) !== (body.version ?? null)) return send(409, { detail: "Changed by someone else" });
     const newWording = engagementSettings && engagementSettings.consentText !== body.consentText;
     engagementSettings = { enabled: body.enabled, consentText: body.consentText, consentVersion: (engagementSettings?.consentVersion ?? 1) + (newWording ? 1 : 0),
@@ -1074,7 +1074,7 @@ function academicApi(req, body, send) {
   }
   if (collection === "attendance-policy") {
     if (req.method === "GET") return attendancePolicy ? send(200, attendancePolicy) : send(204);
-    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner records the attendance rule" });
+    if (!roles.includes("STAFF")) return send(403, { detail: "Staff role required" });
     if ((attendancePolicy?.version ?? null) !== (body.version ?? null)) return send(409, { detail: "The attendance rule was changed by someone else" });
     attendancePolicy = { minConnectedPercent: body.minConnectedPercent, lateAfterMinutes: body.lateAfterMinutes, description: body.description,
       autoFinalise: typeof body.autoFinalise === "boolean" ? body.autoFinalise : !!attendancePolicy?.autoFinalise,
@@ -1109,7 +1109,7 @@ function academicApi(req, body, send) {
     return send(405);
   }
   if (collection === "attendance" && id === "summary" && req.method === "GET") {
-    if (!manager && !roles.includes("ANALYST")) return send(403, { detail: "Owner, administrator or analyst role required" });
+    if (!manager) return send(403, { detail: "Staff role required" });
     const params = new URLSearchParams(query);
     if (!params.get("from") || !params.get("to") || params.get("to") < params.get("from")) return send(400, { detail: "from and to are required" });
     const withClasses = batches.filter(b => classSessions.some(c => c.batchIds.includes(b.id)));
@@ -1133,9 +1133,6 @@ function academicApi(req, body, send) {
     return send(200, { from: params.get("from"), to: params.get("to"), finalClasses: rows.length ? 2 : 0, classesNotFinal: 0,
       totals: sum, students: rows, method: summaryMethod });
   }
-  // Assigned staff may list batches; the mock has no assignments, so they see none.
-  if (!manager && (collection === "batches" || collection === "class-sessions") && !id && req.method === "GET"
-      && roles.some(r => staffRoles.includes(r))) return send(200, []);
   if (!manager) return send(403, { detail: "Forbidden" });
   if (req.method === "GET" && path.endsWith("/attendance/export")) {
     // The real export has more columns and one row per student; the mock proves the download path.
@@ -1161,7 +1158,7 @@ function academicApi(req, body, send) {
   if (collection === "student-invitations") return studentInvitations(req, body, send, id);
 
   if (collection === "students" && sub === "erasure" && req.method === "POST") {
-    if (!roles.includes("ACADEMY_OWNER")) return send(403, { detail: "Only an academy owner erases a student's data" });
+    if (!roles.includes("STAFF")) return send(403, { detail: "Staff role required" });
     const student = students.find(s => s.id === id);
     if (!student) return send(404, { detail: "Student not found" });
     if (String(body.confirmStudentNumber ?? "").trim().toUpperCase() !== student.studentNumber) return send(400, { detail: "Type the student's number to confirm" });
@@ -1214,56 +1211,6 @@ function academicApi(req, body, send) {
     return send(405);
   }
 
-  if (collection === "staff-accounts") {
-    const owner = roles.includes("ACADEMY_OWNER");
-    const forbidden = detail => send(403, { detail });
-    if (req.method === "GET" && !id) return send(200, staff);
-    if (req.method === "POST" && !id) {
-      const email = String(body.email).trim().toLowerCase();
-      if (body.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may grant the owner or administrator role");
-      if (staff.some(s => s.email === email) || students.some(s => s.email === email)) return send(409, { detail: "An account with this email already exists" });
-      const created = { id: uuid(), email, roles: [...body.roles].sort(), status: "PENDING_ACTIVATION", mfaEnrolled: false, version: 0 };
-      staff.push(created);
-      audit("STAFF_ACCOUNT_CREATED", "ACCOUNT", created.id, created.email, { roles: created.roles });
-      return send(201, created);
-    }
-    const person = staff.find(s => s.id === id);
-    if (!person) return notFound();
-    if (req.method === "GET") return send(200, person);
-    if (person.id === SELF_ID) return forbidden(sub === "roles" ? "You cannot change your own roles" : "You cannot disable your own account");
-    if (person.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may manage an owner or administrator account");
-    if (req.method === "PUT" && sub === "roles") {
-      if (body.roles.some(r => ELEVATED.includes(r)) && !owner) return forbidden("Only an academy owner may grant the owner or administrator role");
-      if (person.version !== body.version) return stale();
-      Object.assign(person, { roles: [...body.roles].sort(), version: person.version + 1 });
-      return send(200, person);
-    }
-    if (req.method === "POST" && sub === "disable") {
-      if (person.status !== "DISABLED") {
-        person.passwordSet = person.status === "ACTIVE" || person.passwordSet === true;
-        audit("STAFF_ACCOUNT_DISABLED", "ACCOUNT", person.id, person.email, {});
-      }
-      Object.assign(person, { status: "DISABLED" });
-      return send(200, person);
-    }
-    if (req.method === "POST" && sub === "enable") {
-      if (person.status === "DISABLED") {
-        const fresh = body?.requireNewPassword === true || !person.passwordSet;
-        Object.assign(person, { status: fresh ? "PENDING_ACTIVATION" : "ACTIVE", passwordSet: !fresh, version: person.version + 1 });
-        audit("STAFF_ACCOUNT_ENABLED", "ACCOUNT", person.id, person.email, { newPasswordRequired: String(fresh), statusNow: person.status });
-      }
-      return send(200, person);
-    }
-    return send(405);
-  }
-
-  if (collection === "assignments" && req.method === "DELETE") {
-    const index = assignments.findIndex(a => a.id === id);
-    if (index < 0) return notFound();
-    assignments.splice(index, 1);
-    return send(204);
-  }
-
   if ((collection === "batches" || collection === "courses") && sub === "engagement-ranking" && req.method === "GET" && path.endsWith("/export")) {
     const params = new URLSearchParams(query);
     audit("ENGAGEMENT_RANKING_EXPORTED", collection === "courses" ? "COURSE" : "BATCH", id, null, { from: params.get("from"), to: params.get("to") });
@@ -1278,23 +1225,6 @@ function academicApi(req, body, send) {
     return send(200, { limit: Number(params.get("limit") ?? 10), classes: classSessions.filter(c => c.batchIds.includes(id)).length,
       studentsCounted: 0, top: [], method: "(reactions per class, at most 10) + 3 × pulse answers, divided by classes expected" });
   }
-  if (collection === "batches" && sub === "assignments") {
-    const batch = batches.find(b => b.id === id);
-    if (!batch) return notFound();
-    if (req.method === "GET") return send(200, assignments.filter(a => a.batchId === id));
-    const person = staff.find(s => s.email === String(body.email).trim().toLowerCase());
-    if (!person) return send(404, { detail: "Staff account not found" });
-    if (person.status === "DISABLED") return send(409, { detail: "A disabled account cannot be assigned" });
-    if (!person.roles.includes(body.role)) return send(409, { detail: `The account does not hold the ${body.role} role` });
-    if (assignments.some(a => a.batchId === id && a.accountId === person.id && a.role === body.role)) {
-      return send(409, { detail: "The account is already assigned to this batch in this role" });
-    }
-    const created = { id: uuid(), batchId: id, courseId: batch.courseId, batchCode: batch.code, batchName: batch.name,
-      accountId: person.id, email: person.email, role: body.role, createdAt: new Date().toISOString() };
-    assignments.push(created);
-    return send(201, created);
-  }
-
   if (collection === "accounts" && sub === "invitations" && req.method === "POST") {
     const student = students.find(s => s.accountId === id) ?? staff.find(s => s.id === id);
     if (!student) return notFound();
@@ -1392,7 +1322,13 @@ function academicApi(req, body, send) {
       audit("PULSE_OPENED", "CLASS_SESSION", session.id, session.title, { minutes: String(body.minutes), options: String(body.options.length) });
       return send(201, question);
     }
-    if (sub === "attendance" && req.method === "GET") return send(200, mockAttendance(session));
+    if (sub === "attendance" && req.method === "GET") {
+      const facts = mockAttendance(session);
+      const run = runSessions.get(session.id);
+      if (run) facts.webinarEnded = run.state === "ENDED";
+      if (new URLSearchParams(query).get("includeOnlineHistory") === "true") facts.onlineHistory = onlineHistories.get(session.id) ?? [];
+      return send(200, facts);
+    }
     if (sub === "attendance" && req.method === "POST" && path.endsWith("/attendance/recalculation")) {
       const final = finalisedClasses.get(session.id);
       if (!final) return send(409, { detail: "This class is not final yet; finalise it instead" });
