@@ -5,6 +5,7 @@ import { SessionSync } from "@/components/SessionSync";
 export const metadata: Metadata = {
   title: "LUMA | Physics Cube Academy",
   description: "Physics Cube Academy staff and student portals",
+  icons: { icon: { url: "/physics-cube-academy-logo.jpg", type: "image/jpeg" } },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

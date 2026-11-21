@@ -23,7 +23,7 @@ test.describe("Student ID sign-in (Academy request)", () => {
     await expect(page.locator(".session-error")).toHaveText("We couldn’t find that registration ID. Check it and try again.");
   });
 
-  test("Students can change the quote while sign-in is pending", async ({ page }) => {
+  test("Tips rotate below the form while sign-in is pending and disappear in the portal", async ({ page }) => {
     let release: () => void = () => {};
     const pending = new Promise<void>(resolve => { release = resolve; });
     await page.route("**/api/session/student-login", async route => {
@@ -31,20 +31,22 @@ test.describe("Student ID sign-in (Academy request)", () => {
       await route.continue();
     });
     await page.goto("/sign-in?portal=student");
+    await expect(page.locator('head link[rel="icon"]')).toHaveAttribute("href", "/physics-cube-academy-logo.jpg");
+    const tip = page.locator(".student-sign-in-tip");
+    await expect(tip).toHaveCount(0);
     await page.getByLabel("Registration ID").fill("PCA001");
     const submission = page.getByRole("button", { name: "View my attendance" }).click();
     try {
-      await expect(page.getByRole("status")).toHaveText(/Signing in and opening your attendance/);
-      await page.getByRole("button", { name: "Pause quotes" }).click({ noWaitAfter: true });
-      const quote = page.locator("blockquote");
+      await expect(tip.getByRole("status")).toHaveText("Signing in…");
+      const quote = tip.locator("blockquote");
       const previous = await quote.textContent();
-      await page.getByRole("button", { name: "Next quote" }).click({ noWaitAfter: true });
-      await expect(quote).not.toHaveText(previous ?? "");
+      await expect(quote).not.toHaveText(previous ?? "", { timeout: 7000 });
     } finally {
       release();
       await submission;
     }
     await expect(page).toHaveURL(/\/student$/);
+    await expect(tip).toHaveCount(0);
   });
 
   test("The staff sign-in page shows only the staff form", async ({ page }) => {

@@ -13,8 +13,8 @@ const paths = {
   external: "M13 5h6v6m0-6-9 9m8 0v5H5V6h5",
   lock: "M7 11V7a5 5 0 0 1 10 0v4m-12 0h14v10H5z",
   exit: "M13 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8m3-4 4-4-4-4m-6 4h10",
-  collapse: "M4 4h16v16H4zM9 4v16m6-11-3 3 3 3",
-  expand: "M4 4h16v16H4zM9 4v16m4-11 3 3-3 3",
+  collapse: "m14 6-6 6 6 6",
+  expand: "m10 6 6 6-6 6",
 } as const;
 
 export function PortalIcon({ name }: { name: keyof typeof paths }) {

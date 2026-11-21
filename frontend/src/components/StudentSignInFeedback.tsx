@@ -13,29 +13,23 @@ function nextQuote(current: number) {
   return (current + 1 + Math.floor(Math.random() * (quotes.length - 1))) % quotes.length;
 }
 
-export function StudentSignInFeedback({ status, initialQuote = 0 }: { status: string; initialQuote?: number }) {
+function StudentSignInTip({ initialQuote }: { initialQuote: number }) {
   const [index, setIndex] = useState(initialQuote);
-  const [paused, setPaused] = useState(false);
   const quote = quotes[index];
 
   useEffect(() => {
-    if (paused) return;
-    const timer = window.setInterval(() => {
+    const timer = window.setTimeout(() => {
       setIndex(nextQuote(index));
     }, 5000);
-    return () => window.clearInterval(timer);
-  }, [index, paused]);
+    return () => window.clearTimeout(timer);
+  }, [index]);
 
-  return <div className="student-sign-in-feedback">
-    <p className="student-sign-in-status" role="status"><span aria-hidden="true" />{status}</p>
-    <figure>
+  return <div className="student-sign-in-tip">
+    <p className="student-sign-in-status" role="status">Signing in…</p>
+    <figure key={index}>
       <blockquote>{quote.text}</blockquote>
       {quote.author && <figcaption>{quote.author}</figcaption>}
     </figure>
-    <div className="student-sign-in-controls">
-      <button type="button" onClick={() => setIndex(nextQuote(index))}>Next quote</button>
-      <button type="button" onClick={() => setPaused(!paused)}>{paused ? "Resume quotes" : "Pause quotes"}</button>
-    </div>
   </div>;
 }
 
@@ -85,6 +79,6 @@ export function StudentSignInForm({ children, ...props }: ComponentProps<"form">
   return <form {...props} data-sign-in-pending={pendingQuote !== null} onSubmit={submit}>
     {children}
     {failed && <p className="session-error" role="alert">Couldn’t reach the sign-in service. Please try again.</p>}
-    {pendingQuote !== null && <StudentSignInFeedback status="Signing in and opening your attendance…" initialQuote={pendingQuote} />}
+    {pendingQuote !== null && <StudentSignInTip initialQuote={pendingQuote} />}
   </form>;
 }

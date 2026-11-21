@@ -2860,3 +2860,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The landing route verifies the current session and redirects to the account's default portal. It uses existing silent renewal when the access cookie has expired. Accounts with both roles use the existing Staff default. Signed-out visitors see the portal cards, including immediately after logout.
 - Production build, ESLint, 81 frontend unit tests, HTTP smoke, 8 focused desktop and mobile browser tests, and structure validation passed. Browser checks used synthetic accounts. The rebuilt frontend is running on port 3000. Its public landing and logout redirect were verified, and backend readiness returned HTTP 200. Real account sign-in was not exercised.
 - Roll out by rebuilding the frontend. Revert the commit and rebuild to roll back. No backend or database change is needed.
+
+## Student loading tips and PCA tab branding (2026-11-22)
+
+- Student sign-in shows one short tip below the form while the request is pending. Tips fade in and out, respect reduced-motion preferences, and rotate every five seconds. Student portal pages use a plain loading skeleton.
+- The browser tab uses the same PCA logo asset as the in-page header. The sidebar divider toggle uses a small circular chevron with a larger clickable area.
+- Production build, ESLint, 81 unit tests, session HTTP smoke, 10 desktop/mobile browser checks, and structure validation passed. Browser checks used synthetic accounts. Rebuilt and restarted port 3000, and confirmed the favicon metadata and image response on the running frontend. Real account sign-in was not exercised.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No API or database change is needed.

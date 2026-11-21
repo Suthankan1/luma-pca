@@ -19,6 +19,7 @@ test("the Home report shortcut uses Reports and sidebar collapse survives naviga
   const rail = page.getByRole("complementary", { name: "Staff navigation" });
   const collapse = rail.getByRole("button", { name: "Collapse sidebar" });
   const expand = rail.getByRole("button", { name: "Expand sidebar" });
+  await expect(collapse.locator("svg")).toHaveCSS("border-radius", "50%");
   const bounds = (element: Element) => {
     const button = element.getBoundingClientRect();
     const rail = element.closest("aside")!.getBoundingClientRect();
