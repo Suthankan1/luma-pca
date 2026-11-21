@@ -63,15 +63,25 @@ export async function assignPaymentRoster(_previous: FormState, form: FormData):
     const input = form.get("webinar");
     const webinar = typeof input === "string" ? input.trim() : "";
     if (!webinar || webinar.length > 500) return { ok: false, message: "Enter the class’s Zoom link or webinar ID." };
-    const tracked = await staffApi<WebinarMonitor>("/api/v1/zoom/monitors", { method: "POST", body: { webinar } }, 20000);
-    if (!tracked.ok) return { ok: false, message: zoomProblem(tracked.status, tracked.detail) };
+    const tracked = await staffApi<WebinarMonitor>("/api/v1/zoom/monitors", { method: "POST", body: { webinar } }, 60000);
+    if (!tracked.ok) {
+      revalidatePath("/staff/class-types");
+      return { ok: false, message: tracked.status === 503 && !tracked.detail
+        ? "Zoom tracking did not respond in time. Refresh Class Types and check the tracking status before retrying."
+        : zoomProblem(tracked.status, tracked.detail), values: { academyClassName: name } };
+    }
     id = tracked.data.id;
     revalidatePath("/staff/class-types");
     revalidatePath("/staff/sessions");
   }
   const result = await staffApi<{ academyStudents: number }>(`/api/v1/zoom/monitors/${id}/payment-roster`,
-    { method: "PUT", body: { academyClassName: name } }, 25000);
-  if (!result.ok) return { ok: false, message: result.detail ?? problemMessage(result.status, undefined) };
+    { method: "PUT", body: { academyClassName: name } }, 60000);
+  if (!result.ok) {
+    revalidatePath("/staff/class-types");
+    return { ok: false, message: result.detail ?? (result.status === 503
+      ? "Roster sync did not respond in time. Refresh Class Types and check the sync status before retrying."
+      : problemMessage(result.status, undefined)), values: { academyClassName: name } };
+  }
   revalidatePath("/staff/class-types");
   revalidatePath("/staff/sessions");
   revalidatePath("/staff/academy");

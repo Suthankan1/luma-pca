@@ -159,19 +159,24 @@ class WebinarRunTracker {
 
     /**
      * A webinar was just added (or resumed) while it may already be running, or ran recently: its events already stored
-     * (the inbox keeps every event it receives) are applied in order, so the run starts at Zoom's actual start rather than
-     * at the next event. Only occurrences with an event in the last {@code since} and no run yet.
+     * are used to restore the run's first-seen time and actual start and end. Participant evidence is already stored
+     * separately, so only the first event and lifecycle events need to update the run.
      */
     void backfill(UUID academyId, String webinarId, Instant since) {
         List<Map<String, Object>> events = jdbc.queryForList("""
+                WITH history AS (
+                  SELECT e.*, row_number() OVER (PARTITION BY e.occurrence_uuid ORDER BY e.event_ts, e.created_at, e.receipt_id) AS event_order
+                  FROM zoom_occurrence_events e
+                  WHERE e.academy_id = ? AND e.webinar_id = ?
+                    AND e.occurrence_uuid IN (SELECT occurrence_uuid FROM zoom_occurrence_events WHERE academy_id = ? AND webinar_id = ?
+                                              AND event_ts >= ?)
+                    AND NOT EXISTS (SELECT 1 FROM zoom_webinar_runs w WHERE w.academy_id = e.academy_id AND w.occurrence_uuid = e.occurrence_uuid)
+                )
                 SELECT e.occurrence_uuid, e.event_type, e.event_ts, r.payload::text AS body
-                FROM zoom_occurrence_events e
+                FROM history e
                 JOIN zoom_webhook_receipts r ON r.id = e.receipt_id
-                WHERE e.academy_id = ? AND e.webinar_id = ?
-                  AND e.occurrence_uuid IN (SELECT occurrence_uuid FROM zoom_occurrence_events WHERE academy_id = ? AND webinar_id = ?
-                                            AND event_ts >= ?)
-                  AND NOT EXISTS (SELECT 1 FROM zoom_webinar_runs w WHERE w.academy_id = e.academy_id AND w.occurrence_uuid = e.occurrence_uuid)
-                ORDER BY e.event_ts, e.created_at
+                WHERE e.event_order = 1 OR e.event_type IN ('webinar.started', 'webinar.ended')
+                ORDER BY e.event_ts, e.created_at, e.receipt_id
                 """, academyId, webinarId, academyId, webinarId, since.toEpochMilli());
         for (Map<String, Object> event : events) {
             Map<?, ?> object = Map.of();

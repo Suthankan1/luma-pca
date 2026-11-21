@@ -2962,3 +2962,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The frontend had hidden the entire form when a monthly row had no active Zoom monitor. Every row now shows the payment dropdown. Track and sync reuses a single saved webinar ID when available, and otherwise requires staff to supply the Zoom link or ID. If Academy payment options are unavailable, the dropdown remains visible and disabled.
 - Uses the existing staff-only Zoom tracking and roster assignment APIs. If tracking succeeds and roster sync fails, the webinar is tracked and staff can retry the sync. No backend or database changes.
 - Production build and five Chromium browser checks passed. Coverage includes the missing dropdown regression and tracking a saved webinar ID before syncing a 140-student fixture. Restarted local frontend, verified staff sign-in HTTP 200 and API readiness UP. Real Zoom tracking and payment sync were not exercised. Roll back by reverting and rebuilding the frontend.
+
+## Speed up Zoom tracking before payment roster sync (2026-11-22)
+
+- Local backend logs showed Track and sync timing out during replay of historic Zoom events. Backfill now processes one first event per occurrence and all start/end events. Participant visits are already stored and stay available to attendance.
+- The roster action waits up to 60 seconds per operation and gives separate tracking and roster timeout messages. A failed request keeps the selected payment name.
+- Passed 16 backend integration tests, the targeted backfill test with a 30-minute stored participant visit, two Chromium tests, frontend production build, targeted ESLint and structure validation. Rebuilt and restarted the local services with the original configuration. No production roster operation was submitted during verification. Roll back by reverting and rebuilding both apps. No migration.

@@ -20,7 +20,8 @@ export function PaymentRosterForm({ monitorId, webinarId, assigned, classes }: {
     </span>
     {synced && <span className="muted">Expected per run: {source.studentCount}</span>}
     <label className="academy-link">Academy payment class
-      <select key={assigned} name="academyClassName" defaultValue={source?.className ?? ""} required disabled={pending || !available}>
+      <select key={state?.ok === false ? state.values?.academyClassName : assigned}
+        name="academyClassName" defaultValue={state?.values?.academyClassName ?? source?.className ?? ""} required disabled={pending || !available}>
         <option value="">{!classes ? "Academy database unavailable" : available ? "Select payment class" : "No payment classes found"}</option>
         {classes?.map(item => <option key={item.className} value={item.className}>{item.className}</option>)}
       </select>
