@@ -803,7 +803,7 @@ paths:
                 type: array
                 items:
                   type: object
-                  required: [id, title, startsAt, timeZone, batchCode, joinUrl]
+                  required: [id, title, startsAt, timeZone, batchCode]
                   properties:
                     id: {type: string}
                     title: {type: string}
@@ -811,7 +811,6 @@ paths:
                     durationMinutes: {type: integer, nullable: true}
                     timeZone: {type: string}
                     batchCode: {type: string}
-                    joinUrl: {type: string, format: uri}
         '400': {description: Invalid window}
         '401': {description: Sign-in required}
         '403': {description: Caller is not a student}

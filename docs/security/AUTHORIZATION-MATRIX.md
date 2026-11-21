@@ -43,6 +43,7 @@ linked to a batch the caller is enrolled in on the slot date. Live attendance ch
 the class window and current Zoom evidence. It exposes only distinct totals for the caller's batch scope and the caller's
 own observed join and connected time. No other participant details or roster are returned. Ended, cancelled and out-of-scope
 classes return 404 for live attendance. Both routes require STUDENT and return private, no-store responses.
+Student class and schedule responses omit Zoom join URLs and webinar IDs.
 
 ## History (superseded by the two-role model)
 

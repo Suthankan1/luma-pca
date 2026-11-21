@@ -187,7 +187,7 @@ function studentApi(req, send, body) {
     return send(200, studentHasEnrolments && Date.parse(startsAt) >= Date.parse(url.searchParams.get("from"))
       && Date.parse(startsAt) < Date.parse(url.searchParams.get("to")) ? [{
         id: "mock-zoom-slot", title: "Upcoming Zoom webinar", startsAt, durationMinutes: 60,
-        timeZone: "Asia/Colombo", batchCode: mon.code, joinUrl: "https://zoom.us/j/89900000000",
+        timeZone: "Asia/Colombo", batchCode: mon.code,
       }] : []);
   }
   if (url.pathname === "/api/v1/me/class-sessions/00000000-0000-4000-8000-0000000000f4/live-attendance") {
@@ -274,7 +274,7 @@ function studentApi(req, send, body) {
       localDate: new Date(Date.now() - 20 * 60_000).toISOString().slice(0, 10) }];
     return send(200, [...classes.map(({ offset, ...c }) => ({ ...c, startsAt: `${day(offset)}T12:30:00Z`, endsAt: `${day(offset)}T14:30:00Z`,
       timeZone: "Asia/Colombo", localDate: day(offset) })), ...live].filter(c => Date.parse(c.startsAt) >= from && Date.parse(c.startsAt) < to)
-      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map(c => ({ ...c, joinUrl: c.status === "SCHEDULED" ? "https://zoom.us/j/81234567890" : null })));
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
   }
   return send(404);
 }

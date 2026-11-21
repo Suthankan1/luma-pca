@@ -43,7 +43,6 @@ export default async function StudentLivePage() {
           <div><span className="student-live-badge">Live now</span><h2>{session.title}</h2>
             <p className="panel-sub">Started {formatClock(session.startsAt, ACADEMY_TIME_ZONE)} · {session.batches.map(b => b.code).join(", ")}</p></div>
           <div className="next-class-actions">
-            {session.joinUrl && <a className="action" href={session.joinUrl} target="_blank" rel="noopener noreferrer">Join on Zoom</a>}
             {canParticipate && <Link className="action secondary" href={`/student/classes/${session.id}`}>React and answer</Link>}
           </div>
         </header>

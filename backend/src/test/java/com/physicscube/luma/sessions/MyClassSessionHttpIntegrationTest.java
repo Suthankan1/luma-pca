@@ -104,15 +104,13 @@ class MyClassSessionHttpIntegrationTest extends StaffApiIntegrationTest {
         assertEquals(List.of(first, cancelled, shared, afterWithdrawal), mine.stream().map(m -> m.get("id")).toList());
         assertEquals(List.of("A"), batchCodes(mine.get(0)));
         assertEquals("CANCELLED", mine.get(1).get("status"));
-        assertEquals("https://zoom.us/j/81234567890", mine.get(0).get("joinUrl"), "the Academy asked for joining links");
-        assertEquals(null, mine.get(1).get("joinUrl"), "no join link for a cancelled class");
         assertEquals(List.of("A", "B"), batchCodes(mine.get(2)));
         assertEquals(List.of("B"), batchCodes(mine.get(3)), "no longer listed under the batch they left");
         assertEquals("2027-01-06", mine.get(0).get("localDate"));
         assertEquals("Asia/Colombo", mine.get(0).get("timeZone"));
         for (Map<String, Object> view : mine) {
             assertFalse(view.containsKey("zoomWebinarId"), "students do not get the webinar ID");
-            assertEquals(java.util.Set.of("id", "title", "startsAt", "endsAt", "timeZone", "localDate", "status", "batches", "joinUrl", "origin"),
+            assertEquals(java.util.Set.of("id", "title", "startsAt", "endsAt", "timeZone", "localDate", "status", "batches", "origin"),
                     view.keySet());
         }
     }

@@ -74,7 +74,7 @@ public class WebinarMonitorService {
     }
 
     public record StudentSchedule(String id, String title, Instant startsAt, Integer durationMinutes,
-                                  String timeZone, String batchCode, String joinUrl) {
+                                  String timeZone, String batchCode) {
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +88,7 @@ public class WebinarMonitorService {
         Instant now = DbTime.now();
         List<StudentSchedule> schedule = new ArrayList<>();
         var monitors = jdbc.queryForList("""
-                SELECT id, webinar_id, topic, time_zone, scheduled_start_at, duration_minutes, recurring,
+                SELECT id, topic, time_zone, scheduled_start_at, duration_minutes, recurring,
                        occurrences, academy_class_name
                 FROM zoom_webinar_monitors
                 WHERE academy_id = ? AND active AND sync_status = 'OK' AND academy_class_name IS NOT NULL
@@ -111,8 +111,7 @@ public class WebinarMonitorService {
                         && (e.withdrawnOn() == null || e.withdrawnOn().isAfter(day))).findFirst().ifPresent(e ->
                         schedule.add(new StudentSchedule(monitor.get("id") + ":" + start,
                                 java.util.Objects.requireNonNullElse((String) monitor.get("topic"), "Zoom class"),
-                                start, slot.durationMinutes(), zone.getId(), e.batchCode(),
-                                "https://zoom.us/j/" + monitor.get("webinar_id"))));
+                                start, slot.durationMinutes(), zone.getId(), e.batchCode())));
             }
         }
         return schedule.stream().distinct().sorted(java.util.Comparator.comparing(StudentSchedule::startsAt)

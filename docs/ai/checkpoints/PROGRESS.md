@@ -2874,3 +2874,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Added two STUDENT-only private reads for linked Zoom schedule slots and live attendance. They apply academy and date-specific batch access. Live Now shows distinct counts for the viewer's enrolled batches, a scrub-able graph and the viewer's own connection facts. An ended class hides counts and shows previous and next classes within 45 days.
 - Ten targeted backend tests passed, including PostgreSQL/Testcontainers endpoint authorization, batch scoping, duplicate visits and ended state. The backend packaged in a separate directory because the existing local runtime held the workspace JAR. Frontend production build, ESLint, 81 unit tests, session HTTP smoke, 18 Chromium desktop/mobile tests, structure check and the 115-endpoint OpenAPI check passed.
 - Verified the three pages against the isolated synthetic preview on port 3450. The original API still reports ready. The licensed Zoom account and the full real-stack browser suite were not used for verification. Release the backend before the frontend. No migration. Roll back in reverse order.
+
+## Student Zoom link privacy (2026-11-22)
+
+- Removed Zoom join links from Calendar and Live Now and from both student timetable API responses. Calendar de-duplication now matches title, start and batch. Staff Zoom routes were outside the change.
+- Production build, ESLint, eight targeted PostgreSQL backend tests, six desktop/mobile student browser tests, structure and OpenAPI checks passed. Restarted the local frontend and backend and verified student sign-in and backend readiness. Signed-in browser checks used synthetic accounts.
+- Release the backend before the frontend so raw timetable responses stop carrying links first. Revert both builds to roll back. No migration.

@@ -100,7 +100,9 @@ class ProvisionalAttendanceIntegrationTest extends StaffApiIntegrationTest {
                 """, UUID.randomUUID(), academyId, java.sql.Timestamp.from(now.plusSeconds(3600)), owner);
         String schedule = "/api/v1/me/webinar-schedule?from=" + now + "&to=" + now.plusSeconds(7200);
         assertEquals(200, api.get(schedule, viewer).statusCode());
-        org.junit.jupiter.api.Assertions.assertTrue(api.get(schedule, viewer).body().contains("Upcoming Physics"));
+        var scheduleBody = api.get(schedule, viewer).body();
+        org.junit.jupiter.api.Assertions.assertTrue(scheduleBody.contains("Upcoming Physics"));
+        assertFalse(scheduleBody.contains("joinUrl") || scheduleBody.contains("89900000000"));
         assertEquals("[]", api.get(schedule, unrelated).body());
         assertEquals(403, api.get(schedule, admin).statusCode());
         assertEquals(401, api.get(schedule, null).statusCode());

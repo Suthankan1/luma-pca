@@ -29,7 +29,7 @@ test("Students open their report and select scheduled classes on a monthly calen
   const calendar = page.getByRole("region", { name: "Class calendar" });
   await calendar.getByRole("button", { name: new RegExp(longDayLabel(date)) }).click();
   await expect(page.getByText("Upcoming Zoom webinar")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open in Zoom" })).toHaveAttribute("href", "https://zoom.us/j/89900000000");
+  await expect(page.locator('a[href*="zoom.us"]')).toHaveCount(0);
   await calendar.getByRole("link", { name: "Next month" }).click();
   await expect(page.getByText("Upcoming Zoom webinar")).toHaveCount(0);
   await calendar.getByRole("link", { name: "Go to today" }).click();
@@ -43,7 +43,7 @@ test("Live Now updates its plotted counts and hides them when the class ends", a
     await signIn(page);
     await page.getByRole("link", { name: "Live Now" }).click();
     await expect(page.getByRole("heading", { name: "Live class now" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Join on Zoom" })).toHaveAttribute("href", "https://zoom.us/j/81234567890");
+    await expect(page.locator('a[href*="zoom.us"]')).toHaveCount(0);
     const chart = page.getByRole("slider", { name: "Explore online counts over time" });
     await expect(chart).toHaveAttribute("aria-valuetext", /12 online/);
     await chart.press("Home");

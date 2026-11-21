@@ -56,8 +56,6 @@ export function StudentCalendar({ month, today, selectedDay, weeks, entries }: {
               {entry.endsAt && !entry.estimatedEnd && `–${formatClock(entry.endsAt, ACADEMY_TIME_ZONE)}`}</time>
             <strong>{entry.title}</strong>
             <span>{entry.batchCodes.join(", ")}{entry.cancelled && " · Cancelled"}</span>
-            {!entry.cancelled && entry.date >= today && entry.joinUrl &&
-              <a className="text-link" href={entry.joinUrl} target="_blank" rel="noopener noreferrer">Open in Zoom</a>}
           </li>)}
         </ul>}
       </div>
