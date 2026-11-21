@@ -12,6 +12,7 @@ import {
   activationPath,
   activationProblem,
   extractActivationToken,
+  hasPortal,
   isSameOrigin,
   openAccess,
   passwordChangeProblem,
@@ -48,6 +49,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
   }
 
   const go = (path: string) => new NextResponse(null, { status: 303, headers: { ...noStore, Location: path } });
+  let safePreferred: "staff" | "student" | undefined = action === "student-login" ? "student" : undefined;
+  const signInPath = (error?: string) => {
+    const params = new URLSearchParams();
+    if (error) params.set("error", error);
+    if (safePreferred) params.set("portal", safePreferred);
+    return params.size ? `/sign-in?${params}` : "/sign-in";
+  };
   try {
     const { origin, names, secure, key } = config();
     if (!isSameOrigin(request.headers.get("origin"), origin, request.headers.get("sec-fetch-site"))) {
@@ -68,11 +76,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
         const result = await authRequest("logout", { body: { refreshToken } });
         if (result.status !== 204) return go("/sign-in?error=sign-out");
       }
-      return clearAll("/sign-in?signedOut=1");
+      return clearAll("/?signedOut=1");
     }
-
-    if ((action === "login" || action === "student-login") && refreshToken) return go("/sign-in");
-    if (action === "refresh" && !refreshToken) return clearAll("/sign-in?error=expired");
 
     if (request.headers.get("content-type")?.split(";")[0] !== "application/x-www-form-urlencoded") {
       return new NextResponse(null, { status: 415, headers: noStore });
@@ -93,9 +98,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     }
     const form = new URLSearchParams(encoded);
     const preferred = form.get("portal");
-    const safePreferred = preferred === "staff" || preferred === "student" ? preferred : undefined;
-    const errorPath = (error: string) =>
-      `/sign-in?error=${error}${safePreferred ? `&portal=${safePreferred}` : ""}`;
+    if (action !== "student-login" && (preferred === "staff" || preferred === "student")) safePreferred = preferred;
+    if ((action === "login" || action === "student-login") && refreshToken) return go(signInPath());
+    if (action === "refresh" && !refreshToken) return clearAll(signInPath("expired"));
 
     if (action === "activate") {
       // Independent of any session in this browser: it only sets the invited account's password.
@@ -167,11 +172,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     const password = form.get("password");
     const studentId = form.get("studentId")?.trim();
     if (action === "login" && (!email || email.length > 254 || !password || password.length > 256)) {
-      return go(errorPath("invalid"));
+      return go(signInPath("invalid"));
     }
     if (action === "student-login") {
       if (!studentIdLoginEnabled()) return new NextResponse(null, { status: 404, headers: noStore });
-      if (!studentId || studentId.length > 60) return go(errorPath("student"));
+      if (!studentId || studentId.length > 60) return go(signInPath("student"));
     }
 
     const result = action === "student-login"
@@ -182,11 +187,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       );
 
     if (result.status === 401 || result.status === 400) {
-      if (action === "student-login") return go(errorPath("student"));
-      return action === "login" ? go(errorPath("invalid")) : clearAll(errorPath("expired"));
+      if (action === "student-login") return go(signInPath("student"));
+      return action === "login" ? go(signInPath("invalid")) : clearAll(signInPath("expired"));
     }
-    if (result.status === 429) return go(errorPath("limited"));
-    if (!result.ok) return go(errorPath("unavailable"));
+    if (result.status === 429) return go(signInPath("limited"));
+    if (!result.ok) return go(signInPath("unavailable"));
 
     const tokens = await readTokens(result);
 
@@ -194,12 +199,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     let identity: Identity | null = null;
     try {
       identity = await readIdentity(tokens.accessToken);
-      destination = identity ? portalPath(identity, safePreferred) : errorPath("expired");
+      destination = identity ? portalPath(identity, safePreferred) : signInPath("expired");
     } catch {
-      destination = errorPath("unavailable");
+      destination = signInPath("unavailable");
     }
 
-    const response = go(destination);
+    const wrongPortal = identity && safePreferred && !hasPortal(identity, safePreferred);
+    if (action !== "refresh" && (wrongPortal || !identity || destination.startsWith("/sign-in"))) {
+      const revoked = await authRequest("logout", { body: { refreshToken: tokens.refreshToken } });
+      if (revoked.status !== 204) return go(signInPath("unavailable"));
+      return go(wrongPortal ? signInPath("portal") : destination);
+    }
+
+    const response = go(wrongPortal ? signInPath("portal") : destination);
     response.cookies.set(names.access, sealAccess({ token: tokens.accessToken, identity }, key), sessionCookie(secure, tokens.expiresIn));
     response.cookies.set(names.refresh, tokens.refreshToken, sessionCookie(secure, tokens.refreshExpiresIn));
     return response;
@@ -207,6 +219,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     if (action === "activate") return go(activationPath("unavailable"));
     if (action === "reset-request") return go("/forgot-password?error=unavailable");
     if (action === "reset-confirm") return go(resetPath("unavailable"));
-    return go(action === "logout" ? "/sign-in?error=sign-out" : "/sign-in?error=unavailable");
+    return go(action === "logout" ? "/sign-in?error=sign-out" : signInPath("unavailable"));
   }
 }

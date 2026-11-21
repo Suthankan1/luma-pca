@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NAMED = new Set(["/staff/students/import", "/staff/students/manage", "/staff/sessions/types"]);
 const RECORD_PAGES = /^\/(staff\/(sessions|students|team|batches)|student\/classes)\/[^/]+$/;
 
-type Renewed = { sealed: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number } | null;
+type Renewed = { sealed: string; refreshToken: string; expiresIn: number; refreshExpiresIn: number } | "expired" | null;
 /**
  * Renewals in progress, by refresh token: a page and the pages it prefetches arrive together with the same expired
  * session, and share one renewal instead of each asking the API.
@@ -59,13 +59,22 @@ async function routeRequest(request: NextRequest) {
     // A success is kept briefly so requests a moment behind reuse it; a failure (for example the API briefly down) is
     // forgotten at once so the next page load tries again.
     renewal.then(result => {
-      if (result) setTimeout(() => inFlight.delete(presented), 5000);
+      if (result && result !== "expired") setTimeout(() => inFlight.delete(presented), 5000);
       else inFlight.delete(presented);
     });
   }
   const renewed = await renewal;
-  // Refused (expired or signed out): leave the cookies alone; the page shows the sign-in page.
   if (!renewed) return NextResponse.next();
+  if (renewed === "expired") {
+    // Protected requests still go through their normal access checks. Clear stale state on sign-in so the form can open.
+    if (pathname !== "/sign-in") return NextResponse.next();
+    const headers = new Headers(request.headers);
+    const remaining = request.cookies.getAll().filter(cookie => cookie.name !== names.refresh);
+    headers.set("cookie", remaining.map(cookie => `${cookie.name}=${cookie.value}`).join("; "));
+    const response = NextResponse.next({ request: { headers } });
+    response.cookies.set(names.refresh, "", sessionCookie(secure, 0));
+    return response;
+  }
   const headers = new Headers(request.headers);
   headers.set("cookie", cookieHeaderWith(request.headers.get("cookie"), { [names.access]: renewed.sealed, [names.refresh]: renewed.refreshToken }));
   const response = NextResponse.next({ request: { headers } });
@@ -82,6 +91,7 @@ async function renew(refreshToken: string, client: string | null, key: Buffer): 
       headers: { "Content-Type": "application/json", ...(client ? { "X-Forwarded-For": client } : {}) },
       body: JSON.stringify({ refreshToken }),
     });
+    if (refreshed.status === 401) return "expired";
     if (!refreshed.ok) return null;
     const tokens = validateTokens(await refreshed.json());
     // The page checks the renewed token with the API before showing any protected content.

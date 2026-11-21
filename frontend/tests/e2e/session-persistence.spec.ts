@@ -22,7 +22,7 @@ test.describe("Staying signed in", () => {
     }
 
     await page.getByRole("complementary", { name: "Academy navigation" }).getByRole("button", { name: "Sign out" }).click();
-    await expect(page).toHaveURL(/\/sign-in\?signedOut=1$/);
+    await expect(page).toHaveURL("/");
     expect((await context.cookies()).filter(c => c.name.startsWith("luma-"))).toEqual([]);
     await page.goto("/student");
     await expect(page).toHaveURL(/\/sign-in\?portal=student/);

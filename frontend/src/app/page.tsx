@@ -12,12 +12,12 @@ export default function Home() {
       </section>
       <ClassroomScene />
       <div className="entry-cards">
-        <Link className="entry-card" href="/sign-in?portal=student">
+        <Link className="entry-card" href="/sign-in?portal=student" prefetch={false}>
           <span className="entry-card-top"><span className="entry-icon" aria-hidden>↗</span><span className="entry-number">STUDENT</span></span>
           <strong>Student sign in</strong>
           <span className="entry-go" aria-hidden>View attendance <span>↗</span></span>
         </Link>
-        <Link className="entry-card" href="/sign-in?portal=staff">
+        <Link className="entry-card" href="/sign-in?portal=staff" prefetch={false}>
           <span className="entry-card-top"><span className="entry-icon" aria-hidden>▦</span><span className="entry-number">STAFF</span></span>
           <strong>Staff sign in</strong>
           <span className="entry-go" aria-hidden>Manage attendance <span>↗</span></span>

@@ -3,15 +3,24 @@ sequenceDiagram
   participant BFF as Next.js BFF
   participant API as Spring Identity API
   participant DB as PostgreSQL
-  Note over User,API: Every role signs in with email and password; there is no second factor (MFA removed 2026-11-20)
-  User->>BFF: Login credentials over HTTPS (POST /api/session/login)
+  User->>BFF: Select Staff or Student on the landing page
+  BFF-->>User: Sign-in form for the selected portal
+  User->>BFF: Credentials (email and password, or student registration ID when enabled)
   Note over User,BFF: BFF checks Origin and Sec-Fetch-Site on mutations
-  BFF->>API: POST /auth/login
-  API->>DB: Check password, account status and lockout; start refresh session
+  BFF->>API: POST /auth/login or /auth/student-id-login
+  API->>DB: Verify credentials and account eligibility; start refresh session
   API-->>BFF: Access JWT and opaque refresh token
   BFF->>API: GET /auth/me (current roles)
-  BFF-->>User: HttpOnly SameSite session cookies, redirect to /staff or /student
+  alt Account can access the selected portal
+    BFF-->>User: HttpOnly SameSite cookies and redirect to the selected portal
+  else Account lacks access to the selected portal
+    BFF->>API: Revoke the newly issued session
+    BFF-->>User: Return to the selected sign-in form with an access error
+  end
   User->>BFF: Protected request with session cookie
   BFF->>API: Bearer JWT on server-side request
   API->>API: Check token, live session, auth version, roles and resource scope
   Note over BFF,API: Refresh rotates the opaque token and reuse revokes the session
+  User->>BFF: POST /api/session/logout
+  BFF->>API: Revoke the refresh session
+  BFF-->>User: Expire browser cookies and return to the landing page
