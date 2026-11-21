@@ -2853,3 +2853,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The student sign-in form and student route fallback show a progress status with quotes and class-attendance reminders. Quotes change every five seconds and offer Next and Pause controls. The form waits for the existing BFF sign-in result before navigating, using the same cookie and origin checks. The attributed quotes appear in [Franklin's account of Poor Richard's advice](https://www.gutenberg.org/files/36151/36151-h/36151-h.htm).
 - Production build, ESLint, 81 unit tests, session HTTP smoke, 10 focused desktop and mobile browser tests, and structure validation passed. Browser tests verified the toggle coordinates and interaction with quotes while a synthetic sign-in was delayed. Restarted the local frontend on port 3000 and verified landing, BFF response, and API readiness. Real account sign-in was not exercised.
 - Roll out by rebuilding the frontend. Roll back by reverting the change and rebuilding. No backend or database changes.
+
+## Sidebar divider control and signed-in landing (2026-11-22)
+
+- The shared sidebar toggle sits against the divider at the same height in both states. The desktop control is compact, with a 44 px touch target on mobile.
+- The landing route verifies the current session and redirects to the account's default portal. It uses existing silent renewal when the access cookie has expired. Accounts with both roles use the existing Staff default. Signed-out visitors see the portal cards, including immediately after logout.
+- Production build, ESLint, 81 frontend unit tests, HTTP smoke, 8 focused desktop and mobile browser tests, and structure validation passed. Browser checks used synthetic accounts. The rebuilt frontend is running on port 3000. Its public landing and logout redirect were verified, and backend readiness returned HTTP 200. Real account sign-in was not exercised.
+- Roll out by rebuilding the frontend. Revert the commit and rebuild to roll back. No backend or database change is needed.

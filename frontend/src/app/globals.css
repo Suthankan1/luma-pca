@@ -930,13 +930,13 @@ a.class-detail-row:hover { background:#edf5fc; }
 .portal-frame { grid-template-columns: 224px minmax(0, 1fr); }
 .portal-frame[data-rail-collapsed=true] { grid-template-columns: 68px minmax(0, 1fr); }
 .shell.portal-frame .portal-rail { gap: 24px; padding: 17px 12px; background: #101f35; box-shadow: none; }
-.portal-rail-top { display: flex; align-items: center; gap: 8px; }
+.portal-rail-top { display: flex; align-items: center; min-height: 44px; gap: 8px; margin-inline-end: -12px; }
 .portal-rail-brand { display: flex; align-items: center; gap: 8px; min-width: 0; color: #f4faff; }
 .portal-rail-brand img { flex: none; width: 33px; height: 33px; border-radius: 9px; object-fit: cover; }
 .portal-rail-brand .portal-rail-copy { display: grid; gap: 2px; font-size: 10px; color: #b9ccdd; line-height: 1.2; }
 .portal-rail-brand strong { color: #fff; font-size: 16px; letter-spacing: .035em; }
 .portal-rail-brand small { color: #67d9de; font-size: 11px; }
-.portal-rail-toggle { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 6px; border-radius: 8px; background: #203249; color: #e5f1fb; cursor: pointer; }
+.portal-rail-toggle { display: grid; place-items: center; flex: none; width: 28px; height: 44px; margin-inline-start: auto; border: 1px solid #3a516b; border-inline-end: 0; border-radius: 8px 0 0 8px; background: #203249; color: #e5f1fb; cursor: pointer; }
 .portal-rail svg { width: 18px; height: 18px; flex: none; }
 .portal-rail .staff-nav { display: flex; flex-direction: column; gap: 4px; }
 .portal-rail .staff-navitem, .portal-rail-action { display: flex; align-items: center; gap: 11px; min-height: 42px; padding: 9px 11px; border-radius: 9px; text-decoration: none; color: #dae8f4; font-size: 13px; }
@@ -987,7 +987,8 @@ a.class-detail-row:hover { background:#edf5fc; }
 @media (max-width: 960px) {
   .portal-frame, .portal-frame[data-rail-collapsed=true] { grid-template-columns: minmax(0,1fr); grid-template-rows: auto 1fr; }
   .shell.portal-frame .portal-rail { flex-wrap: nowrap; gap: 8px; padding: 9px 12px; min-width: 0; }
-  .portal-rail-top, .portal-rail-menu, .portal-rail-foot { width: 100%; min-width: 0; }
+  .portal-rail-menu, .portal-rail-foot { width: 100%; min-width: 0; }
+  .portal-rail-toggle { width: 44px; }
   .portal-frame[data-rail-collapsed=true] .portal-rail-brand { display: flex; }
   .portal-rail .staff-nav { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; }
   .portal-rail-foot { justify-content: end; padding-top: 5px; }

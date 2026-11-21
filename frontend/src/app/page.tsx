@@ -1,8 +1,15 @@
 ﻿import Link from "next/link";
 import { ClassroomScene } from "@/components/ClassroomScene";
 import { Shell } from "@/components/Shell";
+import { redirect } from "next/navigation";
+import { currentSession } from "@/lib/auth-server";
+import { portalPath } from "@/lib/session-policy";
 
-export default function Home() {
+export default async function Home() {
+  const { identity } = await currentSession();
+  const destination = identity ? portalPath(identity) : null;
+  if (destination === "/staff" || destination === "/student") redirect(destination);
+
   return <Shell active="home">
     <div className="landing-grid">
       <section className="attendance-intro">

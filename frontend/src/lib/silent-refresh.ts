@@ -8,9 +8,9 @@ export function needsRefresh(has: (name: string) => boolean, names: { access: st
   return !has(names.access) && has(names.refresh);
 }
 
-/** The public landing page and session handlers do not need proxy renewal. */
+/** Session handlers and static assets do not need proxy renewal. */
 export function refreshesOn(pathname: string) {
-  return pathname !== "/" && !pathname.startsWith("/api/session/") && !pathname.startsWith("/_next/") && !/\.[a-z0-9]+$/i.test(pathname);
+  return !pathname.startsWith("/api/session/") && !pathname.startsWith("/_next/") && !/\.[a-z0-9]+$/i.test(pathname);
 }
 
 /** The request's Cookie header with some cookies replaced or added, so this very request already sees the new session. */

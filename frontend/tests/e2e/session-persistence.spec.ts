@@ -12,6 +12,8 @@ test.describe("Staying signed in", () => {
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/student$/);
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/student$/);
 
     for (let i = 0; i < 2; i++) {
       await context.clearCookies({ name: "luma-access" });
@@ -23,6 +25,7 @@ test.describe("Staying signed in", () => {
 
     await page.getByRole("complementary", { name: "Academy navigation" }).getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL("/");
+    await expect(page.getByRole("link", { name: /Student sign in/ })).toBeVisible();
     expect((await context.cookies()).filter(c => c.name.startsWith("luma-"))).toEqual([]);
     await page.goto("/student");
     await expect(page).toHaveURL(/\/sign-in\?portal=student/);
@@ -34,6 +37,10 @@ test.describe("Staying signed in", () => {
     await page.fill("#email", "admin-enrolled@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/staff$/);
+
+    await context.clearCookies({ name: "luma-access" });
+    await page.goto("/");
     await expect(page).toHaveURL(/\/staff$/);
 
     await context.clearCookies({ name: "luma-access" });

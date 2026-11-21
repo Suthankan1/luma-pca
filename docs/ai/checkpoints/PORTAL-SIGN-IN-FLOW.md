@@ -18,6 +18,7 @@ The landing cards already select a portal. The sign-in page and session handler 
 | Valid credentials for the other portal | Stay on the selected sign-in screen with an access message |
 | Already signed in to the other portal | Stay on the selected screen with a sign-out option |
 | Sign out from either portal | Return to the landing page and choose either sign-in |
+| Open the landing page while signed in | Renew the session if needed and open the account's default dashboard |
 | Visit a protected page after sign-out | Redirect to its portal-specific sign-in |
 
 ## Verification and rollout
