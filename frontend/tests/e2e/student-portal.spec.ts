@@ -22,17 +22,24 @@ test("Students open their report and select scheduled classes on a monthly calen
   await signIn(page);
   await expect(page.getByRole("heading", { name: "My Report" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
-  const navigation = page.getByRole("navigation", { name: "Student portal" });
-  await expect(navigation.getByRole("link", { name: "My Report" })).toHaveAttribute("aria-current", "page");
-  if (page.viewportSize()!.width <= 760) {
-    await expect(navigation).toHaveCSS("position", "fixed");
-    const before = await navigation.boundingBox();
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    expect(await navigation.boundingBox()).toEqual(before);
+  if (page.viewportSize()!.width <= 960) {
+    await page.setViewportSize({ width: 320, height: 740 });
+    const navigation = page.getByRole("navigation", { name: "Student portal" });
+    await expect(navigation).toHaveCSS("position", "static");
+    await expect(navigation).toHaveCSS("display", "grid");
+    const tabs = await navigation.getByRole("link").evaluateAll(links => links.map(link => {
+      const box = link.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom, right: box.right, height: box.height };
+    }));
+    expect(tabs).toHaveLength(3);
+    for (const tab of tabs) {
+      expect(tab.top).toBeCloseTo(tabs[0].top);
+      expect(tab.height).toBeGreaterThanOrEqual(44);
+      expect(tab.right).toBeLessThanOrEqual(320);
+      expect(tab.bottom).toBeLessThan(200);
+    }
     await navigation.getByRole("link", { name: "Calendar" }).click();
     await expect(navigation.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
-  } else {
-    await expect(navigation).not.toHaveCSS("position", "fixed");
   }
   await expect(page.getByRole("link", { name: "My classes" })).toHaveCount(0);
   const date = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);

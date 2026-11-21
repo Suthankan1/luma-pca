@@ -2911,3 +2911,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The student tabs use a fixed bottom bar at widths of 760 px or less. Calendar and Live Now flank a raised My Report button. The same links provide active states, focus treatment and prefetch behavior. Layout clearance accounts for the bottom safe area. The desktop sidebar retains the existing tab presentation.
 - Production build, ESLint, structure and 14 desktop/mobile browser tests passed. Browser tests verified fixed position during scroll, mobile tab activation and desktop sidebar placement using synthetic data. Restarted port 3000 and verified student sign-in. Real-account navigation was not exercised.
 - Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database change.
+
+## Restored student mobile top navigation (2026-11-22)
+
+- Restored the student header tabs at the owner's request. The mobile grid gives the three student tabs equal space and 44 px minimum tap targets. Dual-role accounts keep the Staff portal link, with room for it to wrap onto a second row on narrow screens.
+- Production build, ESLint, structure validation and ten synthetic desktop/mobile browser checks passed, including three tabs in one row and tab navigation at 320 px. Restarted port 3000 and verified student sign-in. Real-account navigation was not exercised.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database change.

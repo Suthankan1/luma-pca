@@ -15,23 +15,17 @@ export function StudentTabLinks({ hasStaffPortal }: { hasStaffPortal: boolean })
   const pathname = usePathname();
   const selected = pathname === "/student/attendance" ? "/student"
     : pathname.startsWith("/student/classes/") ? "/student/live" : pathname;
-  return <><nav className="staff-nav student-tab-nav" aria-label="Student portal">
+  return <nav className="staff-nav student-tab-nav" aria-label="Student portal">
     {tabs.map(tab => {
       const active = selected === tab.href;
       return <Link key={tab.href} href={tab.href} title={tab.label} aria-label={tab.label}
-        data-home-tab={tab.href === "/student" || undefined}
         prefetch={active ? false : tab.icon === "live" ? undefined : true}
         className={`staff-navitem ${active ? "active" : ""}`} aria-current={active ? "page" : undefined}>
-        <span className="student-tab-icon">
-          <PortalIcon name={tab.icon} />
-          {tab.href === "/student" && <span className="student-mobile-home"><PortalIcon name="home" /></span>}
-        </span>
-        <span className="portal-rail-copy">{tab.label}</span><LinkPending />
+        <PortalIcon name={tab.icon} /><span className="portal-rail-copy">{tab.label}</span><LinkPending />
       </Link>;
     })}
-  </nav>
-    {hasStaffPortal && <Link className="staff-navitem student-staff-switch" href="/staff" title="Staff portal" aria-label="Staff portal">
+    {hasStaffPortal && <Link className="staff-navitem" href="/staff" title="Staff portal" aria-label="Staff portal">
       <PortalIcon name="external" /><span className="portal-rail-copy">Staff portal</span>
     </Link>}
-  </>;
+  </nav>;
 }
