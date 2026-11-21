@@ -15,11 +15,9 @@ export async function readClassTypeRosters() {
   };
 }
 
-export function ClassTypeRosterControls({ monitor, classes }: {
-  monitor?: WebinarMonitor; classes: AcademyClass[] | null;
+export function ClassTypeRosterControls({ monitor, webinarId, classes }: {
+  monitor?: WebinarMonitor; webinarId?: string; classes: AcademyClass[] | null;
 }) {
-  if (!monitor?.active) return <span className="status off">Zoom link not tracked</span>;
-  if (!classes) return <span className="status off">Sync unavailable</span>;
-  return <PaymentRosterForm key={monitor.id} monitorId={monitor.id}
-    assigned={monitor.academyClassName ?? ""} classes={classes} />;
+  return <PaymentRosterForm monitorId={monitor?.active ? monitor.id : undefined}
+    webinarId={monitor?.webinarId ?? webinarId} assigned={monitor?.academyClassName ?? ""} classes={classes} />;
 }

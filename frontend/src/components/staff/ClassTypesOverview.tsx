@@ -8,7 +8,7 @@ import { ClassTypeRosterControls, type readClassTypeRosters } from "./ClassTypeR
 import type { WebinarMonitor } from "@/lib/webinars";
 
 type Roster = Awaited<ReturnType<typeof readClassTypeRosters>>;
-type MonthlyRow = { key: string; title: string; sessions: ClassSession[]; average: number | null; monitor?: WebinarMonitor };
+type MonthlyRow = { key: string; title: string; sessions: ClassSession[]; average: number | null; monitor?: WebinarMonitor; webinarId?: string };
 
 export async function ClassTypesPanel({ requests, month, through, now, standalone, rosters }: {
   requests: ReturnType<typeof startClassMonth>; month: string; through: string | null; now: number; standalone?: boolean;
@@ -20,12 +20,13 @@ export async function ClassTypesPanel({ requests, month, through, now, standalon
     sessionsFailed={!sessions.ok} totalsFailed={totals?.ok === false} standalone={standalone} roster={roster} />;
 }
 
-function matchMonitor(sessions: ClassSession[], roster: Roster): WebinarMonitor | undefined {
+function matchWebinar(sessions: ClassSession[], roster: Roster) {
   const webinarIds = new Set(sessions.flatMap(session => session.zoomWebinarId ? [session.zoomWebinarId] : []));
-  return webinarIds.size === 1 ? roster.monitors.find(monitor => webinarIds.has(monitor.webinarId)) : undefined;
+  const webinarId = webinarIds.size === 1 ? [...webinarIds][0] : undefined;
+  return { webinarId, monitor: roster.monitors.find(monitor => monitor.webinarId === webinarId) };
 }
 function scheduledRows(month: string, sessions: ClassSession[], completed: MonthlyRow[], roster: Roster) {
-  const rows = new Map(completed.map(group => [group.key, { ...group, monitor: matchMonitor(group.sessions, roster) }]));
+  const rows = new Map(completed.map(group => [group.key, { ...group, ...matchWebinar(group.sessions, roster) }]));
   const scheduled = new Map<string, ClassSession[]>();
   const inMonth = (start: string | null) => !!start && Number.isFinite(Date.parse(start)) &&
     instantParts(start, ACADEMY_TIME_ZONE).date.startsWith(`${month}-`);
@@ -37,8 +38,8 @@ function scheduledRows(month: string, sessions: ClassSession[], completed: Month
     else scheduled.set(key, [session]);
   }
   for (const [key, group] of scheduled) {
-    if (!rows.has(key)) rows.set(key, { key, title: compactClassTitle(group[0].title), sessions: [], average: null,
-      monitor: matchMonitor(group, roster) });
+    const row = rows.get(key) ?? { key, title: compactClassTitle(group[0].title), sessions: [], average: null };
+    rows.set(key, { ...row, ...matchWebinar([...row.sessions, ...group], roster) });
   }
   const represented = new Set([...rows.values()].flatMap(row => row.monitor ? [row.monitor.id] : []));
   for (const monitor of roster.monitors) {
@@ -50,7 +51,7 @@ function scheduledRows(month: string, sessions: ClassSession[], completed: Month
     if (represented.has(monitor.id)) continue;
     const baseKey = classTypeKey(topic);
     const key = rows.has(baseKey) ? monitor.id : baseKey;
-    rows.set(key, { key, title: compactClassTitle(topic), sessions: [], average: null, monitor });
+    rows.set(key, { key, title: compactClassTitle(topic), sessions: [], average: null, monitor, webinarId: monitor.webinarId });
   }
   return [...rows.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
@@ -85,7 +86,7 @@ export function ClassTypesOverview({ month, through, now, sessions, totals, sess
               <span className="class-type-count">{group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}
                 {" · "}<strong className="class-attendance-percent">{group.average == null ? "—" : `${group.average}% avg`}</strong></span>
             </Link> : <h3 className="form-title class-type-title">{group.title}</h3>}
-            {roster && <ClassTypeRosterControls monitor={group.monitor} classes={roster.classes} />}
+            {roster && <ClassTypeRosterControls monitor={group.monitor} webinarId={group.webinarId} classes={roster.classes} />}
           </li>)}</ul>}
       </div>
     </section>

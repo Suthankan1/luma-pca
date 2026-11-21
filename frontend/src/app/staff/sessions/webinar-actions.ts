@@ -56,9 +56,19 @@ export async function webinarAction(_previous: FormState, form: FormData): Promi
 
 export async function assignPaymentRoster(_previous: FormState, form: FormData): Promise<FormState> {
   await requireSameOriginAction();
-  const id = uuidOrNull(form.get("monitorId"));
+  let id = uuidOrNull(form.get("monitorId"));
   const name = classNameOrNull(form.get("academyClassName"));
-  if (!id || !name) return { ok: false, message: "Select an Academy payment class." };
+  if (!name) return { ok: false, message: "Select an Academy payment class." };
+  if (!id) {
+    const input = form.get("webinar");
+    const webinar = typeof input === "string" ? input.trim() : "";
+    if (!webinar || webinar.length > 500) return { ok: false, message: "Enter the class’s Zoom link or webinar ID." };
+    const tracked = await staffApi<WebinarMonitor>("/api/v1/zoom/monitors", { method: "POST", body: { webinar } }, 20000);
+    if (!tracked.ok) return { ok: false, message: zoomProblem(tracked.status, tracked.detail) };
+    id = tracked.data.id;
+    revalidatePath("/staff/class-types");
+    revalidatePath("/staff/sessions");
+  }
   const result = await staffApi<{ academyStudents: number }>(`/api/v1/zoom/monitors/${id}/payment-roster`,
     { method: "PUT", body: { academyClassName: name } }, 25000);
   if (!result.ok) return { ok: false, message: result.detail ?? problemMessage(result.status, undefined) };

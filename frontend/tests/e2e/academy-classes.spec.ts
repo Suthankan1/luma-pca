@@ -19,18 +19,28 @@ test.describe("Academy classes", () => {
     await signInStaff(page, "admin-enrolled@example.invalid");
     const headers = { Authorization: "Bearer fake-access-token.for-bff.e2e-test" };
     const api = mockApiBase() + "/api/v1";
-    const webinar = await page.request.post(`${api}/zoom/monitors`, { headers, data: { webinar: "84400000003" } });
-    expect(webinar.status()).toBe(200);
+    const course = await page.request.post(`${api}/courses`, { headers, data: { code: "ROSTER-PCA", title: "Roster fixture" } });
+    expect(course.status()).toBe(201);
+    const batch = await page.request.post(`${api}/batches`, { headers, data: {
+      courseId: (await course.json()).id, code: "LEGACY", name: "Legacy roster", startsOn: "2026-01-01",
+    } });
+    expect(batch.status()).toBe(201);
+    const session = await page.request.post(`${api}/class-sessions`, { headers, data: {
+      title: "December Paper Class", startsAt: "2026-12-11T12:30:00Z", endsAt: "2026-12-11T13:30:00Z",
+      timeZone: "Asia/Colombo", zoomWebinarId: "84400000003", batchIds: [(await batch.json()).id],
+    } });
+    expect(session.status()).toBe(201);
     await page.goto("/staff/class-types?month=2026-12");
     const list = page.getByRole("region", { name: "Class types for the selected month" });
     const row = list.getByRole("listitem", { name: "December Paper Class" });
     await expect(list.getByRole("listitem", { name: "DC" })).toHaveCount(0);
-    await expect(row.getByText("Sync needed", { exact: true })).toBeVisible();
+    await expect(row.getByText("Zoom link not tracked", { exact: true })).toBeVisible();
     const dropdown = row.getByLabel("Academy payment class");
     const sync = row.getByRole("button", { name: "Sync", exact: true });
+    await expect(row.getByLabel("Zoom link or webinar ID")).toHaveCount(0);
     await expect(dropdown.locator("option")).toHaveText(["Select payment class", "A/L Physics 2027", "Admission", "DC"]);
     await dropdown.selectOption("DC");
-    await sync.click();
+    await row.getByRole("button", { name: "Track and sync" }).click();
     await expect(row.getByText("DC synced. 140 expected students per run.")).toBeVisible();
     await expect(row.getByText("Synced", { exact: true })).toBeVisible();
     await page.reload();
