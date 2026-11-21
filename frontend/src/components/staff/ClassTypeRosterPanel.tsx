@@ -37,10 +37,9 @@ export function ClassTypeRosterControls({ item, slug, roster }: {
     <span className="status off">{roster.classes ? "Academy class not matched" : "Sync unavailable"}</span>
   </div>;
   const { className, studentCount, batch } = item;
-  const synced = !!batch?.lastSyncedAt && batch.lastSyncedStudents === studentCount;
-  if (synced && batch?.active) return <div className="class-type-roster-inline"><span className="status on">Synced</span></div>;
+  const synced = !!batch?.active && !!batch.lastSyncedAt && batch.lastSyncedStudents === studentCount;
   return <div className="class-type-roster-inline">
-    <span className="status off">Sync needed</span>
+    <span className={`status ${synced ? "on" : "off"}`}>{synced ? "Synced" : "Sync needed"}</span>
     <AcademyClassActions className={className} slug={slug} linked={!!batch} batches={roster.available} rosterControls
       selectedBatch={batch?.active ? { id: batch.id, label: roster.label(batch) } : undefined} />
   </div>;

@@ -2937,3 +2937,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - A synced row displays only its status. A matched row needing sync shows Student batch and one Sync action. Unmatched classes and roster outages retain a status explaining why sync is unavailable.
 - Production build, ESLint, structure, 81 unit tests and eight synthetic desktop/mobile browser checks passed. The roster test verified a scheduled-only webinar, hiding an unscheduled Academy class, and changing to a month without that class. Restarted port 3000 and verified staff sign-in and backend readiness. Real roster sync was not exercised.
 - Rebuild the frontend to roll out. Revert and rebuild to roll back. No API or migration changes.
+
+## Keep synced class batches selectable (2026-11-22)
+
+- Matched Class Types rows keep the Student batch dropdown and Sync action alongside their sync status. The linked active batch is selected. Selecting another available batch uses the existing link-and-sync operation for future roster mapping.
+- Production build, structure validation and two desktop synthetic browser tests passed. The regression verified sync, reassignment and persistence after reload. Local staff sign-in and backend readiness returned HTTP 200 after the frontend restart. No real roster sync was performed.
+- Revert and rebuild the frontend to roll back. No API or migration changes.
