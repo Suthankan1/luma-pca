@@ -25,7 +25,7 @@ test.describe("Academy classes", () => {
       data: { courseId: (await course.json()).id, code: "ROSTER-A", name: "Admission batch", startsOn: "2026-01-01" } });
     expect(batch.status()).toBe(201);
     await page.goto("/staff/class-types");
-    const row = page.getByRole("region", { name: "Student batch and sync" }).getByRole("listitem", { name: "Admission" });
+    const row = page.getByRole("region", { name: "Completed class types" }).getByRole("listitem", { name: "Admission" });
     await expect(row.getByText("Batch not selected", { exact: true })).toBeVisible();
     await row.getByLabel("Student batch").selectOption((await batch.json()).id);
     await row.getByRole("button", { name: "Link and sync" }).click();

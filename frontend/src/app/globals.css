@@ -165,11 +165,11 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 
 .academy-link { display:flex; flex-direction:column; gap:6px; font-size:13px; }
 .academy-link select { min-width:min(280px, 100%); }
-.class-type-roster-list { max-height:32rem; overflow-y:auto; }
-.class-type-roster-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.5fr); gap:12px; }
-.class-type-roster-row .academy-actions { padding:0; }
-.class-type-roster-row .form-title { margin:0; overflow-wrap:anywhere; }
-@media (max-width:640px) { .class-type-roster-row { grid-template-columns:minmax(0,1fr); } }
+.class-type-title { margin:0; padding:11px 12px; overflow-wrap:anywhere; }
+.class-type-roster-inline { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:9px; padding:10px 12px; border-top:1px solid #e0ebf2; }
+.class-type-roster-inline .academy-actions { padding:0; gap:8px 12px; }
+.class-type-roster-inline .academy-feedback:empty { display:none; }
+.class-type-roster-inline .academy-link select { max-width:100%; }
 .sync-notes { margin:8px 0 0; padding-left:18px; font-size:13px; line-height:1.6; color:var(--pca-ink); }
 .how-list { padding-left:18px; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }

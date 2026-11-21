@@ -3,7 +3,7 @@ import { StaffShell } from "@/components/StaffShell";
 import { ClassesColumnSkeleton } from "@/components/staff/AttendanceSkeleton";
 import { ClassMonthPicker } from "@/components/staff/ClassMonthPicker";
 import { ClassTypesPanel } from "@/components/staff/ClassTypesOverview";
-import { ClassTypeRosterPanel } from "@/components/staff/ClassTypeRosterPanel";
+import { readClassTypeRosters } from "@/components/staff/ClassTypeRosterPanel";
 import { requirePortal } from "@/lib/auth-server";
 import { startClassMonth } from "@/lib/class-month-api";
 import { renderTime } from "@/lib/insights";
@@ -20,15 +20,13 @@ export default async function ClassTypesPage({ searchParams }: { searchParams: P
   const today = academyToday(new Date(now));
   const range = classMonthRange((await searchParams).month, today);
   const requests = startClassMonth(range);
+  const rosters = readClassTypeRosters();
 
   return <StaffShell active="class-types" crumb="Teaching" title="Class Types" subtitle="Completed sessions and attendance by class type."
     hasStudentPortal={hasPortal(identity, "student")}>
-    <Suspense fallback={<p className="panel-sub" role="status">Loading student batches…</p>}>
-      <ClassTypeRosterPanel />
-    </Suspense>
     <ClassMonthPicker href="/staff/class-types" month={range.month} currentMonth={today.startsWith(range.month)} />
     <Suspense key={range.month} fallback={<ClassesColumnSkeleton />}>
-      <ClassTypesPanel requests={requests} standalone month={range.month} through={range.through} now={now} />
+      <ClassTypesPanel requests={requests} rosters={rosters} standalone month={range.month} through={range.through} now={now} />
     </Suspense>
   </StaffShell>;
 }

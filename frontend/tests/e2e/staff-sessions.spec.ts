@@ -153,6 +153,9 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await page.getByLabel("Class month", { exact: true }).fill(`${year}-02`);
     await page.getByRole("button", { name: "View", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));
+    const row = page.getByRole("region", { name: "Completed class types" }).getByRole("listitem", { name: /February review/ });
+    await expect(row.getByLabel("Student batch")).toBeDisabled();
+    await expect(row.getByText("Academy class not matched")).toBeVisible();
     await page.getByRole("region", { name: "Completed class types" }).getByRole("link", { name: /February review/ }).click();
     await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
     await expect(menuLink).toHaveAttribute("aria-current", "page");

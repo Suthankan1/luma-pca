@@ -2924,3 +2924,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Sync status compares the last successful sync and source student count. A membership change with the same count still requires a sync. The completed-class attendance chart remains available.
 - Production build, ESLint, structure, 81 unit tests and two desktop Academy browser tests passed with synthetic data. The mobile Academy cases were skipped by fixture configuration. Restarted local web and verified staff sign-in and backend readiness. No real roster sync was performed.
 - Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database migration.
+
+## Inline batch controls on Class Types (2026-11-22)
+
+- Moved Student batch and sync status into each Class Types list row. Completed groups use a unique tracked-webinar mapping, exact Academy title, or linked batch to find their roster. Academy classes without completed sessions also appear. Unmatched rows and roster-source outages show a disabled dropdown with a reason.
+- The original LUMA backend reported ready, while its separate Academy read-only roster connection logged a JDBC connection failure. Staff sign-in and the rebuilt frontend were verified. Real roster writes were not run.
+- Production build, ESLint, structure, 81 unit tests and eight synthetic desktop/mobile browser checks passed. Two desktop-only cases were skipped on mobile. Roll back by reverting and rebuilding the frontend. No API or migration changes.
