@@ -808,8 +808,8 @@ const zoomWebinars = {
     occurrences: [1, 8, 15].map((d, i) => ({ occurrenceId: `1700${i}`, startTime: new Date(Date.now() + 95 * 60_000 + (d - 1) * 7 * 86400_000).toISOString(),
       durationMinutes: 120, status: "available" })) }),
   "84400000002": () => ({ topic: "Office hours", type: 6, durationMinutes: 60, timeZone: "Asia/Colombo", scheduledStartAt: null, occurrences: [] }),
-  "84400000003": () => ({ topic: "Admission", type: 5, durationMinutes: 60, timeZone: "Asia/Colombo",
-    scheduledStartAt: "2027-02-11T12:30:00Z", occurrences: [] }),
+  "84400000003": () => ({ topic: "December Paper Class", type: 5, durationMinutes: 60, timeZone: "Asia/Colombo",
+    scheduledStartAt: "2026-12-11T12:30:00Z", occurrences: [] }),
 };
 const monitors = [];
 const runSessions = new Map(); // class id -> run
@@ -878,12 +878,26 @@ function monitorsApi(req, body, send) {
     }
     return send(200, monitorView(m));
   }
-  const action = req.url.match(/^\/api\/v1\/zoom\/monitors\/([^/]+)\/(sync|stop|resume|academy-class)$/);
+  const action = req.url.match(/^\/api\/v1\/zoom\/monitors\/([^/]+)\/(sync|stop|resume|academy-class|payment-roster)$/);
   const m = action && monitors.find(x => x.id === action[1]);
   if (!m) return send(404, { detail: "Monitored webinar not found" });
   if (action[2] === "sync") Object.assign(m, { syncedAt: new Date().toISOString(), syncStatus: "OK" });
   if (action[2] === "stop") m.active = false;
   if (action[2] === "resume") m.active = true;
+  if (action[2] === "payment-roster") {
+    const name = body.academyClassName;
+    if (!Object.hasOwn(academySource, name)) return send(404, { detail: "Academy class not found" });
+    if (!academyLinks.has(name)) {
+      const batch = { id: uuid(), code: "PAY-" + uuid(), name, active: true };
+      batches.push(batch);
+      academyLinks.set(name, { batchId: batch.id });
+    }
+    return academyApi({ headers: req.headers, url: "/api/v1/academy/classes/sync", method: "POST" },
+      { className: name }, (status, result) => {
+        if (status === 200) Object.assign(m, { academyClassName: name, classSource: "ADMIN", classBatchId: academyLinks.get(name).batchId });
+        return send(status, result);
+      });
+  }
   if (action[2] === "academy-class") {
     const name = body.academyClassName ? String(body.academyClassName).trim() : null;
     if (name && !academySource[name]) return send(404, { detail: "Academy class not found" });
@@ -995,6 +1009,7 @@ function insightsApi(req, send) {
 // The Academy's own records (read-only in the real API): classes from payment rows, students by Academy ID.
 const academySource = {
   "A/L Physics 2027": [["PCA101", "Amaya Perera", "amaya@example.invalid"], ["PCA102", "Kavin Silva", null], ["PCA103", null, null]],
+  "DC": Array.from({ length: 140 }, (_, index) => [`PCA${2000 + index}`, `Payment student ${index + 1}`, null]),
   "Admission": [["PCA104", "Nila Fernando", "nila@example.invalid"]],
 };
 const academyLinks = new Map();

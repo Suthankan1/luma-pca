@@ -257,6 +257,23 @@ public class WebinarMonitorService {
                 throw new ResourceNotFoundException("Academy class");
             }
         }
+        applyAcademyClass(caller, monitorId, name);
+        return view(caller.academyId(), monitorId);
+    }
+
+    @Transactional
+    public AcademyClassService.SyncResult assignPaymentRoster(CurrentAccount caller, UUID monitorId, String className) {
+        caller.requireStaff();
+        if (jdbc.queryForList("SELECT id FROM zoom_webinar_monitors WHERE academy_id = ? AND id = ? AND active FOR UPDATE",
+                UUID.class, caller.academyId(), monitorId).isEmpty()) {
+            throw new ResourceNotFoundException("Tracked webinar");
+        }
+        var result = academyClasses.syncExpectedRoster(caller, className);
+        applyAcademyClass(caller, monitorId, className.strip());
+        return result;
+    }
+
+    private void applyAcademyClass(CurrentAccount caller, UUID monitorId, String name) {
         jdbc.update("UPDATE zoom_webinar_monitors SET academy_class_name = ?, class_source = ?, version = version + 1 WHERE id = ?",
                 name, name == null ? null : "ADMIN", monitorId);
         // A run going on now gets the class's students as well (only when it has none yet; ended runs are history).
@@ -269,7 +286,6 @@ public class WebinarMonitorService {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("academyClass", name == null ? "unresolved" : name);
         audit.record(caller.academyId(), caller.accountId(), "ZOOM_WEBINAR_CLASS_SET", "ZOOM_WEBINAR_MONITOR", monitorId, details);
-        return view(caller.academyId(), monitorId);
     }
 
     /** Every monitored webinar (stopped ones too, for their history), live ones first. Staff. */

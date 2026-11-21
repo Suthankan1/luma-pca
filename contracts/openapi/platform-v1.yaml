@@ -1864,6 +1864,22 @@ paths:
     post: {summary: "Resume collecting the webinar (audited)", operationId: resumeWebinarMonitor, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: The monitored webinar}}}
   /api/v1/zoom/monitors/{monitorId}/academy-class:
     put: {summary: "A staff member's explicit choice of the Academy class the webinar teaches, or null for unresolved (audited)", operationId: setWebinarAcademyClass, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}], requestBody: {required: true, content: {application/json: {schema: {type: object, properties: {academyClassName: {type: string, maxLength: 200, nullable: true}}}}}}, responses: {'200': {description: The monitored webinar}, '404': {description: No such Academy class}, '503': {description: Academy database not connected}}}
+  /api/v1/zoom/monitors/{monitorId}/payment-roster:
+    put:
+      summary: Sync the selected Academy payment class and assign its expected roster to a tracked webinar (staff)
+      operationId: assignWebinarPaymentRoster
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [academyClassName], properties: {academyClassName: {type: string, minLength: 1, maxLength: 200}}}}}}
+      responses:
+        '200':
+          description: Roster synced and webinar assigned
+          content: {application/json: {schema: {type: object, required: [academyStudents], properties: {academyStudents: {type: integer, minimum: 1}}}}}
+        '403': {description: Staff access required}
+        '404': {description: Tracked webinar or Academy payment roster unavailable}
+        '409': {description: Expected roster could not be synced completely}
+        '503': {description: Academy payment database unavailable}
   /api/v1/class-sessions/{sessionId}/zoom-run:
     get: {summary: "The Zoom run behind a class: Zoom's schedule (display only) beside the actual start and end, live counts and report status (staff who may open the class)", operationId: classZoomRun, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: "webinarId, topic, occurrenceUuid, state, firstSeenAt, actualStartedAt, actualEndedAt, scheduledStartAt, reported, connectedNow, people, academyClassName, classResolved"}, '204': {description: Not created by a Zoom run}, '404': {description: No such class or not visible}}}
 components:

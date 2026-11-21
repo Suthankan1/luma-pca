@@ -42,7 +42,7 @@ class WebinarRunTracker {
     boolean onEvent(UUID academyId, String webinarId, String occurrenceUuid, String eventType, long eventTs, Map<?, ?> object) {
         List<Map<String, Object>> monitors = jdbc.queryForList("""
                 SELECT id, topic, time_zone, academy_class_name FROM zoom_webinar_monitors
-                WHERE academy_id = ? AND webinar_id = ? AND active
+                WHERE academy_id = ? AND webinar_id = ? AND active FOR SHARE
                 """, academyId, webinarId);
         if (monitors.isEmpty()) {
             // Monitoring stopped during a run: its run still gets the rest of its events (its end above all).

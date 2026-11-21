@@ -15,6 +15,7 @@ the caller's academy, so records of another academy answer 404.
 | Classes, rosters, expected students, attendance, corrections, exports, reports, batch totals | Every class and batch of their academy | Own classes and own records only |
 | Attendance rule, finalisation, recalculation, appeals | Yes | Appeal own record |
 | Zoom: webinar monitoring, occurrences, participants, receipts, reports | Yes | — |
+| Assign an Academy payment roster to an active Zoom monitor | Same-academy monitors only, audited | — (403) |
 | Engagement switch, pulse questions, rankings | Yes | Own consent, reactions and answers (enrolled class only) |
 | Student erasure | Yes (student number typed again, reason, audited) | — |
 | Staff accounts | No API (owner decision 2026-11-20): the operator adds, blocks and unblocks staff | — |

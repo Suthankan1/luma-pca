@@ -97,6 +97,9 @@ webinar event subscriptions on the existing app, and a test webinar run).
   Zoom title equals exactly one Academy `class_type` (case and spacing ignored) or staff chose it (audited),
   and the class is set up as a LUMA batch. Otherwise the run has no expected students: evidence is kept, nobody is marked
   absent. Students are matched by Zoom email/registration or an audited staff decision, never by display name.
+- **Payment roster assignment:** staff choose the exact Academy payment class on Class Types. A successful sync and
+  monitor assignment commit together. Subsequent occurrences use the synced roster. If membership changes at a later
+  sync, the new roster applies to subsequent runs and earlier sessions retain their existing roster links.
 - **Webhook allow-list:** a monitored webinar's events are stored even when `LUMA_ZOOM_WEBHOOK_WEBINAR_ALLOW_LIST` does
   not list it.
 - **Unmonitored webinars** keep the older behaviour (link to a class staff scheduled in the ±60-minute window), so history

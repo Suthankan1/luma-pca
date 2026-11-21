@@ -26,16 +26,14 @@ function SyncDetails({ sync }: { sync: SyncResult }) {
 }
 
 /** Set up, link or sync one Academy class. One action state per row, so the outcome stays after the page refreshes. */
-export function AcademyClassActions({ className, slug, linked, batches, selectedBatch, rosterControls = false }: {
+export function AcademyClassActions({ className, slug, linked, batches }: {
   className: string; slug: string; linked: boolean; batches: { id: string; label: string; disabled?: boolean }[];
-  selectedBatch?: { id: string; label: string };
-  rosterControls?: boolean;
 }) {
   const [state, action, pending] = useActionState(academyClassAction, null);
   const feedback = `academy-feedback-${slug}`;
-  const canSync = !!selectedBatch || batches.some(batch => !batch.disabled);
+  const canSync = batches.some(batch => !batch.disabled);
   return <div className="academy-actions">
-    {!rosterControls && (linked
+    {linked
       ? <form action={action} className="inline-form">
           <input type="hidden" name="intent" value="sync" />
           <input type="hidden" name="className" value={className} />
@@ -49,20 +47,19 @@ export function AcademyClassActions({ className, slug, linked, batches, selected
             <button className="action" type="submit" disabled={pending} aria-describedby={feedback}>
               {pending ? "Setting up…" : "Set up in LUMA"}</button>
           </form>
-        </>)}
-    {(rosterControls || (!linked && batches.length > 0)) && <form action={action} className="academy-link">
+        </>}
+    {!linked && batches.length > 0 && <form action={action} className="academy-link">
       <input type="hidden" name="intent" value="link" />
       <input type="hidden" name="className" value={className} />
-      <label htmlFor={`link-${slug}`}>{rosterControls ? "Student batch" : "Or use an existing batch"}</label>
+      <label htmlFor={`link-${slug}`}>Or use an existing batch</label>
       <div className="inline-form">
-        <select key={selectedBatch?.id} id={`link-${slug}`} name="batchId" required defaultValue={selectedBatch?.id ?? ""}
-          disabled={pending || batches.length === 0 && !selectedBatch}>
+        <select id={`link-${slug}`} name="batchId" required defaultValue=""
+          disabled={pending || !canSync}>
           <option value="" disabled>{canSync ? "Choose a batch" : "No selectable batch"}</option>
-          {selectedBatch && <option value={selectedBatch.id}>{selectedBatch.label}</option>}
           {batches.map(batch => <option key={batch.id} value={batch.id} disabled={batch.disabled}>{batch.label}</option>)}
         </select>
         <button className="action secondary" type="submit" disabled={pending || !canSync}>
-          {pending ? "Syncing…" : rosterControls ? "Sync" : "Link and sync"}
+          {pending ? "Syncing…" : "Link and sync"}
         </button>
       </div>
     </form>}

@@ -2949,3 +2949,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Display all batches returned by the academy-scoped LUMA batch API. The options now identify inactive batches and those linked to another class type. Those entries are disabled, preserving the server's one-class-per-batch rule. When a class mapping or the Academy roster is unavailable, the batch list is still present for reference and sync is unavailable.
 - Production build, ESLint, structure validation and eight synthetic desktop/mobile browser checks passed. Verified an existing link to another class remains visible and disabled. Restarted the local frontend and verified staff sign-in and backend readiness. Real roster sync was not exercised.
 - Revert and rebuild the frontend to roll back. No API or migration changes.
+
+## Assign Academy payment rosters directly in Class Types (2026-11-22)
+
+- Class Types shows the Academy payment names on tracked Zoom class rows in the selected month. Staff can select a different payment name after sync. The dropdown no longer queries the courses or batch lists.
+- The staff-only, same-academy endpoint syncs distinct Academy IDs and assigns the monitor in one transaction. Further runs use the selected payment roster until staff change it. Changed membership gets a fresh internal roster so earlier runs keep their links. The month picker scopes the schedule, and the source roster is keyed by the exact payment name.
+- Verified 16 PostgreSQL integration tests and five Chromium browser tests with synthetic data. Coverage includes 140 unique students despite a duplicate payment, identical expected rosters for two runs, concurrent resync, preservation of the first roster after removal, invalid selection and denied cross-academy/student access. Frontend production build, ESLint, 81 unit tests, OpenAPI and structure checks passed.
+- Rebuild backend and frontend together to roll out or roll back. There is no migration. A code rollback retains saved monitor mappings and enrollment records. The live Academy connection and real roster were not exercised.

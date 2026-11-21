@@ -14,43 +14,33 @@ async function signInStaff(page: Page, email: string) {
 test.describe.configure({ mode: "serial" });
 
 test.describe("Academy classes", () => {
-  test("Class Types can link an existing batch and show the roster sync status", async ({ page }, testInfo) => {
+  test("Class Types syncs a payment name directly and keeps it selectable", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Uses the desktop Academy fixtures");
     await signInStaff(page, "admin-enrolled@example.invalid");
     const headers = { Authorization: "Bearer fake-access-token.for-bff.e2e-test" };
     const api = mockApiBase() + "/api/v1";
-    const course = await page.request.post(`${api}/courses`, { headers, data: { code: "ROSTER-PCA", title: "Roster test" } });
-    expect(course.status()).toBe(201);
-    const courseId = (await course.json()).id;
-    async function createBatch(code: string) {
-      const batch = await page.request.post(`${api}/batches`, { headers,
-        data: { courseId, code, name: `Admission ${code}`, startsOn: "2026-01-01" } });
-      expect(batch.status()).toBe(201);
-      return (await batch.json()).id as string;
-    }
-    const batchId = await createBatch("ROSTER-A");
-    const replacementId = await createBatch("ROSTER-B");
     const webinar = await page.request.post(`${api}/zoom/monitors`, { headers, data: { webinar: "84400000003" } });
     expect(webinar.status()).toBe(200);
-    await page.goto("/staff/class-types?month=2027-02");
+    await page.goto("/staff/class-types?month=2026-12");
     const list = page.getByRole("region", { name: "Class types for the selected month" });
-    const row = list.getByRole("listitem", { name: "Admission" });
-    await expect(list.getByRole("listitem", { name: "A/L Physics 2027" })).toHaveCount(0);
+    const row = list.getByRole("listitem", { name: "December Paper Class" });
+    await expect(list.getByRole("listitem", { name: "DC" })).toHaveCount(0);
     await expect(row.getByText("Sync needed", { exact: true })).toBeVisible();
-    const dropdown = row.getByLabel("Student batch");
+    const dropdown = row.getByLabel("Academy payment class");
     const sync = row.getByRole("button", { name: "Sync", exact: true });
-    await dropdown.selectOption(batchId);
+    await expect(dropdown.locator("option")).toHaveText(["Select payment class", "A/L Physics 2027", "Admission", "DC"]);
+    await dropdown.selectOption("DC");
     await sync.click();
+    await expect(row.getByText("DC synced. 140 expected students per run.")).toBeVisible();
     await expect(row.getByText("Synced", { exact: true })).toBeVisible();
-    await expect(dropdown).toHaveValue(batchId);
-    await dropdown.selectOption(replacementId);
-    await sync.click();
-    await expect(row.locator(".form-ok")).toContainText("enrolled now");
     await page.reload();
-    await expect(dropdown).toHaveValue(replacementId);
-    await expect(row.getByText("Synced", { exact: true })).toBeVisible();
+    await expect(dropdown).toHaveValue("DC");
+    await dropdown.selectOption("Admission");
+    await sync.click();
+    await expect(row.getByText("Admission synced. 1 expected student per run.")).toBeVisible();
+    await expect(dropdown).toHaveValue("Admission");
     await page.getByRole("link", { name: "Next month" }).click();
-    await expect(page).toHaveURL(/month=2027-03$/);
+    await expect(page).toHaveURL(/month=2027-01$/);
     await expect(list.getByText("No class types scheduled for this month.")).toBeVisible();
   });
 
@@ -84,10 +74,5 @@ test.describe("Academy classes", () => {
     await expect(roster).toContainText("3 enrolled");
     await expect(roster).toContainText("PCA101");
     await expect(roster).toContainText("Amaya Perera");
-    await page.goto("/staff/class-types?month=2027-02");
-    const dropdown = page.getByRole("listitem", { name: "Admission" }).getByLabel("Student batch");
-    const linkedOption = dropdown.locator("option").filter({ hasText: "Linked to A/L Physics 2027" });
-    await expect(linkedOption).toHaveCount(1);
-    await expect(linkedOption).toBeDisabled();
   });
 });

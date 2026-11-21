@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { classNameOrNull } from "@/lib/academy";
 import { requireSameOriginAction, staffApi } from "@/lib/staff-api";
 import { problemMessage, uuidOrNull, type FormState } from "@/lib/staff-forms";
 import type { WebinarMonitor } from "@/lib/webinars";
@@ -51,4 +52,19 @@ export async function webinarAction(_previous: FormState, form: FormData): Promi
   revalidatePath("/staff/sessions");
   revalidatePath("/staff");
   return { ok: true, message: done };
+}
+
+export async function assignPaymentRoster(_previous: FormState, form: FormData): Promise<FormState> {
+  await requireSameOriginAction();
+  const id = uuidOrNull(form.get("monitorId"));
+  const name = classNameOrNull(form.get("academyClassName"));
+  if (!id || !name) return { ok: false, message: "Select an Academy payment class." };
+  const result = await staffApi<{ academyStudents: number }>(`/api/v1/zoom/monitors/${id}/payment-roster`,
+    { method: "PUT", body: { academyClassName: name } }, 25000);
+  if (!result.ok) return { ok: false, message: result.detail ?? problemMessage(result.status, undefined) };
+  revalidatePath("/staff/class-types");
+  revalidatePath("/staff/sessions");
+  revalidatePath("/staff/academy");
+  const count = result.data.academyStudents;
+  return { ok: true, message: `${name} synced. ${count} expected ${count === 1 ? "student" : "students"} per run.` };
 }

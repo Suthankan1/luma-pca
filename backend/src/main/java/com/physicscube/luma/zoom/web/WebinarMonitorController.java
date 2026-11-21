@@ -1,5 +1,6 @@
 package com.physicscube.luma.zoom.web;
 
+import com.physicscube.luma.academy.AcademyClassService.SyncResult;
 import com.physicscube.luma.shared.security.CurrentAccount;
 import com.physicscube.luma.zoom.WebinarMonitorService;
 import com.physicscube.luma.zoom.WebinarMonitorService.MonitorView;
@@ -83,5 +84,15 @@ class WebinarMonitorController {
     MonitorView academyClass(JwtAuthenticationToken authentication, @PathVariable UUID monitorId,
                              @Valid @RequestBody ClassRequest request) {
         return monitors.setAcademyClass(CurrentAccount.from(authentication), monitorId, request.academyClassName());
+    }
+
+    record PaymentRosterRequest(@NotBlank @Size(max = 200) String academyClassName) {
+    }
+
+    @PutMapping("/api/v1/zoom/monitors/{monitorId}/payment-roster")
+    SyncResult paymentRoster(
+            JwtAuthenticationToken authentication, @PathVariable UUID monitorId,
+            @Valid @RequestBody PaymentRosterRequest request) {
+        return monitors.assignPaymentRoster(CurrentAccount.from(authentication), monitorId, request.academyClassName());
     }
 }

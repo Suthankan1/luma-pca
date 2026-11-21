@@ -3,8 +3,10 @@ package com.physicscube.luma.academy;
 import com.physicscube.luma.audit.AuditLog;
 import com.physicscube.luma.batches.BatchService;
 import com.physicscube.luma.batches.BatchView;
+import com.physicscube.luma.courses.CourseService;
 import com.physicscube.luma.enrollments.EnrollmentService;
 import com.physicscube.luma.enrollments.EnrollmentView;
+import com.physicscube.luma.enrollments.ExpectedStudent;
 import com.physicscube.luma.identity.AccountService;
 import com.physicscube.luma.identity.domain.EmailAddress;
 import com.physicscube.luma.shared.api.Codes;
@@ -29,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -52,16 +55,18 @@ public class AcademyClassService {
     private final ObjectProvider<AcademyPaymentsCatalog> catalog;
     private final JdbcTemplate jdbc;
     private final BatchService batches;
+    private final CourseService courses;
     private final StudentService students;
     private final EnrollmentService enrollments;
     private final AccountService accounts;
     private final AuditLog audit;
 
-    AcademyClassService(ObjectProvider<AcademyPaymentsCatalog> catalog, JdbcTemplate jdbc, BatchService batches,
+    AcademyClassService(ObjectProvider<AcademyPaymentsCatalog> catalog, JdbcTemplate jdbc, BatchService batches, CourseService courses,
                         StudentService students, EnrollmentService enrollments, AccountService accounts, AuditLog audit) {
         this.catalog = catalog;
         this.jdbc = jdbc;
         this.batches = batches;
+        this.courses = courses;
         this.students = students;
         this.enrollments = enrollments;
         this.accounts = accounts;
@@ -145,6 +150,7 @@ public class AcademyClassService {
     @Transactional
     public AcademyClassView link(CurrentAccount caller, String className, UUID batchId) {
         caller.requireStaff();
+        lockRosterChanges(caller);
         String name = requireName(className);
         if (batchId == null) {
             throw new InvalidRequestException("batchId is required");
@@ -181,6 +187,7 @@ public class AcademyClassService {
     @Transactional
     public SyncResult sync(CurrentAccount caller, String className) {
         caller.requireStaff();
+        lockRosterChanges(caller);
         String name = requireName(className);
         Link link = links(caller.academyId()).get(name);
         if (link == null) {
@@ -188,7 +195,55 @@ public class AcademyClassService {
         }
         enrollments.requireOpenBatch(caller, link.batchId());
         List<AcademyStudent> roster = read(c -> c.rosterForClass(name));
+        return syncRoster(caller, name, link, roster);
+    }
 
+    /** Prepare the exact expected roster before a tracked webinar can advertise the assignment. */
+    @Transactional
+    public SyncResult syncExpectedRoster(CurrentAccount caller, String className) {
+        caller.requireStaff();
+        lockRosterChanges(caller);
+        String name = requireName(className);
+        List<AcademyStudent> roster = read(c -> c.rosterForClass(name));
+        if (roster.isEmpty()) throw new ResourceNotFoundException("Academy payment class roster");
+        if (roster.stream().anyMatch(student -> student.studentId() == null || !NUMBER.matcher(student.studentId()).matches())) {
+            throw new ConflictException("The Academy roster contains invalid student IDs. Correct them before assigning the class.");
+        }
+        Set<String> expected = new HashSet<>();
+        roster.forEach(student -> expected.add(Codes.normalize(student.studentId())));
+        Link link = links(caller.academyId()).get(name);
+        LocalDate today = LocalDate.now(ACADEMY_ZONE);
+        if (link != null) {
+            var current = enrollments.roster(caller, link.batchId());
+            if (current.stream().anyMatch(e -> expected.contains(e.studentNumber()) && e.withdrawnOn() != null)) {
+                throw new ConflictException("Resolve withdrawn students in the existing roster before assigning this payment class.");
+            }
+            Set<String> currentNumbers = enrollments.expectedOn(caller.academyId(), List.of(link.batchId()), today)
+                    .stream().map(ExpectedStudent::studentNumber).collect(Collectors.toSet());
+            if (!currentNumbers.equals(expected)) link = null;
+        }
+        if (link == null) {
+            var course = courses.list(caller, null).stream().filter(c -> "ACADEMY".equals(c.code())).findFirst()
+                    .orElseGet(() -> courses.create(caller, "ACADEMY", "Academy classes"));
+            var batch = batches.create(caller, course.id(), "PAY-" + UUID.randomUUID(), name, today, null);
+            link(caller, name, batch.id());
+            link = links(caller.academyId()).get(name);
+        }
+        enrollments.requireOpenBatch(caller, link.batchId());
+        SyncResult result = syncRoster(caller, name, link, roster);
+        Set<String> actual = enrollments.expectedOn(caller.academyId(), List.of(link.batchId()), today).stream()
+                .map(ExpectedStudent::studentNumber).collect(Collectors.toSet());
+        if (!actual.equals(expected)) {
+            throw new ConflictException("The selected roster is incomplete. Review inactive students and enrollment dates before assigning it.");
+        }
+        return result;
+    }
+
+    private void lockRosterChanges(CurrentAccount caller) {
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "academy-roster/" + caller.academyId());
+    }
+
+    private SyncResult syncRoster(CurrentAccount caller, String name, Link link, List<AcademyStudent> roster) {
         List<String> invalid = new ArrayList<>();
         Map<String, AcademyStudent> byNumber = new LinkedHashMap<>();
         for (AcademyStudent student : roster) {
