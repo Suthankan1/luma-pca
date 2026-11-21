@@ -2905,3 +2905,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - My Report downloads a private PDF for the selected month. The route verifies a student session, reads own identity and monthly attendance, and shares the completed-class filter with the screen. The document includes attendance totals, each completed class, status, connected time and connection history. PDFKit renders searchable text with optional [Noto Tamil](https://github.com/notofonts/tamil) and [Noto Sinhala](https://github.com/notofonts/sinhala) font embedding.
 - Production build, ESLint, 81 unit tests, structure validation and 16 distinct focused desktop/mobile browser checks passed. Verified successful download, invalid month, signed-out denial, staff-only denial, and no-store. Rendered and inspected single-page, three-page, and multilingual synthetic PDFs. Restarted local web and verified student sign-in, unsigned PDF denial and backend readiness. The full real-stack browser suite was not run.
 - Roll out by rebuilding the frontend with the locked dependencies and bundled fonts. Revert and rebuild to roll back. No backend or database migration.
+
+## Student mobile bottom navigation (2026-11-22)
+
+- The student tabs use a fixed bottom bar at widths of 760 px or less. Calendar and Live Now flank a raised My Report button. The same links provide active states, focus treatment and prefetch behavior. Layout clearance accounts for the bottom safe area. The desktop sidebar retains the existing tab presentation.
+- Production build, ESLint, structure and 14 desktop/mobile browser tests passed. Browser tests verified fixed position during scroll, mobile tab activation and desktop sidebar placement using synthetic data. Restarted port 3000 and verified student sign-in. Real-account navigation was not exercised.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database change.
