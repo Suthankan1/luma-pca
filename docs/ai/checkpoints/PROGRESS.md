@@ -2891,3 +2891,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Redesigned the idle and active Live Now states with a responsive status panel, animated signal bars, next-class countdown, previous-class card, calendar navigation, and a larger chart. Added manual refresh and pause/resume to the Live Now header. CSS animations honor reduced-motion preferences.
 - Production build, ESLint, structure validation and six synthetic desktop/mobile browser tests passed. Tests exercised countdown ticking, auto and manual refresh, graph interaction, and removal of live metrics at class end. Restarted port 3000 and verified student sign-in and backend readiness. Real signed-in traffic and Zoom were not exercised.
 - Roll out by rebuilding the frontend. Revert the commit and rebuild to roll back. No API or database changes.
+
+## Faster student tab navigation (2026-11-22)
+
+- Moved the student sidebar into the authenticated shared layout. Calendar and My Report prefetch in the browser's in-memory router cache. Live Now uses the existing dynamic navigation cache policy and keeps polling every 30 seconds while visible.
+- Stream report identity, attendance, appeals, consent and batches independently. Calendar and Live Now show their page headings and controls while content loads. Backend reads continue to bypass shared caches and use the authenticated account.
+- Production build, ESLint, 81 unit tests, structure validation and 14 desktop/mobile browser tests passed. Synthetic tests held attendance data to verify the report opens early, confirmed a warmed Calendar reopened with zero additional page requests, and exercised logout and live updates. Restarted the frontend and verified student sign-in and backend readiness. Real-account latency was not benchmarked.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No migration or backend change.

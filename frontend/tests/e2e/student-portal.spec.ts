@@ -85,3 +85,38 @@ test("A student without enrolments sees an empty calendar and no live class", as
   await page.getByRole("link", { name: "Live Now" }).click();
   await expect(page.getByRole("heading", { name: "No live class" })).toBeVisible();
 });
+
+test("The report shell streams while attendance is slow and a warmed Calendar opens from memory", async ({ page }) => {
+  async function holdReport(mode: "hold" | "release") {
+    const response = await page.request.put(mockApiBase() + "/__test__/student-overview-response", {
+      headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" }, data: { mode },
+    });
+    expect(response.status()).toBe(204);
+  }
+
+  await holdReport("hold");
+  try {
+    await signIn(page);
+    await expect(page.getByRole("heading", { name: "My Report" })).toBeVisible();
+    await expect(page.getByRole("status", { name: "Loading student profile attendance" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Class history" })).toHaveCount(0);
+  } finally {
+    await holdReport("release");
+  }
+  await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Student portal" });
+  const calendar = nav.getByRole("link", { name: "Calendar" });
+  await calendar.click();
+  await expect(page.getByRole("region", { name: "Class calendar" })).toBeVisible();
+  await nav.getByRole("link", { name: "My Report" }).click();
+  await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
+
+  const requests: string[] = [];
+  page.on("request", request => {
+    if (new URL(request.url()).pathname === "/student/calendar" && request.headers().rsc === "1") requests.push(request.url());
+  });
+  await calendar.click();
+  await expect(page.getByRole("region", { name: "Class calendar" })).toBeVisible();
+  expect(requests).toHaveLength(0);
+});

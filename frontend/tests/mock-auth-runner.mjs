@@ -79,7 +79,7 @@ const backend = createServer(async (req, res) => {
     studentLiveOnline = body.online ?? 12;
     return send(204);
   }
-  if (/^\/api\/v1\/students\/[^/]+\/attendance-overview\?/.test(req.url)) await blockedStudentOverview;
+  if (/^\/api\/v1\/(?:students\/[^/]+|me)\/attendance-overview\?/.test(req.url)) await blockedStudentOverview;
   if (/^\/api\/v1\/attendance\/(dashboard|class-totals|latest-completed|recent-completed)(\?|$)/.test(req.url) || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
     return insightsApi(req, send);
   }

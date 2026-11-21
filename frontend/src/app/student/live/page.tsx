@@ -1,10 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ClassCountdown } from "@/components/ClassCountdown";
 import { LiveRefresh } from "@/components/LiveRefresh";
-import { Shell } from "@/components/Shell";
 import { LiveOnlineChart } from "@/components/staff/LiveOnlineChart";
 import { requirePortal } from "@/lib/auth-server";
-import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
 import { addDays, academyToday, ACADEMY_TIME_ZONE, formatDuration, zonedToInstant, type MyConsent } from "@/lib/staff-forms";
 import { formatClock, formatDay, renderTime } from "@/lib/insights";
@@ -19,8 +18,17 @@ type StudentLive = {
 export const metadata = { title: "Live Now · LUMA" };
 
 export default async function StudentLivePage() {
-  const identity = await requirePortal("student");
+  await requirePortal("student");
   const now = renderTime();
+  return <>
+    <header className="student-live-header"><h1 className="heading staff-heading">Live Now</h1><LiveRefresh dashboard /></header>
+    <Suspense fallback={<div className="panel" role="status">Checking live classes…</div>}>
+      <LiveContent now={now} />
+    </Suspense>
+  </>;
+}
+
+async function LiveContent({ now }: { now: number }) {
   const day = academyToday(new Date(now));
   const boundary = (offset: number) => zonedToInstant(addDays(day, offset), "00:00", ACADEMY_TIME_ZONE);
   const { entries, sessions, unavailable } = await studentTimetable(boundary(-45), boundary(46));
@@ -36,8 +44,7 @@ export default async function StudentLivePage() {
     .sort((a, b) => Date.parse(b.endsAt!) - Date.parse(a.endsAt!))[0];
   const next = entries.find(c => !c.cancelled && Date.parse(c.startsAt) > now);
 
-  return <Shell active="student" studentSection="live" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
-    <header className="student-live-header"><h1 className="heading staff-heading">Live Now</h1><LiveRefresh dashboard /></header>
+  return <>
     {(unavailable || failed) && <p className="session-error" role="alert">Some class details couldn’t load. The page will retry.</p>}
     <div className="student-live-stack">
       {active.length ? active.map(({ session, data }) => <section key={session.id} className="student-live-card student-portal-enter">
@@ -73,7 +80,7 @@ export default async function StudentLivePage() {
         </div>
       </>}
     </div>
-  </Shell>;
+  </>;
 }
 
 function Neighbour({ label, entry, countdownFrom }: { label: string; entry?: TimetableEntry; countdownFrom?: number }) {

@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Shell } from "@/components/Shell";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { PulseAnswer, ReactionButtons } from "@/components/StudentEngagement";
 import { requirePortal } from "@/lib/auth-server";
-import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
 import { uuidOrNull, type ClassEngagement } from "@/lib/staff-forms";
 
@@ -12,12 +10,12 @@ export const metadata = { title: "Class · LUMA" };
 
 /** During a class: reactions and the questions staff have opened. Only for consenting students; the API checks everything. */
 export default async function StudentClassPage({ params }: { params: Promise<{ sessionId: string }> }) {
-  const identity = await requirePortal("student");
+  await requirePortal("student");
   const sessionId = uuidOrNull((await params).sessionId);
   if (!sessionId) notFound();
   const engagement = await studentApi<ClassEngagement>(`/api/v1/me/class-sessions/${sessionId}/engagement`);
   if (!engagement.ok && engagement.status === 404) notFound();
-  return <Shell active="student" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
+  return <>
     <p><Link className="text-link" href="/student/classes">← My classes</Link></p>
     <h1 className="heading">Take part</h1>
     {!engagement.ok ? <p className="session-error" role="alert">We couldn’t load this class right now.</p>
@@ -35,5 +33,5 @@ export default async function StudentClassPage({ params }: { params: Promise<{ s
             : engagement.data.pulses.map(p => <PulseAnswer key={p.id} sessionId={sessionId} pulse={p} />)}
         </section>
       </>}
-  </Shell>;
+  </>;
 }
