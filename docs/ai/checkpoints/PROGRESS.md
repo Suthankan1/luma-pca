@@ -2917,3 +2917,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Restored the student header tabs at the owner's request. The mobile grid gives the three student tabs equal space and 44 px minimum tap targets. Dual-role accounts keep the Staff portal link, with room for it to wrap onto a second row on narrow screens.
 - Production build, ESLint, structure validation and ten synthetic desktop/mobile browser checks passed, including three tabs in one row and tab navigation at 320 px. Restarted port 3000 and verified student sign-in. Real-account navigation was not exercised.
 - Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database change.
+
+## Class type batch and roster controls (2026-11-22)
+
+- Staff Class Types shows each Academy class type, its student batch dropdown, and the roster sync status and timestamp. Link and sync and Sync students reuse the Academy actions and refresh Class Types and Classes. Only active, unassigned batches appear as new choices.
+- Sync status compares the last successful sync and source student count. A membership change with the same count still requires a sync. The completed-class attendance chart remains available.
+- Production build, ESLint, structure, 81 unit tests and two desktop Academy browser tests passed with synthetic data. The mobile Academy cases were skipped by fixture configuration. Restarted local web and verified staff sign-in and backend readiness. No real roster sync was performed.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database migration.

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { mockApiBase } from "./support/classes";
 
 async function signInStaff(page: Page, email: string) {
   await page.context().clearCookies();
@@ -13,6 +14,28 @@ async function signInStaff(page: Page, email: string) {
 test.describe.configure({ mode: "serial" });
 
 test.describe("Academy classes", () => {
+  test("Class Types can link an existing batch and show the roster sync status", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Uses the desktop Academy fixtures");
+    await signInStaff(page, "admin-enrolled@example.invalid");
+    const headers = { Authorization: "Bearer fake-access-token.for-bff.e2e-test" };
+    const api = mockApiBase() + "/api/v1";
+    const course = await page.request.post(`${api}/courses`, { headers, data: { code: "ROSTER-PCA", title: "Roster test" } });
+    expect(course.status()).toBe(201);
+    const batch = await page.request.post(`${api}/batches`, { headers,
+      data: { courseId: (await course.json()).id, code: "ROSTER-A", name: "Admission batch", startsOn: "2026-01-01" } });
+    expect(batch.status()).toBe(201);
+    await page.goto("/staff/class-types");
+    const row = page.getByRole("region", { name: "Student batch and sync" }).getByRole("listitem", { name: "Admission" });
+    await expect(row.getByText("Batch not selected", { exact: true })).toBeVisible();
+    await row.getByLabel("Student batch").selectOption((await batch.json()).id);
+    await row.getByRole("button", { name: "Link and sync" }).click();
+    await expect(row.getByText("Synced", { exact: true })).toBeVisible();
+    await expect(row.getByText(/Last synced/)).toBeVisible();
+    await expect(row.getByLabel("Student batch")).toHaveValue((await batch.json()).id);
+    await row.getByRole("button", { name: "Sync students of Admission" }).click();
+    await expect(row.locator(".form-ok")).toContainText("already enrolled");
+  });
+
   test("A class from the Academy records is set up in one step and its students synced", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Sets up shared mock data once");
     await signInStaff(page, "admin-enrolled@example.invalid");
