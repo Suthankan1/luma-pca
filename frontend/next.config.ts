@@ -31,6 +31,7 @@ export const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  serverExternalPackages: ["pdfkit"],
   experimental: {
     // Default client-router lifetimes. Staff list pages opt into a longer quick-return window individually.
     staleTimes: { dynamic: 30, static: 90 },

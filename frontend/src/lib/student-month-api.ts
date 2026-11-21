@@ -1,10 +1,16 @@
-import { type ApiResult, staffApi } from "./staff-api";
+import { type ApiResult, staffApi, studentApi } from "./staff-api";
 import { addDays } from "./staff-forms";
-import type { Dashboard } from "./insights";
+import type { Dashboard, StudentOverview } from "./insights";
 import type { classMonthRange } from "./staff-home";
 import { compileStudentMonth, type StudentDirectoryEntry } from "./student-month";
 
 type StudentPage = { items: StudentDirectoryEntry[]; nextAfter: string | null };
+
+export function readMyReportMonth(range: ReturnType<typeof classMonthRange>) {
+  return readAttendanceWindows(range.first, range.through ?? range.last, (from, to) => studentApi<StudentOverview>(
+    `/api/v1/me/attendance-overview?${new URLSearchParams({ from, to })}`, undefined, 30000),
+  overview => overview.classes.length >= 80);
+}
 
 export async function readStudentDirectory() {
   const students: StudentDirectoryEntry[] = [];

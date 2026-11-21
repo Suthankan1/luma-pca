@@ -8,12 +8,13 @@ test("student data stays private across navigation, logout and a student sign-in
   await page.fill("#email", "student@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("alert")).toHaveText("This account cannot sign in to this portal.");
+  await expect(page.getByText("This account cannot sign in to this portal.", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/portal=staff$/);
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/staff$/);
+  expect((await page.request.get("/student/attendance/download?month=2026-11")).status()).toBe(403);
   const response = await page.goto("/staff/students");
   expect(response?.headers()["cache-control"]).toMatch(/\bprivate\b.*\bno-store\b/);
   await expect(page.getByRole("heading", { name: "Student directory" })).toBeVisible();

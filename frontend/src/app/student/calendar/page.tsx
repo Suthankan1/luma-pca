@@ -17,8 +17,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const timetable = studentTimetable(range.fromInstant, range.toInstant);
 
   return <>
-    <header className="page-head">
-      <div><h1 className="heading staff-heading">Calendar</h1><p className="sub page-sub">Class times in Sri Lanka time</p></div>
+    <header className="student-live-card student-section-hero student-portal-enter">
+      <div><h1>Calendar</h1><p>Class times in Sri Lanka time</p></div>
     </header>
     <Suspense key={month} fallback={<div className="panel" role="status">Loading calendar…</div>}>
       <CalendarContent request={timetable} month={month} today={today} selectedDay={selectedDay} />

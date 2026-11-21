@@ -235,8 +235,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   const agenda = portal.getByRole("region", { name: "Wednesday 13 January 2027" });
   await expect(agenda.getByRole("listitem").filter({ hasText: "Real stack class" })).toContainText("18:00–20:30");
   await portal.getByRole("link", { name: "My Report" }).click();
-  await portal.getByText("My batches", { exact: true }).click();
-  await expect(portal.getByText(/from 12 Jan 2027/)).toBeVisible();
+  await expect(portal.getByText("My batches", { exact: true })).toHaveCount(0);
   await studentAgain.close();
 
   // 7b''. LUMA no longer schedules classes or weekly series: the Classes page tracks Zoom links instead.
@@ -428,9 +427,8 @@ test("an administrator onboards a student end to end on the real stack", async (
   await portalAgain.getByRole("button", { name: "Sign in" }).click();
   await expect(portalAgain).toHaveURL(/\/student$/);
   await portalAgain.goto("/student/attendance?month=2026-03");
-  await portalAgain.getByText("Attendance appeals", { exact: true }).click();
-  await expect(portalAgain.getByRole("listitem", { name: "Attendance Past real class" })
-    .locator(".status")).toHaveText("Present");
+  await expect(portalAgain.getByRole("region", { name: "Class history" }).getByRole("listitem")
+    .filter({ hasText: "Past real class" })).toContainText("Present");
   await finalStudent.close();
   await page.goto("/staff/activity?category=classes");
   await expect(page.getByText("Finalised attendance of “Past real class”").first()).toBeVisible();
@@ -470,15 +468,24 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   test.setTimeout(150_000);
   expect(adminSignedIn, "the onboarding test ran first").toBeTruthy();
 
-  // UAT 11: the student appeals the recorded Present outcome and staff change it to Late.
+  // UAT 11: seed an appeal through the API; an administrator changes Present to Late.
   let student = await signInStudent(browser);
   await student.goto("/student/attendance?month=2026-03");
-  await student.getByText("Attendance appeals", { exact: true }).click();
-  const record = student.getByRole("listitem", { name: "Attendance Past real class" });
-  await record.getByText("Appeal this").click();
-  await record.getByLabel("What should the academy know?").fill("I joined this class late.");
-  await record.getByRole("button", { name: "Send appeal" }).click();
-  await expect(record).toContainText("appeal waiting for a decision");
+  const record = student.getByRole("region", { name: "Class history" }).getByRole("listitem").filter({ hasText: "Past real class" });
+  await expect(record).toBeVisible();
+  await expect(student.getByText("Attendance appeals", { exact: true })).toHaveCount(0);
+  const login = await fetch(`${apiBase}/api/v1/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "real.student@example.invalid", password: studentPassword }) });
+  expect(login.ok).toBeTruthy();
+  const { accessToken } = await login.json() as { accessToken: string };
+  const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+  const records = await (await fetch(`${apiBase}/api/v1/me/attendance`, { headers })).json() as { id: string; classTitle: string }[];
+  const past = records.find(item => item.classTitle === "Past real class");
+  expect(past).toBeTruthy();
+  const seeded = await fetch(`${apiBase}/api/v1/me/attendance/${past!.id}/appeals`, {
+    method: "POST", headers, body: JSON.stringify({ message: "I joined this class late." }),
+  });
+  expect(seeded.status).toBe(201);
   await signInAdmin(page);
   await page.goto("/staff/attendance");
   const appeal = page.getByRole("region", { name: "APPEALS" }).getByRole("listitem", { name: "Appeal PCA-REAL-001 Past real class" });
@@ -488,9 +495,7 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await appeal.getByRole("button", { name: "Accept" }).click();
   await expect(appeal).toHaveCount(0);
   await student.reload();
-  await student.getByText("Attendance appeals", { exact: true }).click();
-  await expect(record.locator(".status")).toHaveText("Late");
-  await expect(record).toContainText("appeal accepted");
+  await expect(record).toContainText("Late");
 
   // UAT 12: the owner switches engagement on; the student agrees (named in rankings) and reacts during a running class.
   await page.goto("/staff/attendance?section=settings");

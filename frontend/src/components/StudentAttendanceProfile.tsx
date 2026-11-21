@@ -3,10 +3,9 @@ import { ClassMonthPicker } from "./staff/ClassMonthPicker";
 import { PanelRetry } from "./staff/PanelRetry";
 import { StudentMonthDetails } from "./StudentMonthDetails";
 import { formatDuration, type StudentOverview, type ClassAttendance, type Enrolment } from "@/lib/insights";
-import { instantParts, ACADEMY_TIME_ZONE } from "@/lib/staff-forms";
 import type { ApiResult } from "@/lib/staff-api";
 import { classTypeKey, compactClassTitle, monthLabel, type classMonthRange } from "@/lib/staff-home";
-import { attendancePercentFor, completedForStudent, participationFor, type Participation } from "@/lib/student-month";
+import { attendancePercentFor, studentReportSessions, participationFor, type Participation } from "@/lib/student-month";
 
 type Month = ReturnType<typeof classMonthRange>;
 
@@ -45,20 +44,15 @@ async function StudentProfilePanels({ range, now, reports, schedule, staff }: {
   const loaded = await reports;
   if (!loaded) return <p className="session-error" role="alert">Monthly attendance couldn’t load. <PanelRetry /></p>;
   const { month, first, last, through } = range;
-  const classes = new Map<string, ClassAttendance>();
   const enrolments = new Map<string, Enrolment>();
   for (const report of loaded) {
-    for (const session of report.classes) {
-      const day = instantParts(session.startsAt, ACADEMY_TIME_ZONE).date;
-      if (through && day >= first && day <= through && completedForStudent(session, now)) classes.set(session.id, session);
-    }
     for (const item of report.enrolments ?? []) {
       if (item.enrolledOn <= last && (!item.withdrawnOn || item.withdrawnOn > first)) {
         enrolments.set(`${item.batchId}/${item.enrolledOn}`, item);
       }
     }
   }
-  const sessions = [...classes.values()].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  const sessions = studentReportSessions(loaded, first, through, now);
   const groups = new Map<string, { key: string; title: string; counts: Participation }>();
   const totals = { expected: 0, joined: 0 };
   let connected = 0;

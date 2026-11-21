@@ -20,9 +20,11 @@ export function StudentCalendar({ month, today, selectedDay, weeks, entries }: {
     else byDay.set(entry.date, [entry]);
   }
   const agenda = byDay.get(selected) ?? [];
+  const days = weeks.flat();
+  const selectedIndex = days.findIndex(day => day.date === selected);
 
   return <div className="student-calendar-grid">
-    <section className="panel student-calendar" aria-label="Class calendar">
+    <section className="panel student-calendar student-portal-enter" aria-label="Class calendar">
       <header className="student-calendar-controls">
         <h2 className="panel-title">{monthLabel(month)}</h2>
         <nav aria-label="Calendar months">
@@ -33,7 +35,7 @@ export function StudentCalendar({ month, today, selectedDay, weeks, entries }: {
       </header>
       <div className="student-calendar-days">
         {weekdays.map(day => <span key={day} className="student-calendar-weekday">{day}</span>)}
-        {weeks.flat().map(day => {
+        {days.map(day => {
           const classes = byDay.get(day.date) ?? [];
           return <button key={day.date} type="button" data-outside={!day.inMonth} aria-current={day.date === today ? "date" : undefined}
             aria-pressed={day.date === selected} onClick={() => setSelected(day.date)}
@@ -47,8 +49,16 @@ export function StudentCalendar({ month, today, selectedDay, weeks, entries }: {
         })}
       </div>
     </section>
-    <section className="panel student-agenda" aria-labelledby="student-agenda-title">
-      <h2 id="student-agenda-title" className="panel-title">{longDayLabel(selected)}</h2>
+    <section className="panel student-agenda student-portal-enter" aria-labelledby="student-agenda-title">
+      <header className="student-agenda-head">
+        <h2 id="student-agenda-title" className="panel-title">{longDayLabel(selected)}</h2>
+        <div role="group" aria-label="Browse days">
+          <button type="button" aria-label="Previous day" disabled={selectedIndex <= 0}
+            onClick={() => setSelected(days[selectedIndex - 1].date)}>‹</button>
+          <button type="button" aria-label="Next day" disabled={selectedIndex < 0 || selectedIndex >= days.length - 1}
+            onClick={() => setSelected(days[selectedIndex + 1].date)}>›</button>
+        </div>
+      </header>
       <div key={selected} className="student-portal-enter">
         {agenda.length === 0 ? <p className="panel-sub">No classes on this day.</p> : <ul>
           {agenda.map(entry => <li key={entry.id}>

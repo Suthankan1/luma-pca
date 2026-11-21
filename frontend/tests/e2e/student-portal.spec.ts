@@ -1,5 +1,6 @@
 ﻿import { expect, test, type Page } from "@playwright/test";
 import { mockApiBase } from "./support/classes";
+import { readFile } from "node:fs/promises";
 import { longDayLabel } from "../../src/lib/staff-home";
 
 async function signIn(page: Page, email = "student@example.invalid") {
@@ -84,6 +85,26 @@ test("A student without enrolments sees an empty calendar and no live class", as
   await expect(page.getByText("No classes on this day.")).toBeVisible();
   await page.getByRole("link", { name: "Live Now" }).click();
   await expect(page.getByRole("heading", { name: "No live class" })).toBeVisible();
+});
+
+test("My Report downloads the selected month's private PDF with no appeals or batches panel", async ({ page }) => {
+  const path = "/student/attendance/download?month=2026-11";
+  expect((await page.request.get(path)).status()).toBe(401);
+  await signIn(page);
+  await page.goto("/student?month=2026-11");
+  await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
+  await expect(page.getByText("Attendance appeals", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("My batches", { exact: true })).toHaveCount(0);
+  const ready = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Download report" }).click();
+  const download = await ready;
+  expect(download.suggestedFilename()).toBe("LUMA-attendance-2026-11.pdf");
+  const bytes = await readFile(await download.path());
+  expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(bytes.length).toBeLessThan(180_000);
+  const response = await page.request.get(path);
+  expect(response.headers()["cache-control"]).toBe("private, no-store");
+  expect((await page.request.get("/student/attendance/download?month=invalid")).status()).toBe(400);
 });
 
 test("The report shell streams while attendance is slow and a warmed Calendar opens from memory", async ({ page }) => {

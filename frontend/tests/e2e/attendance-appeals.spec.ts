@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { mockApiBase } from "./support/classes";
 
 async function signInAsAdmin(page: Page) {
   await page.goto("/sign-in");
@@ -15,23 +16,21 @@ test.describe("Attendance appeals", () => {
     accepted = testInfo.project.name === "mobile" ? "Present" : "Excused";
   });
 
-  test("A student appeals final attendance and an administrator accepts it, correcting the record", async ({ page }) => {
+  test("The student report hides appeals and staff can still resolve an existing appeal", async ({ page }) => {
     await page.goto("/sign-in");
     await page.fill("#email", "student@example.invalid");
     await page.fill("#password", "correct-password");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page).toHaveURL(/\/student$/);
     await page.goto("/student?month=2026-11");
-    await page.getByText("Attendance appeals", { exact: true }).click();
-    const record = page.getByRole("listitem", { name: "Attendance Waves and oscillations" });
-    await record.getByText("Appeal this").click();
-    await record.getByLabel("What should the academy know?").fill("short");
-    await record.getByRole("button", { name: "Send appeal" }).click();
-    await expect(record.locator(".session-error")).toHaveText("Explain your appeal in 10 to 1000 characters.");
-    await record.getByLabel("What should the academy know?").fill("I joined from my parent's phone with their Zoom account.");
-    await record.getByRole("button", { name: "Send appeal" }).click();
-    await expect(record).toContainText("appeal waiting for a decision");
-    await expect(record.getByText("Appeal this")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
+    await expect(page.getByText("Attendance appeals", { exact: true })).toHaveCount(0);
+    const headers = { Authorization: "Bearer fake-access-token.for-bff.e2e-test" };
+    const api = mockApiBase() + "/api/v1/me/attendance";
+    const [record] = await (await page.request.get(api, { headers })).json();
+    const seeded = await page.request.post(`${api}/${record.id}/appeals`,
+      { headers, data: { message: "I joined from my parent's phone with their Zoom account." } });
+    expect(seeded.status()).toBe(201);
 
     await page.context().clearCookies();
     await signInAsAdmin(page);
@@ -45,15 +44,5 @@ test.describe("Attendance appeals", () => {
     await page.goto("/staff/activity?category=classes");
     await expect(page.getByText("Attendance appeal accepted").first()).toBeVisible();
 
-    await page.context().clearCookies();
-    await page.goto("/sign-in");
-    await page.fill("#email", "student@example.invalid");
-    await page.fill("#password", "correct-password");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/student$/);
-    await page.goto("/student/attendance?month=2026-11");
-    await page.getByText("Attendance appeals", { exact: true }).click();
-    await expect(record.locator(".status")).toHaveText(accepted);
-    await expect(record).toContainText("appeal accepted");
   });
 });
