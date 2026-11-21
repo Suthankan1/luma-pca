@@ -2968,3 +2968,8 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Local backend logs showed Track and sync timing out during replay of historic Zoom events. Backfill now processes one first event per occurrence and all start/end events. Participant visits are already stored and stay available to attendance.
 - The roster action waits up to 60 seconds per operation and gives separate tracking and roster timeout messages. A failed request keeps the selected payment name.
 - Passed 16 backend integration tests, the targeted backfill test with a 30-minute stored participant visit, two Chromium tests, frontend production build, targeted ESLint and structure validation. Rebuilt and restarted the local services with the original configuration. No production roster operation was submitted during verification. Roll back by reverting and rebuilding both apps. No migration.
+
+## Fix the Class Type attendance trend stroke (2026-11-22)
+
+- Replaced the SVG dash animation with a short opacity fade. The trend uses a solid stroke across adjacent attendance points. The existing path breaks for unavailable attendance still apply.
+- Frontend production build and six desktop/mobile staff browser checks passed. A Chromium check on the restarted local frontend confirmed the built styles render a solid stroke after the fade on a synthetic wide plot. The signed-in Academy chart was not exercised. Roll back by reverting and rebuilding the frontend. No API or database changes.

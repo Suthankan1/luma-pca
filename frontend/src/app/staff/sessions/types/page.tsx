@@ -160,7 +160,7 @@ function Trend({ rates }: { rates: SessionRate[] }) {
         <div className="class-trend-plot">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <path className="class-trend-grid" d="M0 0H100 M0 50H100 M0 100H100" vectorEffect="non-scaling-stroke" />
-            <path className="class-trend-line" d={line} pathLength={1} vectorEffect="non-scaling-stroke" />
+            <path className="class-trend-line" d={line} vectorEffect="non-scaling-stroke" />
           </svg>
           {points.map(({ session, percent, x }) => percent == null ? null : <Link key={session.id}
             className="class-trend-point" href={`/staff/sessions/${session.id}`}

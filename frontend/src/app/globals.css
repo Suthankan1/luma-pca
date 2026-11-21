@@ -776,8 +776,8 @@ a.class-detail-row:hover { background:#edf5fc; }
 .class-trend-point:is(:hover,:focus) span { display:block; }
 .class-trend-dates { display:flex; justify-content:space-between; margin:6px 12px 0 38px; color:#52677d; font-size:11px; }
 .class-trend-dates[data-single] { justify-content:center; }
-@media (prefers-reduced-motion:no-preference) { .class-trend-line { stroke-dasharray:1; animation:class-trend-draw .65s ease-out both; } }
-@keyframes class-trend-draw { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
+@media (prefers-reduced-motion:no-preference) { .class-trend-line { animation:class-trend-fade .35s ease-out both; } }
+@keyframes class-trend-fade { from { opacity:0; } to { opacity:1; } }
 @media (max-width:850px) { .class-detail-lists { grid-template-columns:minmax(0,1fr); } }
 .session-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,155px),1fr)); gap:12px; }
 .session-metrics > .panel { display:flex; flex-direction:column; justify-content:space-between; min-width:0; padding:16px; border-radius:14px; }
