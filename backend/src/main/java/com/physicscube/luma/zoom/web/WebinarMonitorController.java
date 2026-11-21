@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +15,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -26,6 +30,13 @@ class WebinarMonitorController {
 
     WebinarMonitorController(WebinarMonitorService monitors) {
         this.monitors = monitors;
+    }
+
+    @GetMapping("/api/v1/me/webinar-schedule")
+    ResponseEntity<List<WebinarMonitorService.StudentSchedule>> mySchedule(JwtAuthenticationToken authentication,
+                                                                            @RequestParam Instant from, @RequestParam Instant to) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate())
+                .body(monitors.scheduleForStudent(CurrentAccount.from(authentication), from, to));
     }
 
     record AddRequest(@NotBlank @Size(max = 500) String webinar) {

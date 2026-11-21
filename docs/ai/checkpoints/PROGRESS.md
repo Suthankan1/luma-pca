@@ -2867,3 +2867,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The browser tab uses the same PCA logo asset as the in-page header. The sidebar divider toggle uses a small circular chevron with a larger clickable area.
 - Production build, ESLint, 81 unit tests, session HTTP smoke, 10 desktop/mobile browser checks, and structure validation passed. Browser checks used synthetic accounts. Rebuilt and restarted port 3000, and confirmed the favicon metadata and image response on the running frontend. Real account sign-in was not exercised.
 - Roll out by rebuilding the frontend. Revert and rebuild to roll back. No API or database change is needed.
+
+## Student Calendar, My Report and Live Now (2026-11-22)
+
+- Replaced My classes with monthly Calendar and a day agenda. My Report is still the student home and keeps reports, appeals, batches and engagement consent together. The compact sidebar keeps a small PCA logo. See the [portal plan](STUDENT-PORTAL-PLAN.md).
+- Added two STUDENT-only private reads for linked Zoom schedule slots and live attendance. They apply academy and date-specific batch access. Live Now shows distinct counts for the viewer's enrolled batches, a scrub-able graph and the viewer's own connection facts. An ended class hides counts and shows previous and next classes within 45 days.
+- Ten targeted backend tests passed, including PostgreSQL/Testcontainers endpoint authorization, batch scoping, duplicate visits and ended state. The backend packaged in a separate directory because the existing local runtime held the workspace JAR. Frontend production build, ESLint, 81 unit tests, session HTTP smoke, 18 Chromium desktop/mobile tests, structure check and the 115-endpoint OpenAPI check passed.
+- Verified the three pages against the isolated synthetic preview on port 3450. The original API still reports ready. The licensed Zoom account and the full real-stack browser suite were not used for verification. Release the backend before the frontend. No migration. Roll back in reverse order.

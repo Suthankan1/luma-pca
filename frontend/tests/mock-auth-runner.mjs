@@ -10,6 +10,8 @@ const issueRefresh = () => { const token = `fake-opaque-refresh-${++rotation}`; 
 const jwt = "fake-access-token.for-bff.e2e-test";
 let roles = [];
 let studentHasEnrolments = true;
+let studentLiveEnded = false;
+let studentLiveOnline = 12;
 const activatedTokens = new Set();
 const usedResetTokens = new Set();
 let blockedMonitors;
@@ -69,6 +71,12 @@ const backend = createServer(async (req, res) => {
     if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
     releaseStudentOverview?.();
     blockedStudentOverview = body.mode === "hold" ? new Promise(resolve => { releaseStudentOverview = resolve; }) : undefined;
+    return send(204);
+  }
+  if (req.method === "PUT" && req.url === "/__test__/student-live") {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    studentLiveEnded = body.ended === true;
+    studentLiveOnline = body.online ?? 12;
     return send(204);
   }
   if (/^\/api\/v1\/students\/[^/]+\/attendance-overview\?/.test(req.url)) await blockedStudentOverview;
@@ -174,6 +182,21 @@ function studentApi(req, send, body) {
   const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
   const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
   const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
+  if (url.pathname === "/api/v1/me/webinar-schedule") {
+    const startsAt = `${day(3)}T12:30:00Z`;
+    return send(200, studentHasEnrolments && Date.parse(startsAt) >= Date.parse(url.searchParams.get("from"))
+      && Date.parse(startsAt) < Date.parse(url.searchParams.get("to")) ? [{
+        id: "mock-zoom-slot", title: "Upcoming Zoom webinar", startsAt, durationMinutes: 60,
+        timeZone: "Asia/Colombo", batchCode: mon.code, joinUrl: "https://zoom.us/j/89900000000",
+      }] : []);
+  }
+  if (url.pathname === "/api/v1/me/class-sessions/00000000-0000-4000-8000-0000000000f4/live-attendance") {
+    if (!studentHasEnrolments || studentLiveEnded) return send(404);
+    const sampledAt = new Date().toISOString();
+    const firstJoinAt = new Date(Date.now() - 10 * 60_000).toISOString();
+    return send(200, { joined: 16, online: studentLiveOnline, seen: true, connectedSeconds: 600, firstJoinAt, sampledAt,
+      onlineHistory: [{ at: firstJoinAt, online: 4 }, { at: sampledAt, online: studentLiveOnline }] });
+  }
   if (url.pathname === "/api/v1/me/attendance-overview") {
     const overview = insightsOverview(INSIGHT_STUDENTS[0]);
     return send(200, studentHasEnrolments ? overview : { ...overview, enrolments: [], classes: [] });
@@ -247,7 +270,7 @@ function studentApi(req, send, body) {
     ];
     // One class running now (20 minutes in), so "Take part" can be offered during a class.
     const live = !studentHasEnrolments ? [] : [{ id: "00000000-0000-4000-8000-0000000000f4", title: "Live class now", status: "SCHEDULED", batches: [mon],
-      startsAt: new Date(Date.now() - 20 * 60_000).toISOString(), endsAt: new Date(Date.now() + 90 * 60_000).toISOString(), timeZone: "Asia/Colombo",
+      startsAt: new Date(Date.now() - 20 * 60_000).toISOString(), endsAt: new Date(Date.now() + (studentLiveEnded ? -1 : 90 * 60_000)).toISOString(), timeZone: "Asia/Colombo",
       localDate: new Date(Date.now() - 20 * 60_000).toISOString().slice(0, 10) }];
     return send(200, [...classes.map(({ offset, ...c }) => ({ ...c, startsAt: `${day(offset)}T12:30:00Z`, endsAt: `${day(offset)}T14:30:00Z`,
       timeZone: "Asia/Colombo", localDate: day(offset) })), ...live].filter(c => Date.parse(c.startsAt) >= from && Date.parse(c.startsAt) < to)

@@ -38,6 +38,12 @@ Staff can read their academy’s dated class totals, latest completed class, and
 count each student once. `GET /api/v1/class-sessions/{sessionId}/attendance?includeOnlineHistory=true` adds timestamps and
 counts of matched students from recorded Zoom visits for the requested class, including matched students outside its roster.
 
+**Student calendar and live reads.** The calendar includes future slots only for active, successfully synced Zoom monitors
+linked to a batch the caller is enrolled in on the slot date. Live attendance checks the same dated class enrollment,
+the class window and current Zoom evidence. It exposes only distinct totals for the caller's batch scope and the caller's
+own observed join and connected time. No other participant details or roster are returned. Ended, cancelled and out-of-scope
+classes return 404 for live attendance. Both routes require STUDENT and return private, no-store responses.
+
 ## History (superseded by the two-role model)
 
 The notes below describe the role model before 2026-11-20 and are kept for the record.

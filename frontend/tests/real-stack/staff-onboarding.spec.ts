@@ -231,10 +231,12 @@ test("an administrator onboards a student end to end on the real stack", async (
   await portal.fill("#password", passphrase);
   await portal.getByRole("button", { name: "Sign in" }).click();
   await expect(portal).toHaveURL(/\/student$/);
-  await portal.goto("/student/classes?from=2027-01-11");
-  await expect(portal.getByRole("region", { name: "MY CLASSES" }).getByRole("listitem", { name: "Real stack class" }))
-    .toContainText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
-  await expect(portal.getByRole("region", { name: "MY BATCHES" })).toContainText("from 12 Jan 2027");
+  await portal.goto("/student/calendar?month=2027-01&day=2027-01-13");
+  const agenda = portal.getByRole("region", { name: "Wednesday 13 January 2027" });
+  await expect(agenda.getByRole("listitem").filter({ hasText: "Real stack class" })).toContainText("18:00–20:30");
+  await portal.getByRole("link", { name: "My Report" }).click();
+  await portal.getByText("My batches", { exact: true }).click();
+  await expect(portal.getByText(/from 12 Jan 2027/)).toBeVisible();
   await studentAgain.close();
 
   // 7b''. LUMA no longer schedules classes or weekly series: the Classes page tracks Zoom links instead.
@@ -501,12 +503,12 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await page.goto(`/staff/sessions/${liveClassId}`);
   const liveClass = page.url();
 
-  await student.goto("/student/classes");
-  const panel = student.getByRole("region", { name: "REACTIONS AND QUESTIONS" });
+  await student.goto("/student");
+  const panel = student.getByRole("region", { name: "Reactions and questions" });
   await panel.getByLabel("Staff may also see my name in engagement rankings").check();
   await panel.getByRole("button", { name: "I agree" }).click();
-  await expect(panel).toContainText("You take part");
-  await student.getByRole("listitem", { name: "Live acceptance class" }).getByRole("link", { name: "Take part" }).click();
+  // This fixture has a scheduled window but no Zoom events, so it has no card on Live Now.
+  await student.goto(`/student/classes/${liveClassId}`);
   await student.getByRole("button", { name: "I understand" }).click();
   await expect(student.locator("#reaction-feedback")).toHaveText("Sent.");
   await student.getByRole("button", { name: "Slow down" }).click();

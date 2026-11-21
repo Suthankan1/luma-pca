@@ -5,8 +5,9 @@ import type { ReactNode } from "react";
 import type { Portal } from "@/lib/session-policy";
 
 const studentNav = [
-  { key: "attendance", label: "My attendance", href: "/student", icon: "chart" },
-  { key: "home", label: "My classes", href: "/student/classes", icon: "calendar" },
+  { key: "calendar", label: "Calendar", href: "/student/calendar", icon: "calendar" },
+  { key: "attendance", label: "My Report", href: "/student", icon: "chart" },
+  { key: "live", label: "Live Now", href: "/student/live", icon: "live" },
 ] as const;
 
 /**
@@ -25,8 +26,8 @@ export function Shell({ children, active, otherPortal, studentSection }: {
       <PortalRail portal="student">
         <nav className="staff-nav" aria-label="Student portal">
           {studentNav.map(item => <Link key={item.key} href={item.href} title={item.label} aria-label={item.label}
-            className={`staff-navitem ${(studentSection ?? "home") === item.key ? "active" : ""}`}
-            aria-current={(studentSection ?? "home") === item.key ? "page" : undefined}>
+            className={`staff-navitem ${(studentSection ?? "attendance") === item.key ? "active" : ""}`}
+            aria-current={(studentSection ?? "attendance") === item.key ? "page" : undefined}>
             <PortalIcon name={item.icon} /><span className="portal-rail-copy">{item.label}</span>
           </Link>)}
           {otherPortal && <Link className="staff-navitem" href={`/${otherPortal}`} title={otherPortal === "staff" ? "Staff portal" : "Student portal"}

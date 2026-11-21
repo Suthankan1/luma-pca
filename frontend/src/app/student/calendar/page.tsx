@@ -1,0 +1,29 @@
+import { Shell } from "@/components/Shell";
+import { StudentCalendar } from "@/components/StudentCalendar";
+import { requirePortal } from "@/lib/auth-server";
+import { hasPortal } from "@/lib/session-policy";
+import { academyToday, isRealDate } from "@/lib/staff-forms";
+import { classMonthRange, gridRange, monthWeeks } from "@/lib/staff-home";
+import { studentTimetable } from "@/lib/student-timetable";
+
+export const metadata = { title: "Calendar · LUMA" };
+
+export default async function CalendarPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const identity = await requirePortal("student");
+  const query = await searchParams;
+  const today = academyToday();
+  const { month, first } = classMonthRange(query.month, today, query.from);
+  const range = gridRange(month);
+  const selectedDay = isRealDate(query.day) && query.day >= range.first && query.day < range.after ? query.day
+    : today.startsWith(month) ? today : first;
+  const timetable = await studentTimetable(range.fromInstant, range.toInstant);
+
+  return <Shell active="student" studentSection="calendar" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
+    <header className="page-head">
+      <div><h1 className="heading staff-heading">Calendar</h1><p className="sub page-sub">Class times in Sri Lanka time</p></div>
+    </header>
+    {timetable.unavailable && <p className="session-error" role="alert">Part of your timetable couldn’t load. Refresh to try again.</p>}
+    <StudentCalendar key={`${month}:${selectedDay}`} month={month} today={today} selectedDay={selectedDay}
+      weeks={monthWeeks(month)} entries={timetable.entries} />
+  </Shell>;
+}

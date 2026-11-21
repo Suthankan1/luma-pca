@@ -31,7 +31,9 @@ export async function saveConsent(_previous: FormState, form: FormData): Promise
   if (!Number.isInteger(consentVersion)) return { ok: false, message: "That request was not valid. Reload the page." };
   const result = await studentApi("/api/v1/me/engagement-consent", { method: "PUT", body: { granted, leaderboardOptIn, consentVersion } });
   if (!result.ok) return { ok: false, message: result.status === 409 ? "The wording has changed. Reload the page and read it again." : problemMessage(result.status, result.detail) };
-  revalidatePath("/student/classes");
+  revalidatePath("/student");
+  revalidatePath("/student/attendance");
+  revalidatePath("/student/live");
   return { ok: true, message: granted ? "Thank you. You can react and answer during classes." : "Engagement is off for you. Nothing is recorded." };
 }
 

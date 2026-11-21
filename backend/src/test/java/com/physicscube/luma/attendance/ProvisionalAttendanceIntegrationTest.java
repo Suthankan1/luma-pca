@@ -58,11 +58,84 @@ class ProvisionalAttendanceIntegrationTest extends StaffApiIntegrationTest {
     }
 
     private void event(String type, String at, String participantJson) {
-        long ts = Instant.parse("2026-02-02T" + at + ":00Z").toEpochMilli();
+        event(type, Instant.parse("2026-02-02T" + at + ":00Z"), participantJson);
+    }
+
+    private void event(String type, Instant at, String participantJson) {
+        long ts = at.toEpochMilli();
         String object = "{\"id\":\"" + WEBINAR + "\",\"uuid\":\"" + OCCURRENCE + "\",\"host_id\":\"hostuser\""
                 + (participantJson == null ? "" : ",\"participant\":" + participantJson) + "}";
         String json = "{\"event\":\"" + type + "\",\"event_ts\":" + ts + ",\"payload\":{\"object\":" + object + "}}";
         ZoomTestReceipts.store(context, academyId, type, ts, json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void studentLiveAttendanceIsScopedAndAvailableOnlyDuringTheClass() {
+        AcademyFixtures fixtures = new AcademyFixtures(api, admin);
+        UUID owner = accountIdOf("live-staff@example.test", academyId, Role.STAFF);
+        var mine = fixtures.student("LIVE-01", "live-student@example.test");
+        var outsider = fixtures.student("LIVE-02", "outsider@example.test");
+        activate(UUID.fromString((String) mine.get("accountId")));
+        activate(UUID.fromString((String) outsider.get("accountId")));
+        String viewer = login("live-student@example.test");
+        String unrelated = login("outsider@example.test");
+        UUID otherAcademy = academy("Different academy");
+        String foreign = tokenFor(otherAcademy, Role.STUDENT);
+        Instant now = Instant.now();
+        String date = now.minusSeconds(86400).atZone(java.time.ZoneOffset.UTC).toLocalDate().toString();
+        assertEquals(201, fixtures.enroll(batch, (String) mine.get("id"), date).statusCode());
+        String otherBatch = fixtures.batch(fixtures.course("LIVE"), "OTHER");
+        assertEquals(201, fixtures.enroll(otherBatch, (String) outsider.get("id"), date).statusCode());
+
+        // The monitor cache and class mapping are fixtures. Reading them must make no Zoom API call.
+        jdbc.update("""
+                INSERT INTO academy_class_links (id, academy_id, class_name, batch_id, linked_by)
+                VALUES (?, ?, 'Upcoming Physics', ?, ?)
+                """, UUID.randomUUID(), academyId, UUID.fromString(batch), owner);
+        jdbc.update("""
+                INSERT INTO zoom_webinar_monitors (id, academy_id, webinar_id, topic, time_zone,
+                    scheduled_start_at, duration_minutes, sync_status, academy_class_name, class_source, added_by, added_at)
+                VALUES (?, ?, '89900000000', 'Upcoming Physics', 'Asia/Colombo', ?, 60, 'OK',
+                    'Upcoming Physics', 'ADMIN', ?, now())
+                """, UUID.randomUUID(), academyId, java.sql.Timestamp.from(now.plusSeconds(3600)), owner);
+        String schedule = "/api/v1/me/webinar-schedule?from=" + now + "&to=" + now.plusSeconds(7200);
+        assertEquals(200, api.get(schedule, viewer).statusCode());
+        org.junit.jupiter.api.Assertions.assertTrue(api.get(schedule, viewer).body().contains("Upcoming Physics"));
+        assertEquals("[]", api.get(schedule, unrelated).body());
+        assertEquals(403, api.get(schedule, admin).statusCode());
+        assertEquals(401, api.get(schedule, null).statusCode());
+
+        HttpResponse<String> created = api.post("/api/v1/class-sessions", """
+                {"title":"Current physics","startsAt":"%s","endsAt":"%s","batchIds":["%s","%s"],"zoomWebinarId":"%s"}
+                """.formatted(now.minusSeconds(600), now.plusSeconds(3600), batch, otherBatch, WEBINAR), admin);
+        assertEquals(201, created.statusCode(), created.body());
+        String path = "/api/v1/me/class-sessions/" + HttpApi.parse(created).get("id") + "/live-attendance";
+        assertEquals(404, api.get(path, viewer).statusCode(), "a scheduled window is not live evidence");
+        assertEquals(401, api.get(path, null).statusCode());
+        assertEquals(403, api.get(path, admin).statusCode());
+
+        event("webinar.started", now.minusSeconds(600), null);
+        event("webinar.participant_joined", now.minusSeconds(300),
+                "{\"participant_uuid\":\"viewer-a\",\"email\":\"live-student@example.test\"}");
+        event("webinar.participant_joined", now.minusSeconds(250),
+                "{\"participant_uuid\":\"viewer-b\",\"email\":\"live-student@example.test\"}");
+        event("webinar.participant_joined", now.minusSeconds(200),
+                "{\"participant_uuid\":\"other\",\"email\":\"outsider@example.test\"}");
+        processor.runOnce();
+
+        var live = api.get(path, viewer);
+        assertEquals(200, live.statusCode(), live.body());
+        var data = HttpApi.parse(live);
+        assertEquals(1, data.get("joined"), "deduplicate overlapping visits and omit other batches");
+        assertEquals(1, data.get("online"));
+        assertEquals(true, data.get("seen"));
+        assertFalse(live.body().contains("outsider"));
+        assertEquals(404, api.get(path, foreign).statusCode());
+        assertEquals(404, api.get("/api/v1/me/class-sessions/" + session + "/live-attendance", viewer).statusCode());
+
+        event("webinar.ended", now.minusSeconds(5), null);
+        processor.runOnce();
+        assertEquals(404, api.get(path, viewer).statusCode());
     }
 
     private void visit(String type, String at, String visit, String email) {
