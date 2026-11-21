@@ -2826,3 +2826,13 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Updated obsolete `EXPECTED STUDENTS` region assertions in `staff-onboarding.spec.ts` to `Student attendance results`.
 - Hardened Maven Central download retries with backoff in `backend/Dockerfile` to guard against 429 rate-limiting.
 - Verified: production frontend build, ESLint, TypeScript, 81 unit tests, session HTTP smoke test, and Playwright tests locally.
+
+## Zoom auto-tracking baseline (2026-11-21)
+
+- Started the existing build with original Supabase, API on port 8088 and Next.js on port 3000. API health and readiness returned UP, sign-in returned 200, and anonymous attendance redirected with 307. Automatic migrations were disabled for startup.
+- Auto-tracking implementation, signed-in validation, and a licensed Zoom test are pending. The [work log](ZOOM-AUTO-TRACKING.md) records acceptance criteria, outstanding slices, and the planned rollout and rollback.
+
+## Integration CI repair (2026-11-21)
+
+- PR 116's real-stack browser test found a stale text-order assertion in the attendance roster. It now checks the student row by its accessible name for both staff sessions. The Lighthouse test isolates measurements in fresh Chrome instances and reports the exact runtime error or final path on failure. The performance budgets are unchanged.
+- Changes are confined to CI tests and documentation. No database migration or runtime rollout is required. Revert the test commit to restore the former checks.

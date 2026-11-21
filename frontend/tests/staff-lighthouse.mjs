@@ -21,27 +21,29 @@ if (login.status !== 303 || !cookie || !login.headers.get("location")?.endsWith(
   throw new Error("The synthetic staff sign-in failed");
 }
 
-const chrome = await launch({ chromeFlags: ["--headless", "--no-sandbox", "--disable-dev-shm-usage"] });
 const budgets = { "largest-contentful-paint": 1500, "cumulative-layout-shift": 0.05, "total-blocking-time": 300 };
 const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-try {
-  for (const route of ["/staff/sessions", "/staff/class-types", "/staff/students"]) {
-    const runs = [];
-    for (let i = 0; i < 3; i++) {
+for (const route of ["/staff/sessions", "/staff/class-types", "/staff/students"]) {
+  const runs = [];
+  for (let i = 0; i < 3; i++) {
+    const chrome = await launch({ chromeFlags: ["--headless", "--no-sandbox", "--disable-dev-shm-usage"] });
+    try {
       const result = await lighthouse(new URL(route, origin).href, { port: chrome.port, logLevel: "error",
         onlyCategories: ["performance"], extraHeaders: { Cookie: cookie } }, { extends: "lighthouse:default",
         settings: { formFactor: "desktop", screenEmulation: { mobile: false, width: 1366, height: 768, deviceScaleFactor: 1 },
           throttlingMethod: "provided" } });
       const lhr = result.lhr;
-      if (lhr.runtimeError || new URL(lhr.finalDisplayedUrl).pathname !== route) throw new Error(`Lighthouse did not reach ${route}`);
+      if (lhr.runtimeError) throw new Error(`Lighthouse audit of ${route} failed: ${lhr.runtimeError.code} — ${lhr.runtimeError.message}`);
+      const finalPath = new URL(lhr.finalDisplayedUrl).pathname;
+      if (finalPath !== route) throw new Error(`Lighthouse requested ${route} and reached ${finalPath}`);
       runs.push(lhr.audits);
-    }
-    for (const [metric, budget] of Object.entries(budgets)) {
-      const value = median(runs.map(audits => audits[metric].numericValue));
-      console.log(`${route} ${metric} ${value.toFixed(3)} (budget ${budget})`);
-      if (!Number.isFinite(value) || value > budget) process.exitCode = 1;
+    } finally {
+      await chrome.kill();
     }
   }
-} finally {
-  await chrome.kill();
+  for (const [metric, budget] of Object.entries(budgets)) {
+    const value = median(runs.map(audits => audits[metric].numericValue));
+    console.log(`${route} ${metric} ${value.toFixed(3)} (budget ${budget})`);
+    if (!Number.isFinite(value) || value > budget) process.exitCode = 1;
+  }
 }
