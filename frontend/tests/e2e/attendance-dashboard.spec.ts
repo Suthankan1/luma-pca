@@ -17,8 +17,14 @@ async function signIn(page: Page, portal: "staff" | "student") {
 test("the Home report shortcut uses Reports and sidebar collapse survives navigation", async ({ page }) => {
   await signIn(page, "staff");
   const rail = page.getByRole("complementary", { name: "Staff navigation" });
-  await rail.getByRole("button", { name: "Collapse sidebar" }).click();
-  await expect(rail.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute("aria-expanded", "false");
+  const collapse = rail.getByRole("button", { name: "Collapse sidebar" });
+  const expand = rail.getByRole("button", { name: "Expand sidebar" });
+  const expanded = await collapse.boundingBox();
+  await expect(async () => {
+    if (await collapse.isVisible()) await collapse.click();
+    await expect(expand).toHaveAttribute("aria-expanded", "false", { timeout: 500 });
+  }).toPass({ timeout: 5000 });
+  expect(await expand.boundingBox()).toEqual(expanded);
   await expect(rail.getByText("Classes", { exact: true })).toBeHidden();
   await page.getByRole("link", { name: "Attendance reports", exact: true }).click();
   await expect(page).toHaveURL(/\/staff\/reports$/);

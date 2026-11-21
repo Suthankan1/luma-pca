@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Shell } from "@/components/Shell";
+import { StudentSignInForm } from "@/components/StudentSignInFeedback";
 import { currentSession, studentIdLoginEnabled } from "@/lib/auth-server";
 import { hasPortal, portalPath } from "@/lib/session-policy";
 
@@ -32,6 +33,7 @@ export default async function SignIn({ searchParams }: {
   const showStudentIdForm = studentIdLoginEnabled() && portal !== "staff";
   const showEmailForm = !showStudentIdForm || portal !== "student";
   const showBothForms = showStudentIdForm && showEmailForm;
+  const EmailForm = portal === "student" ? StudentSignInForm : "form";
 
   return <Shell>
     <section className={`panel session-panel ${showBothForms && !identity && !canRefresh ? "session-panel-wide" : ""}`}>
@@ -52,7 +54,7 @@ export default async function SignIn({ searchParams }: {
           <button className="action secondary" type="submit">Sign out</button>
         </form>
       </> : <div className={showBothForms ? "signin-cards" : undefined}>
-      {showStudentIdForm && <form method="post" action="/api/session/student-login" className="session-form"
+      {showStudentIdForm && <StudentSignInForm method="post" action="/api/session/student-login" className="session-form"
         aria-labelledby="student-sign-in">
         <h2 id="student-sign-in" className="eyebrow">Students</h2>
         <input type="hidden" name="portal" value="student" />
@@ -60,8 +62,8 @@ export default async function SignIn({ searchParams }: {
         <input id="student-id" name="studentId" type="text" autoComplete="username" autoCapitalize="characters" spellCheck={false}
           inputMode="text" placeholder="PCA12345" maxLength={60} required autoFocus={portal === "student"} />
         <button className="action" type="submit">View my attendance</button>
-      </form>}
-      {showEmailForm && <form method="post" action="/api/session/login" className="session-form"
+      </StudentSignInForm>}
+      {showEmailForm && <EmailForm method="post" action="/api/session/login" className="session-form"
         aria-labelledby={showBothForms ? "account-sign-in" : undefined}>
         {showBothForms && <h2 id="account-sign-in" className="eyebrow">Academy account</h2>}
         {(portal === "staff" || portal === "student") && <input type="hidden" name="portal" value={portal} />}
@@ -71,7 +73,7 @@ export default async function SignIn({ searchParams }: {
         <input id="password" name="password" type="password" autoComplete="current-password" maxLength={256} required />
         <button className="action" type="submit">Sign in</button>
         <p className="sub"><Link href="/forgot-password">Forgot your password?</Link></p>
-      </form>}
+      </EmailForm>}
       </div>}
     </section>
   </Shell>;

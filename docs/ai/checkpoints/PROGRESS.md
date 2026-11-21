@@ -2846,3 +2846,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - An expired refresh cookie is cleared on sign-in after the API refuses renewal with 401. The existing retry option remains available during service outages. See the [flow and plan](PORTAL-SIGN-IN-FLOW.md) and [auth sequence](../../diagrams/auth-flow.mmd).
 - Production build, TypeScript, targeted ESLint, 81 frontend unit tests, session HTTP smoke, 12 focused Chromium desktop and mobile browser tests, and structure validation passed. The HTTP and browser runs used a mock API. Real-backend and database sign-in was not exercised for this slice.
 - Roll out by rebuilding the frontend, and roll back by reverting the fix and rebuilding. No schema or backend changes.
+
+## Stable sidebar toggle and student sign-in feedback (2026-11-21)
+
+- The shared Staff and Student sidebar keeps its 44 px toggle in the top-left when collapsed or expanded. The sidebar still preserves its state during portal navigation.
+- The student sign-in form and student route fallback show a progress status with quotes and class-attendance reminders. Quotes change every five seconds and offer Next and Pause controls. The form waits for the existing BFF sign-in result before navigating, using the same cookie and origin checks. The attributed quotes appear in [Franklin's account of Poor Richard's advice](https://www.gutenberg.org/files/36151/36151-h/36151-h.htm).
+- Production build, ESLint, 81 unit tests, session HTTP smoke, 10 focused desktop and mobile browser tests, and structure validation passed. Browser tests verified the toggle coordinates and interaction with quotes while a synthetic sign-in was delayed. Restarted the local frontend on port 3000 and verified landing, BFF response, and API readiness. Real account sign-in was not exercised.
+- Roll out by rebuilding the frontend. Roll back by reverting the change and rebuilding. No backend or database changes.

@@ -48,7 +48,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
     return new NextResponse(null, { status: 404, headers: noStore });
   }
 
-  const go = (path: string) => new NextResponse(null, { status: 303, headers: { ...noStore, Location: path } });
+  const wantsDestination = (action === "student-login" || action === "login") &&
+    request.headers.get("accept") === "application/json";
+  const go = (path: string) => wantsDestination
+    ? NextResponse.json({ destination: path }, { headers: noStore })
+    : new NextResponse(null, { status: 303, headers: { ...noStore, Location: path } });
   let safePreferred: "staff" | "student" | undefined = action === "student-login" ? "student" : undefined;
   const signInPath = (error?: string) => {
     const params = new URLSearchParams();

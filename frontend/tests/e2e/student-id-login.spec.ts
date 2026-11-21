@@ -23,6 +23,30 @@ test.describe("Student ID sign-in (Academy request)", () => {
     await expect(page.locator(".session-error")).toHaveText("We couldn’t find that registration ID. Check it and try again.");
   });
 
+  test("Students can change the quote while sign-in is pending", async ({ page }) => {
+    let release: () => void = () => {};
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    await page.route("**/api/session/student-login", async route => {
+      await pending;
+      await route.continue();
+    });
+    await page.goto("/sign-in?portal=student");
+    await page.getByLabel("Registration ID").fill("PCA001");
+    const submission = page.getByRole("button", { name: "View my attendance" }).click();
+    try {
+      await expect(page.getByRole("status")).toHaveText(/Signing in and opening your attendance/);
+      await page.getByRole("button", { name: "Pause quotes" }).click({ noWaitAfter: true });
+      const quote = page.locator("blockquote");
+      const previous = await quote.textContent();
+      await page.getByRole("button", { name: "Next quote" }).click({ noWaitAfter: true });
+      await expect(quote).not.toHaveText(previous ?? "");
+    } finally {
+      release();
+      await submission;
+    }
+    await expect(page).toHaveURL(/\/student$/);
+  });
+
   test("The staff sign-in page shows only the staff form", async ({ page }) => {
     await page.goto("/sign-in?portal=staff");
     await expect(page.getByRole("form", { name: "Students" })).toHaveCount(0);

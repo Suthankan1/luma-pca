@@ -32,6 +32,7 @@
 ## Browser sign-in
 - `/api/session/login` (Origin and Sec-Fetch-Site checked) sends email and password to `POST /api/v1/auth/login`. The optional student registration-ID flow uses `/api/session/student-login`. When a portal is selected, the BFF checks the API-reported roles before setting cookies. Credentials for a different portal cause the newly issued session to be revoked, and the visitor returns to the chosen sign-in form. The shared sign-in page continues to use the account's default portal.
 - Successful sign-out revokes the refresh session, expires the browser cookies and redirects to the landing page. Protected tabs in the same browser return there when they receive the sign-out event. If the revocation request fails, the browser shows a retry option.
+- The interactive student form sends the same URL-encoded POST with `Accept: application/json`. The BFF returns only the relative destination in the JSON body and sets session cookies through the same authorization and origin checks. A native form POST receives the usual 303 redirect.
 
 ## Key management
 - Do not create keys in documentation or config. Generate per-environment keys in managed secrets/KMS. Publish public JWKS only. Rotate without rejecting still-valid previous-kid access tokens; protect private-key access and audit rotations.

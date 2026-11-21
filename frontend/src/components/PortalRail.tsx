@@ -40,12 +40,12 @@ export function PortalRail({ children, portal }: { children: ReactNode; portal: 
   const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
   return <aside className="aside staff-rail portal-rail" aria-label={portal === "staff" ? "Staff navigation" : "Academy navigation"}>
     <div className="portal-rail-top">
+      <button type="button" className="portal-rail-toggle" onClick={toggle} aria-label={label} title={label}
+        aria-controls={id} aria-expanded={!collapsed}><PortalIcon name={collapsed ? "expand" : "collapse"} /></button>
       <Link href={`/${portal}`} className="portal-rail-brand" aria-label={collapsed ? "LUMA PCA Attendance System" : undefined}>
         <Image src="/physics-cube-academy-logo.jpg" alt="" width={33} height={33} />
         <span className="portal-rail-copy"><strong>LUMA <small>PCA</small></strong>{" "}<span>Attendance System</span></span>
       </Link>
-      <button type="button" className="portal-rail-toggle" onClick={toggle} aria-label={label} title={label}
-        aria-controls={id} aria-expanded={!collapsed}><PortalIcon name={collapsed ? "expand" : "collapse"} /></button>
     </div>
     <div className="portal-rail-menu" id={id}>{children}</div>
     <div className="staff-railfoot portal-rail-foot">
