@@ -1,6 +1,6 @@
 import { AcademyClassActions } from "./AcademyForms";
 import { staffApi } from "@/lib/staff-api";
-import { formatSyncedAt, type AcademyClass } from "@/lib/academy";
+import type { AcademyClass } from "@/lib/academy";
 import type { WebinarMonitor } from "@/lib/webinars";
 
 type Course = { id: string; code: string };
@@ -23,7 +23,8 @@ export async function readClassTypeRosters() {
   return {
     classes: classes.ok ? classes.data : null,
     batchesFailed: !batches.ok,
-    monitorClasses: new Map((monitors.ok ? monitors.data : []).map(m => [m.webinarId, m.academyClassName])),
+    monitors: monitors.ok ? monitors.data : [],
+    monitorsFailed: !monitors.ok,
     available,
     label,
   };
@@ -34,22 +35,13 @@ export function ClassTypeRosterControls({ item, slug, roster }: {
 }) {
   if (!item) return <div className="class-type-roster-inline">
     <span className="status off">{roster.classes ? "Academy class not matched" : "Sync unavailable"}</span>
-    <label className="academy-link" htmlFor={`unavailable-${slug}`}>Student batch
-      <select id={`unavailable-${slug}`} disabled>
-        <option>{roster.classes ? "Match the Academy class in Tracked Zoom links" : "Academy database unavailable"}</option>
-      </select>
-    </label>
   </div>;
   const { className, studentCount, batch } = item;
   const synced = !!batch?.lastSyncedAt && batch.lastSyncedStudents === studentCount;
-  const status = !batch ? "Batch not selected" : !batch.active ? "Batch inactive" : synced ? "Synced" : "Sync needed";
+  if (synced && batch?.active) return <div className="class-type-roster-inline"><span className="status on">Synced</span></div>;
   return <div className="class-type-roster-inline">
-    <div>
-      <span className={`status ${synced && batch?.active ? "on" : "off"}`}>{status}</span>
-      <p className="panel-sub">{studentCount} Academy {studentCount === 1 ? "student" : "students"}
-        {batch?.lastSyncedAt && ` · Last synced ${formatSyncedAt(batch.lastSyncedAt)}`}</p>
-    </div>
+    <span className="status off">Sync needed</span>
     <AcademyClassActions className={className} slug={slug} linked={!!batch} batches={roster.available} rosterControls
-      selectedBatch={batch ? { id: batch.id, label: roster.label(batch) } : undefined} />
+      selectedBatch={batch?.active ? { id: batch.id, label: roster.label(batch) } : undefined} />
   </div>;
 }

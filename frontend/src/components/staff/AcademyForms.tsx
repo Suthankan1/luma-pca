@@ -34,7 +34,7 @@ export function AcademyClassActions({ className, slug, linked, batches, selected
   const [state, action, pending] = useActionState(academyClassAction, null);
   const feedback = `academy-feedback-${slug}`;
   return <div className="academy-actions">
-    {linked
+    {!rosterControls && (linked
       ? <form action={action} className="inline-form">
           <input type="hidden" name="intent" value="sync" />
           <input type="hidden" name="className" value={className} />
@@ -48,7 +48,7 @@ export function AcademyClassActions({ className, slug, linked, batches, selected
             <button className="action" type="submit" disabled={pending} aria-describedby={feedback}>
               {pending ? "Setting up…" : "Set up in LUMA"}</button>
           </form>
-        </>}
+        </>)}
     {(rosterControls || (!linked && batches.length > 0)) && <form action={action} className="academy-link">
       <input type="hidden" name="intent" value="link" />
       <input type="hidden" name="className" value={className} />
@@ -61,7 +61,7 @@ export function AcademyClassActions({ className, slug, linked, batches, selected
           {batches.map(batch => <option key={batch.id} value={batch.id}>{batch.label}</option>)}
         </select>
         <button className="action secondary" type="submit" disabled={pending || (!selectedBatch && batches.length === 0)}>
-          {pending ? "Saving…" : "Link and sync"}
+          {pending ? "Syncing…" : rosterControls ? "Sync" : "Link and sync"}
         </button>
       </div>
     </form>}

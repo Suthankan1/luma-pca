@@ -808,6 +808,8 @@ const zoomWebinars = {
     occurrences: [1, 8, 15].map((d, i) => ({ occurrenceId: `1700${i}`, startTime: new Date(Date.now() + 95 * 60_000 + (d - 1) * 7 * 86400_000).toISOString(),
       durationMinutes: 120, status: "available" })) }),
   "84400000002": () => ({ topic: "Office hours", type: 6, durationMinutes: 60, timeZone: "Asia/Colombo", scheduledStartAt: null, occurrences: [] }),
+  "84400000003": () => ({ topic: "Admission", type: 5, durationMinutes: 60, timeZone: "Asia/Colombo",
+    scheduledStartAt: "2027-02-11T12:30:00Z", occurrences: [] }),
 };
 const monitors = [];
 const runSessions = new Map(); // class id -> run

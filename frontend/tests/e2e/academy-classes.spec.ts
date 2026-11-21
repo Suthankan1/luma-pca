@@ -24,16 +24,20 @@ test.describe("Academy classes", () => {
     const batch = await page.request.post(`${api}/batches`, { headers,
       data: { courseId: (await course.json()).id, code: "ROSTER-A", name: "Admission batch", startsOn: "2026-01-01" } });
     expect(batch.status()).toBe(201);
-    await page.goto("/staff/class-types");
-    const row = page.getByRole("region", { name: "Completed class types" }).getByRole("listitem", { name: "Admission" });
-    await expect(row.getByText("Batch not selected", { exact: true })).toBeVisible();
+    const webinar = await page.request.post(`${api}/zoom/monitors`, { headers, data: { webinar: "84400000003" } });
+    expect(webinar.status()).toBe(200);
+    await page.goto("/staff/class-types?month=2027-02");
+    const list = page.getByRole("region", { name: "Class types for the selected month" });
+    const row = list.getByRole("listitem", { name: "Admission" });
+    await expect(list.getByRole("listitem", { name: "A/L Physics 2027" })).toHaveCount(0);
+    await expect(row.getByText("Sync needed", { exact: true })).toBeVisible();
     await row.getByLabel("Student batch").selectOption((await batch.json()).id);
-    await row.getByRole("button", { name: "Link and sync" }).click();
+    await row.getByRole("button", { name: "Sync", exact: true }).click();
     await expect(row.getByText("Synced", { exact: true })).toBeVisible();
-    await expect(row.getByText(/Last synced/)).toBeVisible();
-    await expect(row.getByLabel("Student batch")).toHaveValue((await batch.json()).id);
-    await row.getByRole("button", { name: "Sync students of Admission" }).click();
-    await expect(row.locator(".form-ok")).toContainText("already enrolled");
+    await expect(row.getByLabel("Student batch")).toHaveCount(0);
+    await page.getByRole("link", { name: "Next month" }).click();
+    await expect(page).toHaveURL(/month=2027-03$/);
+    await expect(list.getByText("No class types scheduled for this month.")).toBeVisible();
   });
 
   test("A class from the Academy records is set up in one step and its students synced", async ({ page }, testInfo) => {

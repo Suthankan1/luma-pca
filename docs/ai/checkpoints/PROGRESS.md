@@ -2930,3 +2930,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Moved Student batch and sync status into each Class Types list row. Completed groups use a unique tracked-webinar mapping, exact Academy title, or linked batch to find their roster. Academy classes without completed sessions also appear. Unmatched rows and roster-source outages show a disabled dropdown with a reason.
 - The original LUMA backend reported ready, while its separate Academy read-only roster connection logged a JDBC connection failure. Staff sign-in and the rebuilt frontend were verified. Real roster writes were not run.
 - Production build, ESLint, structure, 81 unit tests and eight synthetic desktop/mobile browser checks passed. Two desktop-only cases were skipped on mobile. Roll back by reverting and rebuilding the frontend. No API or migration changes.
+
+## Month-scoped Class Types and simple sync (2026-11-22)
+
+- The standalone Class Types list shows only the selected month's class sessions and active tracked Zoom schedules for that month. Classes in the Academy catalog without a matching monthly schedule or session are omitted. Completed sessions retain their attendance links and chart.
+- A synced row displays only its status. A matched row needing sync shows Student batch and one Sync action. Unmatched classes and roster outages retain a status explaining why sync is unavailable.
+- Production build, ESLint, structure, 81 unit tests and eight synthetic desktop/mobile browser checks passed. The roster test verified a scheduled-only webinar, hiding an unscheduled Academy class, and changing to a month without that class. Restarted port 3000 and verified staff sign-in and backend readiness. Real roster sync was not exercised.
+- Rebuild the frontend to roll out. Revert and rebuild to roll back. No API or migration changes.
