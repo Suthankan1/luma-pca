@@ -19,6 +19,9 @@ let releaseMonitors;
 let monitorsUnavailable = false;
 let blockedStudentOverview;
 let releaseStudentOverview;
+let blockedClassTypeRead;
+let releaseClassTypeRead;
+let heldClassTypePath;
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -36,6 +39,14 @@ const backend = createServer(async (req, res) => {
   };
 
   const mockOnline = req.url.match(/^\/__test__\/zoom-online\/([^/]+)$/);
+  if (req.method === "PUT" && req.url === "/__test__/class-type-read") {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    releaseClassTypeRead?.();
+    heldClassTypePath = body.path;
+    blockedClassTypeRead = heldClassTypePath ? new Promise(resolve => { releaseClassTypeRead = resolve; }) : undefined;
+    return send(204);
+  }
+  if (req.method === "GET" && req.url.split("?")[0] === heldClassTypePath) await blockedClassTypeRead;
   if (req.method === "PUT" && mockOnline) {
     if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
     const run = runSessions.get(mockOnline[1]);

@@ -157,9 +157,32 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await expect(row.getByText("Zoom link not tracked")).toBeVisible();
     await expect(row.getByLabel("Academy payment class")).toBeEnabled();
     await expect(row.getByLabel("Zoom link or webinar ID")).toBeVisible();
+    const holdRead = async (path?: string) => {
+      const result = await page.request.put(`${mockApiBase()}/__test__/class-type-read`, {
+        headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" }, data: { path },
+      });
+      expect(result.status()).toBe(204);
+    };
+    await holdRead("/api/v1/academy/classes");
+    try {
+      await page.reload({ waitUntil: "commit" });
+      await expect(row.getByText("Loading payment classes…")).toBeVisible();
+      await expect(menuLink).toHaveAttribute("aria-current", "page");
+    } finally {
+      await holdRead();
+    }
     await page.getByRole("region", { name: "Class types for the selected month" }).getByRole("link", { name: /February review/ }).click();
     await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
     const paymentRoster = page.getByRole("region", { name: "Payment roster" });
+    await holdRead("/api/v1/attendance/dashboard");
+    try {
+      await page.reload({ waitUntil: "commit" });
+      await expect(page.getByText("Loading class details…")).toBeVisible();
+      await expect(menuLink).toHaveAttribute("aria-current", "page");
+    } finally {
+      await holdRead();
+    }
+    await expect(paymentRoster).toBeVisible();
     const rosterBox = await paymentRoster.boundingBox();
     const metricsBox = await page.locator(".class-detail-metrics").boundingBox();
     expect(metricsBox!.y - (rosterBox!.y + rosterBox!.height)).toBeGreaterThanOrEqual(16);

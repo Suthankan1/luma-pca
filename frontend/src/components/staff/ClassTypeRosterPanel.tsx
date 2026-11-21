@@ -4,15 +4,10 @@ import type { WebinarMonitor } from "@/lib/webinars";
 import type { ClassSession } from "@/lib/staff-forms";
 import { PaymentRosterForm } from "./PaymentRosterForm";
 
-export async function readClassTypeRosters() {
-  const [classes, monitors] = await Promise.all([
-    staffApi<AcademyClass[]>("/api/v1/academy/classes", undefined, 25000),
-    staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors"),
-  ]);
+export function readClassTypeRosters() {
   return {
-    classes: classes.ok ? classes.data : null,
-    monitors: monitors.ok ? monitors.data : [],
-    monitorsFailed: !monitors.ok,
+    classes: staffApi<AcademyClass[]>("/api/v1/academy/classes", undefined, 25000),
+    monitors: staffApi<WebinarMonitor[]>("/api/v1/zoom/monitors"),
   };
 }
 
@@ -22,9 +17,10 @@ export function matchClassTypeWebinar(sessions: ClassSession[], monitors: Webina
   return { webinarId, monitor: monitors.find(monitor => monitor.webinarId === webinarId) };
 }
 
-export function ClassTypeRosterControls({ monitor, webinarId, classes }: {
-  monitor?: WebinarMonitor; webinarId?: string; classes: AcademyClass[] | null;
+export async function ClassTypeRosterControls({ monitor, webinarId, classes }: {
+  monitor?: WebinarMonitor; webinarId?: string; classes: ReturnType<typeof readClassTypeRosters>["classes"];
 }) {
+  const source = await classes;
   return <PaymentRosterForm monitorId={monitor?.active ? monitor.id : undefined}
-    webinarId={monitor?.webinarId ?? webinarId} assigned={monitor?.academyClassName ?? ""} classes={classes} />;
+    webinarId={monitor?.webinarId ?? webinarId} assigned={monitor?.academyClassName ?? ""} classes={source.ok ? source.data : null} />;
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { Suspense } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { StaffSkeleton } from "@/components/StaffSkeleton";
 import { StaffShell, type StaffSection } from "@/components/StaffShell";
 import { ClassesColumnSkeleton, StudentMonthSkeleton } from "@/components/staff/AttendanceSkeleton";
@@ -23,6 +24,9 @@ const sections: Record<string, { active: StaffSection; crumb: string; title: str
 export default function StaffLoading() {
   const [, , route, detail] = usePathname().split("/");
   const section = sections[route ?? ""] ?? sections[""];
+  if (route === "sessions" && detail === "types") {
+    return <Suspense fallback={null}><ClassTypeDetailLoading /></Suspense>;
+  }
   if (!detail && (route === "sessions" || route === "class-types" || route === "students")) {
     return <StaffShell {...section} subtitle="Loading…">
       <div className="classes-month-picker skeleton skeleton-line" style={{ width: 240 }} aria-hidden="true" />
@@ -31,4 +35,9 @@ export default function StaffLoading() {
     </StaffShell>;
   }
   return <StaffSkeleton {...section} subtitle="Loading…" />;
+}
+
+function ClassTypeDetailLoading() {
+  const fromClassTypes = useSearchParams().get("source") === "class-types";
+  return <StaffSkeleton {...(fromClassTypes ? sections["class-types"] : sections.sessions)} subtitle="Loading class details…" />;
 }

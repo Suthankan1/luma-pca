@@ -2982,3 +2982,8 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 ## Space the Class Type payment and attendance cards (2026-11-22)
 
 - Applied the standard 20px panel spacing above the attendance metrics. The production build and desktop/mobile browser spacing checks passed with test data. Restarted the local frontend and confirmed staff sign-in HTTP 200. Roll back by reverting and rebuilding the frontend. No API or database changes.
+
+## Preserve Class Types during refresh (2026-11-22)
+
+- The staff loading screen now uses the detail URL's source to keep the originating tab active. The Class Types list streams payment options separately, and the detail page loads the payment section independently of attendance.
+- Production build and six desktop/mobile browser tests passed. The refresh regression holds the payment catalog and attendance dashboard in the mock backend, checks the list appears before payment options, and checks that Class Types stays active in the detail loading screen. Restarted the local frontend. Staff sign-in returned HTTP 200 and backend readiness was UP. No real roster write was tested. Roll back by reverting and rebuilding the frontend.

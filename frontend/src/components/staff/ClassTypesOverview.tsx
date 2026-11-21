@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import type { startClassMonth } from "@/lib/class-month-api";
 import { ACADEMY_TIME_ZONE, formatDate, instantParts, type ClassSession } from "@/lib/staff-forms";
 import { averageClassAttendance, classTypeKey, compactClassTitle, monthLabel, monthlyClassTypes, type ClassAttendanceTotal } from "@/lib/staff-home";
@@ -7,14 +8,16 @@ import { PanelRetry } from "./PanelRetry";
 import { ClassTypeRosterControls, matchClassTypeWebinar, type readClassTypeRosters } from "./ClassTypeRosterPanel";
 import type { WebinarMonitor } from "@/lib/webinars";
 
-type Roster = Awaited<ReturnType<typeof readClassTypeRosters>>;
+type RosterRequests = ReturnType<typeof readClassTypeRosters>;
+type Roster = { classes: RosterRequests["classes"]; monitors: WebinarMonitor[]; monitorsFailed: boolean };
 type MonthlyRow = { key: string; title: string; sessions: ClassSession[]; average: number | null; monitor?: WebinarMonitor; webinarId?: string };
 
 export async function ClassTypesPanel({ requests, month, through, now, standalone, rosters }: {
   requests: ReturnType<typeof startClassMonth>; month: string; through: string | null; now: number; standalone?: boolean;
-  rosters?: Promise<Roster>;
+  rosters?: RosterRequests;
 }) {
-  const [sessions, totals, roster] = await Promise.all([requests.sessions, requests.totals, rosters]);
+  const [sessions, totals, monitors] = await Promise.all([requests.sessions, requests.totals, rosters?.monitors]);
+  const roster = rosters && { classes: rosters.classes, monitors: monitors?.ok ? monitors.data : [], monitorsFailed: monitors?.ok === false };
   return <ClassTypesOverview month={month} through={through} now={now} sessions={sessions.ok ? sessions.data : []}
     totals={new Map(totals?.ok ? totals.data.map(total => [total.id, total]) : [])}
     sessionsFailed={!sessions.ok} totalsFailed={totals?.ok === false} standalone={standalone} roster={roster} />;
@@ -69,7 +72,7 @@ export function ClassTypesOverview({ month, through, now, sessions, totals, sess
       aria-labelledby={standalone ? undefined : "class-types-title"}>
       {!standalone && <h2 className="panel-title" id="class-types-title">CLASS TYPES</h2>}
       <p className="panel-sub"><strong>{monthLabel(month)}</strong>{through && ` · completed through ${formatDate(through)}`}</p>
-      {roster?.classes === null && <p className="session-error" role="alert">The Academy roster database couldn’t be reached. Payment class selection and sync are unavailable. <PanelRetry /></p>}
+      {roster && <Suspense fallback={null}><PaymentSourceStatus classes={roster.classes} /></Suspense>}
       {roster?.monitorsFailed && <p className="session-error" role="alert">Zoom schedules couldn’t load. <PanelRetry /></p>}
       <div className="classes-panel-scroll" tabIndex={0} role="region" aria-label="Monthly class types and dates">
         {sessionsFailed && <p className="session-error" role="alert">Class types couldn’t load. <PanelRetry /></p>}
@@ -81,9 +84,16 @@ export function ClassTypesOverview({ month, through, now, sessions, totals, sess
               <span className="class-type-count">{group.sessions.length} {group.sessions.length === 1 ? "session" : "sessions"}
                 {" · "}<strong className="class-attendance-percent">{group.average == null ? "—" : `${group.average}% avg`}</strong></span>
             </Link> : <h3 className="form-title class-type-title">{group.title}</h3>}
-            {roster && <ClassTypeRosterControls monitor={group.monitor} webinarId={group.webinarId} classes={roster.classes} />}
+            {roster && <Suspense fallback={<p className="class-type-roster-inline muted">Loading payment classes…</p>}>
+              <ClassTypeRosterControls monitor={group.monitor} webinarId={group.webinarId} classes={roster.classes} />
+            </Suspense>}
           </li>)}</ul>}
       </div>
     </section>
   </div>;
+}
+
+async function PaymentSourceStatus({ classes }: { classes: RosterRequests["classes"] }) {
+  if ((await classes).ok) return null;
+  return <p className="session-error" role="alert">The Academy roster database couldn’t be reached. Payment class selection and sync are unavailable. <PanelRetry /></p>;
 }
