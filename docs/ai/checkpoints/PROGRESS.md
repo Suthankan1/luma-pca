@@ -2838,3 +2838,5 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Changes are confined to CI tests and documentation. No database migration or runtime rollout is required. Revert the test commit to restore the former checks.
 
 - Subsequent GitHub runs reproduced Chrome's intermittent `NO_NAVSTART` trace error in the push workflow while the PR workflow met the budgets. The check now retries only that trace error and still requires three valid samples per route. The reports browser test waits for the React search control to respond and uses separate fixtures for retries.
+
+- The next real-stack run passed onboarding and exposed an appeal fixture selecting the current outcome, which the form correctly excludes. The fixture now verifies a real Present-to-Late change and can create a session spanning Colombo midnight. The reports fixture now checks the canonical uppercase registration ID. Production frontend build, lint, 81 unit tests, and four repeated desktop/mobile report checks passed locally. Hosted checks are recorded on PR 116.

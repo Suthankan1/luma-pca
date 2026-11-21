@@ -18,7 +18,7 @@ test("report options load on selection and each workbook still downloads", async
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/staff$/);
   const suffix = randomUUID().slice(0, 8);
-  const studentNumber = `PCA-RPT-${suffix}`;
+  const studentNumber = `PCA-RPT-${suffix.toUpperCase()}`;
   const studentName = `Fixture Attendee ${suffix}`;
   const course = await seed(page, "/api/v1/courses", { code: `RPT-${suffix}`, title: "Report course" });
   const batch = await seed(page, "/api/v1/batches", { courseId: course.id, code: "RPT", name: "Report class", startsOn: "2026-01-01" });

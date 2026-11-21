@@ -49,17 +49,17 @@ async function adminToken() {
   apiToken = ((await login.json()) as { accessToken: string }).accessToken;
   return apiToken;
 }
-async function createClass(title: string, date: string, start: string, end: string, batch: string, webinar?: string) {
+async function createClass(title: string, date: string, start: string, end: string, batch: string, webinar?: string, endDate = date) {
   const token = await adminToken();
   const get = async (path: string) => (await fetch(`${apiBase}${path}`, { headers: { Authorization: `Bearer ${token}` } })).json();
   const [courseCode, batchCode] = batch.split(" · ");
   const course = ((await get("/api/v1/courses")) as { id: string; code: string }[]).find(c => c.code === courseCode)!;
   const found = ((await get("/api/v1/batches")) as { id: string; courseId: string; code: string }[])
     .find(b => b.courseId === course.id && b.code === batchCode)!;
-  const at = (time: string) => new Date(Date.parse(`${date}T${time}:00+05:30`)).toISOString();
+  const at = (day: string, time: string) => new Date(Date.parse(`${day}T${time}:00+05:30`)).toISOString();
   const created = await fetch(`${apiBase}/api/v1/class-sessions`, { method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ title, startsAt: at(start), endsAt: at(end), timeZone: "Asia/Colombo", batchIds: [found.id],
+    body: JSON.stringify({ title, startsAt: at(date, start), endsAt: at(endDate, end), timeZone: "Asia/Colombo", batchIds: [found.id],
       zoomWebinarId: webinar ? webinar.replace(/\s/g, "") : null }) });
   expect(created.status, await created.clone().text()).toBe(201);
   return ((await created.json()) as { id: string }).id;
@@ -468,26 +468,26 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   test.setTimeout(150_000);
   expect(adminSignedIn, "the onboarding test ran first").toBeTruthy();
 
-  // UAT 11: the student appeals the corrected class; an administrator accepts it as Present.
+  // UAT 11: the student appeals the recorded Present outcome and staff change it to Late.
   let student = await signInStudent(browser);
   await student.goto("/student/attendance?month=2026-03");
   await student.getByText("Attendance appeals", { exact: true }).click();
   const record = student.getByRole("listitem", { name: "Attendance Past real class" });
   await record.getByText("Appeal this").click();
-  await record.getByLabel("What should the academy know?").fill("I was in class for the whole session; the note was for another day.");
+  await record.getByLabel("What should the academy know?").fill("I joined this class late.");
   await record.getByRole("button", { name: "Send appeal" }).click();
   await expect(record).toContainText("appeal waiting for a decision");
   await signInAdmin(page);
   await page.goto("/staff/attendance");
   const appeal = page.getByRole("region", { name: "APPEALS" }).getByRole("listitem", { name: "Appeal PCA-REAL-001 Past real class" });
-  await expect(appeal).toContainText("the note was for another day");
-  await appeal.getByLabel("Outcome if accepted").selectOption({ label: "Present" });
+  await expect(appeal).toContainText("I joined this class late.");
+  await appeal.getByLabel("Outcome if accepted").selectOption("LATE");
   await appeal.getByLabel("Note to the student").fill("Checked against Zoom's report");
   await appeal.getByRole("button", { name: "Accept" }).click();
   await expect(appeal).toHaveCount(0);
   await student.reload();
   await student.getByText("Attendance appeals", { exact: true }).click();
-  await expect(record.locator(".status")).toHaveText("Present");
+  await expect(record.locator(".status")).toHaveText("Late");
   await expect(record).toContainText("appeal accepted");
 
   // UAT 12: the owner switches engagement on; the student agrees (named in rankings) and reacts during a running class.
@@ -497,8 +497,7 @@ test("user acceptance cases 11, 12, 13, 15 and 17 on the real stack", async ({ p
   await settings.getByRole("button", { name: "Save engagement settings" }).click();
   await expect(page.locator("#engagement-feedback")).toHaveText("Engagement is on. Students are asked for consent in their portal.");
   const from = colombo(-15), to = colombo(60);
-  if (to.date !== from.date) test.skip(true, "a class across midnight cannot be created in one day; run again later");
-  const liveClassId = await createClass("Live acceptance class", from.date, from.time, to.time, "REAL-PHY · PAST · Past term");
+  const liveClassId = await createClass("Live acceptance class", from.date, from.time, to.time, "REAL-PHY · PAST · Past term", undefined, to.date);
   await page.goto(`/staff/sessions/${liveClassId}`);
   const liveClass = page.url();
 
