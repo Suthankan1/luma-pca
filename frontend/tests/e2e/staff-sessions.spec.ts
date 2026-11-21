@@ -159,6 +159,12 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await expect(row.getByLabel("Zoom link or webinar ID")).toBeVisible();
     await page.getByRole("region", { name: "Class types for the selected month" }).getByRole("link", { name: /February review/ }).click();
     await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
+    const paymentRoster = page.getByRole("region", { name: "Payment roster" });
+    await expect(paymentRoster.getByLabel("Academy payment class")).toBeEnabled();
+    await paymentRoster.getByLabel("Academy payment class").selectOption("Admission");
+    await paymentRoster.getByLabel("Zoom link or webinar ID").fill("84400000002");
+    await paymentRoster.getByRole("button", { name: "Track and sync" }).click();
+    await expect(paymentRoster.getByText("Admission synced. 1 expected student per run.")).toBeVisible();
     await expect(menuLink).toHaveAttribute("aria-current", "page");
     await page.getByRole("link", { name: /Back to Class Types/ }).click();
     await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));

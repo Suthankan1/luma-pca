@@ -1,6 +1,7 @@
 ﻿import { staffApi } from "@/lib/staff-api";
 import type { AcademyClass } from "@/lib/academy";
 import type { WebinarMonitor } from "@/lib/webinars";
+import type { ClassSession } from "@/lib/staff-forms";
 import { PaymentRosterForm } from "./PaymentRosterForm";
 
 export async function readClassTypeRosters() {
@@ -13,6 +14,12 @@ export async function readClassTypeRosters() {
     monitors: monitors.ok ? monitors.data : [],
     monitorsFailed: !monitors.ok,
   };
+}
+
+export function matchClassTypeWebinar(sessions: ClassSession[], monitors: WebinarMonitor[]) {
+  const ids = new Set(sessions.flatMap(session => session.zoomWebinarId ? [session.zoomWebinarId] : []));
+  const webinarId = ids.size === 1 ? [...ids][0] : undefined;
+  return { webinarId, monitor: monitors.find(monitor => monitor.webinarId === webinarId) };
 }
 
 export function ClassTypeRosterControls({ monitor, webinarId, classes }: {

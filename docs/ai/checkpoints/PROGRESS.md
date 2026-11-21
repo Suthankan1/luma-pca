@@ -2973,3 +2973,8 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 
 - Replaced the SVG dash animation with a short opacity fade. The trend uses a solid stroke across adjacent attendance points. The existing path breaks for unavailable attendance still apply.
 - Frontend production build and six desktop/mobile staff browser checks passed. A Chromium check on the restarted local frontend confirmed the built styles render a solid stroke after the fade on a synthetic wide plot. The signed-in Academy chart was not exercised. Roll back by reverting and rebuilding the frontend. No API or database changes.
+
+## Payment roster controls on Class Type details (2026-11-22)
+
+- Added the shared payment dropdown and Sync or Track and sync to the detail route above the attendance chart. The detail and overview resolve the payment form by the same unambiguous Zoom webinar ID and both refresh after assignment.
+- Frontend production build, six desktop/mobile staff checks, and structure validation passed. Synthetic track and sync from the detail page passed on mobile and on the desktop retry after one mock sign-in failure. Restarted the local frontend and verified sign-in HTTP 200 and backend readiness UP. No real roster sync was submitted. Roll back by reverting and rebuilding the frontend. No backend or database changes.

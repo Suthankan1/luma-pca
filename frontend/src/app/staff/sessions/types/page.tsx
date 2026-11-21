@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 import { StaffShell } from "@/components/StaffShell";
+import { ClassTypeRosterControls, matchClassTypeWebinar, readClassTypeRosters } from "@/components/staff/ClassTypeRosterPanel";
 import { requirePortal } from "@/lib/auth-server";
 import { formatDay, formatShortDay, renderTime, type Dashboard } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { ACADEMY_TIME_ZONE, academyToday, formatDate, type ClassSession, type ProvisionalAttendance } from "@/lib/staff-forms";
-import { attendancePercent, averageClassAttendance, classMonthRange, monthLabel, monthlyClassTypes, timeRange, type ClassAttendanceTotal } from "@/lib/staff-home";
+import { attendancePercent, averageClassAttendance, classMonthRange, classTypeKey, monthLabel, monthlyClassTypes, timeRange, type ClassAttendanceTotal } from "@/lib/staff-home";
 import { StudentAttendanceList } from "./student-attendance-list";
 
 export const metadata = { title: "Class type attendance · LUMA" };
@@ -42,10 +43,15 @@ export default async function ClassTypePage({ searchParams }: {
   const batchIds = [...new Set(group.sessions.flatMap(session => session.batches.map(batch => batch.batchId)))];
   const attendanceRange = new URLSearchParams({ from: first, to: through });
   if (batchIds.length === 1) attendanceRange.set("batchId", batchIds[0]);
-  const [dashboard, rosters] = await Promise.all([
+  const [dashboard, rosters, paymentRoster] = await Promise.all([
     staffApi<Dashboard>(`/api/v1/attendance/dashboard?${attendanceRange}`, undefined, timeout),
     Promise.all(batchIds.map(id => staffApi<Enrolment[]>(`/api/v1/batches/${id}/enrollments`))),
+    readClassTypeRosters(),
   ]);
+  const paymentWebinar = matchClassTypeWebinar(
+    sessions.data.filter(session => session.status === "SCHEDULED" && classTypeKey(session.title) === type),
+    paymentRoster.monitors,
+  );
   const rosterComplete = rosters.every(result => result.ok);
   const enrolled = new Map(rosters.flatMap(result => result.ok ? result.data : [])
     .filter(item => item.enrolledOn <= through && (!item.withdrawnOn || item.withdrawnOn > through))
@@ -105,6 +111,10 @@ export default async function ClassTypePage({ searchParams }: {
   });
 
   return <StaffShell {...shell} title={group.title} subtitle={`${monthLabel(month)} · through ${formatDate(through)} · Sri Lanka time`}>
+    <section className="panel panel-gap" aria-label="Payment roster">
+      <h2 className="panel-title">Payment roster</h2>
+      <ClassTypeRosterControls {...paymentWebinar} classes={paymentRoster.classes} />
+    </section>
     <div className="class-detail-metrics">
       <section className="panel"><h2 className="panel-title">Enrolled students</h2><strong>{rosterComplete ? enrolled.size : "—"}</strong></section>
       <section className="panel"><h2 className="panel-title">Average attendance</h2><strong>{average === 0 ? "<1%" : showPercent(average)}</strong></section>

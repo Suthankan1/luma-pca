@@ -4,7 +4,7 @@ import { ACADEMY_TIME_ZONE, formatDate, instantParts, type ClassSession } from "
 import { averageClassAttendance, classTypeKey, compactClassTitle, monthLabel, monthlyClassTypes, type ClassAttendanceTotal } from "@/lib/staff-home";
 import { AttendanceChart } from "./ClassesAttendanceChart";
 import { PanelRetry } from "./PanelRetry";
-import { ClassTypeRosterControls, type readClassTypeRosters } from "./ClassTypeRosterPanel";
+import { ClassTypeRosterControls, matchClassTypeWebinar, type readClassTypeRosters } from "./ClassTypeRosterPanel";
 import type { WebinarMonitor } from "@/lib/webinars";
 
 type Roster = Awaited<ReturnType<typeof readClassTypeRosters>>;
@@ -20,13 +20,8 @@ export async function ClassTypesPanel({ requests, month, through, now, standalon
     sessionsFailed={!sessions.ok} totalsFailed={totals?.ok === false} standalone={standalone} roster={roster} />;
 }
 
-function matchWebinar(sessions: ClassSession[], roster: Roster) {
-  const webinarIds = new Set(sessions.flatMap(session => session.zoomWebinarId ? [session.zoomWebinarId] : []));
-  const webinarId = webinarIds.size === 1 ? [...webinarIds][0] : undefined;
-  return { webinarId, monitor: roster.monitors.find(monitor => monitor.webinarId === webinarId) };
-}
 function scheduledRows(month: string, sessions: ClassSession[], completed: MonthlyRow[], roster: Roster) {
-  const rows = new Map(completed.map(group => [group.key, { ...group, ...matchWebinar(group.sessions, roster) }]));
+  const rows = new Map(completed.map(group => [group.key, { ...group, ...matchClassTypeWebinar(group.sessions, roster.monitors) }]));
   const scheduled = new Map<string, ClassSession[]>();
   const inMonth = (start: string | null) => !!start && Number.isFinite(Date.parse(start)) &&
     instantParts(start, ACADEMY_TIME_ZONE).date.startsWith(`${month}-`);
@@ -39,7 +34,7 @@ function scheduledRows(month: string, sessions: ClassSession[], completed: Month
   }
   for (const [key, group] of scheduled) {
     const row = rows.get(key) ?? { key, title: compactClassTitle(group[0].title), sessions: [], average: null };
-    rows.set(key, { ...row, ...matchWebinar([...row.sessions, ...group], roster) });
+    rows.set(key, { ...row, ...matchClassTypeWebinar([...row.sessions, ...group], roster.monitors) });
   }
   const represented = new Set([...rows.values()].flatMap(row => row.monitor ? [row.monitor.id] : []));
   for (const monitor of roster.monitors) {
