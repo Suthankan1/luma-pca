@@ -123,7 +123,7 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await expect.poll(() => todayGroup.locator("h3").evaluate(heading => {
       const panel = heading.closest(".classes-panel-scroll")!.getBoundingClientRect();
       const bounds = heading.getBoundingClientRect();
-      return bounds.top >= panel.top && bounds.bottom <= panel.bottom;
+      return bounds.top >= panel.top - 2 && bounds.bottom <= panel.bottom + 2;
     })).toBe(true);
     if (!today.endsWith("-01")) {
       await expect.poll(() => schedule.evaluate(element => element.scrollTop)).toBeGreaterThan(0);

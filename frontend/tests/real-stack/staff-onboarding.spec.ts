@@ -216,7 +216,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await page.goto(`/staff/sessions/${classId}`);
   const classUrl = page.url();
   await expect(page.locator(".sub").first()).toHaveText("Wed 13 Jan 2027 · 18:00–20:30 (Asia/Colombo)");
-  await expect(page.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
+  await expect(page.getByRole("region", { name: "Student attendance results" })).toContainText("PCA-REAL-001 Real Stack Student");
   // The seeded Zoom occurrence on this webinar at 18:20 was linked as soon as the class existed.
   const zoomLinks = page.getByRole("region", { name: "Zoom occurrences linked" });
   await expect(zoomLinks.getByRole("listitem").locator(".status")).toHaveText(["Linked automatically"]);
@@ -290,7 +290,7 @@ test("an administrator onboards a student end to end on the real stack", async (
   await colleague.goto("/staff/sessions?from=2027-01-10");
   await expect(colleague.getByRole("region", { name: "CLASSES" })).toContainText("Real stack class");
   await colleague.goto(classUrl);
-  await expect(colleague.getByRole("region", { name: "EXPECTED STUDENTS" })).toContainText("PCA-REAL-001 Real Stack Student");
+  await expect(colleague.getByRole("region", { name: "Student attendance results" })).toContainText("PCA-REAL-001 Real Stack Student");
   for (const path of ["/staff/students", "/staff/zoom", "/staff/activity"]) {
     await colleague.goto(path);
     await expect(colleague.locator(".banner").filter({ hasText: /Only academy owners/ })).toHaveCount(0);

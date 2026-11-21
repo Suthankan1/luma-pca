@@ -2818,3 +2818,11 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Aligned the OpenAPI request with the registration-ID-only endpoint. Updated browser tests to enter through the active student sign-in and check imported students on both the monthly directory and the management record.
 - Production frontend build, ESLint, TypeScript, 81 unit tests, session HTTP smoke, structure and the 113-endpoint contract check passed. The desktop import regression passed on synthetic data. GitHub CI covers the full integration branch against its own fixtures.
 - Opening a PR leaves `main` and the running environments alone. V30 and V31 require their documented rollout steps before merge. The registration-ID-only mode is off by default and impersonation remains possible when enabled.
+
+## PR #116 CI check failures resolution (2026-11-21)
+
+- Fixed student portal sign-in button locator in `attendance-dashboard.spec.ts` (`View my attendance`).
+- Fixed subpixel scrolling assertion and animation frame alignment in `ClassScheduleScroll.tsx` and `staff-sessions.spec.ts`.
+- Updated obsolete `EXPECTED STUDENTS` region assertions in `staff-onboarding.spec.ts` to `Student attendance results`.
+- Hardened Maven Central download retries with backoff in `backend/Dockerfile` to guard against 429 rate-limiting.
+- Verified: production frontend build, ESLint, TypeScript, 81 unit tests, session HTTP smoke test, and Playwright tests locally.

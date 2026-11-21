@@ -5,7 +5,7 @@ async function signIn(page: Page, portal: "staff" | "student") {
   await page.goto(`/sign-in?portal=${portal}`);
   if (portal === "student") {
     await page.getByLabel("Registration ID").fill("PCA001");
-    await page.getByRole("button", { name: "Open my student portal" }).click();
+    await page.getByRole("button", { name: "View my attendance" }).click();
   } else {
     await page.fill("#email", "admin-enrolled@example.invalid");
     await page.fill("#password", "correct-password");
