@@ -2978,3 +2978,7 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 
 - Added the shared payment dropdown and Sync or Track and sync to the detail route above the attendance chart. The detail and overview resolve the payment form by the same unambiguous Zoom webinar ID and both refresh after assignment.
 - Frontend production build, six desktop/mobile staff checks, and structure validation passed. Synthetic track and sync from the detail page passed on mobile and on the desktop retry after one mock sign-in failure. Restarted the local frontend and verified sign-in HTTP 200 and backend readiness UP. No real roster sync was submitted. Roll back by reverting and rebuilding the frontend. No backend or database changes.
+
+## Space the Class Type payment and attendance cards (2026-11-22)
+
+- Applied the standard 20px panel spacing above the attendance metrics. The production build and desktop/mobile browser spacing checks passed with test data. Restarted the local frontend and confirmed staff sign-in HTTP 200. Roll back by reverting and rebuilding the frontend. No API or database changes.

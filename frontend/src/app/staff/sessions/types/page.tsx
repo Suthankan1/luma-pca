@@ -115,7 +115,7 @@ export default async function ClassTypePage({ searchParams }: {
       <h2 className="panel-title">Payment roster</h2>
       <ClassTypeRosterControls {...paymentWebinar} classes={paymentRoster.classes} />
     </section>
-    <div className="class-detail-metrics">
+    <div className="class-detail-metrics panel-gap">
       <section className="panel"><h2 className="panel-title">Enrolled students</h2><strong>{rosterComplete ? enrolled.size : "—"}</strong></section>
       <section className="panel"><h2 className="panel-title">Average attendance</h2><strong>{average === 0 ? "<1%" : showPercent(average)}</strong></section>
     </div>
