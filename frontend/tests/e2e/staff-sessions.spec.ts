@@ -81,7 +81,7 @@ test.describe("Classes (Zoom owns schedules)", () => {
     const day = page.getByRole("region", { name: "CLASSES" }).getByRole("group", { name: "Wednesday 6 January 2027" });
     const row = day.getByRole("listitem").filter({ hasText: `Waves ${p}` });
     await expect(row).toContainText("18:00–20:00");
-    await expect(row.getByRole("link")).toHaveAttribute("href", `/staff/sessions/${old.id}`);
+    await expect(row.getByRole("link")).toHaveAttribute("href", `/staff/sessions/${old.id}?month=2027-01`);
     await expect(page.locator("#class-batch")).toHaveCount(0);
 
     // Its attendance roster includes expected students and the class stays read-only.
@@ -141,6 +141,11 @@ test.describe("Classes (Zoom owns schedules)", () => {
     const chart = page.getByRole("list", { name: "ATTENDANCE BY CLASS", exact: true });
     await expect(chart.getByRole("listitem")).toHaveCount(2);
     await expect(chart.getByRole("listitem", { name: new RegExp(`February review.*29 Feb ${year}`) })).toBeVisible();
+    const sessionHref = (await schedule.getByRole("listitem", { name: /February review/ }).getByRole("link").getAttribute("href"))!;
+    expect(sessionHref).toContain(`?month=${year}-02`);
+    await page.goto(sessionHref);
+    await expect(page.getByRole("link", { name: "Back to Classes" })).toHaveAttribute("href", `/staff/sessions?month=${year}-02`);
+    await page.getByRole("link", { name: "Back to Classes" }).click();
     await types.getByRole("link", { name: /February review/ }).click();
     await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: /Back to Classes/ })).toHaveAttribute("href", `/staff/sessions?month=${year}-02`);
@@ -192,6 +197,13 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await paymentRoster.getByRole("button", { name: "Track and sync" }).click();
     await expect(paymentRoster.getByText("Admission synced. 1 expected student per run.")).toBeVisible();
     await expect(menuLink).toHaveAttribute("aria-current", "page");
+    const typeUrl = new URL(page.url());
+    await page.goto(`${sessionHref.split("?")[0]}${typeUrl.search}`);
+    await expect(menuLink).toHaveAttribute("aria-current", "page");
+    await expect(menuLink).toHaveAttribute("href", `/staff/class-types?month=${year}-02`);
+    await page.getByRole("link", { name: "Back to class type" }).click();
+    await expect(page).toHaveURL(url => url.pathname === typeUrl.pathname &&
+      [...typeUrl.searchParams].every(([key, value]) => url.searchParams.get(key) === value));
     await page.getByRole("link", { name: /Back to Class Types/ }).click();
     await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));
   });

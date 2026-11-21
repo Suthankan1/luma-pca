@@ -36,6 +36,7 @@ export function StaffTabLinks({ active, hasStudentPortal }: { active: StaffSecti
   const params = useSearchParams();
   const search = params.toString();
   const currentUrl = search ? `${pathname}?${search}` : pathname;
+  const month = params.get("month");
 
   function rememberCurrentTab() {
     if (staffNav.some(item => item.href === pathname && item.rememberUrl)) {
@@ -46,7 +47,10 @@ export function StaffTabLinks({ active, hasStudentPortal }: { active: StaffSecti
   return <nav className="staff-nav" aria-label="Staff sections">
     {staffNav.map(item => {
       const here = item.href === pathname;
-      const href = item.rememberUrl && here ? currentUrl : history?.urls[item.href] ?? item.href;
+      const sectionMonth = item.key === active && (active === "sessions" || active === "class-types") && month;
+      const href = item.rememberUrl && here ? currentUrl
+        : sectionMonth ? `${item.href}?${new URLSearchParams({ month: sectionMonth })}`
+        : history?.urls[item.href] ?? item.href;
       return <Link key={item.key} href={href} onNavigate={rememberCurrentTab} title={item.label} aria-label={item.label}
         prefetch={!here && href.includes("?") ? true : undefined}
         className={`staff-navitem ${item.key === active ? "active" : ""}`}

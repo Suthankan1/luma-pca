@@ -11,13 +11,18 @@ const tabs = [
   { label: "Live Now", href: "/student/live", icon: "live" },
 ] as const;
 
-export function StudentTabLinks({ hasStaffPortal }: { hasStaffPortal: boolean }) {
-  const pathname = usePathname();
+export function studentTab(pathname: string) {
   const selected = pathname === "/student/attendance" ? "/student"
+    : pathname === "/student/classes" ? "/student/calendar"
     : pathname.startsWith("/student/classes/") ? "/student/live" : pathname;
+  return tabs.find(tab => tab.href === selected);
+}
+
+export function StudentTabLinks({ hasStaffPortal }: { hasStaffPortal: boolean }) {
+  const selected = studentTab(usePathname());
   return <nav className="staff-nav student-tab-nav" aria-label="Student portal">
     {tabs.map(tab => {
-      const active = selected === tab.href;
+      const active = selected?.href === tab.href;
       return <Link key={tab.href} href={tab.href} title={tab.label} aria-label={tab.label}
         prefetch={active ? false : tab.icon === "live" ? undefined : true}
         className={`staff-navitem ${active ? "active" : ""}`} aria-current={active ? "page" : undefined}>

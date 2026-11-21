@@ -22,7 +22,7 @@ export default async function ClassTypesPage({ searchParams }: { searchParams: P
   const requests = startClassMonth(range);
   const rosters = readClassTypeRosters();
 
-  return <StaffShell active="class-types" crumb="Teaching" title="Class Types" subtitle="Scheduled class types for the selected month."
+  return <StaffShell active="class-types" crumb="Teaching / Class Types" title="Class Types" subtitle="Scheduled class types for the selected month."
     hasStudentPortal={hasPortal(identity, "student")}>
     <ClassMonthPicker href="/staff/class-types" month={range.month} currentMonth={today.startsWith(range.month)} />
     <Suspense key={range.month} fallback={<ClassesColumnSkeleton />}>

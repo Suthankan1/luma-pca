@@ -32,7 +32,7 @@ export default async function ReportsPage({ searchParams }: {
   const period = selected ?? reportPeriod(undefined, undefined, today)!;
   const active = typeof kind === "string" && isReportKind(kind) ? kind : null;
 
-  return <StaffShell active="reports" crumb="Teaching" title="Reports"
+  return <StaffShell active="reports" crumb="Teaching / Reports" title="Reports"
     subtitle={period.first === period.last ? monthLabel(period.first) : `${monthLabel(period.first)} – ${monthLabel(period.last)}`}
     hasStudentPortal={hasPortal(identity, "student")}>
     <section className="panel" aria-label="Report period">

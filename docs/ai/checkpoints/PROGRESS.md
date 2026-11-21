@@ -2987,3 +2987,8 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 
 - The staff loading screen now uses the detail URL's source to keep the originating tab active. The Class Types list streams payment options separately, and the detail page loads the payment section independently of attendance.
 - Production build and six desktop/mobile browser tests passed. The refresh regression holds the payment catalog and attendance dashboard in the mock backend, checks the list appears before payment options, and checks that Class Types stays active in the detail loading screen. Restarted the local frontend. Staff sign-in returned HTTP 200 and backend readiness was UP. No real roster write was tested. Roll back by reverting and rebuilding the frontend.
+
+## Align staff and student portal navigation (2026-11-22)
+
+- Matched staff section headers between loading and ready states. Class session links keep the selected month and the Class Type origin, and the back link returns to the corresponding list or detail page. Student loading headings follow the selected tab, and the participation page returns to Live Now.
+- Frontend production build, structure validation, and 20 desktop/mobile checks passed across the main run and a focused rerun after updating two assertions for month-bearing links. Restarted the local frontend and verified both sign-in pages returned HTTP 200 and the backend reported UP. Signed-in navigation was tested with fixtures. Roll back by reverting and rebuilding the frontend. No API or data changes.

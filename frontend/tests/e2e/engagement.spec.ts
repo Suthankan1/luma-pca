@@ -39,6 +39,8 @@ test.describe("Engagement with consent", () => {
     await panel.getByRole("button", { name: "I agree" }).click();
     await page.getByRole("link", { name: "Live Now" }).click();
     await page.getByRole("link", { name: "React and answer" }).click();
+    await expect(page.getByRole("link", { name: "Live Now", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Back to Live Now" })).toHaveAttribute("href", "/student/live");
     await expect(page.locator(".live-refresh")).toContainText("Updating every 20 seconds");
     await page.getByRole("button", { name: "I understand" }).click();
     await expect(page.locator("#reaction-feedback")).toHaveText("Sent.");

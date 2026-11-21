@@ -4,7 +4,7 @@ export default function Loading() {
   return (
     <StaffSkeleton
       active="attendance"
-      crumb="Operations"
+      crumb="Teaching / Attendance"
       title="Attendance"
       subtitle="Loading attendance..."
     />

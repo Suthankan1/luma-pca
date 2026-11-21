@@ -21,7 +21,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
   const identity = await requirePortal("staff");
   const studentId = uuidOrNull((await params).studentId);
   if (!studentId) notFound();
-  const shellBase = { active: "students" as const, crumb: "Students", hasStudentPortal: hasPortal(identity, "student") };
+  const shellBase = { active: "students" as const, crumb: "People / Students", hasStudentPortal: hasPortal(identity, "student") };
 
   const [student, enrollments, batches, courses, attendance] = await Promise.all([
     staffApi<Student>(`/api/v1/students/${studentId}`),

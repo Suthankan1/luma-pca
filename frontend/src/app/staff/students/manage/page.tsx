@@ -26,7 +26,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
   const search = typeof q === "string" ? q.trim().slice(0, 100) : "";
   const filter = filters.find(f => f.key === status) ?? filters[0];
   const cursor = typeof after === "string" && /^[A-Za-z0-9._-]{1,60}$/.test(after) ? after : null;
-  const shell = { active: "students" as const, crumb: "Students", title: "Manage students",
+  const shell = { active: "students" as const, crumb: "People / Students", title: "Manage students",
     subtitle: "Each student has one academy record and one sign-in, whatever batches they join.",
     hasStudentPortal: hasPortal(identity, "student") };
 

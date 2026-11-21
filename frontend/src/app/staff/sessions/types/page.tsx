@@ -31,6 +31,7 @@ export default async function ClassTypePage({ searchParams }: {
   const sessions = await staffApi<ClassSession[]>(`/api/v1/class-sessions?${range}`, undefined, timeout);
   const standalone = source === "class-types";
   const label = standalone ? "Class Types" : "Classes";
+  const sessionQuery = new URLSearchParams({ month, type, ...(standalone ? { source: "class-types" } : {}) }).toString();
   const shell = { active: standalone ? "class-types" as const : "sessions" as const, crumb: `Teaching / ${label}`,
     hasStudentPortal: hasPortal(identity, "student"),
     actions: <Link href={`/staff/${standalone ? "class-types" : "sessions"}?month=${month}`} className="text-link">← Back to {label}</Link> };
@@ -119,7 +120,7 @@ export default async function ClassTypePage({ searchParams }: {
       <section className="panel"><h2 className="panel-title">Average attendance</h2><strong>{average === 0 ? "<1%" : showPercent(average)}</strong></section>
     </div>
     {!complete && <p className="session-error" role="status">Some attendance figures couldn’t load. Please reload to see the complete average.</p>}
-    <Trend rates={rates} />
+    <Trend rates={rates} sessionQuery={sessionQuery} />
     <div className="class-detail-lists panel-gap">
       <section className="panel" aria-labelledby="enrolled-title">
         <h2 id="enrolled-title" className="panel-title">Enrolled students</h2>
@@ -133,7 +134,7 @@ export default async function ClassTypePage({ searchParams }: {
         <div className="classes-panel-scroll" role="region" aria-label="Completed session attendance" tabIndex={0}>
           {rates.length === 0 ? <p className="dir-empty muted">No completed sessions with recorded joins this month.</p>
             : <ul>{rates.map(({ session, percent }) => <li key={session.id}>
-            <Link className="class-detail-row" href={`/staff/sessions/${session.id}`}>
+            <Link className="class-detail-row" href={`/staff/sessions/${session.id}?${sessionQuery}`}>
               <div><span>{formatDay(session.startsAt, ACADEMY_TIME_ZONE)}</span><small>{timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })}
                 {session.origin !== "ZOOM_RUN" && " · Scheduled time"}</small></div>
               <strong className="class-attendance-percent">{showPercent(percent)}</strong>
@@ -158,7 +159,7 @@ function showPercent(percent: number | null) {
   return percent < 0.5 ? "<1%" : `${Math.round(percent)}%`;
 }
 
-function Trend({ rates }: { rates: SessionRate[] }) {
+function Trend({ rates, sessionQuery }: { rates: SessionRate[]; sessionQuery: string }) {
   const chronological = [...rates].reverse();
   const first = chronological[0]?.session;
   const last = chronological.at(-1)?.session;
@@ -180,7 +181,7 @@ function Trend({ rates }: { rates: SessionRate[] }) {
             <path className="class-trend-line" d={line} vectorEffect="non-scaling-stroke" />
           </svg>
           {points.map(({ session, percent, x }) => percent == null ? null : <Link key={session.id}
-            className="class-trend-point" href={`/staff/sessions/${session.id}`}
+            className="class-trend-point" href={`/staff/sessions/${session.id}?${sessionQuery}`}
             style={{ "--x": `${x}%`, "--y": `${100 - percent}%` } as CSSProperties} data-edge={x > 70 ? "end" : undefined}
             aria-label={`${formatDay(session.startsAt, ACADEMY_TIME_ZONE)} at ${timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })}, ${showPercent(percent)} attendance`}>
             <span aria-hidden="true">{formatShortDay(session.startsAt, ACADEMY_TIME_ZONE)} · {timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })} · {showPercent(percent)}</span>
