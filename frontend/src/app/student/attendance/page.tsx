@@ -8,7 +8,7 @@ import { hasPortal } from "@/lib/session-policy";
 import { studentApi } from "@/lib/staff-api";
 import { academyToday, formatClassTime, formatDate, formatDuration, outcomeLabels, instantParts, ACADEMY_TIME_ZONE,
   type AttendanceRecordView, type MyConsent } from "@/lib/staff-forms";
-import { classMonthRange, monthLabel } from "@/lib/staff-home";
+import { classMonthRange, compactClassTitle, monthLabel } from "@/lib/staff-home";
 import { readAttendanceWindows } from "@/lib/student-month-api";
 
 export const metadata = { title: "My Report · LUMA" };
@@ -44,8 +44,8 @@ export default async function MyAttendancePage({ searchParams }: { searchParams:
     {!records.ok && <p className="session-error panel-gap" role="alert">Attendance appeals couldn’t load.</p>}
     {finalRecords.length > 0 && <details className="panel panel-gap profile-appeals">
       <summary>Attendance appeals</summary>
-      <ul className="dir-list">{finalRecords.map((record, index) => <li key={record.id} className="dir-course my-attendance" aria-label={`Attendance ${record.classTitle}`}>
-        <div className="dir-row"><div><strong>{record.classTitle}</strong>
+      <ul className="dir-list">{finalRecords.map((record, index) => <li key={record.id} className="dir-course my-attendance" aria-label={`Attendance ${compactClassTitle(record.classTitle)}`}>
+        <div className="dir-row"><div><strong>{compactClassTitle(record.classTitle)}</strong>
           <span className="dir-dates muted"> {formatClassTime(record.classStartsAt, record.classEndsAt, record.timeZone)}</span>
           <div className="dir-dates muted">{formatDuration(record.connectedSeconds)} connected
             {record.appealStatus === "OPEN" ? " · appeal waiting for a decision" : record.appealStatus ? ` · appeal ${record.appealStatus.toLowerCase()}` : ""}</div></div>

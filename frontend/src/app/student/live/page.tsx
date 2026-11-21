@@ -8,6 +8,7 @@ import { studentApi } from "@/lib/staff-api";
 import { addDays, academyToday, ACADEMY_TIME_ZONE, formatDuration, zonedToInstant, type MyConsent } from "@/lib/staff-forms";
 import { formatClock, formatDay, renderTime } from "@/lib/insights";
 import { studentTimetable, type TimetableEntry } from "@/lib/student-timetable";
+import { compactClassTitle } from "@/lib/staff-home";
 
 type StudentLive = {
   joined: number; online: number; seen: boolean; connectedSeconds: number; firstJoinAt: string | null;
@@ -40,7 +41,7 @@ export default async function StudentLivePage() {
     <div className="student-live-stack">
       {active.length ? active.map(({ session, data }) => <section key={session.id} className="panel student-live-card student-portal-enter">
         <header>
-          <div><span className="student-live-badge">Live now</span><h2>{session.title}</h2>
+          <div><span className="student-live-badge">Live now</span><h2>{compactClassTitle(session.title)}</h2>
             <p className="panel-sub">Started {formatClock(session.startsAt, ACADEMY_TIME_ZONE)} · {session.batches.map(b => b.code).join(", ")}</p></div>
           <div className="next-class-actions">
             {canParticipate && <Link className="action secondary" href={`/student/classes/${session.id}`}>React and answer</Link>}
@@ -74,7 +75,7 @@ function Neighbour({ label, entry }: { label: string; entry?: TimetableEntry }) 
   return <section className="panel student-neighbour">
     <h2 className="panel-title">{label}</h2>
     {entry ? <>
-      <p><strong>{entry.title}</strong></p>
+      <p><strong>{compactClassTitle(entry.title)}</strong></p>
       <time dateTime={entry.startsAt}>{formatDay(entry.startsAt, ACADEMY_TIME_ZONE)} · {formatClock(entry.startsAt, ACADEMY_TIME_ZONE)}</time>
       <Link className="text-link" href={`/student/calendar?month=${entry.date.slice(0, 7)}&day=${entry.date}`}>View in calendar</Link>
     </> : <p className="panel-sub">No class found within 45 days.</p>}

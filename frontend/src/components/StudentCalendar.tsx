@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { longDayLabel, monthLabel, shiftMonth, type CalendarDay } from "@/lib/staff-home";
+import { compactClassTitle, longDayLabel, monthLabel, shiftMonth, type CalendarDay } from "@/lib/staff-home";
 import { ACADEMY_TIME_ZONE } from "@/lib/staff-forms";
 import { formatClock } from "@/lib/insights";
 import type { TimetableEntry } from "@/lib/student-timetable";
@@ -54,7 +54,7 @@ export function StudentCalendar({ month, today, selectedDay, weeks, entries }: {
           {agenda.map(entry => <li key={entry.id}>
             <time dateTime={entry.startsAt}>{formatClock(entry.startsAt, ACADEMY_TIME_ZONE)}
               {entry.endsAt && !entry.estimatedEnd && `–${formatClock(entry.endsAt, ACADEMY_TIME_ZONE)}`}</time>
-            <strong>{entry.title}</strong>
+            <strong>{compactClassTitle(entry.title)}</strong>
             <span>{entry.batchCodes.join(", ")}{entry.cancelled && " · Cancelled"}</span>
           </li>)}
         </ul>}

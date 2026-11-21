@@ -28,7 +28,8 @@ test("Students open their report and select scheduled classes on a monthly calen
   await expect(page.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible();
   const calendar = page.getByRole("region", { name: "Class calendar" });
   await calendar.getByRole("button", { name: new RegExp(longDayLabel(date)) }).click();
-  await expect(page.getByText("Upcoming Zoom webinar")).toBeVisible();
+  await expect(page.getByText("Upcoming Zoom webinar | MON", { exact: true })).toBeVisible();
+  await expect(page.getByText("Webinar title suffix")).toHaveCount(0);
   await expect(page.locator('a[href*="zoom.us"]')).toHaveCount(0);
   await calendar.getByRole("link", { name: "Next month" }).click();
   await expect(page.getByText("Upcoming Zoom webinar")).toHaveCount(0);

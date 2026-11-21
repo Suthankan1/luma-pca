@@ -186,7 +186,7 @@ function studentApi(req, send, body) {
     const startsAt = `${day(3)}T12:30:00Z`;
     return send(200, studentHasEnrolments && Date.parse(startsAt) >= Date.parse(url.searchParams.get("from"))
       && Date.parse(startsAt) < Date.parse(url.searchParams.get("to")) ? [{
-        id: "mock-zoom-slot", title: "Upcoming Zoom webinar", startsAt, durationMinutes: 60,
+        id: "mock-zoom-slot", title: "Upcoming Zoom webinar | MON | Webinar title suffix", startsAt, durationMinutes: 60,
         timeZone: "Asia/Colombo", batchCode: mon.code,
       }] : []);
   }

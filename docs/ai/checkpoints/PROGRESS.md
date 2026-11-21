@@ -2880,3 +2880,8 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Removed Zoom join links from Calendar and Live Now and from both student timetable API responses. Calendar de-duplication now matches title, start and batch. Staff Zoom routes were outside the change.
 - Production build, ESLint, eight targeted PostgreSQL backend tests, six desktop/mobile student browser tests, structure and OpenAPI checks passed. Restarted the local frontend and backend and verified student sign-in and backend readiness. Signed-in browser checks used synthetic accounts.
 - Release the backend before the frontend so raw timetable responses stop carrying links first. Revert both builds to roll back. No migration.
+
+## Compact student class titles (2026-11-22)
+
+- Calendar, Live Now, the previous and next class cards, and attendance appeals now use the same compact class title as My Report history. For three-part titles separated by pipes, the visible name keeps the class and batch and drops the suffix.
+- Production build, ESLint, structure, 81 unit tests, and six synthetic desktop/mobile browser tests passed. Restarted the local frontend and verified student sign-in and backend readiness. Revert the frontend commit and rebuild to roll back.
