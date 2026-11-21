@@ -2836,3 +2836,5 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 
 - PR 116's real-stack browser test found a stale text-order assertion in the attendance roster. It now checks the student row by its accessible name for both staff sessions. The Lighthouse test isolates measurements in fresh Chrome instances and reports the exact runtime error or final path on failure. The performance budgets are unchanged.
 - Changes are confined to CI tests and documentation. No database migration or runtime rollout is required. Revert the test commit to restore the former checks.
+
+- Subsequent GitHub runs reproduced Chrome's intermittent `NO_NAVSTART` trace error in the push workflow while the PR workflow met the budgets. The check now retries only that trace error and still requires three valid samples per route. The reports browser test waits for the React search control to respond and uses separate fixtures for retries.

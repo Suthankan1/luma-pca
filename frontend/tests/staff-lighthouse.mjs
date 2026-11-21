@@ -25,14 +25,20 @@ const budgets = { "largest-contentful-paint": 1500, "cumulative-layout-shift": 0
 const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 for (const route of ["/staff/sessions", "/staff/class-types", "/staff/students"]) {
   const runs = [];
-  for (let i = 0; i < 3; i++) {
-    const chrome = await launch({ chromeFlags: ["--headless", "--no-sandbox", "--disable-dev-shm-usage"] });
+  // Chrome occasionally records a trace without a navigation. Require three valid
+  // samples and retry only that instrumentation error, never a budget violation.
+  for (let attempt = 1; runs.length < 3 && attempt <= 5; attempt++) {
+    const chrome = await launch({ chromeFlags: ["--headless=new", "--no-sandbox", "--disable-dev-shm-usage"] });
     try {
       const result = await lighthouse(new URL(route, origin).href, { port: chrome.port, logLevel: "error",
         onlyCategories: ["performance"], extraHeaders: { Cookie: cookie } }, { extends: "lighthouse:default",
         settings: { formFactor: "desktop", screenEmulation: { mobile: false, width: 1366, height: 768, deviceScaleFactor: 1 },
           throttlingMethod: "provided" } });
       const lhr = result.lhr;
+      if (lhr.runtimeError?.code === "NO_NAVSTART" && attempt < 5) {
+        console.warn(`${route} trace missed the navigation on attempt ${attempt}; collecting a new sample`);
+        continue;
+      }
       if (lhr.runtimeError) throw new Error(`Lighthouse audit of ${route} failed: ${lhr.runtimeError.code} — ${lhr.runtimeError.message}`);
       const finalPath = new URL(lhr.finalDisplayedUrl).pathname;
       if (finalPath !== route) throw new Error(`Lighthouse requested ${route} and reached ${finalPath}`);
