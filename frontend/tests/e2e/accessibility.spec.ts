@@ -39,7 +39,13 @@ test("student pages have no serious accessibility problems", async ({ page }) =>
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/student$/);
+  await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
   await check(page, "/student");
   await page.goto("/student/classes");
-  await check(page, "/student/classes");
+  await expect(page).toHaveURL(/\/student\/calendar$/);
+  await expect(page.getByRole("region", { name: "Class calendar" })).toBeVisible();
+  await check(page, "/student/calendar");
+  await page.goto("/student/live");
+  await expect(page.getByRole("heading", { name: "Live class now" })).toBeVisible();
+  await check(page, "/student/live");
 });
