@@ -58,8 +58,8 @@ async function LiveContent({ now }: { now: number }) {
         <dl className="student-live-metrics">
           <div><dt>Students joined</dt><dd>{data.joined}</dd></div>
           <div><dt>Online now</dt><dd>{data.online}</dd></div>
-          <div><dt>Your connected time</dt><dd>{data.seen ? formatDuration(data.connectedSeconds) : "No join seen yet"}</dd>
-            {data.firstJoinAt && <small>First joined {formatClock(data.firstJoinAt, ACADEMY_TIME_ZONE)}</small>}</div>
+          <div><dt>Your connected time</dt><dd>{data.seen ? formatDuration(data.connectedSeconds) : "No join seen yet"}
+            {data.firstJoinAt && <small>First joined {formatClock(data.firstJoinAt, ACADEMY_TIME_ZONE)}</small>}</dd></div>
         </dl>
         <div className="student-live-chart-panel">
           <LiveOnlineChart key={session.id} sessionId={session.id} history={data.onlineHistory} sampledAt={Date.parse(data.sampledAt)}

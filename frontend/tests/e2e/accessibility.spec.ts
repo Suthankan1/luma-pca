@@ -34,6 +34,7 @@ test("staff pages have no serious accessibility problems", async ({ page }) => {
 });
 
 test("student pages have no serious accessibility problems", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/sign-in");
   await page.fill("#email", "student@example.invalid");
   await page.fill("#password", "correct-password");
