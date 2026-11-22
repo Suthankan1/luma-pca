@@ -44,7 +44,7 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
   const range = classMonthRange(params.month, today, params.from);
   const { month, through } = range;
   const currentMonth = today.startsWith(month);
-  const shell = { active: "sessions" as const, crumb: "Teaching", title: "Classes",
+  const shell = { active: "sessions" as const, crumb: "Teaching / Classes", title: "Classes",
     subtitle: "Classes Zoom has scheduled for the webinars you track, and the ones already held. Times come from Zoom.",
     hasStudentPortal: hasPortal(identity, "student") };
 
@@ -120,7 +120,7 @@ async function ScheduleColumn({ range, requests, monitorsRequest, now, today }: 
                   <span className={`home-state home-state-${entry.state}`}>{stateLabels[entry.state]}</span>
                 </>;
                 return <li key={entry.key} className={`home-entry home-entry-${entry.state}`} aria-label={`${entry.title}, ${stateLabels[entry.state]}`}>
-                  {entry.sessionId ? <Link href={entry.href}>{body}</Link> : <div className="home-entry-static">{body}</div>}
+                  {entry.sessionId ? <Link href={`${entry.href}?month=${month}`}>{body}</Link> : <div className="home-entry-static">{body}</div>}
                 </li>;
               })}</ul>}
           </div>)}

@@ -55,11 +55,13 @@ public class SecurityConfig {
                             "/api/v1/engagement-settings",
                             "/api/v1/academy/classes", "/api/v1/academy/classes/link", "/api/v1/academy/classes/sync",
                             "/api/v1/zoom/monitors", "/api/v1/zoom/monitors/*/sync", "/api/v1/zoom/monitors/*/stop",
-                            "/api/v1/zoom/monitors/*/resume", "/api/v1/zoom/monitors/*/academy-class")
+                            "/api/v1/zoom/monitors/*/resume", "/api/v1/zoom/monitors/*/academy-class",
+                            "/api/v1/zoom/monitors/*/payment-roster")
                         .hasRole("STAFF")
                     // A student's own data; services resolve "own" from the token, never from input.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/student", "/api/v1/me/enrollments", "/api/v1/me/class-sessions",
-                            "/api/v1/me/attendance", "/api/v1/me/attendance-overview").hasRole("STUDENT")
+                            "/api/v1/me/attendance", "/api/v1/me/attendance-overview", "/api/v1/me/webinar-schedule",
+                            "/api/v1/me/class-sessions/*/live-attendance").hasRole("STUDENT")
                     .requestMatchers(HttpMethod.POST, "/api/v1/me/attendance/*/appeals").hasRole("STUDENT")
                     // Engagement (006): a student's own consent, reactions and answers; services check consent and class.
                     .requestMatchers(HttpMethod.GET, "/api/v1/me/engagement-consent", "/api/v1/me/class-sessions/*/engagement").hasRole("STUDENT")

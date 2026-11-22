@@ -32,7 +32,7 @@ export default async function StudentAttendancePage({ params, searchParams }: {
   const scheduleRange = new URLSearchParams({ from: range.fromInstant, to: range.toInstant });
   const back = withParams("/staff/students", { month: range.month, q: typeof query.q === "string" ? query.q : null,
     type: typeof query.type === "string" ? query.type : null, sort: typeof query.sort === "string" ? query.sort : null });
-  return <StaffShell active="students" crumb="Students / Attendance" title={student.ok ? student.data.fullName : "Student attendance"}
+  return <StaffShell active="students" crumb="People / Students / Attendance" title={student.ok ? student.data.fullName : "Student attendance"}
     subtitle={student.ok ? `${student.data.studentNumber} · ${monthLabel(range.month)}` : monthLabel(range.month)}
     hasStudentPortal={hasPortal(identity, "student")} actions={<Link href={back} className="text-link">← Back to Students</Link>}>
     <StudentAttendanceProfile range={range} today={today} now={now} reports={student.ok ? reports : null}

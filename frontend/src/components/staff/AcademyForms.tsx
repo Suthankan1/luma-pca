@@ -27,10 +27,11 @@ function SyncDetails({ sync }: { sync: SyncResult }) {
 
 /** Set up, link or sync one Academy class. One action state per row, so the outcome stays after the page refreshes. */
 export function AcademyClassActions({ className, slug, linked, batches }: {
-  className: string; slug: string; linked: boolean; batches: { id: string; label: string }[];
+  className: string; slug: string; linked: boolean; batches: { id: string; label: string; disabled?: boolean }[];
 }) {
   const [state, action, pending] = useActionState(academyClassAction, null);
   const feedback = `academy-feedback-${slug}`;
+  const canSync = batches.some(batch => !batch.disabled);
   return <div className="academy-actions">
     {linked
       ? <form action={action} className="inline-form">
@@ -46,19 +47,22 @@ export function AcademyClassActions({ className, slug, linked, batches }: {
             <button className="action" type="submit" disabled={pending} aria-describedby={feedback}>
               {pending ? "Setting up…" : "Set up in LUMA"}</button>
           </form>
-          {batches.length > 0 && <form action={action} className="academy-link">
-            <input type="hidden" name="intent" value="link" />
-            <input type="hidden" name="className" value={className} />
-            <label htmlFor={`link-${slug}`}>Or use an existing batch</label>
-            <div className="inline-form">
-              <select id={`link-${slug}`} name="batchId" required defaultValue="">
-                <option value="" disabled>Choose a batch</option>
-                {batches.map(batch => <option key={batch.id} value={batch.id}>{batch.label}</option>)}
-              </select>
-              <button className="action secondary" type="submit" disabled={pending}>{pending ? "Linking…" : "Link and sync"}</button>
-            </div>
-          </form>}
         </>}
+    {!linked && batches.length > 0 && <form action={action} className="academy-link">
+      <input type="hidden" name="intent" value="link" />
+      <input type="hidden" name="className" value={className} />
+      <label htmlFor={`link-${slug}`}>Or use an existing batch</label>
+      <div className="inline-form">
+        <select id={`link-${slug}`} name="batchId" required defaultValue=""
+          disabled={pending || !canSync}>
+          <option value="" disabled>{canSync ? "Choose a batch" : "No selectable batch"}</option>
+          {batches.map(batch => <option key={batch.id} value={batch.id} disabled={batch.disabled}>{batch.label}</option>)}
+        </select>
+        <button className="action secondary" type="submit" disabled={pending || !canSync}>
+          {pending ? "Syncing…" : "Link and sync"}
+        </button>
+      </div>
+    </form>}
     <div id={feedback} role={state?.ok === false ? "alert" : "status"} className="academy-feedback">
       {state && <p className={state.ok ? "form-ok" : "session-error"}>{state.message}</p>}
       {state?.sync && <SyncDetails sync={state.sync} />}

@@ -111,6 +111,13 @@ class AttendanceController {
         return attendance.forClass(CurrentAccount.from(authentication), sessionId, includeOnlineHistory);
     }
 
+    @GetMapping("/api/v1/me/class-sessions/{sessionId}/live-attendance")
+    ResponseEntity<ProvisionalAttendanceService.StudentLiveAttendance> myLiveClass(JwtAuthenticationToken authentication,
+                                                                                   @PathVariable UUID sessionId) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate())
+                .body(attendance.myLiveClass(CurrentAccount.from(authentication), sessionId));
+    }
+
     @GetMapping("/api/v1/class-sessions/{sessionId}/attendance/export")
     ResponseEntity<byte[]> exportClass(JwtAuthenticationToken authentication, @PathVariable UUID sessionId) {
         return csv(exports.forClass(CurrentAccount.from(authentication), sessionId));

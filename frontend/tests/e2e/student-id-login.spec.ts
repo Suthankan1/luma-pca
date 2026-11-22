@@ -23,6 +23,32 @@ test.describe("Student ID sign-in (Academy request)", () => {
     await expect(page.locator(".session-error")).toHaveText("We couldn’t find that registration ID. Check it and try again.");
   });
 
+  test("Tips rotate below the form while sign-in is pending and disappear in the portal", async ({ page }) => {
+    let release: () => void = () => {};
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    await page.route("**/api/session/student-login", async route => {
+      await pending;
+      await route.continue();
+    });
+    await page.goto("/sign-in?portal=student");
+    await expect(page.locator('head link[rel="icon"]')).toHaveAttribute("href", "/physics-cube-academy-logo.jpg");
+    const tip = page.locator(".student-sign-in-tip");
+    await expect(tip).toHaveCount(0);
+    await page.getByLabel("Registration ID").fill("PCA001");
+    const submission = page.getByRole("button", { name: "View my attendance" }).click();
+    try {
+      await expect(tip.getByRole("status")).toHaveText("Signing in…");
+      const quote = tip.locator("blockquote");
+      const previous = await quote.textContent();
+      await expect(quote).not.toHaveText(previous ?? "", { timeout: 7000 });
+    } finally {
+      release();
+      await submission;
+    }
+    await expect(page).toHaveURL(/\/student$/);
+    await expect(tip).toHaveCount(0);
+  });
+
   test("The staff sign-in page shows only the staff form", async ({ page }) => {
     await page.goto("/sign-in?portal=staff");
     await expect(page.getByRole("form", { name: "Students" })).toHaveCount(0);

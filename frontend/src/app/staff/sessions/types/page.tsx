@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { CSSProperties } from "react";
+import { Suspense, type CSSProperties } from "react";
 import { StaffShell } from "@/components/StaffShell";
+import { ClassTypeRosterControls, matchClassTypeWebinar, readClassTypeRosters } from "@/components/staff/ClassTypeRosterPanel";
 import { requirePortal } from "@/lib/auth-server";
 import { formatDay, formatShortDay, renderTime, type Dashboard } from "@/lib/insights";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { ACADEMY_TIME_ZONE, academyToday, formatDate, type ClassSession, type ProvisionalAttendance } from "@/lib/staff-forms";
-import { attendancePercent, averageClassAttendance, classMonthRange, monthLabel, monthlyClassTypes, timeRange, type ClassAttendanceTotal } from "@/lib/staff-home";
+import { attendancePercent, averageClassAttendance, classMonthRange, classTypeKey, monthLabel, monthlyClassTypes, timeRange, type ClassAttendanceTotal } from "@/lib/staff-home";
 import { StudentAttendanceList } from "./student-attendance-list";
 
 export const metadata = { title: "Class type attendance · LUMA" };
@@ -30,6 +31,7 @@ export default async function ClassTypePage({ searchParams }: {
   const sessions = await staffApi<ClassSession[]>(`/api/v1/class-sessions?${range}`, undefined, timeout);
   const standalone = source === "class-types";
   const label = standalone ? "Class Types" : "Classes";
+  const sessionQuery = new URLSearchParams({ month, type, ...(standalone ? { source: "class-types" } : {}) }).toString();
   const shell = { active: standalone ? "class-types" as const : "sessions" as const, crumb: `Teaching / ${label}`,
     hasStudentPortal: hasPortal(identity, "student"),
     actions: <Link href={`/staff/${standalone ? "class-types" : "sessions"}?month=${month}`} className="text-link">← Back to {label}</Link> };
@@ -38,6 +40,7 @@ export default async function ClassTypePage({ searchParams }: {
   </StaffShell>;
   const group = monthlyClassTypes(sessions.data, now).find(([key]) => key === type)?.[1];
   if (!group) notFound();
+  const paymentRoster = readClassTypeRosters();
 
   const batchIds = [...new Set(group.sessions.flatMap(session => session.batches.map(batch => batch.batchId)))];
   const attendanceRange = new URLSearchParams({ from: first, to: through });
@@ -105,12 +108,19 @@ export default async function ClassTypePage({ searchParams }: {
   });
 
   return <StaffShell {...shell} title={group.title} subtitle={`${monthLabel(month)} · through ${formatDate(through)} · Sri Lanka time`}>
-    <div className="class-detail-metrics">
+    <section className="panel panel-gap" aria-label="Payment roster">
+      <h2 className="panel-title">Payment roster</h2>
+      <Suspense fallback={<p className="class-type-roster-inline muted">Loading payment classes…</p>}>
+        <DetailPaymentRoster requests={paymentRoster}
+          sessions={sessions.data.filter(session => session.status === "SCHEDULED" && classTypeKey(session.title) === type)} />
+      </Suspense>
+    </section>
+    <div className="class-detail-metrics panel-gap">
       <section className="panel"><h2 className="panel-title">Enrolled students</h2><strong>{rosterComplete ? enrolled.size : "—"}</strong></section>
       <section className="panel"><h2 className="panel-title">Average attendance</h2><strong>{average === 0 ? "<1%" : showPercent(average)}</strong></section>
     </div>
     {!complete && <p className="session-error" role="status">Some attendance figures couldn’t load. Please reload to see the complete average.</p>}
-    <Trend rates={rates} />
+    <Trend rates={rates} sessionQuery={sessionQuery} />
     <div className="class-detail-lists panel-gap">
       <section className="panel" aria-labelledby="enrolled-title">
         <h2 id="enrolled-title" className="panel-title">Enrolled students</h2>
@@ -124,7 +134,7 @@ export default async function ClassTypePage({ searchParams }: {
         <div className="classes-panel-scroll" role="region" aria-label="Completed session attendance" tabIndex={0}>
           {rates.length === 0 ? <p className="dir-empty muted">No completed sessions with recorded joins this month.</p>
             : <ul>{rates.map(({ session, percent }) => <li key={session.id}>
-            <Link className="class-detail-row" href={`/staff/sessions/${session.id}`}>
+            <Link className="class-detail-row" href={`/staff/sessions/${session.id}?${sessionQuery}`}>
               <div><span>{formatDay(session.startsAt, ACADEMY_TIME_ZONE)}</span><small>{timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })}
                 {session.origin !== "ZOOM_RUN" && " · Scheduled time"}</small></div>
               <strong className="class-attendance-percent">{showPercent(percent)}</strong>
@@ -136,12 +146,20 @@ export default async function ClassTypePage({ searchParams }: {
   </StaffShell>;
 }
 
+async function DetailPaymentRoster({ requests, sessions }: {
+  requests: ReturnType<typeof readClassTypeRosters>; sessions: ClassSession[];
+}) {
+  const monitors = await requests.monitors;
+  return <ClassTypeRosterControls {...matchClassTypeWebinar(sessions, monitors.ok ? monitors.data : [])}
+    classes={requests.classes} />;
+}
+
 function showPercent(percent: number | null) {
   if (percent == null) return "—";
   return percent < 0.5 ? "<1%" : `${Math.round(percent)}%`;
 }
 
-function Trend({ rates }: { rates: SessionRate[] }) {
+function Trend({ rates, sessionQuery }: { rates: SessionRate[]; sessionQuery: string }) {
   const chronological = [...rates].reverse();
   const first = chronological[0]?.session;
   const last = chronological.at(-1)?.session;
@@ -160,10 +178,10 @@ function Trend({ rates }: { rates: SessionRate[] }) {
         <div className="class-trend-plot">
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <path className="class-trend-grid" d="M0 0H100 M0 50H100 M0 100H100" vectorEffect="non-scaling-stroke" />
-            <path className="class-trend-line" d={line} pathLength={1} vectorEffect="non-scaling-stroke" />
+            <path className="class-trend-line" d={line} vectorEffect="non-scaling-stroke" />
           </svg>
           {points.map(({ session, percent, x }) => percent == null ? null : <Link key={session.id}
-            className="class-trend-point" href={`/staff/sessions/${session.id}`}
+            className="class-trend-point" href={`/staff/sessions/${session.id}?${sessionQuery}`}
             style={{ "--x": `${x}%`, "--y": `${100 - percent}%` } as CSSProperties} data-edge={x > 70 ? "end" : undefined}
             aria-label={`${formatDay(session.startsAt, ACADEMY_TIME_ZONE)} at ${timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })}, ${showPercent(percent)} attendance`}>
             <span aria-hidden="true">{formatShortDay(session.startsAt, ACADEMY_TIME_ZONE)} · {timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })} · {showPercent(percent)}</span>

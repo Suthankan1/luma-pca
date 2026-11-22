@@ -13,7 +13,7 @@ export const metadata = { title: "Attendance · LUMA" };
 /** Attendance work for staff: what needs doing, batch totals, and the academy's rule and engagement settings. */
 export default async function AttendancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const identity = await requirePortal("staff");
-  const shell = { active: "attendance" as const, crumb: "Teaching", title: "Attendance",
+  const shell = { active: "attendance" as const, crumb: "Teaching / Attendance", title: "Attendance",
     subtitle: "Finalise ended classes, answer appeals, see reports, and keep the academy’s attendance rule.",
     hasStudentPortal: hasPortal(identity, "student") };
   const query = await searchParams;

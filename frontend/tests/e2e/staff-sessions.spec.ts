@@ -81,7 +81,7 @@ test.describe("Classes (Zoom owns schedules)", () => {
     const day = page.getByRole("region", { name: "CLASSES" }).getByRole("group", { name: "Wednesday 6 January 2027" });
     const row = day.getByRole("listitem").filter({ hasText: `Waves ${p}` });
     await expect(row).toContainText("18:00–20:00");
-    await expect(row.getByRole("link")).toHaveAttribute("href", `/staff/sessions/${old.id}`);
+    await expect(row.getByRole("link")).toHaveAttribute("href", `/staff/sessions/${old.id}?month=2027-01`);
     await expect(page.locator("#class-batch")).toHaveCount(0);
 
     // Its attendance roster includes expected students and the class stays read-only.
@@ -141,6 +141,11 @@ test.describe("Classes (Zoom owns schedules)", () => {
     const chart = page.getByRole("list", { name: "ATTENDANCE BY CLASS", exact: true });
     await expect(chart.getByRole("listitem")).toHaveCount(2);
     await expect(chart.getByRole("listitem", { name: new RegExp(`February review.*29 Feb ${year}`) })).toBeVisible();
+    const sessionHref = (await schedule.getByRole("listitem", { name: /February review/ }).getByRole("link").getAttribute("href"))!;
+    expect(sessionHref).toContain(`?month=${year}-02`);
+    await page.goto(sessionHref);
+    await expect(page.getByRole("link", { name: "Back to Classes" })).toHaveAttribute("href", `/staff/sessions?month=${year}-02`);
+    await page.getByRole("link", { name: "Back to Classes" }).click();
     await types.getByRole("link", { name: /February review/ }).click();
     await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: /Back to Classes/ })).toHaveAttribute("href", `/staff/sessions?month=${year}-02`);
@@ -153,9 +158,52 @@ test.describe("Classes (Zoom owns schedules)", () => {
     await page.getByLabel("Class month", { exact: true }).fill(`${year}-02`);
     await page.getByRole("button", { name: "View", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));
-    await page.getByRole("region", { name: "Completed class types" }).getByRole("link", { name: /February review/ }).click();
+    const row = page.getByRole("region", { name: "Class types for the selected month" }).getByRole("listitem", { name: /February review/ });
+    await expect(row.getByText("Zoom link not tracked")).toBeVisible();
+    await expect(row.getByLabel("Academy payment class")).toBeEnabled();
+    await expect(row.getByLabel("Zoom link or webinar ID")).toBeVisible();
+    const holdRead = async (path?: string) => {
+      const result = await page.request.put(`${mockApiBase()}/__test__/class-type-read`, {
+        headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" }, data: { path },
+      });
+      expect(result.status()).toBe(204);
+    };
+    await holdRead("/api/v1/academy/classes");
+    try {
+      await page.reload({ waitUntil: "commit" });
+      await expect(row.getByText("Loading payment classes…")).toBeVisible();
+      await expect(menuLink).toHaveAttribute("aria-current", "page");
+    } finally {
+      await holdRead();
+    }
+    await page.getByRole("region", { name: "Class types for the selected month" }).getByRole("link", { name: /February review/ }).click();
     await expect(page.getByRole("heading", { name: "February review", level: 1 })).toBeVisible();
+    const paymentRoster = page.getByRole("region", { name: "Payment roster" });
+    await holdRead("/api/v1/attendance/dashboard");
+    try {
+      await page.reload({ waitUntil: "commit" });
+      await expect(page.getByText("Loading class details…")).toBeVisible();
+      await expect(menuLink).toHaveAttribute("aria-current", "page");
+    } finally {
+      await holdRead();
+    }
+    await expect(paymentRoster).toBeVisible();
+    const rosterBox = await paymentRoster.boundingBox();
+    const metricsBox = await page.locator(".class-detail-metrics").boundingBox();
+    expect(metricsBox!.y - (rosterBox!.y + rosterBox!.height)).toBeGreaterThanOrEqual(16);
+    await expect(paymentRoster.getByLabel("Academy payment class")).toBeEnabled();
+    await paymentRoster.getByLabel("Academy payment class").selectOption("Admission");
+    await paymentRoster.getByLabel("Zoom link or webinar ID").fill("84400000002");
+    await paymentRoster.getByRole("button", { name: "Track and sync" }).click();
+    await expect(paymentRoster.getByText("Admission synced. 1 expected student per run.")).toBeVisible();
     await expect(menuLink).toHaveAttribute("aria-current", "page");
+    const typeUrl = new URL(page.url());
+    await page.goto(`${sessionHref.split("?")[0]}${typeUrl.search}`);
+    await expect(menuLink).toHaveAttribute("aria-current", "page");
+    await expect(menuLink).toHaveAttribute("href", `/staff/class-types?month=${year}-02`);
+    await page.getByRole("link", { name: "Back to class type" }).click();
+    await expect(page).toHaveURL(url => url.pathname === typeUrl.pathname &&
+      [...typeUrl.searchParams].every(([key, value]) => url.searchParams.get(key) === value));
     await page.getByRole("link", { name: /Back to Class Types/ }).click();
     await expect(page).toHaveURL(new RegExp(`/staff/class-types\\?month=${year}-02$`));
   });

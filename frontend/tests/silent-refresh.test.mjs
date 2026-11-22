@@ -14,6 +14,7 @@ test("session routes and static files are left alone", () => {
   assert.equal(refreshesOn("/staff/dashboard"), true);
   assert.equal(refreshesOn("/student"), true);
   assert.equal(refreshesOn("/sign-in"), true);
+  assert.equal(refreshesOn("/"), true, "home can redirect a renewed session to its dashboard");
   assert.equal(refreshesOn("/api/session/logout"), false, "signing out must not renew first");
   assert.equal(refreshesOn("/api/session/refresh"), false);
   assert.equal(refreshesOn("/_next/data/x.json"), false);

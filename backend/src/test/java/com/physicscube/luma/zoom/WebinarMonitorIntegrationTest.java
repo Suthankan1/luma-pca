@@ -469,8 +469,10 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
     @Test
     void addingAWebinarThatIsAlreadyRunningStartsItsRunAtZoomsActualStart() {
         Instant start = Instant.now().truncatedTo(ChronoUnit.SECONDS).minus(40, ChronoUnit.MINUTES);
+        fixtures.student("PCA001", "amaya@example.test");
         started(SCHEDULED, "Running==", start); // stored before anyone monitored the webinar
-        visit(SCHEDULED, "Running==", "amaya@example.test", "b1", start.plus(2, ChronoUnit.MINUTES), null);
+        visit(SCHEDULED, "Running==", "amaya@example.test", "b1",
+                start.plus(2, ChronoUnit.MINUTES), start.plus(32, ChronoUnit.MINUTES));
         process();
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM zoom_webinar_runs WHERE academy_id = ?", Integer.class, academyId));
 
@@ -479,6 +481,7 @@ class WebinarMonitorIntegrationTest extends StaffApiIntegrationTest {
         assertEquals("LIVE", run.get("state"));
         assertEquals(start, ((Timestamp) run.get("actual_started_at")).toInstant(), "not the moment staff added it");
         assertNotEquals(null, monitor.get("live"));
+        assertEquals(1800, ((Number) attendanceOf(run.get("class_session_id"), "PCA001").get("connectedSeconds")).intValue());
     }
 
     @Test

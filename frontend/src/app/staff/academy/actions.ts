@@ -17,6 +17,8 @@ function academyProblem(status: number, detail: string | undefined) {
 async function sync(className: string): Promise<AcademyActionState> {
   const result = await staffApi<SyncResult>("/api/v1/academy/classes/sync", { method: "POST", body: { className } }, 60000);
   revalidatePath("/staff/academy");
+  revalidatePath("/staff/class-types");
+  revalidatePath("/staff/sessions");
   if (!result.ok) return { ok: false, message: academyProblem(result.status, result.detail) };
   return { ok: true, message: syncSummary(result.data), sync: result.data };
 }

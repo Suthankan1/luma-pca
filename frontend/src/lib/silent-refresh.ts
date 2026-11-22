@@ -8,7 +8,7 @@ export function needsRefresh(has: (name: string) => boolean, names: { access: st
   return !has(names.access) && has(names.refresh);
 }
 
-/** Paths whose pages read the session. Session routes (sign-in, refresh, sign-out) manage cookies themselves. */
+/** Session handlers and static assets do not need proxy renewal. */
 export function refreshesOn(pathname: string) {
   return !pathname.startsWith("/api/session/") && !pathname.startsWith("/_next/") && !/\.[a-z0-9]+$/i.test(pathname);
 }

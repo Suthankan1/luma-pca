@@ -79,7 +79,7 @@ export async function currentSession() {
     const identity = session ? await readIdentity(session.token) : null;
     return {
       identity,
-      canRefresh: cookieJar.has(names.refresh),
+      canRefresh: Boolean(cookieJar.get(names.refresh)?.value),
       unavailable: false,
     };
   } catch {

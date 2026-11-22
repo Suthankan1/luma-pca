@@ -1,54 +1,54 @@
-import { Shell } from "@/components/Shell";
+﻿import { Suspense } from "react";
 import { StudentAttendanceProfile, type ProfileClass } from "@/components/StudentAttendanceProfile";
-import { AppealForm } from "@/components/AppealForm";
+import { ConsentForm } from "@/components/StudentEngagement";
 import { requirePortal } from "@/lib/auth-server";
-import { dateOrNull, renderTime, type StudentOverview } from "@/lib/insights";
-import { hasPortal } from "@/lib/session-policy";
-import { studentApi } from "@/lib/staff-api";
-import { academyToday, formatClassTime, formatDuration, outcomeLabels, instantParts, ACADEMY_TIME_ZONE,
-  type AttendanceRecordView } from "@/lib/staff-forms";
+import { dateOrNull, renderTime } from "@/lib/insights";
+import { studentApi, type ApiResult } from "@/lib/staff-api";
+import { academyToday, type MyConsent } from "@/lib/staff-forms";
 import { classMonthRange, monthLabel } from "@/lib/staff-home";
-import { readAttendanceWindows } from "@/lib/student-month-api";
+import { readMyReportMonth } from "@/lib/student-month-api";
 
-export const metadata = { title: "My attendance · LUMA" };
+export const metadata = { title: "My Report · LUMA" };
 
 export default async function MyAttendancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const identity = await requirePortal("student");
+  await requirePortal("student");
   const query = await searchParams;
   const now = renderTime();
   const today = academyToday(new Date(now));
   const range = classMonthRange(query.month, today, dateOrNull(query.from));
   const scheduleRange = new URLSearchParams({ from: range.fromInstant, to: range.toInstant });
   const schedule = studentApi<ProfileClass[]>(`/api/v1/me/class-sessions?${scheduleRange}`, undefined, 25000);
-  const [me, reports, records] = await Promise.all([
-    studentApi<{ fullName: string; studentNumber: string }>("/api/v1/me/student"),
-    readAttendanceWindows(range.first, range.through ?? range.last, (from, to) => studentApi<StudentOverview>(
-      `/api/v1/me/attendance-overview?${new URLSearchParams({ from, to })}`, undefined, 30000), data => data.classes.length >= 80),
-    studentApi<AttendanceRecordView[]>("/api/v1/me/attendance"),
-  ]);
-  const finalRecords = records.ok ? records.data.filter(record => {
-    const day = instantParts(record.classStartsAt, ACADEMY_TIME_ZONE).date;
-    return day >= range.first && day <= range.last;
-  }) : [];
-  return <Shell active="student" studentSection="attendance" otherPortal={hasPortal(identity, "staff") ? "staff" : undefined}>
-    <header className="page-head"><div><p className="crumbs">Student portal / My attendance</p>
-      <h1 className="heading staff-heading">{me.ok ? me.data.fullName : "My attendance"}</h1>
-      <p className="sub page-sub">{me.ok ? `${me.data.studentNumber} · ` : ""}{monthLabel(range.month)}</p>
-    </div></header>
-    <StudentAttendanceProfile range={range} today={today} now={now} reports={reports} schedule={schedule} href="/student" />
-    {!records.ok && <p className="session-error panel-gap" role="alert">Attendance appeals couldn’t load.</p>}
-    {finalRecords.length > 0 && <details className="panel panel-gap profile-appeals">
-      <summary>Attendance appeals</summary>
-      <ul className="dir-list">{finalRecords.map((record, index) => <li key={record.id} className="dir-course my-attendance" aria-label={`Attendance ${record.classTitle}`}>
-        <div className="dir-row"><div><strong>{record.classTitle}</strong>
-          <span className="dir-dates muted"> {formatClassTime(record.classStartsAt, record.classEndsAt, record.timeZone)}</span>
-          <div className="dir-dates muted">{formatDuration(record.connectedSeconds)} connected
-            {record.appealStatus === "OPEN" ? " · appeal waiting for a decision" : record.appealStatus ? ` · appeal ${record.appealStatus.toLowerCase()}` : ""}</div></div>
-          <span className={`status ${record.outcome === "ABSENT" ? "off" : "on"}`}>{outcomeLabels[record.outcome]}</span>
-        </div>
-        {record.appealStatus !== "OPEN" && <details className="decision"><summary>Appeal this</summary>
-          <AppealForm prefix={`appeal-${index}`} recordId={record.id} /></details>}
-      </li>)}</ul>
-    </details>}
-  </Shell>;
+  const me = studentApi<StudentHeading>("/api/v1/me/student");
+  const reports = readMyReportMonth(range);
+  const consent = studentApi<MyConsent>("/api/v1/me/engagement-consent");
+  return <div className="student-report-page">
+    <header className="student-live-card student-section-hero student-portal-enter">
+      <div>
+        <h1>My Report</h1>
+        <p><Suspense fallback={null}><ReportIdentity request={me} /></Suspense>{monthLabel(range.month)}</p>
+      </div>
+      <a className="student-live-calendar-link" href={`/student/attendance/download?month=${range.month}`} download>
+        Download report <span aria-hidden="true">↓</span>
+      </a>
+    </header>
+    <div className="student-portal-enter">
+      <StudentAttendanceProfile range={range} today={today} now={now} reports={reports} schedule={schedule} href="/student" />
+    </div>
+    <Suspense fallback={null}><ReportEngagement request={consent} /></Suspense>
+  </div>;
+}
+
+type StudentHeading = { fullName: string; studentNumber: string };
+
+async function ReportIdentity({ request }: { request: Promise<ApiResult<StudentHeading>> }) {
+  const me = await request;
+  return me.ok ? <>{me.data.fullName} · {me.data.studentNumber} · </> : null;
+}
+
+async function ReportEngagement({ request }: { request: Promise<ApiResult<MyConsent>> }) {
+  const consent = await request;
+  return consent.ok && consent.data.enabled ? <section className="panel panel-gap" aria-labelledby="engagement-title">
+    <h2 id="engagement-title" className="panel-title">Reactions and questions</h2>
+    <ConsentForm consent={consent.data} />
+  </section> : null;
 }

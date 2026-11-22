@@ -1,6 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+﻿import { expect, test, type Page } from "@playwright/test";
+import { mockApiBase } from "./support/classes";
+import { readFile } from "node:fs/promises";
+import { longDayLabel } from "../../src/lib/staff-home";
 
-async function signIn(page: Page, email: string) {
+async function signIn(page: Page, email = "student@example.invalid") {
   await page.goto("/sign-in");
   await page.fill("#email", email);
   await page.fill("#password", "correct-password");
@@ -8,66 +11,152 @@ async function signIn(page: Page, email: string) {
   await expect(page).toHaveURL(/\/student$/);
 }
 
-test.describe("Student portal", () => {
-  test("A student sees their upcoming classes and batches", async ({ page }) => {
-    await signIn(page, "student@example.invalid");
-    await page.getByRole("link", { name: "My classes" }).click();
-    await expect(page.getByRole("heading", { name: "My classes", level: 1 })).toBeVisible();
-
-    const classes = page.getByRole("region", { name: "MY CLASSES" });
-    const waves = classes.getByRole("listitem", { name: "Waves and oscillations" });
-    await expect(waves).toContainText(/\d{1,2} \w{3} \d{4} · 18:00–20:00 \(Asia\/Colombo\)/);
-    await expect(waves).toContainText("MON");
-    await expect(waves.locator(".status")).toHaveText("Scheduled");
-    const revision = classes.getByRole("listitem", { name: "Revision for both batches" });
-    await expect(revision).toContainText("MON, SAT");
-    await expect(revision.locator(".status")).toHaveText("Cancelled");
-    // Only the four weeks shown; the next page has the later class.
-    await expect(classes).not.toContainText("Far future class");
-    await classes.getByRole("link", { name: "Next four weeks →" }).click();
-    await expect(page).toHaveURL(/\/student\/classes\?from=\d{4}-\d{2}-\d{2}$/);
-    await expect(classes).toContainText("Far future class");
-    await expect(classes).not.toContainText("Waves and oscillations");
-    await classes.getByRole("link", { name: "From today" }).click();
-    await expect(page).toHaveURL(/\/student\/classes$/);
-    await expect(classes).toContainText("Waves and oscillations");
-
-    const batches = page.getByRole("region", { name: "MY BATCHES" });
-    await expect(batches.getByRole("listitem").filter({ hasText: "MON" })).toContainText("from 5 Jan 2026");
-    await expect(batches.getByRole("listitem").filter({ hasText: "MON" }).locator(".status")).toHaveText("Enrolled");
-    await expect(batches.getByRole("listitem").filter({ hasText: "SAT" })).toContainText("withdrawn 31 Mar 2026");
-    await expect(batches.getByRole("listitem").filter({ hasText: "SAT" }).locator(".status")).toHaveText("Withdrawn");
-
-    // A malformed date in the address falls back to today.
-    await page.goto("/student/classes?from=2026-02-30");
-    await expect(classes).toContainText("Waves and oscillations");
+async function liveState(page: Page, ended: boolean, online = 12) {
+  const response = await page.request.put(mockApiBase() + "/__test__/student-live", {
+    headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" }, data: { ended, online },
   });
+  expect(response.status()).toBe(204);
+}
 
-  test("The class running now is shown first with a Zoom join button", async ({ page }) => {
-    await signIn(page, "student@example.invalid");
-    await page.getByRole("link", { name: "My classes" }).click();
-    const next = page.getByRole("region", { name: "Live now" });
-    await expect(next).toContainText("Live class now");
-    await expect(next.getByRole("link", { name: /Join on Zoom now/ })).toHaveAttribute("href", "https://zoom.us/j/81234567890");
-    await expect(page.getByRole("list", { name: "Last 30 days" }).getByRole("listitem", { name: /^Attendance: \d+%$/ })).toBeVisible();
-    const classes = page.getByRole("region", { name: "MY CLASSES" });
-    await expect(classes.getByRole("listitem", { name: "Live class now" })).toContainText("Live now");
-    await expect(classes.getByRole("listitem", { name: "Revision for both batches" }).getByRole("link", { name: /Zoom link/ })).toHaveCount(0);
-    await page.getByRole("complementary", { name: "Academy navigation" }).getByRole("link", { name: "My attendance" }).click();
-    await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
-  });
+test("Students open their report and select scheduled classes on a monthly calendar", async ({ page }) => {
+  await signIn(page);
+  await expect(page.getByRole("heading", { name: "My Report" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
+  if (page.viewportSize()!.width <= 960) {
+    await page.setViewportSize({ width: 320, height: 740 });
+    const navigation = page.getByRole("navigation", { name: "Student portal" });
+    await expect(navigation).toHaveCSS("position", "static");
+    await expect(navigation).toHaveCSS("display", "grid");
+    const tabs = await navigation.getByRole("link").evaluateAll(links => links.map(link => {
+      const box = link.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom, right: box.right, height: box.height };
+    }));
+    expect(tabs).toHaveLength(3);
+    for (const tab of tabs) {
+      expect(tab.top).toBeCloseTo(tabs[0].top);
+      expect(tab.height).toBeGreaterThanOrEqual(44);
+      expect(tab.right).toBeLessThanOrEqual(320);
+      expect(tab.bottom).toBeLessThan(200);
+    }
+    await navigation.getByRole("link", { name: "Calendar" }).click();
+    await expect(navigation.getByRole("link", { name: "Calendar" })).toHaveAttribute("aria-current", "page");
+  }
+  await expect(page.getByRole("link", { name: "My classes" })).toHaveCount(0);
+  const date = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10);
+  await page.goto(`/student/classes?month=${date.slice(0, 7)}`);
+  await expect(page).toHaveURL(/\/student\/calendar/);
+  await expect(page.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible();
+  const calendar = page.getByRole("region", { name: "Class calendar" });
+  await calendar.getByRole("button", { name: new RegExp(longDayLabel(date)) }).click();
+  await expect(page.getByText("Upcoming Zoom webinar | MON", { exact: true })).toBeVisible();
+  await expect(page.getByText("Webinar title suffix")).toHaveCount(0);
+  await expect(page.locator('a[href*="zoom.us"]')).toHaveCount(0);
+  await calendar.getByRole("link", { name: "Next month" }).click();
+  await expect(page.getByText("Upcoming Zoom webinar")).toHaveCount(0);
+  await calendar.getByRole("link", { name: "Go to today" }).click();
+  await expect(page).toHaveURL(/\/student\/calendar$/);
+});
 
-  test("The home page offers a student and a staff way in", async ({ page }) => {
-    await page.context().clearCookies();
-    await page.goto("/");
-    await page.getByRole("link", { name: /Student sign in/ }).click();
-    await expect(page).toHaveURL(/\/sign-in\?portal=student$/);
-  });
+test("Live Now updates its plotted counts and hides them when the class ends", async ({ page }) => {
+  await page.clock.install();
+  await liveState(page, false);
+  try {
+    await signIn(page);
+    await page.getByRole("link", { name: "Live Now" }).click();
+    await expect(page.getByRole("heading", { name: "Live class now" })).toBeVisible();
+    await expect(page.locator('a[href*="zoom.us"]')).toHaveCount(0);
+    const chart = page.getByRole("slider", { name: "Explore online counts over time" });
+    await expect(chart).toHaveAttribute("aria-valuetext", /12 online/);
+    await chart.press("Home");
+    await expect(chart).toHaveAttribute("aria-valuetext", /4 online/);
+    await liveState(page, false, 14);
+    await page.clock.fastForward(31_000);
+    await expect(page.locator(".student-live-metrics")).toContainText("Online now14");
 
-  test("A student without enrolments is told how to get one", async ({ page }) => {
-    await signIn(page, "new-student@example.invalid");
-    await page.getByRole("link", { name: "My classes" }).click();
-    await expect(page.getByRole("region", { name: "MY CLASSES" })).toContainText("No classes in these four weeks.");
-    await expect(page.getByRole("region", { name: "MY BATCHES" })).toContainText("You aren’t enrolled in a batch yet.");
+    await liveState(page, true);
+    await page.clock.fastForward(31_000);
+    await expect(page.getByRole("heading", { name: "No live class" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Previous class" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Next class" })).toBeVisible();
+    const countdown = page.getByRole("timer", { name: "Time until the next scheduled class" });
+    await expect(countdown).toBeVisible();
+    const before = await countdown.textContent();
+    await page.clock.fastForward(2_000);
+    await expect(countdown).not.toHaveText(before ?? "");
+    await expect(chart).toHaveCount(0);
+    await expect(page.locator(".student-live-metrics")).toHaveCount(0);
+    const rail = page.getByRole("complementary", { name: "Academy navigation" });
+    await rail.getByRole("button", { name: "Collapse sidebar" }).click();
+    await expect(rail.getByRole("link", { name: "LUMA PCA Attendance System" })).toBeVisible();
+    await page.getByRole("button", { name: "Pause", exact: true }).click();
+    await expect(page.getByText("Auto-refresh paused")).toBeVisible();
+    await liveState(page, false, 18);
+    await page.getByRole("button", { name: "Refresh now" }).click();
+    await expect(page.locator(".student-live-metrics")).toContainText("Online now18");
+  } finally {
+    await liveState(page, false);
+  }
+});
+
+test("A student without enrolments sees an empty calendar and no live class", async ({ page }) => {
+  await signIn(page, "new-student@example.invalid");
+  await page.getByRole("link", { name: "Calendar" }).click();
+  await expect(page.getByText("No classes on this day.")).toBeVisible();
+  await page.getByRole("link", { name: "Live Now" }).click();
+  await expect(page.getByRole("heading", { name: "No live class" })).toBeVisible();
+});
+
+test("My Report downloads the selected month's private PDF with no appeals or batches panel", async ({ page }) => {
+  const path = "/student/attendance/download?month=2026-11";
+  expect((await page.request.get(path)).status()).toBe(401);
+  await signIn(page);
+  await page.goto("/student?month=2026-11");
+  await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
+  await expect(page.getByText("Attendance appeals", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("My batches", { exact: true })).toHaveCount(0);
+  const ready = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Download report" }).click();
+  const download = await ready;
+  expect(download.suggestedFilename()).toBe("LUMA-attendance-2026-11.pdf");
+  const bytes = await readFile(await download.path());
+  expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(bytes.length).toBeLessThan(180_000);
+  const response = await page.request.get(path);
+  expect(response.headers()["cache-control"]).toBe("private, no-store");
+  expect((await page.request.get("/student/attendance/download?month=invalid")).status()).toBe(400);
+});
+
+test("The report shell streams while attendance is slow and a warmed Calendar opens from memory", async ({ page }) => {
+  async function holdReport(mode: "hold" | "release") {
+    const response = await page.request.put(mockApiBase() + "/__test__/student-overview-response", {
+      headers: { Authorization: "Bearer fake-access-token.for-bff.e2e-test" }, data: { mode },
+    });
+    expect(response.status()).toBe(204);
+  }
+
+  await holdReport("hold");
+  try {
+    await signIn(page);
+    await expect(page.getByRole("heading", { name: "My Report" })).toBeVisible();
+    await expect(page.getByRole("status", { name: "Loading student profile attendance" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Class history" })).toHaveCount(0);
+  } finally {
+    await holdReport("release");
+  }
+  await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Student portal" });
+  const calendar = nav.getByRole("link", { name: "Calendar" });
+  await calendar.click();
+  await expect(page.getByRole("region", { name: "Class calendar" })).toBeVisible();
+  await nav.getByRole("link", { name: "My Report" }).click();
+  await expect(page.getByRole("region", { name: "Class history" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
+
+  const requests: string[] = [];
+  page.on("request", request => {
+    if (new URL(request.url()).pathname === "/student/calendar" && request.headers().rsc === "1") requests.push(request.url());
   });
+  await calendar.click();
+  await expect(page.getByRole("region", { name: "Class calendar" })).toBeVisible();
+  expect(requests).toHaveLength(0);
 });

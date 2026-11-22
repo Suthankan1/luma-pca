@@ -106,12 +106,19 @@ try {
   assert.equal((await post("login", login, "https://other.luma.example")).status, 403);
   assert.equal(rotation, 0);
   const rejected = await post("login", { ...login, password: "wrong" });
-  assert.match(rejected.headers.get("location"), /error=invalid/);
+  assert.equal(rejected.headers.get("location"), "/sign-in?error=invalid&portal=staff");
   assert.equal(rejected.headers.getSetCookie().length, 0);
-  const success = await post("login", login);
+  const wrongPortal = await post("login", login);
+  assert.equal(wrongPortal.headers.get("location"), "/sign-in?error=portal&portal=staff");
+  assert.equal(wrongPortal.headers.getSetCookie().length, 0);
+  assert.equal(latestRefresh, "", "revoke the session issued for the wrong portal");
+  const success = await post("login", { ...login, portal: "student" });
   location(success, "/student");
   recordCookies(success);
   location(await call("/staff"), "/student");
+  const staffSignIn = await call("/sign-in?portal=staff");
+  assert.equal(staffSignIn.status, 200);
+  assert.match(await staffSignIn.text(), /Sign out to switch accounts/);
   const student = await call("/student");
   assert.equal(student.status, 200);
   assert.match(student.headers.get("cache-control"), /no-store/);
@@ -167,11 +174,24 @@ try {
   assert.equal((await call("/student")).status, 200);
 
   // 3. Logout
+  down = true;
+  const unavailableLogout = await post("logout", {});
+  assert.equal(unavailableLogout.headers.get("location"), "/sign-in?error=sign-out");
+  assert.equal(unavailableLogout.headers.getSetCookie().length, 0);
+  down = false;
   const logout = await post("logout", {});
-  location(logout, "/sign-in");
+  assert.equal(logout.headers.get("location"), "/?signedOut=1");
   recordCookies(logout);
   assert.equal(jar.has("__Host-luma-access"), false);
   assert.equal(jar.has("__Host-luma-refresh"), false);
+
+  jar.set("__Host-luma-refresh", "revoked-refresh");
+  const stale = await call("/sign-in?portal=staff");
+  const staleHtml = await stale.text();
+  assert.match(staleHtml, /name="email"/);
+  assert.doesNotMatch(staleHtml, /Continue session/);
+  recordCookies(stale);
+  assert.equal(jar.size, 0);
 
   // 4. Staff sign in with email and password alone, straight into the dashboard.
   const wrongAdmin = await post("login", { email: "admin@example.invalid", password: "wrong-password", portal: "staff" });

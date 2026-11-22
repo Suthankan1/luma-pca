@@ -785,6 +785,70 @@ paths:
               schema: {type: array, items: {$ref: '#/components/schemas/StudentClass'}}
         '400': {description: Window invalid or longer than 92 days}
         '403': {description: Caller is not a student}
+  /api/v1/me/webinar-schedule:
+    get:
+      summary: Upcoming cached Zoom schedules for the student's enrolled batches
+      operationId: listMyWebinarSchedule
+      tags: [Sessions]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: query, name: from, required: true, schema: {type: string, format: date-time}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date-time}, description: 'Exclusive; at most 92 days after from'}
+      responses:
+        '200':
+          description: Future schedules from active, linked and synced monitors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, title, startsAt, timeZone, batchCode]
+                  properties:
+                    id: {type: string}
+                    title: {type: string}
+                    startsAt: {type: string, format: date-time}
+                    durationMinutes: {type: integer, nullable: true}
+                    timeZone: {type: string}
+                    batchCode: {type: string}
+        '400': {description: Invalid window}
+        '401': {description: Sign-in required}
+        '403': {description: Caller is not a student}
+        '404': {description: Student record unavailable}
+  /api/v1/me/class-sessions/{sessionId}/live-attendance:
+    get:
+      summary: Live joined and online counts for enrolled batches and the caller's own attendance
+      operationId: getMyLiveAttendance
+      tags: [Attendance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Provisional Zoom evidence and sampled online counts with no roster or individual peer records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [joined, online, seen, connectedSeconds, sampledAt, onlineHistory]
+                properties:
+                  joined: {type: integer}
+                  online: {type: integer}
+                  seen: {type: boolean}
+                  connectedSeconds: {type: integer, format: int64}
+                  firstJoinAt: {type: string, format: date-time, nullable: true}
+                  sampledAt: {type: string, format: date-time}
+                  onlineHistory:
+                    type: array
+                    items:
+                      type: object
+                      required: [at, online]
+                      properties:
+                        at: {type: string, format: date-time}
+                        online: {type: integer}
+        '401': {description: Sign-in required}
+        '403': {description: Caller is not a student}
+        '404': {description: Class is outside the caller's enrollment or is not currently live}
   /api/v1/class-sessions/series:
     post:
       summary: Create a weekly series of classes, or preview it (implemented; staff)
@@ -1800,6 +1864,22 @@ paths:
     post: {summary: "Resume collecting the webinar (audited)", operationId: resumeWebinarMonitor, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: The monitored webinar}}}
   /api/v1/zoom/monitors/{monitorId}/academy-class:
     put: {summary: "A staff member's explicit choice of the Academy class the webinar teaches, or null for unresolved (audited)", operationId: setWebinarAcademyClass, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}], requestBody: {required: true, content: {application/json: {schema: {type: object, properties: {academyClassName: {type: string, maxLength: 200, nullable: true}}}}}}, responses: {'200': {description: The monitored webinar}, '404': {description: No such Academy class}, '503': {description: Academy database not connected}}}
+  /api/v1/zoom/monitors/{monitorId}/payment-roster:
+    put:
+      summary: Sync the selected Academy payment class and assign its expected roster to a tracked webinar (staff)
+      operationId: assignWebinarPaymentRoster
+      tags: [Zoom]
+      security: [{bearerAuth: []}]
+      parameters: [{in: path, name: monitorId, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [academyClassName], properties: {academyClassName: {type: string, minLength: 1, maxLength: 200}}}}}}
+      responses:
+        '200':
+          description: Roster synced and webinar assigned
+          content: {application/json: {schema: {type: object, required: [academyStudents], properties: {academyStudents: {type: integer, minimum: 1}}}}}
+        '403': {description: Staff access required}
+        '404': {description: Tracked webinar or Academy payment roster unavailable}
+        '409': {description: Expected roster could not be synced completely}
+        '503': {description: Academy payment database unavailable}
   /api/v1/class-sessions/{sessionId}/zoom-run:
     get: {summary: "The Zoom run behind a class: Zoom's schedule (display only) beside the actual start and end, live counts and report status (staff who may open the class)", operationId: classZoomRun, tags: [Zoom], security: [{bearerAuth: []}], parameters: [{in: path, name: sessionId, required: true, schema: {type: string, format: uuid}}], responses: {'200': {description: "webinarId, topic, occurrenceUuid, state, firstSeenAt, actualStartedAt, actualEndedAt, scheduledStartAt, reported, connectedNow, people, academyClassName, classResolved"}, '204': {description: Not created by a Zoom run}, '404': {description: No such class or not visible}}}
 components:

@@ -14,8 +14,16 @@ test("The staff portal has no Staff page or menu item", async ({ page }) => {
   await expect(menu.getByRole("link", { name: /^\W*Staff$/ })).toHaveCount(0);
   const sections = menu.getByRole("navigation", { name: "Staff sections" });
   await expect(sections.locator('a[href^="/staff"]')).toHaveText([/Home/, /Classes/, /Class Types/, /Students/, /Reports/]);
-  await sections.getByRole("link", { name: "Students", exact: true }).click();
-  await expect(sections.getByRole("link", { name: "Students", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(sections.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
+  for (const [label, crumb] of [
+    ["Classes", "Teaching / Classes"], ["Class Types", "Teaching / Class Types"],
+    ["Students", "People / Students"], ["Reports", "Teaching / Reports"],
+  ]) {
+    const tab = sections.getByRole("link", { name: label, exact: true });
+    await tab.click();
+    await expect(tab).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".page-head .crumbs")).toHaveText(crumb);
+  }
   expect((await page.goto("/staff/team"))?.status()).toBe(404);
   expect((await page.goto("/staff/team/00000000-0000-4000-8000-0000000000bb"))?.status()).toBe(404);
 });

@@ -5,6 +5,8 @@ import com.physicscube.luma.attendance.AttendanceProjectionStore.ProjectedVisit;
 import com.physicscube.luma.attendance.domain.AttendanceDurationCalculator;
 import com.physicscube.luma.attendance.domain.ConnectionInterval;
 import com.physicscube.luma.enrollments.ExpectedStudent;
+import com.physicscube.luma.enrollments.EnrollmentService;
+import com.physicscube.luma.shared.api.ResourceNotFoundException;
 import com.physicscube.luma.sessions.ClassSessionService;
 import com.physicscube.luma.sessions.SessionView;
 import com.physicscube.luma.shared.security.CurrentAccount;
@@ -41,14 +43,16 @@ public class ProvisionalAttendanceService {
     private final ClassSessionService sessions;
     private final ZoomParticipantService zoom;
     private final StudentService students;
+    private final EnrollmentService enrollments;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final AttendanceProjectionStore projection;
 
-    ProvisionalAttendanceService(ClassSessionService sessions, ZoomParticipantService zoom, StudentService students,
+    ProvisionalAttendanceService(ClassSessionService sessions, ZoomParticipantService zoom, StudentService students, EnrollmentService enrollments,
                                  org.springframework.jdbc.core.JdbcTemplate jdbc, AttendanceProjectionStore projection) {
         this.sessions = sessions;
         this.zoom = zoom;
         this.students = students;
+        this.enrollments = enrollments;
         this.jdbc = jdbc;
         this.projection = projection;
     }
@@ -88,6 +92,39 @@ public class ProvisionalAttendanceService {
     }
 
     public record OnlineSample(Instant at, int online) {
+    }
+
+    public record StudentLiveAttendance(int joined, int online, boolean seen, long connectedSeconds,
+                                        Instant firstJoinAt, Instant sampledAt, List<OnlineSample> onlineHistory) {
+    }
+
+    @Transactional(readOnly = true)
+    public StudentLiveAttendance myLiveClass(CurrentAccount caller, UUID sessionId) {
+        Instant now = DbTime.now();
+        var session = sessions.mine(caller, now.minus(Duration.ofHours(12)), now.plusNanos(1000)).stream()
+                .filter(c -> c.id().equals(sessionId) && "SCHEDULED".equals(c.status()) && c.endsAt().isAfter(now))
+                .findFirst().orElseThrow(() -> new ResourceNotFoundException("Live class"));
+        UUID studentId = students.mine(caller).id();
+        var batchIds = session.batches().stream().map(batch -> batch.batchId()).toList();
+        Set<UUID> roster = enrollments.expectedOn(caller.academyId(), batchIds, session.localDate()).stream()
+                .map(ExpectedStudent::studentId).collect(Collectors.toSet());
+        if (!roster.contains(studentId)) throw new ResourceNotFoundException("Live class");
+
+        ClassActivity activity = zoom.activityForClass(caller.academyId(), sessionId);
+        boolean live = activity.occurrences().stream()
+                .filter(id -> !activity.endedAt().containsKey(id) && !activity.reportedOccurrences().contains(id))
+                .anyMatch(id -> activity.startedAt().containsKey(id) && !activity.startedAt().get(id).isAfter(now));
+        if (!live) throw new ResourceNotFoundException("Live class");
+
+        List<StudentVisit> joins = activity.visits().stream().filter(visit -> roster.contains(visit.studentId())
+                && visit.joinedAt() != null && !visit.joinedAt().isAfter(now)
+                && (visit.leftAt() == null || visit.leftAt().isAfter(session.startsAt()))).toList();
+        var own = facts(joins.stream().filter(visit -> studentId.equals(visit.studentId())).toList(),
+                activity, session.startsAt(), session.endsAt(), now);
+        var history = OnlineHistory.sample(activity, roster, session.startsAt(), session.endsAt(), now);
+        return new StudentLiveAttendance((int) joins.stream().map(StudentVisit::studentId).distinct().count(),
+                history.isEmpty() ? 0 : history.getLast().online(), !own.timeline().isEmpty(), own.connectedSeconds(),
+                own.firstJoinAt(), now, history);
     }
 
     private record FinalRecords(Map<UUID, Object[]> records, Instant finalisedAt) {

@@ -30,7 +30,7 @@ export default async function StudentsPage({ searchParams }: {
   const { month } = range;
   const directoryRequest = readMonthlyStudentDirectory(range, now);
 
-  return <StaffShell active="students" crumb="People" title="Students" subtitle={monthLabel(month)}
+  return <StaffShell active="students" crumb="People / Students" title="Students" subtitle={monthLabel(month)}
     hasStudentPortal={hasPortal(identity, "student")}>
     <ClassMonthPicker href="/staff/students" month={month} currentMonth={today.startsWith(month)} label="Attendance month" />
     <Suspense key={month} fallback={<StudentMonthSkeleton />}>

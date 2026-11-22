@@ -2,6 +2,7 @@ package com.physicscube.luma.zoom;
 
 import com.physicscube.luma.academy.AcademyClassService;
 import com.physicscube.luma.audit.AuditLog;
+import com.physicscube.luma.enrollments.EnrollmentService;
 import com.physicscube.luma.shared.api.ConflictException;
 import com.physicscube.luma.shared.api.InvalidRequestException;
 import com.physicscube.luma.shared.api.ResourceNotFoundException;
@@ -12,6 +13,9 @@ import com.physicscube.luma.zoom.api.ZoomApiClient;
 import com.physicscube.luma.zoom.api.ZoomApiException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.Duration;
+import java.time.ZoneId;
+import java.time.DateTimeException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,12 +52,13 @@ public class WebinarMonitorService {
     private final AuditLog audit;
     private final com.physicscube.luma.sessions.ClassSessionService sessions;
     private final WebinarRunTracker runs;
+    private final EnrollmentService enrollments;
     /** Runs already stored this recently are picked up when a webinar is added or resumed (a run lasts at most 12 h). */
     static final java.time.Duration BACKFILL = java.time.Duration.ofHours(24);
 
     WebinarMonitorService(ObjectProvider<ZoomApiClient> api, JdbcTemplate jdbc, AcademyClassService academyClasses,
                           MonitoredWebinars monitored, AuditLog audit, com.physicscube.luma.sessions.ClassSessionService sessions,
-                          WebinarRunTracker runs) {
+                          WebinarRunTracker runs, EnrollmentService enrollments) {
         this.runs = runs;
         this.sessions = sessions;
         this.api = api;
@@ -61,10 +66,64 @@ public class WebinarMonitorService {
         this.academyClasses = academyClasses;
         this.monitored = monitored;
         this.audit = audit;
+        this.enrollments = enrollments;
     }
 
     /** Zoom's own schedule entry for one occurrence of a recurring webinar (display only). */
     public record ZoomOccurrence(String occurrenceId, Instant startTime, Integer durationMinutes, String status) {
+    }
+
+    public record StudentSchedule(String id, String title, Instant startsAt, Integer durationMinutes,
+                                  String timeZone, String batchCode) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<StudentSchedule> scheduleForStudent(CurrentAccount caller, Instant from, Instant to) {
+        caller.requireRole("STUDENT");
+        if (!to.isAfter(from) || Duration.between(from, to).compareTo(Duration.ofDays(92)) > 0) {
+            throw new InvalidRequestException("to must be after from and at most 92 days later");
+        }
+        var enrolled = enrollments.mine(caller);
+        if (enrolled.isEmpty()) return List.of();
+        Instant now = DbTime.now();
+        List<StudentSchedule> schedule = new ArrayList<>();
+        var monitors = jdbc.queryForList("""
+                SELECT id, topic, time_zone, scheduled_start_at, duration_minutes, recurring,
+                       occurrences, academy_class_name
+                FROM zoom_webinar_monitors
+                WHERE academy_id = ? AND active AND sync_status = 'OK' AND academy_class_name IS NOT NULL
+                """, caller.academyId());
+        for (var monitor : monitors) {
+            var batch = academyClasses.linkedBatch(caller.academyId(), (String) monitor.get("academy_class_name"));
+            if (batch.isEmpty()) continue;
+            var memberships = enrolled.stream().filter(e -> e.batchId().equals(batch.get())).toList();
+            if (memberships.isEmpty()) continue;
+            ZoneId zone = scheduleZone((String) monitor.get("time_zone"));
+            var slots = Boolean.TRUE.equals(monitor.get("recurring")) ? occurrences(monitor.get("occurrences"))
+                    : List.of(new ZoomOccurrence(null, instant((Timestamp) monitor.get("scheduled_start_at")),
+                            (Integer) monitor.get("duration_minutes"), null));
+            for (var slot : slots) {
+                Instant start = slot.startTime();
+                if (start == null || start.isBefore(from) || !start.isBefore(to) || !start.isAfter(now)
+                        || "deleted".equalsIgnoreCase(slot.status())) continue;
+                var day = start.atZone(zone).toLocalDate();
+                memberships.stream().filter(e -> !e.enrolledOn().isAfter(day)
+                        && (e.withdrawnOn() == null || e.withdrawnOn().isAfter(day))).findFirst().ifPresent(e ->
+                        schedule.add(new StudentSchedule(monitor.get("id") + ":" + start,
+                                java.util.Objects.requireNonNullElse((String) monitor.get("topic"), "Zoom class"),
+                                start, slot.durationMinutes(), zone.getId(), e.batchCode())));
+            }
+        }
+        return schedule.stream().distinct().sorted(java.util.Comparator.comparing(StudentSchedule::startsAt)
+                .thenComparing(StudentSchedule::id)).toList();
+    }
+
+    private static ZoneId scheduleZone(String zone) {
+        try {
+            return ZoneId.of(java.util.Objects.requireNonNullElse(zone, "Asia/Colombo"));
+        } catch (DateTimeException invalidZone) {
+            return ZoneId.of("Asia/Colombo");
+        }
     }
 
     /**
@@ -198,6 +257,23 @@ public class WebinarMonitorService {
                 throw new ResourceNotFoundException("Academy class");
             }
         }
+        applyAcademyClass(caller, monitorId, name);
+        return view(caller.academyId(), monitorId);
+    }
+
+    @Transactional
+    public AcademyClassService.SyncResult assignPaymentRoster(CurrentAccount caller, UUID monitorId, String className) {
+        caller.requireStaff();
+        if (jdbc.queryForList("SELECT id FROM zoom_webinar_monitors WHERE academy_id = ? AND id = ? AND active FOR UPDATE",
+                UUID.class, caller.academyId(), monitorId).isEmpty()) {
+            throw new ResourceNotFoundException("Tracked webinar");
+        }
+        var result = academyClasses.syncExpectedRoster(caller, className);
+        applyAcademyClass(caller, monitorId, className.strip());
+        return result;
+    }
+
+    private void applyAcademyClass(CurrentAccount caller, UUID monitorId, String name) {
         jdbc.update("UPDATE zoom_webinar_monitors SET academy_class_name = ?, class_source = ?, version = version + 1 WHERE id = ?",
                 name, name == null ? null : "ADMIN", monitorId);
         // A run going on now gets the class's students as well (only when it has none yet; ended runs are history).
@@ -210,7 +286,6 @@ public class WebinarMonitorService {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("academyClass", name == null ? "unresolved" : name);
         audit.record(caller.academyId(), caller.accountId(), "ZOOM_WEBINAR_CLASS_SET", "ZOOM_WEBINAR_MONITOR", monitorId, details);
-        return view(caller.academyId(), monitorId);
     }
 
     /** Every monitored webinar (stopped ones too, for their history), live ones first. Staff. */

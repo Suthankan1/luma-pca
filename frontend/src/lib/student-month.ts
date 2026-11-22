@@ -1,5 +1,6 @@
-import type { Dashboard } from "./insights.ts";
+import type { ClassAttendance, Dashboard, StudentOverview } from "./insights.ts";
 import { classTypeKey, compactClassTitle } from "./staff-home.ts";
+import { ACADEMY_TIME_ZONE, instantParts } from "./staff-forms.ts";
 
 export type StudentDirectoryEntry = { id: string; studentNumber: string; fullName: string };
 export type Participation = { expected: number; joined: number };
@@ -19,6 +20,18 @@ export function participationFor(
 
 export function completedForStudent(session: { endsAt: string; state: string }, now: number) {
   return session.state !== "LIVE" && Date.parse(session.endsAt) <= now;
+}
+
+export function studentReportSessions(reports: StudentOverview[], first: string, through: string | null, now: number): ClassAttendance[] {
+  if (!through) return [];
+  const classes = new Map<string, ClassAttendance>();
+  for (const report of reports) {
+    for (const session of report.classes) {
+      const day = instantParts(session.startsAt, ACADEMY_TIME_ZONE).date;
+      if (day >= first && day <= through && completedForStudent(session, now)) classes.set(session.id, session);
+    }
+  }
+  return [...classes.values()].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
 }
 
 export function compileStudentMonth(directory: StudentDirectoryEntry[], dashboards: Dashboard[], now: number) {

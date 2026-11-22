@@ -15,6 +15,7 @@ the caller's academy, so records of another academy answer 404.
 | Classes, rosters, expected students, attendance, corrections, exports, reports, batch totals | Every class and batch of their academy | Own classes and own records only |
 | Attendance rule, finalisation, recalculation, appeals | Yes | Appeal own record |
 | Zoom: webinar monitoring, occurrences, participants, receipts, reports | Yes | — |
+| Assign an Academy payment roster to an active Zoom monitor | Same-academy monitors only, audited | — (403) |
 | Engagement switch, pulse questions, rankings | Yes | Own consent, reactions and answers (enrolled class only) |
 | Student erasure | Yes (student number typed again, reason, audited) | — |
 | Staff accounts | No API (owner decision 2026-11-20): the operator adds, blocks and unblocks staff | — |
@@ -37,6 +38,13 @@ Zoom users are not counted as students; a student in two batches sees only class
 Staff can read their academy’s dated class totals, latest completed class, and last five completed classes. Shared classes
 count each student once. `GET /api/v1/class-sessions/{sessionId}/attendance?includeOnlineHistory=true` adds timestamps and
 counts of matched students from recorded Zoom visits for the requested class, including matched students outside its roster.
+
+**Student calendar and live reads.** The calendar includes future slots only for active, successfully synced Zoom monitors
+linked to a batch the caller is enrolled in on the slot date. Live attendance checks the same dated class enrollment,
+the class window and current Zoom evidence. It exposes only distinct totals for the caller's batch scope and the caller's
+own observed join and connected time. No other participant details or roster are returned. Ended, cancelled and out-of-scope
+classes return 404 for live attendance. Both routes require STUDENT and return private, no-store responses.
+Student class and schedule responses omit Zoom join URLs and webinar IDs.
 
 ## History (superseded by the two-role model)
 

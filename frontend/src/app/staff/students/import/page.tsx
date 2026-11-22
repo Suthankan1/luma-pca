@@ -12,7 +12,7 @@ export const metadata = { title: "Import students · LUMA" };
 
 export default async function ImportStudentsPage() {
   const identity = await requirePortal("staff");
-  const shell = { active: "students" as const, crumb: "Students", title: "Import students",
+  const shell = { active: "students" as const, crumb: "People / Students", title: "Import students",
     subtitle: "Add many students from a spreadsheet. Every row is checked first; nothing is saved unless the whole file is valid.",
     hasStudentPortal: hasPortal(identity, "student") };
   const [courses, batches] = await Promise.all([staffApi<CourseRef[]>("/api/v1/courses"), staffApi<Batch[]>("/api/v1/batches")]);

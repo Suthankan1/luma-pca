@@ -17,20 +17,34 @@ export const metadata = { title: "Class · LUMA" };
 const attendanceTimeoutMs = 25_000;
 
 /** One class for staff: its students, Zoom run, attendance (with corrections) and engagement questions. */
-export default async function SessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
+export default async function SessionPage({ params, searchParams }: {
+  params: Promise<{ sessionId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const identity = await requirePortal("staff");
   const sessionId = uuidOrNull((await params).sessionId);
   if (!sessionId) notFound();
-  const [session, zoom, attendance, engagement, zoomRun] = await Promise.all([
+  const [session, zoom, attendance, engagement, zoomRun, query] = await Promise.all([
     staffApi<ClassSession>(`/api/v1/class-sessions/${sessionId}`),
     staffApi<Occurrence[]>(`/api/v1/zoom/occurrences?decided=true&sessionId=${sessionId}&limit=50`),
     staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${sessionId}/attendance?includeOnlineHistory=true`, undefined, attendanceTimeoutMs),
     staffApi<ClassEngagement>(`/api/v1/class-sessions/${sessionId}/engagement`),
     staffApi<ClassRun | null>(`/api/v1/class-sessions/${sessionId}/zoom-run`),
+    searchParams,
   ]);
   if (!session.ok && (session.status === 404 || session.status === 403)) notFound();
-  const shell = { active: "sessions" as const, crumb: "Teaching / Classes", hasStudentPortal: hasPortal(identity, "student"),
-    actions: <Link className="text-link" href="/staff/sessions">← Classes</Link> };
+  const fromClassTypes = query.source === "class-types";
+  const parent = fromClassTypes ? "Class Types" : "Classes";
+  const backQuery = new URLSearchParams();
+  if (typeof query.month === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(query.month)) backQuery.set("month", query.month);
+  const classType = typeof query.type === "string" && query.type.length > 0 && query.type.length <= 300 ? query.type : null;
+  if (classType) {
+    backQuery.set("type", classType);
+    if (fromClassTypes) backQuery.set("source", "class-types");
+  }
+  const backPath = classType ? "/staff/sessions/types" : fromClassTypes ? "/staff/class-types" : "/staff/sessions";
+  const shell = { active: fromClassTypes ? "class-types" as const : "sessions" as const, crumb: `Teaching / ${parent}`,
+    hasStudentPortal: hasPortal(identity, "student"),
+    actions: <Link className="text-link" href={backQuery.size ? `${backPath}?${backQuery}` : backPath}>← Back to {classType ? "class type" : parent}</Link> };
   if (!session.ok) {
     return <StaffShell {...shell} title="Class" subtitle="">
       <p className="session-error" role="alert">We couldn’t load this class right now. Please reload the page shortly.</p>

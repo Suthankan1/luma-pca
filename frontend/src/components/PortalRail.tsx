@@ -10,11 +10,12 @@ const paths = {
   layers: "m12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5",
   users: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.9M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm8-8a4 4 0 0 1 0 8",
   chart: "M4 3v17h17M9 16v-3m5 3V9m5 7V5",
+  live: "M3 12h4l3-6 4 12 3-6h4",
   external: "M13 5h6v6m0-6-9 9m8 0v5H5V6h5",
   lock: "M7 11V7a5 5 0 0 1 10 0v4m-12 0h14v10H5z",
   exit: "M13 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8m3-4 4-4-4-4m-6 4h10",
-  collapse: "M4 4h16v16H4zM9 4v16m6-11-3 3 3 3",
-  expand: "M4 4h16v16H4zM9 4v16m4-11 3 3-3 3",
+  collapse: "m14 6-6 6 6 6",
+  expand: "m10 6 6 6-6 6",
 } as const;
 
 export function PortalIcon({ name }: { name: keyof typeof paths }) {

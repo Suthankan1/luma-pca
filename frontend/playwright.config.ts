@@ -37,7 +37,8 @@ export default defineConfig({
     },
   ],
   webServer: [port, mobilePort].map(p => ({
-    command: `LUMA_PLAYWRIGHT_PORT=${p} node tests/mock-auth-runner.mjs`,
+    command: "node tests/mock-auth-runner.mjs",
+    env: { LUMA_PLAYWRIGHT_PORT: String(p) },
     url: `http://127.0.0.1:${p}/sign-in`,
     reuseExistingServer: !process.env.CI,
     timeout: 30000,

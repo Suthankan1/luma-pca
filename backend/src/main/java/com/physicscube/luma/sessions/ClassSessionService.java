@@ -144,7 +144,7 @@ public class ClassSessionService {
                             .distinct().sorted(Comparator.comparing(StudentClassView.Batch::code)).toList();
                     return mine.isEmpty() ? null : new StudentClassView(session.getId(), session.getTitle(), session.getStartsAt(),
                             session.getEndsAt(), session.getTimeZone(), day, session.getStatus(), mine,
-                            StudentClassView.joinUrl(session.getZoomWebinarId(), session.getStatus()), session.getOrigin());
+                            session.getOrigin());
                 })
                 .filter(java.util.Objects::nonNull)
                 .sorted(Comparator.comparing(StudentClassView::startsAt).thenComparing(StudentClassView::id))

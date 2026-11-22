@@ -10,6 +10,8 @@ const issueRefresh = () => { const token = `fake-opaque-refresh-${++rotation}`; 
 const jwt = "fake-access-token.for-bff.e2e-test";
 let roles = [];
 let studentHasEnrolments = true;
+let studentLiveEnded = false;
+let studentLiveOnline = 12;
 const activatedTokens = new Set();
 const usedResetTokens = new Set();
 let blockedMonitors;
@@ -17,6 +19,9 @@ let releaseMonitors;
 let monitorsUnavailable = false;
 let blockedStudentOverview;
 let releaseStudentOverview;
+let blockedClassTypeRead;
+let releaseClassTypeRead;
+let heldClassTypePath;
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -34,6 +39,14 @@ const backend = createServer(async (req, res) => {
   };
 
   const mockOnline = req.url.match(/^\/__test__\/zoom-online\/([^/]+)$/);
+  if (req.method === "PUT" && req.url === "/__test__/class-type-read") {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    releaseClassTypeRead?.();
+    heldClassTypePath = body.path;
+    blockedClassTypeRead = heldClassTypePath ? new Promise(resolve => { releaseClassTypeRead = resolve; }) : undefined;
+    return send(204);
+  }
+  if (req.method === "GET" && req.url.split("?")[0] === heldClassTypePath) await blockedClassTypeRead;
   if (req.method === "PUT" && mockOnline) {
     if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
     const run = runSessions.get(mockOnline[1]);
@@ -71,7 +84,13 @@ const backend = createServer(async (req, res) => {
     blockedStudentOverview = body.mode === "hold" ? new Promise(resolve => { releaseStudentOverview = resolve; }) : undefined;
     return send(204);
   }
-  if (/^\/api\/v1\/students\/[^/]+\/attendance-overview\?/.test(req.url)) await blockedStudentOverview;
+  if (req.method === "PUT" && req.url === "/__test__/student-live") {
+    if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
+    studentLiveEnded = body.ended === true;
+    studentLiveOnline = body.online ?? 12;
+    return send(204);
+  }
+  if (/^\/api\/v1\/(?:students\/[^/]+|me)\/attendance-overview\?/.test(req.url)) await blockedStudentOverview;
   if (/^\/api\/v1\/attendance\/(dashboard|class-totals|latest-completed|recent-completed)(\?|$)/.test(req.url) || /^\/api\/v1\/students\/[^/]+\/attendance-overview/.test(req.url)) {
     return insightsApi(req, send);
   }
@@ -174,6 +193,21 @@ function studentApi(req, send, body) {
   const day = offset => new Date(Date.now() + offset * 86400_000).toISOString().slice(0, 10);
   const mon = { batchId: "00000000-0000-4000-8000-0000000000d1", code: "MON", name: "Monday evening" };
   const sat = { batchId: "00000000-0000-4000-8000-0000000000d2", code: "SAT", name: "Saturday morning" };
+  if (url.pathname === "/api/v1/me/webinar-schedule") {
+    const startsAt = `${day(3)}T12:30:00Z`;
+    return send(200, studentHasEnrolments && Date.parse(startsAt) >= Date.parse(url.searchParams.get("from"))
+      && Date.parse(startsAt) < Date.parse(url.searchParams.get("to")) ? [{
+        id: "mock-zoom-slot", title: "Upcoming Zoom webinar | MON | Webinar title suffix", startsAt, durationMinutes: 60,
+        timeZone: "Asia/Colombo", batchCode: mon.code,
+      }] : []);
+  }
+  if (url.pathname === "/api/v1/me/class-sessions/00000000-0000-4000-8000-0000000000f4/live-attendance") {
+    if (!studentHasEnrolments || studentLiveEnded) return send(404);
+    const sampledAt = new Date().toISOString();
+    const firstJoinAt = new Date(Date.now() - 10 * 60_000).toISOString();
+    return send(200, { joined: 16, online: studentLiveOnline, seen: true, connectedSeconds: 600, firstJoinAt, sampledAt,
+      onlineHistory: [{ at: firstJoinAt, online: 4 }, { at: sampledAt, online: studentLiveOnline }] });
+  }
   if (url.pathname === "/api/v1/me/attendance-overview") {
     const overview = insightsOverview(INSIGHT_STUDENTS[0]);
     return send(200, studentHasEnrolments ? overview : { ...overview, enrolments: [], classes: [] });
@@ -247,11 +281,11 @@ function studentApi(req, send, body) {
     ];
     // One class running now (20 minutes in), so "Take part" can be offered during a class.
     const live = !studentHasEnrolments ? [] : [{ id: "00000000-0000-4000-8000-0000000000f4", title: "Live class now", status: "SCHEDULED", batches: [mon],
-      startsAt: new Date(Date.now() - 20 * 60_000).toISOString(), endsAt: new Date(Date.now() + 90 * 60_000).toISOString(), timeZone: "Asia/Colombo",
+      startsAt: new Date(Date.now() - 20 * 60_000).toISOString(), endsAt: new Date(Date.now() + (studentLiveEnded ? -1 : 90 * 60_000)).toISOString(), timeZone: "Asia/Colombo",
       localDate: new Date(Date.now() - 20 * 60_000).toISOString().slice(0, 10) }];
     return send(200, [...classes.map(({ offset, ...c }) => ({ ...c, startsAt: `${day(offset)}T12:30:00Z`, endsAt: `${day(offset)}T14:30:00Z`,
       timeZone: "Asia/Colombo", localDate: day(offset) })), ...live].filter(c => Date.parse(c.startsAt) >= from && Date.parse(c.startsAt) < to)
-      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map(c => ({ ...c, joinUrl: c.status === "SCHEDULED" ? "https://zoom.us/j/81234567890" : null })));
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
   }
   return send(404);
 }
@@ -785,6 +819,8 @@ const zoomWebinars = {
     occurrences: [1, 8, 15].map((d, i) => ({ occurrenceId: `1700${i}`, startTime: new Date(Date.now() + 95 * 60_000 + (d - 1) * 7 * 86400_000).toISOString(),
       durationMinutes: 120, status: "available" })) }),
   "84400000002": () => ({ topic: "Office hours", type: 6, durationMinutes: 60, timeZone: "Asia/Colombo", scheduledStartAt: null, occurrences: [] }),
+  "84400000003": () => ({ topic: "December Paper Class", type: 5, durationMinutes: 60, timeZone: "Asia/Colombo",
+    scheduledStartAt: "2026-12-11T12:30:00Z", occurrences: [] }),
 };
 const monitors = [];
 const runSessions = new Map(); // class id -> run
@@ -853,12 +889,26 @@ function monitorsApi(req, body, send) {
     }
     return send(200, monitorView(m));
   }
-  const action = req.url.match(/^\/api\/v1\/zoom\/monitors\/([^/]+)\/(sync|stop|resume|academy-class)$/);
+  const action = req.url.match(/^\/api\/v1\/zoom\/monitors\/([^/]+)\/(sync|stop|resume|academy-class|payment-roster)$/);
   const m = action && monitors.find(x => x.id === action[1]);
   if (!m) return send(404, { detail: "Monitored webinar not found" });
   if (action[2] === "sync") Object.assign(m, { syncedAt: new Date().toISOString(), syncStatus: "OK" });
   if (action[2] === "stop") m.active = false;
   if (action[2] === "resume") m.active = true;
+  if (action[2] === "payment-roster") {
+    const name = body.academyClassName;
+    if (!Object.hasOwn(academySource, name)) return send(404, { detail: "Academy class not found" });
+    if (!academyLinks.has(name)) {
+      const batch = { id: uuid(), code: "PAY-" + uuid(), name, active: true };
+      batches.push(batch);
+      academyLinks.set(name, { batchId: batch.id });
+    }
+    return academyApi({ headers: req.headers, url: "/api/v1/academy/classes/sync", method: "POST" },
+      { className: name }, (status, result) => {
+        if (status === 200) Object.assign(m, { academyClassName: name, classSource: "ADMIN", classBatchId: academyLinks.get(name).batchId });
+        return send(status, result);
+      });
+  }
   if (action[2] === "academy-class") {
     const name = body.academyClassName ? String(body.academyClassName).trim() : null;
     if (name && !academySource[name]) return send(404, { detail: "Academy class not found" });
@@ -970,6 +1020,7 @@ function insightsApi(req, send) {
 // The Academy's own records (read-only in the real API): classes from payment rows, students by Academy ID.
 const academySource = {
   "A/L Physics 2027": [["PCA101", "Amaya Perera", "amaya@example.invalid"], ["PCA102", "Kavin Silva", null], ["PCA103", null, null]],
+  "DC": Array.from({ length: 140 }, (_, index) => [`PCA${2000 + index}`, `Payment student ${index + 1}`, null]),
   "Admission": [["PCA104", "Nila Fernando", "nila@example.invalid"]],
 };
 const academyLinks = new Map();

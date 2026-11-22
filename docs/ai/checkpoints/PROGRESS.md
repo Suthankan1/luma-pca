@@ -2840,3 +2840,167 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Subsequent GitHub runs reproduced Chrome's intermittent `NO_NAVSTART` trace error in the push workflow while the PR workflow met the budgets. The check now retries only that trace error and still requires three valid samples per route. The reports browser test waits for the React search control to respond and uses separate fixtures for retries.
 
 - The next real-stack run passed onboarding and exposed an appeal fixture selecting the current outcome, which the form correctly excludes. The fixture now verifies a real Present-to-Late change and can create a session spanning Colombo midnight. The reports fixture now checks the canonical uppercase registration ID. Production frontend build, lint, 81 unit tests, and four repeated desktop/mobile report checks passed locally. Hosted checks are recorded on PR 116.
+## Portal sign-in and sign-out (2026-11-21)
+
+- The landing cards open portal-specific forms. BFF login checks the selected portal against the API's current roles and revokes sessions issued for wrong-portal credentials. The browser no longer redirects public pages based on another tab's login. Confirmed sign-out clears browser cookies and returns the current and other protected tabs to the landing page.
+- An expired refresh cookie is cleared on sign-in after the API refuses renewal with 401. The existing retry option remains available during service outages. See the [flow and plan](PORTAL-SIGN-IN-FLOW.md) and [auth sequence](../../diagrams/auth-flow.mmd).
+- Production build, TypeScript, targeted ESLint, 81 frontend unit tests, session HTTP smoke, 12 focused Chromium desktop and mobile browser tests, and structure validation passed. The HTTP and browser runs used a mock API. Real-backend and database sign-in was not exercised for this slice.
+- Roll out by rebuilding the frontend, and roll back by reverting the fix and rebuilding. No schema or backend changes.
+
+## Stable sidebar toggle and student sign-in feedback (2026-11-21)
+
+- The shared Staff and Student sidebar keeps its 44 px toggle in the top-left when collapsed or expanded. The sidebar still preserves its state during portal navigation.
+- The student sign-in form and student route fallback show a progress status with quotes and class-attendance reminders. Quotes change every five seconds and offer Next and Pause controls. The form waits for the existing BFF sign-in result before navigating, using the same cookie and origin checks. The attributed quotes appear in [Franklin's account of Poor Richard's advice](https://www.gutenberg.org/files/36151/36151-h/36151-h.htm).
+- Production build, ESLint, 81 unit tests, session HTTP smoke, 10 focused desktop and mobile browser tests, and structure validation passed. Browser tests verified the toggle coordinates and interaction with quotes while a synthetic sign-in was delayed. Restarted the local frontend on port 3000 and verified landing, BFF response, and API readiness. Real account sign-in was not exercised.
+- Roll out by rebuilding the frontend. Roll back by reverting the change and rebuilding. No backend or database changes.
+
+## Sidebar divider control and signed-in landing (2026-11-22)
+
+- The shared sidebar toggle sits against the divider at the same height in both states. The desktop control is compact, with a 44 px touch target on mobile.
+- The landing route verifies the current session and redirects to the account's default portal. It uses existing silent renewal when the access cookie has expired. Accounts with both roles use the existing Staff default. Signed-out visitors see the portal cards, including immediately after logout.
+- Production build, ESLint, 81 frontend unit tests, HTTP smoke, 8 focused desktop and mobile browser tests, and structure validation passed. Browser checks used synthetic accounts. The rebuilt frontend is running on port 3000. Its public landing and logout redirect were verified, and backend readiness returned HTTP 200. Real account sign-in was not exercised.
+- Roll out by rebuilding the frontend. Revert the commit and rebuild to roll back. No backend or database change is needed.
+
+## Student loading tips and PCA tab branding (2026-11-22)
+
+- Student sign-in shows one short tip below the form while the request is pending. Tips fade in and out, respect reduced-motion preferences, and rotate every five seconds. Student portal pages use a plain loading skeleton.
+- The browser tab uses the same PCA logo asset as the in-page header. The sidebar divider toggle uses a small circular chevron with a larger clickable area.
+- Production build, ESLint, 81 unit tests, session HTTP smoke, 10 desktop/mobile browser checks, and structure validation passed. Browser checks used synthetic accounts. Rebuilt and restarted port 3000, and confirmed the favicon metadata and image response on the running frontend. Real account sign-in was not exercised.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No API or database change is needed.
+
+## Student Calendar, My Report and Live Now (2026-11-22)
+
+- Replaced My classes with monthly Calendar and a day agenda. My Report is still the student home and keeps reports, appeals, batches and engagement consent together. The compact sidebar keeps a small PCA logo. See the [portal plan](STUDENT-PORTAL-PLAN.md).
+- Added two STUDENT-only private reads for linked Zoom schedule slots and live attendance. They apply academy and date-specific batch access. Live Now shows distinct counts for the viewer's enrolled batches, a scrub-able graph and the viewer's own connection facts. An ended class hides counts and shows previous and next classes within 45 days.
+- Ten targeted backend tests passed, including PostgreSQL/Testcontainers endpoint authorization, batch scoping, duplicate visits and ended state. The backend packaged in a separate directory because the existing local runtime held the workspace JAR. Frontend production build, ESLint, 81 unit tests, session HTTP smoke, 18 Chromium desktop/mobile tests, structure check and the 115-endpoint OpenAPI check passed.
+- Verified the three pages against the isolated synthetic preview on port 3450. The original API still reports ready. The licensed Zoom account and the full real-stack browser suite were not used for verification. Release the backend before the frontend. No migration. Roll back in reverse order.
+
+## Student Zoom link privacy (2026-11-22)
+
+- Removed Zoom join links from Calendar and Live Now and from both student timetable API responses. Calendar de-duplication now matches title, start and batch. Staff Zoom routes were outside the change.
+- Production build, ESLint, eight targeted PostgreSQL backend tests, six desktop/mobile student browser tests, structure and OpenAPI checks passed. Restarted the local frontend and backend and verified student sign-in and backend readiness. Signed-in browser checks used synthetic accounts.
+- Release the backend before the frontend so raw timetable responses stop carrying links first. Revert both builds to roll back. No migration.
+
+## Compact student class titles (2026-11-22)
+
+- Calendar, Live Now, the previous and next class cards, and attendance appeals now use the same compact class title as My Report history. For three-part titles separated by pipes, the visible name keeps the class and batch and drops the suffix.
+- Production build, ESLint, structure, 81 unit tests, and six synthetic desktop/mobile browser tests passed. Restarted the local frontend and verified student sign-in and backend readiness. Revert the frontend commit and rebuild to roll back.
+
+## Student Live Now redesign (2026-11-22)
+
+- Redesigned the idle and active Live Now states with a responsive status panel, animated signal bars, next-class countdown, previous-class card, calendar navigation, and a larger chart. Added manual refresh and pause/resume to the Live Now header. CSS animations honor reduced-motion preferences.
+- Production build, ESLint, structure validation and six synthetic desktop/mobile browser tests passed. Tests exercised countdown ticking, auto and manual refresh, graph interaction, and removal of live metrics at class end. Restarted port 3000 and verified student sign-in and backend readiness. Real signed-in traffic and Zoom were not exercised.
+- Roll out by rebuilding the frontend. Revert the commit and rebuild to roll back. No API or database changes.
+
+## Faster student tab navigation (2026-11-22)
+
+- Moved the student sidebar into the authenticated shared layout. Calendar and My Report prefetch in the browser's in-memory router cache. Live Now uses the existing dynamic navigation cache policy and keeps polling every 30 seconds while visible.
+- Stream report identity, attendance, appeals, consent and batches independently. Calendar and Live Now show their page headings and controls while content loads. Backend reads continue to bypass shared caches and use the authenticated account.
+- Production build, ESLint, 81 unit tests, structure validation and 14 desktop/mobile browser tests passed. Synthetic tests held attendance data to verify the report opens early, confirmed a warmed Calendar reopened with zero additional page requests, and exercised logout and live updates. Restarted the frontend and verified student sign-in and backend readiness. Real-account latency was not benchmarked.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No migration or backend change.
+
+## Student report PDF and calendar redesign (2026-11-22)
+
+- Styled My Report and Calendar to match Live Now, keeping month selection, class-type filtering, and calendar day navigation. Removed the My batches panel and student appeal form and its web action. Staff can still resolve existing appeals through their own flow.
+- My Report downloads a private PDF for the selected month. The route verifies a student session, reads own identity and monthly attendance, and shares the completed-class filter with the screen. The document includes attendance totals, each completed class, status, connected time and connection history. PDFKit renders searchable text with optional [Noto Tamil](https://github.com/notofonts/tamil) and [Noto Sinhala](https://github.com/notofonts/sinhala) font embedding.
+- Production build, ESLint, 81 unit tests, structure validation and 16 distinct focused desktop/mobile browser checks passed. Verified successful download, invalid month, signed-out denial, staff-only denial, and no-store. Rendered and inspected single-page, three-page, and multilingual synthetic PDFs. Restarted local web and verified student sign-in, unsigned PDF denial and backend readiness. The full real-stack browser suite was not run.
+- Roll out by rebuilding the frontend with the locked dependencies and bundled fonts. Revert and rebuild to roll back. No backend or database migration.
+
+## Student mobile bottom navigation (2026-11-22)
+
+- The student tabs use a fixed bottom bar at widths of 760 px or less. Calendar and Live Now flank a raised My Report button. The same links provide active states, focus treatment and prefetch behavior. Layout clearance accounts for the bottom safe area. The desktop sidebar retains the existing tab presentation.
+- Production build, ESLint, structure and 14 desktop/mobile browser tests passed. Browser tests verified fixed position during scroll, mobile tab activation and desktop sidebar placement using synthetic data. Restarted port 3000 and verified student sign-in. Real-account navigation was not exercised.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database change.
+
+## Restored student mobile top navigation (2026-11-22)
+
+- Restored the student header tabs at the owner's request. The mobile grid gives the three student tabs equal space and 44 px minimum tap targets. Dual-role accounts keep the Staff portal link, with room for it to wrap onto a second row on narrow screens.
+- Production build, ESLint, structure validation and ten synthetic desktop/mobile browser checks passed, including three tabs in one row and tab navigation at 320 px. Restarted port 3000 and verified student sign-in. Real-account navigation was not exercised.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database change.
+
+## Class type batch and roster controls (2026-11-22)
+
+- Staff Class Types shows each Academy class type, its student batch dropdown, and the roster sync status and timestamp. Link and sync and Sync students reuse the Academy actions and refresh Class Types and Classes. Only active, unassigned batches appear as new choices.
+- Sync status compares the last successful sync and source student count. A membership change with the same count still requires a sync. The completed-class attendance chart remains available.
+- Production build, ESLint, structure, 81 unit tests and two desktop Academy browser tests passed with synthetic data. The mobile Academy cases were skipped by fixture configuration. Restarted local web and verified staff sign-in and backend readiness. No real roster sync was performed.
+- Roll out by rebuilding the frontend. Revert and rebuild to roll back. No backend or database migration.
+
+## Inline batch controls on Class Types (2026-11-22)
+
+- Moved Student batch and sync status into each Class Types list row. Completed groups use a unique tracked-webinar mapping, exact Academy title, or linked batch to find their roster. Academy classes without completed sessions also appear. Unmatched rows and roster-source outages show a disabled dropdown with a reason.
+- The original LUMA backend reported ready, while its separate Academy read-only roster connection logged a JDBC connection failure. Staff sign-in and the rebuilt frontend were verified. Real roster writes were not run.
+- Production build, ESLint, structure, 81 unit tests and eight synthetic desktop/mobile browser checks passed. Two desktop-only cases were skipped on mobile. Roll back by reverting and rebuilding the frontend. No API or migration changes.
+
+## Month-scoped Class Types and simple sync (2026-11-22)
+
+- The standalone Class Types list shows only the selected month's class sessions and active tracked Zoom schedules for that month. Classes in the Academy catalog without a matching monthly schedule or session are omitted. Completed sessions retain their attendance links and chart.
+- A synced row displays only its status. A matched row needing sync shows Student batch and one Sync action. Unmatched classes and roster outages retain a status explaining why sync is unavailable.
+- Production build, ESLint, structure, 81 unit tests and eight synthetic desktop/mobile browser checks passed. The roster test verified a scheduled-only webinar, hiding an unscheduled Academy class, and changing to a month without that class. Restarted port 3000 and verified staff sign-in and backend readiness. Real roster sync was not exercised.
+- Rebuild the frontend to roll out. Revert and rebuild to roll back. No API or migration changes.
+
+## Keep synced class batches selectable (2026-11-22)
+
+- Matched Class Types rows keep the Student batch dropdown and Sync action alongside their sync status. The linked active batch is selected. Selecting another available batch uses the existing link-and-sync operation for future roster mapping.
+- Production build, structure validation and two desktop synthetic browser tests passed. The regression verified sync, reassignment and persistence after reload. Local staff sign-in and backend readiness returned HTTP 200 after the frontend restart. No real roster sync was performed.
+- Revert and rebuild the frontend to roll back. No API or migration changes.
+
+## Show every LUMA batch in Class Types (2026-11-22)
+
+- Display all batches returned by the academy-scoped LUMA batch API. The options now identify inactive batches and those linked to another class type. Those entries are disabled, preserving the server's one-class-per-batch rule. When a class mapping or the Academy roster is unavailable, the batch list is still present for reference and sync is unavailable.
+- Production build, ESLint, structure validation and eight synthetic desktop/mobile browser checks passed. Verified an existing link to another class remains visible and disabled. Restarted the local frontend and verified staff sign-in and backend readiness. Real roster sync was not exercised.
+- Revert and rebuild the frontend to roll back. No API or migration changes.
+
+## Assign Academy payment rosters directly in Class Types (2026-11-22)
+
+- Class Types shows the Academy payment names on tracked Zoom class rows in the selected month. Staff can select a different payment name after sync. The dropdown no longer queries the courses or batch lists.
+- The staff-only, same-academy endpoint syncs distinct Academy IDs and assigns the monitor in one transaction. Further runs use the selected payment roster until staff change it. Changed membership gets a fresh internal roster so earlier runs keep their links. The month picker scopes the schedule, and the source roster is keyed by the exact payment name.
+- Verified 16 PostgreSQL integration tests and five Chromium browser tests with synthetic data. Coverage includes 140 unique students despite a duplicate payment, identical expected rosters for two runs, concurrent resync, preservation of the first roster after removal, invalid selection and denied cross-academy/student access. Frontend production build, ESLint, 81 unit tests, OpenAPI and structure checks passed.
+- Rebuild backend and frontend together to roll out or roll back. There is no migration. A code rollback retains saved monitor mappings and enrollment records. The live Academy connection and real roster were not exercised.
+
+## Show payment dropdown on untracked Class Types rows (2026-11-22)
+
+- The frontend had hidden the entire form when a monthly row had no active Zoom monitor. Every row now shows the payment dropdown. Track and sync reuses a single saved webinar ID when available, and otherwise requires staff to supply the Zoom link or ID. If Academy payment options are unavailable, the dropdown remains visible and disabled.
+- Uses the existing staff-only Zoom tracking and roster assignment APIs. If tracking succeeds and roster sync fails, the webinar is tracked and staff can retry the sync. No backend or database changes.
+- Production build and five Chromium browser checks passed. Coverage includes the missing dropdown regression and tracking a saved webinar ID before syncing a 140-student fixture. Restarted local frontend, verified staff sign-in HTTP 200 and API readiness UP. Real Zoom tracking and payment sync were not exercised. Roll back by reverting and rebuilding the frontend.
+
+## Speed up Zoom tracking before payment roster sync (2026-11-22)
+
+- Local backend logs showed Track and sync timing out during replay of historic Zoom events. Backfill now processes one first event per occurrence and all start/end events. Participant visits are already stored and stay available to attendance.
+- The roster action waits up to 60 seconds per operation and gives separate tracking and roster timeout messages. A failed request keeps the selected payment name.
+- Passed 16 backend integration tests, the targeted backfill test with a 30-minute stored participant visit, two Chromium tests, frontend production build, targeted ESLint and structure validation. Rebuilt and restarted the local services with the original configuration. No production roster operation was submitted during verification. Roll back by reverting and rebuilding both apps. No migration.
+
+## Fix the Class Type attendance trend stroke (2026-11-22)
+
+- Replaced the SVG dash animation with a short opacity fade. The trend uses a solid stroke across adjacent attendance points. The existing path breaks for unavailable attendance still apply.
+- Frontend production build and six desktop/mobile staff browser checks passed. A Chromium check on the restarted local frontend confirmed the built styles render a solid stroke after the fade on a synthetic wide plot. The signed-in Academy chart was not exercised. Roll back by reverting and rebuilding the frontend. No API or database changes.
+
+## Payment roster controls on Class Type details (2026-11-22)
+
+- Added the shared payment dropdown and Sync or Track and sync to the detail route above the attendance chart. The detail and overview resolve the payment form by the same unambiguous Zoom webinar ID and both refresh after assignment.
+- Frontend production build, six desktop/mobile staff checks, and structure validation passed. Synthetic track and sync from the detail page passed on mobile and on the desktop retry after one mock sign-in failure. Restarted the local frontend and verified sign-in HTTP 200 and backend readiness UP. No real roster sync was submitted. Roll back by reverting and rebuilding the frontend. No backend or database changes.
+
+## Space the Class Type payment and attendance cards (2026-11-22)
+
+- Applied the standard 20px panel spacing above the attendance metrics. The production build and desktop/mobile browser spacing checks passed with test data. Restarted the local frontend and confirmed staff sign-in HTTP 200. Roll back by reverting and rebuilding the frontend. No API or database changes.
+
+## Preserve Class Types during refresh (2026-11-22)
+
+- The staff loading screen now uses the detail URL's source to keep the originating tab active. The Class Types list streams payment options separately, and the detail page loads the payment section independently of attendance.
+- Production build and six desktop/mobile browser tests passed. The refresh regression holds the payment catalog and attendance dashboard in the mock backend, checks the list appears before payment options, and checks that Class Types stays active in the detail loading screen. Restarted the local frontend. Staff sign-in returned HTTP 200 and backend readiness was UP. No real roster write was tested. Roll back by reverting and rebuilding the frontend.
+
+## Align staff and student portal navigation (2026-11-22)
+
+- Matched staff section headers between loading and ready states. Class session links keep the selected month and the Class Type origin, and the back link returns to the corresponding list or detail page. Student loading headings follow the selected tab, and the participation page returns to Live Now.
+- Frontend production build, structure validation, and 20 desktop/mobile checks passed across the main run and a focused rerun after updating two assertions for month-bearing links. Restarted the local frontend and verified both sign-in pages returned HTTP 200 and the backend reported UP. Signed-in navigation was tested with fixtures. Roll back by reverting and rebuilding the frontend. No API or data changes.
+
+## Staff PDF attendance reports (2026-11-22)
+
+- Added Download PDF beside Excel for Class session, Class type and Student reports. Both use the existing staff-only export route, selected Sri Lanka date range and academy-scoped reads. The response stays private and no-store. Export logs record report kind, format and period.
+- The compressed A4 PDFs have a summary, month calendar and paginated tables. Session reports show the attendance roster and evidence status. Class type reports show monthly and per-session totals. Student reports show outcomes, class breakdowns, session history and available connection visits.
+- Production build, targeted ESLint, 81 unit tests, two desktop/mobile report checks, structure and OpenAPI validation passed. The browser checks covered all six downloads plus anonymous and student denial. Rendered fixtures were visually inspected, including repeated headers across a 278-student roster and separate Tamil and Sinhala names. One-page fixture PDFs were about 4 KB and the 278-student fixture was about 35 KB. Restarted the local frontend. Real Academy report data was not downloaded. No migration or backend rollout. Roll back by reverting and rebuilding the frontend.
+
+## PR 117 integration and accessibility fixes (2026-11-22)
+
+- Rebased the portal work on current main, preserving its report search hydration checks and real-stack attendance fixes. The synthetic real-stack flow now verifies the report heading and student identity and creates the legacy appeal through the API. The report fixture includes its unique search suffix.
+- Student accessibility tests wait for canonical navigation and test the report, calendar and live screens with reduced motion. Darkened adjacent-month dates for contrast and placed the first-join note inside the definition it describes.
+- Local Maven verify passed 406 tests and the isolated real-stack passed both browser scenarios. No schema or live-data change. Hosted verification is recorded on PR 117.

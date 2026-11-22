@@ -87,7 +87,7 @@ check "old refresh token replay rejected by API" "$(curl -s -o /dev/null -w '%{h
 check "replay revoked the browser session" "$(web $ORIGIN/student)" 307
 web -X POST -H "Origin: $ORIGIN" --data-urlencode email=smoke.student@example.invalid --data-urlencode "password=$PHRASE" $ORIGIN/api/session/login >/dev/null
 check "logout" "$(web -X POST -H "Origin: $ORIGIN" $ORIGIN/api/session/logout)" 303
-check "logout redirect" "$(loc)" "/sign-in?signedOut=1"
+check "logout redirect" "$(loc)" "/?signedOut=1"
 
 # --- Admin sign-in: email and password open the staff portal directly ---
 rm -f "$JAR"

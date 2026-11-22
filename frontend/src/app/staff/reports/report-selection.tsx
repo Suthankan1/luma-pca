@@ -46,7 +46,10 @@ export function ReportSelection({ kind, title, label, options, empty, month, end
         </fieldset>
         <div className="report-selection-footer">
           {selected && <p className="panel-sub">Selected <strong>{selected.label}</strong>{selected.detail && ` · ${selected.detail}`}</p>}
-          <button className="action" type="submit" disabled={!selected}>Download Excel</button>
+          <div className="report-download-actions">
+            <button className="action" type="submit" name="format" value="pdf" disabled={!selected}>Download PDF</button>
+            <button className="action secondary" type="submit" name="format" value="xlsx" disabled={!selected}>Download Excel</button>
+          </div>
         </div>
       </form>}
   </section>;

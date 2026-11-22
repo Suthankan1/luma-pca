@@ -34,13 +34,13 @@ test.describe("Engagement with consent", () => {
     await expect(page.locator("#engagement-feedback")).toHaveText("Engagement is on. Students are asked for consent in their portal.");
 
     await signInStudent(page);
-    await page.getByRole("link", { name: "My classes" }).click();
-    const panel = page.getByRole("region", { name: "REACTIONS AND QUESTIONS" });
+    const panel = page.getByRole("region", { name: "Reactions and questions" });
     await expect(panel).toContainText("LUMA records the reactions and answers");
     await panel.getByRole("button", { name: "I agree" }).click();
-    await expect(panel).toContainText("You take part");
-    await expect(page.getByRole("listitem", { name: "Waves and oscillations" }).getByRole("link", { name: "Take part" })).toHaveCount(0);
-    await page.getByRole("listitem", { name: "Live class now" }).getByRole("link", { name: "Take part" }).click();
+    await page.getByRole("link", { name: "Live Now" }).click();
+    await page.getByRole("link", { name: "React and answer" }).click();
+    await expect(page.getByRole("link", { name: "Live Now", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Back to Live Now" })).toHaveAttribute("href", "/student/live");
     await expect(page.locator(".live-refresh")).toContainText("Updating every 20 seconds");
     await page.getByRole("button", { name: "I understand" }).click();
     await expect(page.locator("#reaction-feedback")).toHaveText("Sent.");

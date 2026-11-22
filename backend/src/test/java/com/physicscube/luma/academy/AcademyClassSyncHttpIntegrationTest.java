@@ -9,15 +9,22 @@ import com.physicscube.luma.identity.domain.Role;
 import com.physicscube.luma.support.AcademyFixtures;
 import com.physicscube.luma.support.HttpApi;
 import com.physicscube.luma.support.StaffApiIntegrationTest;
+import com.physicscube.luma.zoom.ZoomReceiptProcessor;
+import com.physicscube.luma.zoom.ZoomTestReceipts;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -29,6 +36,8 @@ import org.springframework.test.context.DynamicPropertySource;
  */
 class AcademyClassSyncHttpIntegrationTest extends StaffApiIntegrationTest {
     private static JdbcTemplate source;
+    @Autowired ApplicationContext context;
+    @Autowired ZoomReceiptProcessor processor;
 
     @DynamicPropertySource
     static void academySource(DynamicPropertyRegistry registry) {
@@ -115,6 +124,68 @@ class AcademyClassSyncHttpIntegrationTest extends StaffApiIntegrationTest {
 
     private HttpResponse<String> sync(String className, String token) {
         return api.post("/api/v1/academy/classes/sync", HttpApi.json(Map.of("className", className)), token);
+    }
+
+    @Test
+    void paymentRosterAssignmentIsScopedAndEachNewRunUsesTheExactRoster() {
+        String webinar = "89900000037";
+        UUID monitorId = UUID.randomUUID();
+        UUID addedBy = accountIdOf("payment-roster-owner@example.invalid", academyId, Role.STAFF);
+        jdbc.update("""
+                INSERT INTO zoom_webinar_monitors (id, academy_id, webinar_id, topic, time_zone,
+                    recurring, sync_status, added_by, added_at)
+                VALUES (?, ?, ?, 'December Paper Class', 'Asia/Colombo', true, 'OK', ?, now())
+                """, monitorId, academyId, webinar, addedBy);
+        String path = "/api/v1/zoom/monitors/" + monitorId + "/payment-roster";
+        String selection = HttpApi.json(Map.of("academyClassName", "DC"));
+        for (int i = 2000; i < 2140; i++) pay("PCA" + i, "DC");
+        pay("PCA2000", "DC");
+        assertEquals(403, api.put(path, selection, tokenFor(academyId, Role.STUDENT)).statusCode());
+        assertEquals(404, api.put(path, selection, tokenFor(academy("Another Academy"), Role.STAFF)).statusCode());
+        assertEquals(404, api.put(path, HttpApi.json(Map.of("academyClassName", "Unknown")), admin).statusCode());
+        assertNull(jdbc.queryForObject("SELECT academy_class_name FROM zoom_webinar_monitors WHERE id = ?", String.class, monitorId));
+
+        var sync = api.put(path, selection, admin);
+        assertEquals(200, sync.statusCode(), sync.body());
+        assertEquals(140, HttpApi.parse(sync).get("academyStudents"));
+        assertEquals(0, HttpApi.parse(api.put(path, selection, admin)).get("enrolled"));
+        startRun(webinar, "payment-first", Instant.now());
+        startRun(webinar, "payment-second", Instant.now().plusSeconds(86400));
+        var originalRoster = runRoster("payment-first");
+        assertEquals(140, originalRoster.size());
+        assertEquals("PCA2000", originalRoster.getFirst());
+        assertEquals(originalRoster, runRoster("payment-second"));
+
+        source.update("UPDATE academy_src.payment SET deleted_at = now() WHERE pcaid = 'PCA2000'");
+        var firstSync = CompletableFuture.supplyAsync(() -> api.put(path, selection, admin));
+        var secondSync = api.put(path, selection, admin);
+        assertEquals(139, HttpApi.parse(firstSync.join()).get("academyStudents"));
+        assertEquals(139, HttpApi.parse(secondSync).get("academyStudents"));
+        startRun(webinar, "payment-third", Instant.now().plusSeconds(172800));
+        assertEquals(originalRoster.subList(1, 140), runRoster("payment-third"));
+        assertEquals(originalRoster, runRoster("payment-first"));
+
+        pay("invalid id", "Broken");
+        assertEquals(409, api.put(path, HttpApi.json(Map.of("academyClassName", "Broken")), admin).statusCode());
+        assertEquals("DC", jdbc.queryForObject("SELECT academy_class_name FROM zoom_webinar_monitors WHERE id = ?",
+                String.class, monitorId));
+    }
+
+    private void startRun(String webinar, String occurrence, Instant at) {
+        var ts = at.toEpochMilli();
+        String body = """
+                {"event":"webinar.started","event_ts":%d,"payload":{"object":{"id":"%s","uuid":"%s"}}}
+                """.formatted(ts, webinar, occurrence);
+        ZoomTestReceipts.store(context, academyId, "webinar.started", ts, body.getBytes(StandardCharsets.UTF_8));
+        processor.runOnce();
+    }
+
+    private List<String> runRoster(String occurrence) {
+        UUID sessionId = jdbc.queryForObject(
+                "SELECT class_session_id FROM zoom_webinar_runs WHERE academy_id = ? AND occurrence_uuid = ?",
+                UUID.class, academyId, occurrence);
+        return maps(api.get("/api/v1/class-sessions/" + sessionId + "/students", admin)).stream()
+                .map(student -> (String) student.get("studentNumber")).toList();
     }
 
     @Test

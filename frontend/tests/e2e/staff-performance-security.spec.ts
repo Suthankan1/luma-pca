@@ -1,23 +1,38 @@
 import { expect, test } from "@playwright/test";
 
-test("student data stays private across navigation, logout and a student sign-in", async ({ page }) => {
-  await page.goto("/sign-in?portal=staff");
+test("student data stays private across navigation, logout and a student sign-in", async ({ page, context }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: /Staff sign in/ }).click();
+  await expect(page.getByRole("heading", { name: "Staff sign in" })).toBeVisible();
+  await expect(page.getByLabel("Registration ID")).toHaveCount(0);
+  await page.fill("#email", "student@example.invalid");
+  await page.fill("#password", "correct-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText("This account cannot sign in to this portal.", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/portal=staff$/);
   await page.fill("#email", "admin-enrolled@example.invalid");
   await page.fill("#password", "correct-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/staff$/);
+  expect((await page.request.get("/student/attendance/download?month=2026-11")).status()).toBe(403);
   const response = await page.goto("/staff/students");
   expect(response?.headers()["cache-control"]).toMatch(/\bprivate\b.*\bno-store\b/);
   await expect(page.getByRole("heading", { name: "Student directory" })).toBeVisible();
+  const otherTab = await context.newPage();
+  await otherTab.goto("/staff");
+  await expect(otherTab.getByRole("button", { name: "Sign out" })).toBeVisible();
   await page.getByRole("button", { name: "Sign out" }).click();
-  await expect(page).toHaveURL(/\/sign-in/);
+  await expect(page).toHaveURL("/");
+  await expect(otherTab).toHaveURL("/");
   await page.goBack({ waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/sign-in/);
   await expect(page.getByRole("heading", { name: "Student directory" })).toHaveCount(0);
-  await page.goto("/sign-in");
-  await page.fill("#email", "student@example.invalid");
-  await page.fill("#password", "correct-password");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.goto("/");
+  await page.getByRole("link", { name: /Student sign in/ }).click();
+  await expect(page.getByRole("heading", { name: "Student sign in" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toHaveCount(0);
+  await page.getByLabel("Registration ID").fill("PCA001");
+  await page.getByRole("button", { name: "View my attendance" }).click();
   await expect(page).toHaveURL(/\/student$/);
   await page.goto("/staff/students");
   await expect(page).toHaveURL(/\/student$/);
