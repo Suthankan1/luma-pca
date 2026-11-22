@@ -140,7 +140,8 @@ test("an administrator onboards a student end to end on the real stack", async (
   await student.fill("#password", passphrase);
   await student.getByRole("button", { name: "Sign in" }).click();
   await expect(student).toHaveURL(/\/student$/);
-  await expect(student.getByRole("heading", { name: "Real Stack Student", exact: true })).toBeVisible();
+  await expect(student.getByRole("heading", { name: "My Report", exact: true })).toBeVisible();
+  await expect(student.locator(".student-report-page header").first()).toContainText(/Real Stack Student.*PCA-REAL-001/);
   await studentContext.close();
 
   // 6. The administrator sees the account as active.
