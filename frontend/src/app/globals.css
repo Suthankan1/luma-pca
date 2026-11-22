@@ -718,6 +718,7 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .report-no-results { padding:4px 10px; }
 .report-selection-footer { display:grid; justify-items:start; gap:8px; }
 .report-selection-footer p { overflow-wrap:anywhere; }
+.report-download-actions { display:flex; flex-wrap:wrap; gap:8px; }
 .student-month-average { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:8px 16px; }
 .student-month-average span { display:block; font-size:13px; color:var(--ink-2); }
 .student-month-average strong, .student-month-summary strong { display:block; color:#116d70; font-size:clamp(24px,4vw,36px); font-variant-numeric:tabular-nums; }
