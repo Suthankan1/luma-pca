@@ -33,7 +33,7 @@ test("all three staff reports download private, lightweight PDFs and Excel workb
   await seed(page, `/api/v1/batches/${batch.id}/enrollments`, { studentId: student.id, enrolledOn: "2026-01-01" });
   const colombo = new Date(Date.now() + 19_800_000);
   const month = new Date(Date.UTC(colombo.getUTCFullYear(), colombo.getUTCMonth() - 1, 12)).toISOString().slice(0, 7);
-  await seed(page, "/api/v1/class-sessions", { title: "Report class · Practice", startsAt: `${month}-12T12:00:00Z`,
+  await seed(page, "/api/v1/class-sessions", { title: `Report class - Practice ${suffix}`, startsAt: `${month}-12T12:00:00Z`,
     endsAt: `${month}-12T13:00:00Z`, batchIds: [batch.id], timeZone: "Asia/Colombo" });
 
   await page.goto(`/staff/reports?month=${month}`);
