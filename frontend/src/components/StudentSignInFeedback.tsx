@@ -65,9 +65,14 @@ export function StudentSignInForm({ children, ...props }: ComponentProps<"form">
         headers: { Accept: "application/json" },
         body: fields,
         redirect: "error",
+        signal: AbortSignal.timeout(40000),
       });
       if (!response.ok) throw new Error("Sign-in request failed");
       const { destination } = await response.json();
+      if (typeof destination !== "string" ||
+          (destination !== "/student" && destination !== "/sign-in" && !destination.startsWith("/sign-in?"))) {
+        throw new Error("Invalid sign-in destination");
+      }
       window.location.assign(destination);
     } catch {
       submitting.current = false;

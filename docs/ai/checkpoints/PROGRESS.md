@@ -3004,3 +3004,20 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Rebased the portal work on current main, preserving its report search hydration checks and real-stack attendance fixes. The synthetic real-stack flow now verifies the report heading and student identity and creates the legacy appeal through the API. The report fixture includes its unique search suffix.
 - Student accessibility tests wait for canonical navigation and test the report, calendar and live screens with reduced motion. Darkened adjacent-month dates for contrast and placed the first-join note inside the definition it describes.
 - Local Maven verify passed 406 tests and the isolated real-stack passed both browser scenarios. No schema or live-data change. Hosted verification is recorded on PR 117.
+## Student registration-ID sign-in availability (2026-11-23)
+
+- The student and shared sign-in pages and the staff invitation hints use the API's availability response. The BFF forwards ID sign-in to the API, which remains responsible for the academy setting, rate limiting and the student-only session. Staff password sign-in uses its existing path.
+- Local API reported enabled and the public production API reported disabled. Rebuilt and restarted the local frontend. Verified the student page has only the registration-ID field, the staff page has its password form, readiness reported UP and an unknown ID was rejected by the database-backed stack. Successful sign-in through attendance was exercised with fixture accounts only.
+- Production build, session HTTP smoke test, 81 unit tests, 16 desktop/mobile tests and structure validation passed. Browser coverage includes switching API availability while the web app runs.
+- No migration. Production needs the frontend release and the Academy's documented approval and backend settings for ID-only access. To stop new ID sign-ins, disable the backend flag. To roll back the frontend, revert and rebuild. Production was left as observed.
+
+## Student sign-in recovery (2026-11-23)
+
+- The student page shows a retry action during a sign-in availability outage. An explicitly disabled API still offers the normal email form. The ID-only view uses one Registration ID field and one submit action. Interactive requests have a timeout and accept only student-portal or sign-in destinations.
+- Rebuilt and restarted the local frontend. The production build, session smoke test, structure validation and 12 desktop/mobile checks passed across the initial run and a focused rerun after narrowing the test alert locator. Local PostgreSQL readiness was UP and both local forms were checked. Successful sign-in used fixture accounts.
+- Added operator steps to the deployment runbook. Revert and rebuild the frontend to roll back. No database migration or production change.
+
+## Separate shared and student sign-in forms (2026-11-23)
+
+- The shared sign-in page was rendering both forms when ID login was enabled. It now renders the academy account form and links to the dedicated student page. The shared email form still handles account activation, password resets and role-based routing. Only the dedicated student page checks ID login availability. Removed the unused two-form layout styles.
+- Production frontend build, session HTTP smoke, structure validation and 26 desktop/mobile browser checks passed. Restarted local frontend and verified the shared, staff and student pages each serve one form with PostgreSQL readiness UP. Browser sign-ins used fixtures. No database migration or production release. Revert and rebuild the frontend to roll back.

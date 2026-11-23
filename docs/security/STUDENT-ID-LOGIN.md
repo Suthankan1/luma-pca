@@ -10,7 +10,8 @@ version asked for the ID twice, as username and password, which added no securit
 
 With the flag enabled, the landing page’s Student sign-in link opens a form with one **Registration ID** field, and a
 successful sign-in lands on the student’s attendance report (`/student`). The shared `/sign-in` page also provides the
-academy account form for staff and existing email accounts. Staff sign-in is unchanged (email and password).
+academy account form for staff and existing email accounts, with a link to the separate student registration-ID
+form. Staff sign-in is unchanged (email and password).
 
 The student never sees it, but a normal LUMA session is still opened behind the ID: it is what keeps each student to
 their own records, keeps every staff route closed to them, and lets them sign out.
@@ -24,9 +25,11 @@ protect staff accounts in any way.
 
 ## What LUMA does to limit the damage
 
-- **Off unless switched on in both places:** `LUMA_STUDENT_ID_LOGIN_ENABLED=true` in the API (which also needs
-  `LUMA_STUDENT_ID_LOGIN_ACADEMY_ID`, defaulting to the Zoom webhook academy) and in the web app. While off, the API
-  answers 404 and the sign-in page shows only the email form.
+- **Off unless switched on in the API:** set `LUMA_STUDENT_ID_LOGIN_ENABLED=true` and configure
+  `LUMA_STUDENT_ID_LOGIN_ACADEMY_ID` (defaults to the Zoom webhook academy). The web app reads availability from
+  `GET /api/v1/auth/student-id-login` on the sign-in page. While off, the API denies ID sign-in with 404 and the
+  page offers email sign-in. Disabling the flag blocks new ID sign-ins. Existing sessions follow normal session
+  revocation and expiry rules.
 - **Students only:** the session is opened only for an account whose **sole** role is `STUDENT`. An account with any
   staff role is refused, even if it also has a student record. Staff keep email + password.
 - **Same refusal for everything:** unknown ID, deactivated student, disabled account, staff account,

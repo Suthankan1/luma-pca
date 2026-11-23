@@ -3,7 +3,7 @@ import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
 import { notFound } from "next/navigation";
 import { StaffShell } from "@/components/StaffShell";
 import { Disclosure } from "@/components/Disclosure";
-import { requirePortal, studentIdLoginEnabled } from "@/lib/auth-server";
+import { requirePortal, studentIdLoginAvailability } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { AttendanceExportForm } from "@/components/staff/AttendanceExportForm";
@@ -32,7 +32,8 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
   const rankingQuery = rankFrom && rankTo ? new URLSearchParams({ from: rankFrom, to: rankTo, limit: String(top) }) : null;
 
   // Single round of parallel requests instead of 4 sequential rounds
-  const [batch, roster, summary] = await Promise.all([
+  const [studentIdAvailability, batch, roster, summary] = await Promise.all([
+    studentIdLoginAvailability(),
     staffApi<Batch>(`/api/v1/batches/${batchId}`),
     staffApi<Enrollment[]>(`/api/v1/batches/${batchId}/enrollments`),
     staffApi<BatchAttendanceSummary>(`/api/v1/batches/${batchId}/attendance/summary?${new URLSearchParams({ from: sumFrom, to: sumTo })}`),
@@ -76,7 +77,7 @@ export default async function RosterPage({ params, searchParams }: { params: Pro
     <section className="panel panel-gap" aria-labelledby="batch-invite-title">
       <h2 id="batch-invite-title" className="panel-title">INVITE BY EMAIL</h2>
       <Disclosure summary="Email sign-in links to this batch’s students">
-        {studentIdLoginEnabled() && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
+        {studentIdAvailability === "enabled" && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
           for email sign-in. Students without an email of their own are never emailed.</p>}
         <BulkInviteForm batchId={batchId} scope="this batch’s current students" />
       </Disclosure>

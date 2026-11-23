@@ -22,6 +22,8 @@ let releaseStudentOverview;
 let blockedClassTypeRead;
 let releaseClassTypeRead;
 let heldClassTypePath;
+let studentIdLoginEnabled = true;
+let studentIdLoginUnavailable = false;
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -38,6 +40,11 @@ const backend = createServer(async (req, res) => {
     res.end(text);
   };
 
+  if (req.method === "PUT" && req.url === "/__test__/student-id-login") {
+    studentIdLoginEnabled = body.enabled === true;
+    studentIdLoginUnavailable = body.unavailable === true;
+    return send(204);
+  }
   const mockOnline = req.url.match(/^\/__test__\/zoom-online\/([^/]+)$/);
   if (req.method === "PUT" && req.url === "/__test__/class-type-read") {
     if (req.headers.authorization !== `Bearer ${jwt}`) return send(401);
@@ -118,6 +125,9 @@ const backend = createServer(async (req, res) => {
       break;
 
     case "/api/v1/auth/student-id-login": {
+      if (studentIdLoginUnavailable) return send(503);
+      if (req.method === "GET") return send(200, { enabled: studentIdLoginEnabled });
+      if (!studentIdLoginEnabled) return send(404);
       // As the API: the Academy registration ID alone, letter case ignored.
       const id = String(body.studentId ?? "").trim().toUpperCase();
       if (id !== "PCA001") return send(401);
@@ -1473,7 +1483,6 @@ const nextApp = spawn(
       LUMA_WEB_ORIGIN: webOrigin,
       LUMA_SESSION_KEY: randomBytes(32).toString("base64url"),
       API_INTERNAL_URL: `http://127.0.0.1:${backendPort}`,
-      LUMA_STUDENT_ID_LOGIN_ENABLED: "true",
     },
   }
 );
