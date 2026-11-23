@@ -5,7 +5,6 @@ import {
   currentSession,
   readIdentity,
   readTokens,
-  studentIdLoginEnabled,
 } from "@/lib/auth-server";
 import { clientAddressFrom, trustedProxyHops } from "@/lib/client-address";
 import {
@@ -179,7 +178,6 @@ export async function POST(request: NextRequest, context: { params: Promise<{ ac
       return go(signInPath("invalid"));
     }
     if (action === "student-login") {
-      if (!studentIdLoginEnabled()) return new NextResponse(null, { status: 404, headers: noStore });
       if (!studentId || studentId.length > 60) return go(signInPath("student"));
     }
 

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockApiBase } from "./support/classes";
 
 test.describe("Student ID sign-in (Academy request)", () => {
   test("A student signs in with their registration ID alone and sees their attendance", async ({ page }) => {
@@ -53,5 +54,22 @@ test.describe("Student ID sign-in (Academy request)", () => {
     await page.goto("/sign-in?portal=staff");
     await expect(page.getByRole("form", { name: "Students" })).toHaveCount(0);
     await expect(page.locator("#email")).toBeVisible();
+  });
+
+  test("The student form follows the API switch without restarting the web app", async ({ page, request }) => {
+    const toggle = mockApiBase() + "/__test__/student-id-login";
+    await page.goto("/sign-in?portal=student");
+    await expect(page.getByLabel("Registration ID")).toBeVisible();
+    try {
+      expect((await request.put(toggle, { data: { enabled: false } })).status()).toBe(204);
+      await page.reload();
+      await expect(page.getByLabel("Registration ID")).toHaveCount(0);
+      await expect(page.getByLabel("Email")).toBeVisible();
+      await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+    } finally {
+      expect((await request.put(toggle, { data: { enabled: true } })).status()).toBe(204);
+    }
+    await page.reload();
+    await expect(page.getByLabel("Registration ID")).toBeVisible();
   });
 });

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Shell } from "@/components/Shell";
 import { StudentSignInForm } from "@/components/StudentSignInFeedback";
-import { currentSession, studentIdLoginEnabled } from "@/lib/auth-server";
+import { currentSession, studentIdLoginAvailability } from "@/lib/auth-server";
 import { hasPortal, portalPath } from "@/lib/session-policy";
 
 const messages = {
@@ -27,10 +27,14 @@ export default async function SignIn({ searchParams }: {
   if (destination && error !== "sign-out" && (destination === "/staff" || destination === "/student")) {
     redirect(destination);
   }
+  const studentIdAvailability = portal !== "staff" && !identity && !canRefresh && error !== "sign-out"
+    ? await studentIdLoginAvailability()
+    : "disabled";
   const message = error && Object.hasOwn(messages, error)
     ? messages[error as keyof typeof messages]
-    : unavailable ? messages.unavailable : undefined;
-  const showStudentIdForm = studentIdLoginEnabled() && portal !== "staff";
+    : unavailable || (portal === "student" && studentIdAvailability === "unavailable")
+      ? messages.unavailable : undefined;
+  const showStudentIdForm = studentIdAvailability === "enabled";
   const showEmailForm = !showStudentIdForm || portal !== "student";
   const showBothForms = showStudentIdForm && showEmailForm;
   const EmailForm = portal === "student" ? StudentSignInForm : "form";

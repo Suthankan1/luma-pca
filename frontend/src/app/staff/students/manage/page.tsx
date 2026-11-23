@@ -3,7 +3,7 @@ import { StaffShell } from "@/components/StaffShell";
 import { Disclosure } from "@/components/Disclosure";
 import { AddStudentForm } from "@/components/staff/StudentForms";
 import { BulkInviteForm } from "@/components/staff/BulkInviteForm";
-import { requirePortal, studentIdLoginEnabled } from "@/lib/auth-server";
+import { requirePortal, studentIdLoginAvailability } from "@/lib/auth-server";
 import { hasPortal } from "@/lib/session-policy";
 import { staffApi } from "@/lib/staff-api";
 import { accountStatusLabels, formatInstant, studentListHref } from "@/lib/staff-forms";
@@ -30,7 +30,8 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
     subtitle: "Each student has one academy record and one sign-in, whatever batches they join.",
     hasStudentPortal: hasPortal(identity, "student") };
 
-  const [failures, result] = await Promise.all([
+  const [studentIdAvailability, failures, result] = await Promise.all([
+    studentIdLoginAvailability(),
     staffApi<FailedInvitation[]>("/api/v1/student-invitations/failures"),
     staffApi<Page>(`/api/v1/students?limit=50${filter.query}${cursor ? `&after=${encodeURIComponent(cursor)}` : ""}${search ? `&q=${encodeURIComponent(search)}` : ""}`),
   ]);
@@ -83,7 +84,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
       <section className="panel panel-gap" aria-labelledby="invite-all-title">
         <h2 id="invite-all-title" className="panel-title">INVITE BY EMAIL</h2>
         <Disclosure summary="Email sign-in links to students">
-          {studentIdLoginEnabled() && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
+          {studentIdAvailability === "enabled" && <p className="panel-sub">Students can sign in with their student ID, so invitations are only needed
             for email sign-in. Students without an email of their own are never emailed.</p>}
           <BulkInviteForm batchId={null} scope="every active student" />
         </Disclosure>
