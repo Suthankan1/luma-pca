@@ -3036,3 +3036,13 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Restarted `luma-backend` service on Oracle VM; verified `GET /api/v1/auth/student-id-login` returns `{"enabled":true}` and actuator health is UP.
 - Verified on live Vercel frontend [https://luma-pca.vercel.app/sign-in?portal=student](https://luma-pca.vercel.app/sign-in?portal=student) that the student sign-in form presents only the Registration ID field with submit action `View my attendance`. The staff sign-in page at `/sign-in?portal=staff` remains unchanged with email and password fields.
 
+## Fix Zoom live attendee reconnect handling (2026-11-24)
+
+- In `ZoomParticipantService`, rejoining attendees who disconnected and reconnected on the same Zoom client share the same `visit_key` (`participant_uuid` or `user_id`). Previously, `readClassActivities` and `participants` did not treat re-joins with the same key as new visit intervals and did not clear a past `visit.left` timestamp. As a result, students who briefly lost network and reconnected were permanently stuck with a past `visit.left` timestamp, causing `OnlineHistory.sample()` and provisional attendance to mark them offline and deflating the live online count during live webinars.
+- Updated `ZoomParticipantService`:
+  - `readClassActivities` tracks `latestByVisitKey` and creates a new `Visit` interval whenever a `webinar.participant_joined` event arrives for a visit key whose previous interval had already left (`latest.left != null`).
+  - `participants` tracks active visit intervals and records re-joins with the same `visit_key` as new visit sessions, using `c[0] > c[1]` to accurately report open visits.
+- Added `rejoinWithSameVisitKeyCountsAsNewVisitAndKeepsOpenStatus` test in `ZoomParticipantIntegrationTest`. Passed all 41 Zoom and provisional attendance tests (`ZoomParticipantIntegrationTest`, `OnlineHistoryTest`, `ProvisionalAttendanceIntegrationTest`, `WebinarMonitorIntegrationTest`, `ZoomReceiptProcessingIntegrationTest`, `ZoomReportIntegrationTest`).
+- No database migration or frontend changes required. Roll back by reverting `ZoomParticipantService.java`.
+
+
