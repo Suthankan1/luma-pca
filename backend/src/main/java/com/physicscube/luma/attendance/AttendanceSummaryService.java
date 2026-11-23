@@ -63,7 +63,11 @@ public class AttendanceSummaryService {
         }
     }
 
-    private static final String IN_RANGE = "cs.status <> 'CANCELLED' AND (cs.starts_at AT TIME ZONE cs.time_zone)::date BETWEEN ? AND ?";
+    private static final String IN_RANGE = """
+            cs.status <> 'CANCELLED' AND (cs.starts_at AT TIME ZONE cs.time_zone)::date BETWEEN ? AND ?
+            AND NOT EXISTS (SELECT 1 FROM zoom_classes_without_attendees z
+                            WHERE z.academy_id = cs.academy_id AND z.class_session_id = cs.id)
+            """;
 
     /** Each enrolled student's final attendance in one batch's classes. */
     @Transactional(readOnly = true)

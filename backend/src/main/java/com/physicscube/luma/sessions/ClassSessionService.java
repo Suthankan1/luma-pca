@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -95,7 +94,7 @@ public class ClassSessionService {
     @Transactional(readOnly = true)
     public List<CompletedSession> recentCompleted(CurrentAccount caller, Instant now, int limit) {
         caller.requireStaff();
-        return sessions.recentCompleted(caller.academyId(), now, Limit.of(limit)).stream()
+        return sessions.recentCompleted(caller.academyId(), now, limit).stream()
                 .map(session -> new CompletedSession(session.getId(), session.getTitle(), session.getEndsAt(),
                         session.getTimeZone(), session.localDate(), Set.copyOf(session.batchIds())))
                 .toList();
@@ -134,7 +133,10 @@ public class ClassSessionService {
         if (batchIds.isEmpty()) {
             return List.of();
         }
-        return sessions.inWindowForBatches(academyId, from, to, batchIds).stream()
+        List<ClassSession> found = sessions.inWindowForBatches(academyId, from, to, batchIds);
+        Set<UUID> empty = withoutAttendees(academyId, found);
+        return found.stream()
+                .filter(session -> !empty.contains(session.getId()))
                 .map(session -> {
                     java.time.LocalDate day = session.localDate();
                     List<StudentClassView.Batch> mine = enrolled.stream()
@@ -536,6 +538,8 @@ public class ClassSessionService {
     }
 
     private List<SessionView> views(CurrentAccount caller, List<ClassSession> found) {
+        if (found.isEmpty()) return List.of();
+        Set<UUID> empty = withoutAttendees(caller.academyId(), found);
         Map<UUID, BatchView> batchViews = batches.viewsInAcademy(caller.academyId(),
                 found.stream().flatMap(s -> s.batchIds().stream()).collect(Collectors.toSet()));
         return found.stream().map(s -> new SessionView(s.getId(), s.getTitle(), s.getStartsAt(), s.getEndsAt(),
@@ -544,6 +548,11 @@ public class ClassSessionService {
                         .map(b -> new SessionView.Batch(b.id(), b.courseId(), b.code(), b.name()))
                         .sorted(Comparator.comparing(SessionView.Batch::code).thenComparing(SessionView.Batch::batchId))
                         .toList(),
-                s.getVersion(), s.getCreatedAt(), s.getUpdatedAt(), s.getOrigin())).toList();
+                s.getVersion(), s.getCreatedAt(), s.getUpdatedAt(), s.getOrigin(), empty.contains(s.getId()))).toList();
+    }
+
+    private Set<UUID> withoutAttendees(UUID academyId, List<ClassSession> found) {
+        return found.isEmpty() ? Set.of()
+                : Set.copyOf(sessions.withoutAttendees(academyId, found.stream().map(ClassSession::getId).toList()));
     }
 }

@@ -105,3 +105,14 @@ webinar event subscriptions on the existing app, and a test webinar run).
 - **Unmonitored webinars** keep the older behaviour (link to a class staff scheduled in the ±60-minute window), so history
   is unchanged. Scheduling, editing, cancelling and importing classes answer 409 unless
   `LUMA_SESSIONS_MANUAL_SCHEDULING=true` (test setups only).
+## Attendance exclusion for runs without attendees
+
+Exclude a class from attendance only when every linked occurrence has a fetched participant report and all
+reported join sessions are verified host rows. An empty completed report also qualifies. A non-host row counts
+as attendance evidence even if LUMA cannot match it to a student or the connection is too short to earn credit.
+A missing or failed report cannot establish this exclusion. Newly fetched reports with discarded incomplete
+rows cannot establish it either.
+
+The staff timetable and Zoom evidence retain the run with a **No attendees** label. Attendance timelines,
+summaries, finalisation and exports omit it. Historical attendance records and their audit history are retained
+and excluded at read time. A later report with an attendee makes the class eligible again.

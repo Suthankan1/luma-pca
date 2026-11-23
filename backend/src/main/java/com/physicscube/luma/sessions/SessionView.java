@@ -11,7 +11,7 @@ import java.util.UUID;
  */
 public record SessionView(UUID id, String title, Instant startsAt, Instant endsAt, String timeZone, LocalDate localDate,
                           String status, String zoomWebinarId, UUID seriesId, List<Batch> batches, long version, Instant createdAt, Instant updatedAt,
-                          String origin) {
+                          String origin, boolean noAttendees) {
     public record Batch(UUID batchId, UUID courseId, String code, String name) {
     }
 }

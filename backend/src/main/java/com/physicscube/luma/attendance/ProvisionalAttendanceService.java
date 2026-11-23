@@ -155,6 +155,13 @@ public class ProvisionalAttendanceService {
         var activityTask = com.physicscube.luma.shared.concurrent.Parallel.start(() -> zoom.activityForClass(academyId, sessionId));
         var recordsTask = com.physicscube.luma.shared.concurrent.Parallel.start(() -> finalRecords(academyId, sessionId));
         SessionView session = sessions.get(caller, sessionId); // access check: batch-scoped staff see their classes only
+        if (session.noAttendees()) {
+            ClassActivity evidence = com.physicscube.luma.shared.concurrent.Parallel.join(activityTask);
+            com.physicscube.luma.shared.concurrent.Parallel.join(recordsTask);
+            int linked = evidence.occurrences().size();
+            return new ProvisionalAttendance(sessionId, "NO_ATTENDEES", session.startsAt(), session.endsAt(),
+                    linked, linked, true, 0, DbTime.now(), List.of(), null, null);
+        }
         List<ExpectedStudent> expected = sessions.expectedStudents(caller, session);
         ClassActivity activity = com.physicscube.luma.shared.concurrent.Parallel.join(activityTask);
         Instant now = DbTime.now();

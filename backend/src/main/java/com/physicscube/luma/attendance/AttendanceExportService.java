@@ -83,6 +83,7 @@ public class AttendanceExportService {
             sessions.list(caller, piece, pieceEnd, batchId).forEach(s -> found.putIfAbsent(s.id(), s));
         }
         List<SessionView> classes = found.values().stream()
+                .filter(s -> !s.noAttendees())
                 .filter(s -> !s.localDate().isBefore(from) && !s.localDate().isAfter(to))
                 .sorted(Comparator.comparing(SessionView::startsAt)).toList();
         StringBuilder csv = new StringBuilder(HEADER).append("\r\n");

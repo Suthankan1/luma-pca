@@ -83,6 +83,7 @@ export async function GET(request: Request) {
       const response = await staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${session.id}/attendance`, undefined, 25000);
       if (!response.ok) return response.status === 404 ? notFound() : unavailable();
       const attendance = response.data;
+      if (attendance.status === "NO_ATTENDEES") return notFound();
       if (workbook) {
         const expected = attendance.students.filter(row => row.expected);
         const joined = expected.filter(row => row.seen).length;

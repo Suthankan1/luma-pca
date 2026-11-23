@@ -29,6 +29,7 @@ export function SessionAttendancePanel({ session, initialRun, initial, initialEn
   const joined = students.filter(student => student.seen);
   const expected = students.filter(student => student.expected);
   const finalised = Boolean(facts?.finalisedAt);
+  const noAttendees = facts ? facts.status === "NO_ATTENDEES" : session.noAttendees;
   const credited = students.filter(student => student.outcome === "PRESENT" || student.outcome === "LATE").length;
   const running = run?.state === "LIVE" && !facts?.webinarEnded;
   const cancelled = session.status !== "SCHEDULED";
@@ -43,7 +44,7 @@ export function SessionAttendancePanel({ session, initialRun, initial, initialEn
   const chartEnd = actualEnd ? Date.parse(actualEnd) : runningWindow ? clock : showLastSample ? Date.parse(lastSample.at) : sessionEnd;
   const duration = actualEnd ? Date.parse(actualEnd) : running ? clock : legacy ? sessionEnd : null;
   const until = sessionEnd + 30 * 60_000;
-  const showPoll = !finalised && !cancelled && sessionStart - 15 * 60_000 <= clock && clock <= until;
+  const showPoll = !finalised && !noAttendees && !cancelled && sessionStart - 15 * 60_000 <= clock && clock <= until;
   const pollPath = `/staff/sessions/${session.id}/live${initialEngagement?.enabled ? "?engagement=true" : ""}`;
   const delayed = useLivePoll<LiveSessionSnapshot>(pollPath, showPoll && !paused, data => {
     setLatest(data);
@@ -51,7 +52,7 @@ export function SessionAttendancePanel({ session, initialRun, initial, initialEn
       endRefreshed.current = true;
       router.refresh();
     }
-    return Boolean(data.attendance.finalisedAt);
+    return Boolean(data.attendance.finalisedAt) || data.attendance.status === "NO_ATTENDEES";
   }, until);
 
   const metrics = [
@@ -65,6 +66,10 @@ export function SessionAttendancePanel({ session, initialRun, initial, initialEn
   ];
 
   return <>
+    {noAttendees ? <section className="panel" aria-label="Attendance">
+      <h2 className="panel-title">No attendees</h2>
+      <p className="panel-sub">Zoom reported no attendees. This session is excluded from attendance.</p>
+    </section> : <>
     <dl className="session-metrics" aria-label="Session summary">
       {metrics.map(metric => <div className="panel" key={metric.label}>
         <dt>{metric.label}</dt><dd><strong>{metric.value}</strong></dd>
@@ -86,6 +91,7 @@ export function SessionAttendancePanel({ session, initialRun, initial, initialEn
       {facts && !finalised && facts.status === "RECONCILED" && !cancelled && sessionEnd <= clock && <FinaliseForm sessionId={session.id} />}
       {facts && <SessionAttendanceRoster students={students} sessionId={session.id} timeZone={session.timeZone} finalised={finalised} />}
     </section>
+    </>}
     <div className={run ? "staff-grid panel-gap" : "panel-gap"}>
       {children}
       {run && <ZoomRunPanel run={run} timeZone={session.timeZone} now={clock} />}

@@ -67,7 +67,7 @@ export default async function ClassTypePage({ searchParams }: {
     const indexes: number[] = [];
     dashboard.data.classes.forEach((session, index) => {
       if (ids.has(session.id)) {
-        if (session.joined > 0) indexes.push(index);
+        if (session.state !== "NO_WEBINAR" || session.joined > 0) indexes.push(index);
         totals.set(session.id, session);
       }
     });
@@ -80,27 +80,31 @@ export default async function ClassTypePage({ searchParams }: {
   }
   // The shared dashboard caps its class matrix. Fetch any omitted selected sessions in small batches.
   const omitted = dashboard.ok ? group.sessions.filter(session => !totals.has(session.id)) : [];
+  const excluded = new Set<string>();
   for (let offset = 0; offset < omitted.length; offset += 6) {
     const results = await Promise.all(omitted.slice(offset, offset + 6)
       .map(session => staffApi<ProvisionalAttendance>(`/api/v1/class-sessions/${session.id}/attendance`, undefined, timeout)));
     for (const result of results) {
       if (!result.ok) continue;
+      if (result.data.status === "NO_ATTENDEES") {
+        excluded.add(result.data.sessionId);
+        continue;
+      }
       const expected = result.data.students.filter(student => student.expected);
       const joined = expected.filter(student => student.seen).length;
       totals.set(result.data.sessionId, { id: result.data.sessionId, expected: expected.length, joined });
-      if (joined > 0) {
+      if (result.data.linkedOccurrences > 0 || joined > 0) {
         for (const student of expected) addStudent(student.studentId, student.seen);
       }
     }
   }
 
-  const complete = totals.size === ids.size;
-  const counted = group.sessions.filter(session => (totals.get(session.id)?.joined ?? 0) > 0);
+  const counted = group.sessions.filter(session => !excluded.has(session.id));
+  const complete = totals.size === counted.length;
   const average = complete ? averageClassAttendance(counted, totals) : null;
-  const rates = group.sessions.flatMap(session => {
+  const rates = counted.map(session => {
     const total = totals.get(session.id);
-    if (total?.joined === 0) return [];
-    return [{ session, percent: total && total.expected > 0 ? total.joined * 100 / total.expected : null }];
+    return { session, percent: total && total.expected > 0 ? total.joined * 100 / total.expected : null };
   });
   const students = [...enrolled.values()].map(({ studentId, studentName, studentNumber }) => {
     const counts = studentCounts.get(studentId);
@@ -117,7 +121,7 @@ export default async function ClassTypePage({ searchParams }: {
     </section>
     <div className="class-detail-metrics panel-gap">
       <section className="panel"><h2 className="panel-title">Enrolled students</h2><strong>{rosterComplete ? enrolled.size : "—"}</strong></section>
-      <section className="panel"><h2 className="panel-title">Average attendance</h2><strong>{average === 0 ? "<1%" : showPercent(average)}</strong></section>
+      <section className="panel"><h2 className="panel-title">Average attendance</h2><strong>{showPercent(average)}</strong></section>
     </div>
     {!complete && <p className="session-error" role="status">Some attendance figures couldn’t load. Please reload to see the complete average.</p>}
     <Trend rates={rates} sessionQuery={sessionQuery} />
@@ -132,7 +136,7 @@ export default async function ClassTypePage({ searchParams }: {
         <h2 id="held-title" className="panel-title">Completed sessions</h2>
         <p className="panel-sub">{rates.length} {rates.length === 1 ? "session" : "sessions"} this month</p>
         <div className="classes-panel-scroll" role="region" aria-label="Completed session attendance" tabIndex={0}>
-          {rates.length === 0 ? <p className="dir-empty muted">No completed sessions with recorded joins this month.</p>
+          {rates.length === 0 ? <p className="dir-empty muted">No completed sessions this month.</p>
             : <ul>{rates.map(({ session, percent }) => <li key={session.id}>
             <Link className="class-detail-row" href={`/staff/sessions/${session.id}?${sessionQuery}`}>
               <div><span>{formatDay(session.startsAt, ACADEMY_TIME_ZONE)}</span><small>{timeRange({ ...session, timeZone: ACADEMY_TIME_ZONE })}
@@ -156,7 +160,7 @@ async function DetailPaymentRoster({ requests, sessions }: {
 
 function showPercent(percent: number | null) {
   if (percent == null) return "—";
-  return percent < 0.5 ? "<1%" : `${Math.round(percent)}%`;
+  return percent > 0 && percent < 0.5 ? "<1%" : `${Math.round(percent)}%`;
 }
 
 function Trend({ rates, sessionQuery }: { rates: SessionRate[]; sessionQuery: string }) {

@@ -1378,7 +1378,7 @@ paths:
                 required: [sessionId, status, classStartsAt, classEndsAt, linkedOccurrences, webinarEnded, unmatchedPeople, calculatedAt, students]
                 properties:
                   sessionId: {type: string, format: uuid}
-                  status: {type: string, enum: [PROVISIONAL, RECONCILED], description: RECONCILED when every linked occurrence is counted from Zoom's participant report; neither is a present/absent decision}
+                  status: {type: string, enum: [PROVISIONAL, RECONCILED, NO_ATTENDEES], description: NO_ATTENDEES when all linked reports confirm an empty or host-only session; excluded from attendance}
                   classStartsAt: {type: string, format: date-time}
                   classEndsAt: {type: string, format: date-time}
                   linkedOccurrences: {type: integer}
@@ -2025,6 +2025,7 @@ components:
       type: object
       required: [id, title, startsAt, endsAt, timeZone, localDate, status, batches, version, createdAt, updatedAt]
       properties:
+        noAttendees: {type: boolean, description: All linked Zoom reports confirm there were no non-host attendees}
         seriesId: {type: string, format: uuid, nullable: true, description: Set on classes created together as a weekly series}
         id: {type: string, format: uuid}
         title: {type: string}

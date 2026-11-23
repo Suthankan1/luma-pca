@@ -99,7 +99,7 @@ export type EntryState = "live" | "now" | "upcoming" | "ended";
 /** One thing on the timetable: a LUMA class, or a Zoom occurrence that has no class yet. */
 export type DayEntry = {
   key: string; sessionId: string | null; title: string; startsAt: string; endsAt: string | null; timeZone: string;
-  source: "class" | "zoom"; state: EntryState; href: string;
+  source: "class" | "zoom"; state: EntryState; href: string; noAttendees?: boolean;
 };
 
 export const entryStateLabels: Record<EntryState, string> = { live: "Live", now: "In progress", upcoming: "Upcoming", ended: "Ended" };
@@ -121,7 +121,7 @@ export function calendarEntries(sessions: readonly ClassSession[], monitors: rea
     const state: EntryState = liveIds.has(s.id) || liveRun ? "live"
       : now < Date.parse(s.startsAt) ? "upcoming" : now < Date.parse(s.endsAt) ? "now" : "ended";
     add(s.localDate, { key: s.id, sessionId: s.id, title: s.title, startsAt: s.startsAt, endsAt: liveRun ? null : s.endsAt,
-      timeZone: s.timeZone, source: "class", state, href: `/staff/sessions/${s.id}` });
+      timeZone: s.timeZone, source: "class", state, href: `/staff/sessions/${s.id}`, noAttendees: s.noAttendees });
   }
   for (const m of monitors ?? []) {
     if (!m.active) continue;
@@ -202,7 +202,7 @@ export function classTypeKey(title: string) {
 /** Group completed timetable entries by the class and batch name shown to staff. */
 export function monthlyClassTypes(sessions: readonly ClassSession[], now: number) {
   const groups = new Map<string, { title: string; sessions: ClassSession[] }>();
-  const completed = sessions.filter(session => session.status === "SCHEDULED" && Date.parse(session.endsAt) <= now)
+  const completed = sessions.filter(session => !session.noAttendees && session.status === "SCHEDULED" && Date.parse(session.endsAt) <= now)
     .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
   for (const session of completed) {
     const title = compactClassTitle(session.title);

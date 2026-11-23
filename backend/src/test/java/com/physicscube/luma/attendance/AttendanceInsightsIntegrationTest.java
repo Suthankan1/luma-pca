@@ -284,6 +284,55 @@ class AttendanceInsightsIntegrationTest extends StaffApiIntegrationTest {
     }
 
     @Test
+    void hostOnlyReportsExcludeHistoricalAbsencesAndNewEvidenceRestoresTheClass() {
+        UUID session = UUID.fromString(classId);
+        jdbc.update("""
+                INSERT INTO attendance_records (id, academy_id, class_session_id, student_id, computed_outcome,
+                outcome, connected_seconds, rule_min_connected_percent, rule_late_after_minutes, finalised_by, finalised_at)
+                SELECT ?, ?, ?, ?, 'ABSENT', 'ABSENT', 0, 75, 10, id, now()
+                FROM accounts WHERE academy_id = ? ORDER BY id LIMIT 1
+                """, UUID.randomUUID(), academyId, session, UUID.fromString(amaya), academyId);
+        String details = "/api/v1/class-sessions/" + classId + "/attendance";
+        String history = "/api/v1/students/" + amaya + "/attendance";
+        String day = start.atZone(java.time.ZoneId.of("Asia/Colombo")).toLocalDate().toString();
+        String range = "?from=" + day + "&to=" + day;
+        activate(amayaAccount);
+        String student = login("amaya@example.test");
+        assertEquals(1, HttpApi.parseList(api.get(history, admin)).size());
+
+        jdbc.update("UPDATE zoom_report_participants SET host = true WHERE academy_id = ? AND occurrence_uuid = 'Waves=='", academyId);
+        assertEquals("NO_ATTENDEES", ok(api.get(details, admin)).get("status"));
+        assertEquals(List.of(), classTotals(admin));
+        assertEquals(List.of(), list(ok(api.get("/api/v1/attendance/dashboard", admin)).get("classes")));
+        assertEquals(List.of(), HttpApi.parseList(api.get(history, admin)));
+        assertEquals(List.of(), HttpApi.parseList(api.get("/api/v1/me/attendance", student)));
+        assertEquals(0, map(ok(api.get("/api/v1/me/attendance-overview", student)).get("overall")).get("classes"));
+        String batchAttendance = "/api/v1/batches/" + batch + "/attendance";
+        assertEquals(0, ok(api.get(batchAttendance + "/summary" + range, admin)).get("finalClasses"));
+        HttpResponse<String> export = api.get(batchAttendance + "/export" + range, admin);
+        assertEquals(200, export.statusCode());
+        assertEquals(1, export.body().lines().count(), "CSV contains only its header");
+        assertEquals(409, api.post(details + "/finalisation", "{}", admin).statusCode());
+        assertEquals(204, api.get(LATEST_COMPLETED, admin).statusCode());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM attendance_records WHERE class_session_id = ?", Integer.class, session));
+
+        jdbc.update("UPDATE zoom_report_fetches SET complete_rows = false WHERE academy_id = ? AND occurrence_uuid = 'Waves=='", academyId);
+        assertEquals("RECONCILED", ok(api.get(details, admin)).get("status"), "incomplete report rows cannot establish exclusion");
+        jdbc.update("UPDATE zoom_report_fetches SET complete_rows = true WHERE academy_id = ? AND occurrence_uuid = 'Waves=='", academyId);
+        jdbc.update("""
+                INSERT INTO zoom_occurrence_links (academy_id, occurrence_uuid, webinar_id, class_session_id, link_source, linked_at)
+                VALUES (?, 'pending==', ?, ?, 'AUTOMATIC', now())
+                """, academyId, WEBINAR, session);
+        assertEquals("PROVISIONAL", ok(api.get(details, admin)).get("status"), "every linked occurrence needs a report");
+        jdbc.update("DELETE FROM zoom_occurrence_links WHERE academy_id = ? AND occurrence_uuid = 'pending=='", academyId);
+
+        jdbc.update("UPDATE zoom_report_participants SET host = false, email = NULL WHERE academy_id = ? AND occurrence_uuid = 'Waves=='", academyId);
+        assertEquals("RECONCILED", ok(api.get(details, admin)).get("status"));
+        assertEquals(List.of(Map.of("id", classId, "expected", 2, "joined", 0)), classTotals(admin));
+        assertEquals(1, HttpApi.parseList(api.get(history, admin)).size());
+    }
+
+    @Test
     void completedProjectionMatchesSourceAndRejectsStalePublication() {
         UUID session = UUID.fromString(classId);
         String dashboard = "/api/v1/attendance/dashboard";

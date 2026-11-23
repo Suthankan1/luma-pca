@@ -63,6 +63,7 @@ public class AttendanceQueueService {
         for (Object[] row : candidates(caller.academyId(), now)) {
             UUID id = (UUID) row[0];
             ProvisionalAttendance facts = attendance.forClass(caller, id);
+            if ("NO_ATTENDEES".equals(facts.status())) continue;
             String state = facts.linkedOccurrences() == 0 ? "NO_ZOOM_RUN" : "RECONCILED".equals(facts.status()) ? "READY" : "WAITING_FOR_REPORT";
             result.add(new PendingClass(id, (String) row[1], ((Timestamp) row[2]).toInstant(), ((Timestamp) row[3]).toInstant(),
                     (String) row[4], facts.linkedOccurrences(), state));
@@ -133,6 +134,8 @@ public class AttendanceQueueService {
                 SELECT cs.id, cs.title, cs.starts_at, cs.ends_at, cs.time_zone FROM class_sessions cs
                 WHERE cs.academy_id = ? AND cs.status = 'SCHEDULED' AND cs.ends_at <= ? AND cs.ends_at > ?
                   AND NOT EXISTS (SELECT 1 FROM attendance_records ar WHERE ar.class_session_id = cs.id)
+                  AND NOT EXISTS (SELECT 1 FROM zoom_classes_without_attendees z
+                                  WHERE z.academy_id = cs.academy_id AND z.class_session_id = cs.id)
                 ORDER BY cs.starts_at LIMIT ?
                 """, (r, i) -> new Object[] {r.getObject(1, UUID.class), r.getString(2), r.getTimestamp(3), r.getTimestamp(4), r.getString(5)},
                 academy, Timestamp.from(now), Timestamp.from(now.minus(LOOKBACK_DAYS, ChronoUnit.DAYS)), MAX_CLASSES);
