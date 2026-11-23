@@ -29,7 +29,7 @@ function scheduledRows(month: string, sessions: ClassSession[], completed: Month
   const inMonth = (start: string | null) => !!start && Number.isFinite(Date.parse(start)) &&
     instantParts(start, ACADEMY_TIME_ZONE).date.startsWith(`${month}-`);
   for (const session of sessions) {
-    if (session.status !== "SCHEDULED" || !inMonth(session.startsAt)) continue;
+    if (session.noAttendees || session.status !== "SCHEDULED" || !inMonth(session.startsAt)) continue;
     const key = classTypeKey(session.title);
     const group = scheduled.get(key);
     if (group) group.push(session);

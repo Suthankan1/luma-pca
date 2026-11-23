@@ -76,6 +76,9 @@ public class AttendanceFinalisationService {
             throw new ConflictException("This class is not final yet; finalise it instead");
         }
         ProvisionalAttendance facts = attendance.forClass(caller, sessionId);
+        if ("NO_ATTENDEES".equals(facts.status())) {
+            throw new ConflictException("Zoom reported no attendees for this class");
+        }
         if (!"RECONCILED".equals(facts.status())) {
             throw new ConflictException("Zoom's participant report is needed for every linked occurrence before recalculating");
         }
@@ -147,6 +150,9 @@ public class AttendanceFinalisationService {
         SessionView session = sessions.get(caller, sessionId);
         // One finalisation per class, even if two staff members press at once.
         jdbc.queryForList("SELECT id FROM class_sessions WHERE id = ? AND academy_id = ? FOR UPDATE", sessionId, caller.academyId());
+        if (session.noAttendees()) {
+            throw new ConflictException("Zoom reported no attendees for this class");
+        }
         Integer done = jdbc.queryForObject("SELECT count(*) FROM attendance_records WHERE class_session_id = ?", Integer.class, sessionId);
         if (done != null && done > 0) {
             throw new ConflictException("This class's attendance is already final; recalculate it from Zoom's report, or correct a student's record");
@@ -161,6 +167,9 @@ public class AttendanceFinalisationService {
             throw new ConflictException("The class has not finished yet");
         }
         ProvisionalAttendance facts = attendance.forClass(caller, sessionId);
+        if ("NO_ATTENDEES".equals(facts.status())) {
+            throw new ConflictException("Zoom reported no attendees for this class");
+        }
         if (!"RECONCILED".equals(facts.status())) {
             throw new ConflictException(facts.linkedOccurrences() == 0
                     ? "No Zoom occurrence is linked to this class"

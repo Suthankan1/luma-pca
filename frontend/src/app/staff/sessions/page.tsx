@@ -85,10 +85,10 @@ async function ScheduleColumn({ range, requests, monitorsRequest, now, today }: 
   const byDay = calendarEntries(monthSessions, sessions.ok ? monitorList : null, liveIds, now);
   const days = [...byDay.keys()].filter(day => day >= first && day <= last).sort();
   const scheduleDays = currentMonth && !byDay.has(today) && sessions.ok ? [...days, today].sort() : days;
-  const count = days.reduce((n, day) => n + (byDay.get(day)?.length ?? 0), 0);
+  const count = days.reduce((n, day) => n + (byDay.get(day)?.filter(entry => !entry.noAttendees).length ?? 0), 0);
   const byId = new Map(totals?.ok ? totals.data.map(total => [total.id, total]) : []);
   const bars = days.flatMap(day => (byDay.get(day) ?? []).flatMap(entry => {
-    if (!entry.sessionId || entry.state !== "ended" || day > today) return [];
+    if (!entry.sessionId || entry.noAttendees || entry.state !== "ended" || day > today) return [];
     const total = byId.get(entry.sessionId);
     return [{ id: entry.key, label: day.slice(-2), title: `${compactClassTitle(entry.title)} · ${formatDate(day)}`,
       percent: total ? attendancePercent(total) : null }];
@@ -113,7 +113,7 @@ async function ScheduleColumn({ range, requests, monitorsRequest, now, today }: 
                   <span className="home-entry-time">{timeRange({ ...entry, timeZone: ACADEMY_TIME_ZONE })}</span>
                   <span className="home-entry-copy">
                     <OneLineTitle text={entry.title} />
-                    <span className="home-entry-meta">{entryNote(entry)}{entry.state === "ended" && entry.sessionId && <>
+                    <span className="home-entry-meta">{entry.noAttendees ? "No attendees" : entryNote(entry)}{!entry.noAttendees && entry.state === "ended" && entry.sessionId && <>
                       {" · "}<strong className="class-attendance-percent">{percent == null ? "—" : `${percent}%`}</strong>
                     </>}</span>
                   </span>

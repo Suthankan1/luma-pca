@@ -11,7 +11,7 @@ export async function reportSessions(period: ReportPeriod, now: number) {
     const query = new URLSearchParams({ from: fromInstant, to: toInstant });
     const result = await staffApi<ClassSession[]>(`/api/v1/class-sessions?${query}`, undefined, 25000);
     if (!result.ok || !result.data) return null;
-    sessions.push(...result.data.filter(session => session.status === "SCHEDULED" && Date.parse(session.endsAt) <= now));
+    sessions.push(...result.data.filter(session => !session.noAttendees && session.status === "SCHEDULED" && Date.parse(session.endsAt) <= now));
   }
   return sessions.sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
 }

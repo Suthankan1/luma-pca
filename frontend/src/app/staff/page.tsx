@@ -137,7 +137,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
                       <OneLineTitle text={entry.title} />
                       {detail && <span className="home-entry-meta">{detail}</span>}
                     </span>
-                    <span className={`home-state home-state-${entry.state}`}>{entryStateLabels[entry.state]}</span>
+                    <span className={`home-state home-state-${entry.state}`}>{entry.noAttendees ? "No attendees" : entryStateLabels[entry.state]}</span>
                   </Link>
                 </li>;
               })}

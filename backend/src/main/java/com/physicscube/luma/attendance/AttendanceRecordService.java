@@ -247,7 +247,12 @@ public class AttendanceRecordService {
     }
 
     private List<RecordView> history(UUID academyId, UUID studentId) {
-        return jdbc.query(RECORD_SQL + " WHERE r.academy_id = ? AND r.student_id = ? ORDER BY s.starts_at DESC LIMIT 500",
+        return jdbc.query(RECORD_SQL + """
+                 WHERE r.academy_id = ? AND r.student_id = ?
+                   AND NOT EXISTS (SELECT 1 FROM zoom_classes_without_attendees z
+                                   WHERE z.academy_id = s.academy_id AND z.class_session_id = s.id)
+                 ORDER BY s.starts_at DESC LIMIT 500
+                """,
                 (row, i) -> record(row), academyId, studentId);
     }
 

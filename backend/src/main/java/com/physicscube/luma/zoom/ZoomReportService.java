@@ -185,12 +185,13 @@ public class ZoomReportService {
         transactions.executeWithoutResult(status -> {
             jdbc.update("DELETE FROM zoom_report_participants WHERE academy_id = ? AND occurrence_uuid = ?", academyId, occurrenceUuid);
             jdbc.update("""
-                    INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, next_attempt_at, last_error, fetched_at, join_sessions, webinar_id)
-                    VALUES (?, ?, 'FETCHED', 1, NULL, NULL, ?, ?, ?)
+                    INSERT INTO zoom_report_fetches (academy_id, occurrence_uuid, status, attempts, next_attempt_at, last_error, fetched_at,
+                      join_sessions, webinar_id, complete_rows)
+                    VALUES (?, ?, 'FETCHED', 1, NULL, NULL, ?, ?, ?, ?)
                     ON CONFLICT (academy_id, occurrence_uuid) DO UPDATE SET status = 'FETCHED', attempts = zoom_report_fetches.attempts + 1,
                       next_attempt_at = NULL, last_error = NULL, fetched_at = EXCLUDED.fetched_at, join_sessions = EXCLUDED.join_sessions,
-                      webinar_id = coalesce(EXCLUDED.webinar_id, zoom_report_fetches.webinar_id)
-                    """, academyId, occurrenceUuid, Timestamp.from(now), rows.size(), webinarForRow);
+                      webinar_id = coalesce(EXCLUDED.webinar_id, zoom_report_fetches.webinar_id), complete_rows = EXCLUDED.complete_rows
+                    """, academyId, occurrenceUuid, Timestamp.from(now), rows.size(), webinarForRow, rows.size() == report.size());
             jdbc.batchUpdate("""
                     INSERT INTO zoom_report_participants (id, academy_id, occurrence_uuid, email, display_name, registrant_id,
                       joined_at, left_at, duration_seconds, host, registrant_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

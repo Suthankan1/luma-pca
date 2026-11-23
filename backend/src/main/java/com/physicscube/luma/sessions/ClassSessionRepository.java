@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -41,12 +40,20 @@ interface ClassSessionRepository extends JpaRepository<ClassSession, UUID> {
     List<ClassSession> inWindowForBatches(@Param("academyId") UUID academyId, @Param("from") Instant from,
                                           @Param("to") Instant to, @Param("batchIds") Collection<UUID> batchIds);
 
-    @Query("""
-            select s from ClassSession s
-            where s.academyId = :academyId and s.endsAt <= :now and s.status <> 'CANCELLED'
-            order by s.endsAt desc, s.id desc
-            """)
-    List<ClassSession> recentCompleted(@Param("academyId") UUID academyId, @Param("now") Instant now, Limit limit);
+    @Query(value = """
+            SELECT s.* FROM class_sessions s
+            WHERE s.academy_id = :academyId AND s.ends_at <= :now AND s.status <> 'CANCELLED'
+              AND NOT EXISTS (SELECT 1 FROM zoom_classes_without_attendees z
+                              WHERE z.academy_id = s.academy_id AND z.class_session_id = s.id)
+            ORDER BY s.ends_at DESC, s.id DESC LIMIT :limit
+            """, nativeQuery = true)
+    List<ClassSession> recentCompleted(@Param("academyId") UUID academyId, @Param("now") Instant now, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT class_session_id FROM zoom_classes_without_attendees
+            WHERE academy_id = :academyId AND class_session_id IN (:ids)
+            """, nativeQuery = true)
+    List<UUID> withoutAttendees(@Param("academyId") UUID academyId, @Param("ids") Collection<UUID> ids);
 
     List<ClassSession> findByAcademyIdAndSeriesIdOrderByStartsAt(UUID academyId, UUID seriesId);
 }

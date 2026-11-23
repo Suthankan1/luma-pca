@@ -3021,3 +3021,10 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 
 - The shared sign-in page was rendering both forms when ID login was enabled. It now renders the academy account form and links to the dedicated student page. The shared email form still handles account activation, password resets and role-based routing. Only the dedicated student page checks ID login availability. Removed the unused two-form layout styles.
 - Production frontend build, session HTTP smoke, structure validation and 26 desktop/mobile browser checks passed. Restarted local frontend and verified the shared, staff and student pages each serve one form with PostgreSQL readiness UP. Browser sign-ins used fixtures. No database migration or production release. Revert and rebuild the frontend to roll back.
+
+## Exclude Zoom runs without attendees (2026-11-23)
+
+- Flyway V32 publishes a read-only Zoom view of classes whose linked reports are all fetched, complete and empty or host-only. New report fetches record when incomplete rows were discarded. Historical reports use the stored join count. Unmatched attendee rows keep a class eligible.
+- Staff history retains the run with No attendees. Attendance summaries, recent classes, class-type counts, student history, finalisation and CSV/PDF/Excel reports omit it. Historical attendance records and corrections stay in the database. Replacing the report with attendee evidence makes the class eligible again.
+- Passed 29 targeted backend integration tests against disposable PostgreSQL 18 using a temporary datasource adapter in a copy of the backend because Docker was unavailable. Also passed the expanded historical-exclusion regression and the queue fixture rerun. Frontend build, 81 unit tests, eight staff desktop/mobile checks, targeted lint, OpenAPI YAML parsing and structure validation passed.
+- Release the backend with V32 before the frontend. The configured database and production were not migrated. To roll back, redeploy the prior binaries and leave the additive migration in place.

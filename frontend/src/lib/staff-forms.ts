@@ -304,7 +304,7 @@ export function formatWebinarId(id: string | null) {
 export type ClassSession = { id: string; title: string; startsAt: string; endsAt: string; timeZone: string; localDate: string; status: string;
   zoomWebinarId: string | null; seriesId?: string | null; batches: { batchId: string; courseId: string; code: string; name: string }[]; version: number;
   /** LUMA (scheduled by staff before Zoom owned schedules) or ZOOM_RUN (an actual run of a monitored webinar). */
-  origin?: "LUMA" | "ZOOM_RUN" };
+  origin?: "LUMA" | "ZOOM_RUN"; noAttendees?: boolean };
 export type CourseRef = { id: string; code: string };
 type BatchRef = { id: string; courseId: string; code: string; name: string; active: boolean };
 
@@ -387,7 +387,7 @@ export function parsePolicyForm(form: FormData): { minConnectedPercent: number; 
   return { minConnectedPercent: percent, lateAfterMinutes: late, description };
 }
 export type OnlineObservation = { at: string; online: number };
-export type ProvisionalAttendance = { sessionId: string; status: "PROVISIONAL" | "RECONCILED"; classStartsAt: string; classEndsAt: string;
+export type ProvisionalAttendance = { sessionId: string; status: "PROVISIONAL" | "RECONCILED" | "NO_ATTENDEES"; classStartsAt: string; classEndsAt: string;
   finalisedAt?: string | null; linkedOccurrences: number; reportedOccurrences: number; webinarEnded: boolean; unmatchedPeople: number;
   calculatedAt: string; students: AttendanceRow[]; onlineHistory?: OnlineObservation[] };
 

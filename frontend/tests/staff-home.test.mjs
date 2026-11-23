@@ -22,6 +22,7 @@ test("month-to-date class types group title variants and show completed sessions
   const groups = monthlyClassTypes([
     session({ id: "older", title: `${title} | Former suffix`, startsAt: "2026-11-19T10:30:00Z", endsAt: "2026-11-19T12:00:00Z" }),
     session({ id: "newer", title: `${title} | New suffix` }),
+    session({ id: "host-only", title, noAttendees: true }),
     session({ id: "other", title: "Model Paper Class | 2028 Batch" }),
     session({ id: "ongoing", title, endsAt: "2026-11-20T14:00:00Z" }),
     session({ id: "cancelled", title, status: "CANCELLED" }),

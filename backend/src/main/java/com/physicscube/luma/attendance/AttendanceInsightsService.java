@@ -155,7 +155,7 @@ public class AttendanceInsightsService {
     public List<ClassTotals> classTotals(CurrentAccount caller, Range range) {
         Instant now = DbTime.now();
         List<SessionView> completed = sessions.list(caller, range.start(), range.end(), null).stream()
-                .filter(session -> !"CANCELLED".equals(session.status()) && !session.endsAt().isAfter(now))
+                .filter(session -> !session.noAttendees() && !"CANCELLED".equals(session.status()) && !session.endsAt().isAfter(now))
                 .toList();
         List<RosterRequest> requests = completed.stream().map(session -> new RosterRequest(session.id(), session.localDate(),
                 session.batches().stream().map(SessionView.Batch::batchId).collect(Collectors.toSet()))).toList();
@@ -191,7 +191,7 @@ public class AttendanceInsightsService {
         Instant now = DbTime.now();
         var directory = Parallel.start(() -> students.attendanceDirectory(caller));
         List<SessionView> completed = sessions.list(caller, range.start(), range.end(), null).stream()
-                .filter(session -> !"CANCELLED".equals(session.status()) && !session.endsAt().isAfter(now))
+                .filter(session -> !session.noAttendees() && !"CANCELLED".equals(session.status()) && !session.endsAt().isAfter(now))
                 .sorted(Comparator.comparing(SessionView::startsAt)).toList();
         List<RosterRequest> requests = completed.stream().map(session -> new RosterRequest(session.id(), session.localDate(),
                 session.batches().stream().map(SessionView.Batch::batchId).collect(Collectors.toSet()))).toList();
@@ -234,7 +234,7 @@ public class AttendanceInsightsService {
     public Dashboard dashboard(CurrentAccount caller, Range range, UUID courseId, UUID batchId) {
         Instant now = DbTime.now();
         List<SessionView> found = sessions.list(caller, range.start(), range.end(), batchId).stream()
-                .filter(s -> !"CANCELLED".equals(s.status()) && s.startsAt().isBefore(now))
+                .filter(s -> !s.noAttendees() && !"CANCELLED".equals(s.status()) && s.startsAt().isBefore(now))
                 .filter(s -> courseId == null || s.batches().stream().anyMatch(b -> courseId.equals(b.courseId())))
                 .sorted(Comparator.comparing(SessionView::startsAt))
                 .toList();
