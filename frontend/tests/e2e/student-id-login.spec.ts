@@ -16,12 +16,22 @@ test.describe("Student ID sign-in (Academy request)", () => {
   });
 
   test("An unknown registration ID is refused with a student-specific message", async ({ page }) => {
-    await page.goto("/sign-in");
+    await page.goto("/sign-in?portal=student");
     const students = page.getByRole("form", { name: "Students" });
     await students.getByLabel("Registration ID").fill("PCA002");
     await students.getByRole("button", { name: "View my attendance" }).click();
     await expect(page).toHaveURL(/\/sign-in\?error=student&portal=student$/);
     await expect(page.locator(".session-error")).toHaveText("We couldn’t find that registration ID. Check it and try again.");
+  });
+
+  test("The shared sign-in page links to the separate registration ID form", async ({ page }) => {
+    await page.goto("/sign-in");
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Registration ID")).toHaveCount(0);
+    await page.getByRole("link", { name: "Student registration ID sign-in" }).click();
+    await expect(page.getByLabel("Registration ID")).toBeVisible();
+    await expect(page.getByLabel("Email")).toHaveCount(0);
+    await expect(page.getByLabel("Password", { exact: true })).toHaveCount(0);
   });
 
   test("Tips rotate below the form while sign-in is pending and disappear in the portal", async ({ page }) => {

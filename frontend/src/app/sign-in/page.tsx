@@ -27,7 +27,7 @@ export default async function SignIn({ searchParams }: {
   if (destination && error !== "sign-out" && (destination === "/staff" || destination === "/student")) {
     redirect(destination);
   }
-  const studentIdAvailability = portal !== "staff" && !identity && !canRefresh && error !== "sign-out"
+  const studentIdAvailability = portal === "student" && !identity && !canRefresh && error !== "sign-out"
     ? await studentIdLoginAvailability()
     : "disabled";
   const message = error && Object.hasOwn(messages, error)
@@ -37,11 +37,10 @@ export default async function SignIn({ searchParams }: {
   const showStudentIdForm = studentIdAvailability === "enabled";
   const studentServiceUnavailable = portal === "student" && studentIdAvailability === "unavailable";
   const showEmailForm = portal !== "student" || studentIdAvailability === "disabled";
-  const showBothForms = showStudentIdForm && showEmailForm;
   const EmailForm = portal === "student" ? StudentSignInForm : "form";
 
   return <Shell>
-    <section className={`panel session-panel ${showBothForms && !identity && !canRefresh ? "session-panel-wide" : ""}`}>
+    <section className="panel session-panel">
       <p className="eyebrow">{portal === "staff" ? "STAFF PORTAL" : portal === "student" ? "STUDENT PORTAL" : "PHYSICS CUBE ACADEMY"}</p>
       <h1 className="heading">{portal === "staff" ? "Staff sign in" : portal === "student" ? "Student sign in" : "Sign in to LUMA"}</h1>
       {portal === "student" && showEmailForm && <p className="sub">Sign in with your academy account to view your attendance.</p>}
@@ -60,19 +59,14 @@ export default async function SignIn({ searchParams }: {
         </form>
       </> : studentServiceUnavailable ? <div className="session-form">
         <a className="action" href="/sign-in?portal=student">Try again</a>
-      </div> : <div className={showBothForms ? "signin-cards" : undefined}>
-      {showStudentIdForm && <StudentSignInForm method="post" action="/api/session/student-login" className="session-form"
+      </div> : showStudentIdForm ? <StudentSignInForm method="post" action="/api/session/student-login" className="session-form"
         aria-label="Students">
-        {showBothForms && <h2 className="eyebrow">Students</h2>}
         <input type="hidden" name="portal" value="student" />
         <label htmlFor="student-id">Registration ID</label>
         <input id="student-id" name="studentId" type="text" autoComplete="username" autoCapitalize="characters" spellCheck={false}
           inputMode="text" placeholder="PCA12345" maxLength={60} required autoFocus={portal === "student"} />
         <button className="action" type="submit">View my attendance</button>
-      </StudentSignInForm>}
-      {showEmailForm && <EmailForm method="post" action="/api/session/login" className="session-form"
-        aria-labelledby={showBothForms ? "account-sign-in" : undefined}>
-        {showBothForms && <h2 id="account-sign-in" className="eyebrow">Academy account</h2>}
+      </StudentSignInForm> : <EmailForm method="post" action="/api/session/login" className="session-form">
         {(portal === "staff" || portal === "student") && <input type="hidden" name="portal" value={portal} />}
         <label htmlFor="email">Email</label>
         <input id="email" name="email" type="email" autoComplete="username" maxLength={254} required />
@@ -80,8 +74,8 @@ export default async function SignIn({ searchParams }: {
         <input id="password" name="password" type="password" autoComplete="current-password" maxLength={256} required />
         <button className="action" type="submit">Sign in</button>
         <p className="sub"><Link href="/forgot-password">Forgot your password?</Link></p>
+        {!portal && <p className="sub"><Link href="/sign-in?portal=student">Student registration ID sign-in</Link></p>}
       </EmailForm>}
-      </div>}
     </section>
   </Shell>;
 }

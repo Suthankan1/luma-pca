@@ -10,7 +10,8 @@ version asked for the ID twice, as username and password, which added no securit
 
 With the flag enabled, the landing page’s Student sign-in link opens a form with one **Registration ID** field, and a
 successful sign-in lands on the student’s attendance report (`/student`). The shared `/sign-in` page also provides the
-academy account form for staff and existing email accounts. Staff sign-in is unchanged (email and password).
+academy account form for staff and existing email accounts, with a link to the separate student registration-ID
+form. Staff sign-in is unchanged (email and password).
 
 The student never sees it, but a normal LUMA session is still opened behind the ID: it is what keeps each student to
 their own records, keeps every staff route closed to them, and lets them sign out.

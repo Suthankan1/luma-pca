@@ -309,10 +309,6 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .entry-icon { display:inline-grid; place-items:center; width:42px; height:42px; border-radius:12px; background:#e6f3fc; color:var(--pca-blue) !important; font-size:18px; }
 .entry-go { color:var(--pca-blue) !important; font-weight:700; margin-top:auto; }
 @media (prefers-reduced-motion: reduce) { .entry-card { transition:none; } .entry-card:hover { transform:none; } }
-.signin-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px; align-items:start; max-width:880px; }
-.signin-cards .session-form { background:#fff; border:1px solid #d7e5f2; border-radius:20px; padding:22px; margin:0; }
-.signin-cards h2 { font-size:13px; }
-.session-panel-wide { max-width: 920px; }
 @media (max-width: 580px) {
   .kpis { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
   .kpi { padding:12px 14px; }
@@ -411,7 +407,7 @@ footer { padding-top:35px; font-size:12px; color:var(--pca-muted); }
 .dir-row > .text-link, .dir-row > span > .text-link, .dir-row > div > .text-link, .dir-meta .text-link, .link-row .text-link,
 .task-row .text-link, .pager .text-link, .nav-links .text-link { display:inline-block; padding:4px 0; min-height:28px; }
 .decision summary { display:inline-flex; align-items:center; }
-.live-cards, .signin-cards { grid-template-columns:repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
+.live-cards { grid-template-columns:repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
 .entry-cards { grid-template-columns:repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
 .live-facts { grid-template-columns:repeat(auto-fit, minmax(min(110px, 100%), 1fr)); }
 
@@ -473,7 +469,6 @@ body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; background:#eff3f7
 .public-footer { max-width:1440px; margin:34px auto 0; padding:20px 0 24px; display:flex; justify-content:space-between; gap:15px; color:#7a8999; font-size:10px; letter-spacing:.3px; }
 .public-auth { display:flex; align-items:center; justify-content:center; min-height:calc(100svh - 210px); padding:48px 0; }
 .public-auth .session-panel { width:100%; max-width:480px; padding:38px; background:#ffffffa8; backdrop-filter:blur(22px); border:1px solid #fff; box-shadow:0 24px 70px #254b6910,inset 0 1px #fff; animation:material-enter .65s ease both; }
-.public-auth .session-panel-wide { max-width:920px; }
 .public-auth .heading { font-size:34px; font-weight:600; letter-spacing:-1.3px; }
 .public-auth .eyebrow { font-size:9px; letter-spacing:2px; color:#35768a; }
 .public-auth .sub { font-size:13px; }

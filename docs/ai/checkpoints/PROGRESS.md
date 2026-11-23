@@ -3016,3 +3016,8 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - The student page shows a retry action during a sign-in availability outage. An explicitly disabled API still offers the normal email form. The ID-only view uses one Registration ID field and one submit action. Interactive requests have a timeout and accept only student-portal or sign-in destinations.
 - Rebuilt and restarted the local frontend. The production build, session smoke test, structure validation and 12 desktop/mobile checks passed across the initial run and a focused rerun after narrowing the test alert locator. Local PostgreSQL readiness was UP and both local forms were checked. Successful sign-in used fixture accounts.
 - Added operator steps to the deployment runbook. Revert and rebuild the frontend to roll back. No database migration or production change.
+
+## Separate shared and student sign-in forms (2026-11-23)
+
+- The shared sign-in page was rendering both forms when ID login was enabled. It now renders the academy account form and links to the dedicated student page. The shared email form still handles account activation, password resets and role-based routing. Only the dedicated student page checks ID login availability. Removed the unused two-form layout styles.
+- Production frontend build, session HTTP smoke, structure validation and 26 desktop/mobile browser checks passed. Restarted local frontend and verified the shared, staff and student pages each serve one form with PostgreSQL readiness UP. Browser sign-ins used fixtures. No database migration or production release. Revert and rebuild the frontend to roll back.
