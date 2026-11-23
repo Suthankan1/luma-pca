@@ -145,4 +145,4 @@ luma-pca/
 
 ## Licensing
 
-Private repository; no software license has been selected. See `LICENSE_DECISION_REQUIRED.md` before publishing reusable source code or onboarding external contributors.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

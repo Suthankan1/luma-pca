@@ -3045,4 +3045,11 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Added `rejoinWithSameVisitKeyCountsAsNewVisitAndKeepsOpenStatus` test in `ZoomParticipantIntegrationTest`. Passed all 41 Zoom and provisional attendance tests (`ZoomParticipantIntegrationTest`, `OnlineHistoryTest`, `ProvisionalAttendanceIntegrationTest`, `WebinarMonitorIntegrationTest`, `ZoomReceiptProcessingIntegrationTest`, `ZoomReportIntegrationTest`).
 - No database migration or frontend changes required. Roll back by reverting `ZoomParticipantService.java`.
 
+## Add MIT License and prepare initial release v0.1.0 (2026-11-24)
+
+- Added MIT License for Physics Cube Academy and contributors.
+- Removed `LICENSE_DECISION_REQUIRED.md` and updated `README.md` licensing section.
+- Packaged backend and frontend artifacts for initial GitHub release `v0.1.0`.
+
+
 
