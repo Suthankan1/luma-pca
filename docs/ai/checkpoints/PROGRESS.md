@@ -3028,3 +3028,11 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Staff history retains the run with No attendees. Attendance summaries, recent classes, class-type counts, student history, finalisation and CSV/PDF/Excel reports omit it. Historical attendance records and corrections stay in the database. Replacing the report with attendee evidence makes the class eligible again.
 - Passed 29 targeted backend integration tests against disposable PostgreSQL 18 using a temporary datasource adapter in a copy of the backend because Docker was unavailable. Also passed the expanded historical-exclusion regression and the queue fixture rerun. Frontend build, 81 unit tests, eight staff desktop/mobile checks, targeted lint, OpenAPI YAML parsing and structure validation passed.
 - Release the backend with V32 before the frontend. The configured database and production were not migrated. To roll back, redeploy the prior binaries and leave the additive migration in place.
+
+## Production student ID sign-in rollout (2026-11-24)
+
+- Configured production backend on Oracle Cloud VM (`/opt/luma/.env`) with `LUMA_STUDENT_ID_LOGIN_ENABLED=true` and `LUMA_STUDENT_ID_LOGIN_ACADEMY_ID=ee64f416-7ef9-49b8-a62c-4a2ff3c3a256`.
+- Synchronized local `.env` with the same student ID sign-in settings.
+- Restarted `luma-backend` service on Oracle VM; verified `GET /api/v1/auth/student-id-login` returns `{"enabled":true}` and actuator health is UP.
+- Verified on live Vercel frontend [https://luma-pca.vercel.app/sign-in?portal=student](https://luma-pca.vercel.app/sign-in?portal=student) that the student sign-in form presents only the Registration ID field with submit action `View my attendance`. The staff sign-in page at `/sign-in?portal=staff` remains unchanged with email and password fields.
+
