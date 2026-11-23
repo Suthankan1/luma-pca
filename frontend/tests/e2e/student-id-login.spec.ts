@@ -72,4 +72,19 @@ test.describe("Student ID sign-in (Academy request)", () => {
     await page.reload();
     await expect(page.getByLabel("Registration ID")).toBeVisible();
   });
+
+  test("Students can retry after the sign-in service recovers", async ({ page, request }) => {
+    const toggle = mockApiBase() + "/__test__/student-id-login";
+    try {
+      expect((await request.put(toggle, { data: { enabled: true, unavailable: true } })).status()).toBe(204);
+      await page.goto("/sign-in?portal=student");
+      await expect(page.getByRole("alert").filter({ hasText: "sign-in service" })).toBeVisible();
+      await expect(page.getByLabel("Registration ID")).toHaveCount(0);
+      await expect(page.getByLabel("Email")).toHaveCount(0);
+    } finally {
+      expect((await request.put(toggle, { data: { enabled: true } })).status()).toBe(204);
+    }
+    await page.getByRole("link", { name: "Try again" }).click();
+    await expect(page.getByLabel("Registration ID")).toBeVisible();
+  });
 });

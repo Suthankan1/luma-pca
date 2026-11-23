@@ -45,6 +45,18 @@ Then `aws ecs update-service --force-new-deployment` for `api` and `web`, wait f
    stored), `LUMA_ZOOM_REPORTS_ENABLED=false`, `LUMA_MAIL_BULK_ENABLED=false`, engagement off in the Attendance page, and
    removing the Zoom webhook secret (the endpoint then answers 404 and Zoom retries later).
 
+## Student registration-ID sign-in
+
+After the Academy records its approval, set `LUMA_STUDENT_ID_LOGIN_ENABLED=true` and
+`LUMA_STUDENT_ID_LOGIN_ACADEMY_ID` in the backend service environment. See
+[Student ID sign-in](../../security/STUDENT-ID-LOGIN.md) for the academy fallback, rate limits and privacy implications.
+Restart the backend service and check that `GET /api/v1/auth/student-id-login` returns `{"enabled":true}`.
+
+With the frontend release running, open `/sign-in?portal=student` in a fresh browser session. Verify that the only
+field is Registration ID, an authorized test student's ID opens their attendance, and a separate staff session
+still signs in through `/sign-in?portal=staff`. Set the backend flag to `false` and restart the service to stop
+new ID sign-ins. Existing sessions follow the normal expiry and revocation rules.
+
 ## Email through Gmail (Oracle VM)
 
 The backend sends every email (invitations, password resets, attendance notices), so the settings go in the backend's

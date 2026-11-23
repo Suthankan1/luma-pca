@@ -23,6 +23,7 @@ let blockedClassTypeRead;
 let releaseClassTypeRead;
 let heldClassTypePath;
 let studentIdLoginEnabled = true;
+let studentIdLoginUnavailable = false;
 
 const backend = createServer(async (req, res) => {
   let encoded = "";
@@ -41,6 +42,7 @@ const backend = createServer(async (req, res) => {
 
   if (req.method === "PUT" && req.url === "/__test__/student-id-login") {
     studentIdLoginEnabled = body.enabled === true;
+    studentIdLoginUnavailable = body.unavailable === true;
     return send(204);
   }
   const mockOnline = req.url.match(/^\/__test__\/zoom-online\/([^/]+)$/);
@@ -123,6 +125,7 @@ const backend = createServer(async (req, res) => {
       break;
 
     case "/api/v1/auth/student-id-login": {
+      if (studentIdLoginUnavailable) return send(503);
       if (req.method === "GET") return send(200, { enabled: studentIdLoginEnabled });
       if (!studentIdLoginEnabled) return send(404);
       // As the API: the Academy registration ID alone, letter case ignored.

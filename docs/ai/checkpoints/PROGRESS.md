@@ -3010,3 +3010,9 @@ Verified the Next.js production build and the Staff Home Playwright spec on desk
 - Local API reported enabled and the public production API reported disabled. Rebuilt and restarted the local frontend. Verified the student page has only the registration-ID field, the staff page has its password form, readiness reported UP and an unknown ID was rejected by the database-backed stack. Successful sign-in through attendance was exercised with fixture accounts only.
 - Production build, session HTTP smoke test, 81 unit tests, 16 desktop/mobile tests and structure validation passed. Browser coverage includes switching API availability while the web app runs.
 - No migration. Production needs the frontend release and the Academy's documented approval and backend settings for ID-only access. To stop new ID sign-ins, disable the backend flag. To roll back the frontend, revert and rebuild. Production was left as observed.
+
+## Student sign-in recovery (2026-11-23)
+
+- The student page shows a retry action during a sign-in availability outage. An explicitly disabled API still offers the normal email form. The ID-only view uses one Registration ID field and one submit action. Interactive requests have a timeout and accept only student-portal or sign-in destinations.
+- Rebuilt and restarted the local frontend. The production build, session smoke test, structure validation and 12 desktop/mobile checks passed across the initial run and a focused rerun after narrowing the test alert locator. Local PostgreSQL readiness was UP and both local forms were checked. Successful sign-in used fixture accounts.
+- Added operator steps to the deployment runbook. Revert and rebuild the frontend to roll back. No database migration or production change.

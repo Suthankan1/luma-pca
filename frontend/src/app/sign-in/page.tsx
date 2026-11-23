@@ -35,7 +35,8 @@ export default async function SignIn({ searchParams }: {
     : unavailable || (portal === "student" && studentIdAvailability === "unavailable")
       ? messages.unavailable : undefined;
   const showStudentIdForm = studentIdAvailability === "enabled";
-  const showEmailForm = !showStudentIdForm || portal !== "student";
+  const studentServiceUnavailable = portal === "student" && studentIdAvailability === "unavailable";
+  const showEmailForm = portal !== "student" || studentIdAvailability === "disabled";
   const showBothForms = showStudentIdForm && showEmailForm;
   const EmailForm = portal === "student" ? StudentSignInForm : "form";
 
@@ -43,7 +44,7 @@ export default async function SignIn({ searchParams }: {
     <section className={`panel session-panel ${showBothForms && !identity && !canRefresh ? "session-panel-wide" : ""}`}>
       <p className="eyebrow">{portal === "staff" ? "STAFF PORTAL" : portal === "student" ? "STUDENT PORTAL" : "PHYSICS CUBE ACADEMY"}</p>
       <h1 className="heading">{portal === "staff" ? "Staff sign in" : portal === "student" ? "Student sign in" : "Sign in to LUMA"}</h1>
-      {portal === "student" && !showStudentIdForm && <p className="sub">Sign in with your academy account to view your attendance.</p>}
+      {portal === "student" && showEmailForm && <p className="sub">Sign in with your academy account to view your attendance.</p>}
       {message && <p className="session-error" role="alert">{message}</p>}
       {wrongPortal && <p className="sub">You’re signed in to another portal. Sign out to switch accounts.</p>}
       {activated === "1" && <p className="sub" role="status">Your account is active. Sign in with your new password.</p>}
@@ -57,10 +58,12 @@ export default async function SignIn({ searchParams }: {
         <form method="post" action="/api/session/logout" className="session-form">
           <button className="action secondary" type="submit">Sign out</button>
         </form>
-      </> : <div className={showBothForms ? "signin-cards" : undefined}>
+      </> : studentServiceUnavailable ? <div className="session-form">
+        <a className="action" href="/sign-in?portal=student">Try again</a>
+      </div> : <div className={showBothForms ? "signin-cards" : undefined}>
       {showStudentIdForm && <StudentSignInForm method="post" action="/api/session/student-login" className="session-form"
-        aria-labelledby="student-sign-in">
-        <h2 id="student-sign-in" className="eyebrow">Students</h2>
+        aria-label="Students">
+        {showBothForms && <h2 className="eyebrow">Students</h2>}
         <input type="hidden" name="portal" value="student" />
         <label htmlFor="student-id">Registration ID</label>
         <input id="student-id" name="studentId" type="text" autoComplete="username" autoCapitalize="characters" spellCheck={false}
