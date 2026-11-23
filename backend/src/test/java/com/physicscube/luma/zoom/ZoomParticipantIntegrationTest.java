@@ -33,6 +33,8 @@ class ZoomParticipantIntegrationTest extends StaffApiIntegrationTest {
     ZoomReceiptProcessor processor;
     @Autowired
     ZoomWebhookReceipts receipts;
+    @Autowired
+    ZoomParticipantService zoom;
 
     UUID academyId;
     String admin;
@@ -257,5 +259,30 @@ class ZoomParticipantIntegrationTest extends StaffApiIntegrationTest {
         assertEquals("STUDENT", guest.get("match"), "the guest's own email matches nobody; its registration email is student 2's");
         assertEquals("REGISTRATION_EMAIL", guest.get("matchSource"));
         assertEquals("S-002", guest.get("studentNumber"));
+    }
+
+    @Test
+    void rejoinWithSameVisitKeyCountsAsNewVisitAndKeepsOpenStatus() {
+        webinar("webinar.started", "2027-03-01T08:31:00Z");
+        participant("webinar.participant_joined", "2027-03-01T08:32:00Z", "", "visit-same", "first.student@example.test", "First");
+        participant("webinar.participant_left", "2027-03-01T08:40:00Z", "", "visit-same", "first.student@example.test", "First");
+        // Rejoin with the exact same visit key (e.g. participant_uuid or user_id reused across network drops)
+        participant("webinar.participant_joined", "2027-03-01T08:42:00Z", "", "visit-same", "first.student@example.test", "First Rejoin");
+        processor.runOnce();
+
+        List<Map<String, Object>> people = people();
+        Map<String, Object> first = byEmail(people, "first.student@example.test");
+        assertEquals(2, first.get("visits"), "rejoin with same visit key must count as a separate visit");
+        assertEquals(1, first.get("openVisits"), "the rejoin is open/live");
+
+        var activity = zoom.activityForClass(academyId, UUID.fromString(session));
+        List<ZoomParticipantService.StudentVisit> studentVisits = activity.visits().stream()
+                .filter(v -> v.studentId().equals(UUID.fromString(enrolled)))
+                .toList();
+        assertEquals(2, studentVisits.size(), "both visit intervals should be present in class activity");
+        assertEquals(Instant.parse("2027-03-01T08:32:00Z"), studentVisits.get(0).joinedAt());
+        assertEquals(Instant.parse("2027-03-01T08:40:00Z"), studentVisits.get(0).leftAt());
+        assertEquals(Instant.parse("2027-03-01T08:42:00Z"), studentVisits.get(1).joinedAt());
+        assertNull(studentVisits.get(1).leftAt(), "active rejoin has leftAt = null");
     }
 }

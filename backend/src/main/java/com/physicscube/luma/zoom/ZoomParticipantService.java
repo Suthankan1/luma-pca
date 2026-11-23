@@ -108,6 +108,7 @@ public class ZoomParticipantService {
 
         Map<String, Person> people = new LinkedHashMap<>();
         Map<String, String> registrantByEmail = new HashMap<>();
+        Map<String, String> activeVisitKey = new HashMap<>();
         for (Map<String, Object> row : rows) {
             String visit = (String) row.get("visit_key");
             if (visit == null) {
@@ -125,9 +126,31 @@ public class ZoomParticipantService {
                     ? new Person(email, new LinkedHashMap<>(), name, at, at, Boolean.TRUE.equals(row.get("host")))
                     : new Person(email, before.visits(), name != null ? name : before.name(), before.first(), at,
                             before.host() || Boolean.TRUE.equals(row.get("host")));
-            // [joins, leaves] per visit; events are read in Zoom's time order.
-            int[] counts = person.visits().computeIfAbsent(visit, v -> new int[2]);
-            counts["webinar.participant_left".equals(row.get("event_type")) ? 1 : 0]++;
+            // [joins, leaves] per visit interval; a rejoin with the same visit key is a separate visit.
+            boolean isLeft = "webinar.participant_left".equals(row.get("event_type"));
+            String sessionLookupKey = key + ":" + visit;
+            String currentSession = activeVisitKey.get(sessionLookupKey);
+            if (isLeft) {
+                if (currentSession == null || !person.visits().containsKey(currentSession)) {
+                    currentSession = visit + "#" + person.visits().size();
+                    activeVisitKey.put(sessionLookupKey, currentSession);
+                }
+                int[] counts = person.visits().computeIfAbsent(currentSession, v -> new int[2]);
+                counts[1]++;
+            } else {
+                if (currentSession != null) {
+                    int[] counts = person.visits().get(currentSession);
+                    if (counts != null && counts[1] >= counts[0]) {
+                        currentSession = visit + "#" + person.visits().size();
+                        activeVisitKey.put(sessionLookupKey, currentSession);
+                    }
+                } else {
+                    currentSession = visit;
+                    activeVisitKey.put(sessionLookupKey, currentSession);
+                }
+                int[] counts = person.visits().computeIfAbsent(currentSession, v -> new int[2]);
+                counts[0]++;
+            }
             people.put(key, person);
         }
 
@@ -142,7 +165,7 @@ public class ZoomParticipantService {
 
         List<ParticipantView> views = new ArrayList<>();
         for (Person person : people.values()) {
-            int open = (int) person.visits().values().stream().filter(c -> c[0] > 0 && c[1] == 0).count();
+            int open = (int) person.visits().values().stream().filter(c -> c[0] > c[1]).count();
             Resolved match = person.host() ? new Resolved(Match.HOST, null, null)
                     : person.email() == null ? new Resolved(Match.UNMATCHED, null, null)
                     : resolved.getOrDefault(person.email(), new Resolved(Match.UNMATCHED, null, null));
@@ -369,6 +392,7 @@ public class ZoomParticipantService {
         if (!byOccurrence.isEmpty()) {
             String[] occArray = byOccurrence.keySet().toArray(String[]::new);
             Map<String, Instant> firstEvents = new HashMap<>();
+            Map<String, Visit> latestByVisitKey = new HashMap<>();
             jdbc.query("""
                     SELECT occurrence_uuid, event_type, event_ts, visit_key, participant_email, host, registrant_id
                     FROM zoom_occurrence_events
@@ -395,14 +419,33 @@ public class ZoomParticipantService {
                     evidence.hosts.add(email);
                     return;
                 }
-                Visit visit = visits.computeIfAbsent(visitKey, k -> new Visit(email));
-                if (visit.registrantId == null) {
-                    visit.registrantId = row.getString("registrant_id");
-                }
+                String latestKey = occurrence + ":" + visitKey;
+                Visit latest = latestByVisitKey.get(latestKey);
+                String registrantId = row.getString("registrant_id");
                 if ("webinar.participant_left".equals(type)) {
-                    visit.left = visit.left == null || at.isAfter(visit.left) ? at : visit.left;
-                } else if (visit.joined == null) {
+                    if (latest != null) {
+                        latest.left = latest.left == null || at.isAfter(latest.left) ? at : latest.left;
+                    } else {
+                        Visit visit = new Visit(email);
+                        visit.left = at;
+                        visit.registrantId = registrantId;
+                        latestByVisitKey.put(latestKey, visit);
+                        visits.put(visitKey + "#" + visits.size(), visit);
+                    }
+                } else if (latest == null || latest.left != null) {
+                    // A new visit interval: initial join or a rejoin after having left.
+                    Visit visit = new Visit(email);
                     visit.joined = at;
+                    visit.registrantId = registrantId;
+                    latestByVisitKey.put(latestKey, visit);
+                    visits.put(visitKey + "#" + visits.size(), visit);
+                } else {
+                    if (latest.joined == null || at.isBefore(latest.joined)) {
+                        latest.joined = at;
+                    }
+                    if (latest.registrantId == null) {
+                        latest.registrantId = registrantId;
+                    }
                 }
             }, academyId, occArray);
             firstEvents.forEach((occ, at) -> byOccurrence.get(occ).started.putIfAbsent(occ, at));
